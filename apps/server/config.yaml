@@ -1,0 +1,36 @@
+# iii engine configuration
+# Docs: https://iii.dev/docs/how-to/configure-engine
+workers:
+  - name: iii-http
+    config:
+      port: 3111
+      host: 0.0.0.0
+      default_timeout: 60000
+      concurrency_request_limit: 1024
+      cors:
+        allowed_origins:
+          - "*"
+        allowed_methods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+
+  - name: iii-observability
+    config:
+      enabled: true
+      service_name: iii
+      exporter: memory
+      memory_max_spans: 10000
+      metrics_enabled: true
+      metrics_exporter: memory
+      logs_enabled: true
+      logs_exporter: memory
+      logs_console_output: true
+      sampling_ratio: 1.0
+
+  - name: queue
+    config:
+      adapter:
+        name: builtin

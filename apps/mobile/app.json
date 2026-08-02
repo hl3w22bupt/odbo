@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "心伴AI",
+    "slug": "xinban-ai",
+    "scheme": "xinban",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2A1B3D"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.xinban.ai",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
+    },
+    "android": {
+      "package": "com.xinban.ai",
+      "adaptiveIcon": {
+        "backgroundColor": "#FBF6F1",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

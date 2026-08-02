@@ -1,0 +1,364 @@
+// 心伴AI · 数据模型
+// Prisma 7 · SQLite (dev) / PostgreSQL (prod) 兼容
+// 枚举以 String 存储以保证 SQLite 兼容
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============ 用户体系 ============
+
+/// 用户 / 管理员
+model User {
+  id           String   @id @default(cuid())
+  phone        String   @unique
+  nickname     String?
+  avatarUrl    String?
+  role         String   @default("USER") // USER | ADMIN
+  status       String   @default("ACTIVE") // ACTIVE | BANNED | DISABLED
+  gender       String? // MALE | FEMALE
+  age          Int?
+  lastActiveAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  conversations        Conversation[]
+  messages             Message[]
+  memberships          Membership[]
+  orders               Order[]
+  quotas               Quota[]
+  auditLogs            AuditLog[]
+  affections           Affection[]
+  sessions             DeviceSession[]
+  customizations       CharacterCustomization[]
+  giftTransactions     GiftTransaction[]
+  contentAuditLogs     ContentAuditLog[]
+
+  @@index([phone])
+}
+
+/// 刷新令牌会话（设备登录态）
+model DeviceSession {
+  id           String    @id @default(cuid())
+  userId       String
+  refreshToken String    @unique
+  expiresAt    DateTime
+  ip           String?
+  userAgent    String?
+  revoked      Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshToken])
+}
+
+/// 短信验证码
+model SmsCode {
+  id        String    @id @default(cuid())
+  phone     String
+  code      String
+  purpose   String    @default("LOGIN") // LOGIN | BIND
+  expiresAt DateTime
+  used      Boolean   @default(false)
+  attempts  Int       @default(0)
+  ip        String?
+  createdAt DateTime  @default(now())
+
+  @@index([phone, purpose])
+  @@index([createdAt])
+}
+
+// ============ 角色（人设） ============
+
+/// 伴友角色
+model Character {
+  id            String   @id @default(cuid())
+  name          String // 林晚晴
+  title         String // 温婉知己
+  type          String // INCLUSIVE | POSSESSIVE
+  tier          String   @default("FREE") // FREE | VIP
+  isMemberOnly  Boolean  @default(false)
+  dialect       String   @default("MANDARIN") // MANDARIN | SICHUAN | CANTONESE
+  occupation    String
+  personality   String // 性格提示词模板
+  greeting      String
+  avatarUrl     String?
+  voice         String?
+  tags          String   @default("")
+  config        String   @default("{}") // 附加配置 JSON 字符串
+  status        String   @default("ACTIVE")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  conversations   Conversation[]
+  messages        Message[]
+  affections      Affection[]
+  customizations  CharacterCustomization[]
+  giftTransactions GiftTransaction[]
+
+  @@index([tier])
+  @@index([type])
+}
+
+/// 形象与命名定制
+model CharacterCustomization {
+  id          String   @id @default(cuid())
+  userId      String
+  characterId String
+  customName  String?
+  hairstyle   String?
+  outfit      String?
+  voice       String?
+  avatarUrl   String?
+  config      String   @default("{}")
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, characterId])
+}
+
+// ============ 会话与消息 ============
+
+/// 会话（单角色 / 多角色同台）
+model Conversation {
+  id             String    @id @default(cuid())
+  userId         String
+  characterId    String? // 单角色模式必填；多角色模式为空
+  mode           String    @default("SINGLE") // SINGLE | MULTI
+  title          String?
+  status         String    @default("ACTIVE") // ACTIVE | ARCHIVED
+  lastMessageAt  DateTime? @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  messages  Message[]
+
+  @@index([userId, updatedAt])
+  @@index([characterId])
+}
+
+/// 消息
+model Message {
+  id             String    @id @default(cuid())
+  conversationId String
+  userId         String
+  characterId    String?
+  role           String // USER | ASSISTANT | SYSTEM
+  content        String
+  status         String    @default("COMPLETED") // COMPLETED | PENDING | TYPING | FAILED | FILTERED
+  type           String    @default("TEXT") // TEXT | GIFT | IMAGE | SYSTEM | PROACTIVE
+  metadata       String    @default("{}") // JSON：好感度/动画/回语等
+  createdAt      DateTime  @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character    Character?   @relation(fields: [characterId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@index([userId, createdAt])
+  @@index([characterId, createdAt])
+}
+
+// ============ 商业化 ============
+
+/// 会员订阅
+model Membership {
+  id        String    @id @default(cuid())
+  userId    String
+  plan      String // MONTHLY | QUARTERLY | YEARLY
+  status    String    @default("ACTIVE") // ACTIVE | EXPIRED | CANCELLED
+  startedAt DateTime
+  expiresAt DateTime
+  orderId   String?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// 商品（会员卡 / 单点内购）
+model Product {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  type          String // MEMBERSHIP | STORY | VOICE_PACK | GIFT
+  name          String
+  description   String?
+  price         Int // 分
+  originalPrice Int?
+  durationDays  Int? // 会员卡天数
+  benefits      String   @default("{}") // JSON 权益明细
+  memberOnly    Boolean  @default(false)
+  status        String   @default("ACTIVE")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  orders Order[]
+
+  @@index([type])
+}
+
+/// 订单
+model Order {
+  id          String    @id @default(cuid())
+  orderNo     String    @unique
+  userId      String
+  productId   String?
+  type        String // MEMBERSHIP | STORY | VOICE_PACK | GIFT
+  productCode String
+  title       String
+  amount      Int // 分
+  currency    String    @default("CNY")
+  status      String    @default("PENDING") // PENDING | PENDING_CONFIRM | PAID | CLOSED | REFUNDED | FAILED
+  channel     String? // WECHAT | ALIPAY | MOCK
+  payOrderNo  String?
+  paidAt      DateTime?
+  confirmed   Boolean   @default(false)
+  confirmAt   DateTime?
+  metadata    String    @default("{}")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([orderNo])
+  @@index([status])
+}
+
+// ============ 礼物系统 ============
+
+/// 礼物
+model Gift {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Int // 分
+  icon        String?
+  imageUrl    String?
+  isLimited   Boolean  @default(false)
+  memberOnly  Boolean  @default(false)
+  stock       Int?
+  effect      String   @default("{}") // 好感度增减
+  replies     String   @default("{}") // 各人设回语 {"<characterId>":"..."}
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  transactions GiftTransaction[]
+
+  @@index([isLimited])
+}
+
+/// 送礼记录
+model GiftTransaction {
+  id             String    @id @default(cuid())
+  userId         String
+  giftId         String
+  characterId    String
+  amount         Int
+  reply          String?
+  affectionDelta Int
+  animation      String    @default("{}")
+  createdAt      DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gift      Gift      @relation(fields: [giftId], references: [id], onDelete: Cascade)
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([characterId])
+}
+
+/// 好感度
+model Affection {
+  id          String    @id @default(cuid())
+  userId      String
+  characterId String
+  value       Int       @default(0)
+  level       Int       @default(1)
+  updatedAt   DateTime  @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, characterId])
+}
+
+// ============ 配额 ============
+
+/// 每日消息配额（免费 120 条/日）
+model Quota {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String // YYYY-MM-DD
+  used      Int      @default(0)
+  limit     Int      @default(120)
+  resetAt   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
+
+// ============ 审计与合规 ============
+
+/// 审计日志（登录/支付/管理操作）
+model AuditLog {
+  id        String    @id @default(cuid())
+  userId    String?
+  actor     String? // 操作人标识
+  action    String // LOGIN | LOGOUT | PAY | PAY_CALLBACK | ADMIN_* | GIFT | CUSTOMIZE
+  detail    String    @default("{}")
+  ip        String?
+  createdAt DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action, createdAt])
+  @@index([createdAt])
+}
+
+/// 敏感词库（自建）
+model SensitiveWord {
+  id        String   @id @default(cuid())
+  word      String   @unique
+  level     String   @default("BLOCK") // BLOCK | FLAG
+  category  String?
+  createdAt DateTime @default(now())
+}
+
+/// 内容审核日志
+model ContentAuditLog {
+  id          String    @id @default(cuid())
+  userId      String?
+  direction   String // IN | OUT
+  content     String
+  result      String // PASS | BLOCK | REPLACED
+  matchedWord String?
+  messageId   String?
+  createdAt   DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([createdAt])
+}

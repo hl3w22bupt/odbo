@@ -16,8 +16,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
 dotenv.config({ path: path.join(root, '.env') })
 
-const III_URL = process.env.III_URL ?? 'ws://localhost:49134'
-const HTTP_PORT = process.env.HTTP_PORT ?? '3111'
+const III_URL = process.env.III_URL ?? 'ws://localhost:49144'
+const HTTP_PORT = process.env.HTTP_PORT ?? '3888'
 const match = III_URL.match(/:(\d+)/)
 const WS_PORT = match ? Number(match[1]) : 49134
 
@@ -86,7 +86,7 @@ async function main() {
   const worker = spawn('npx', ['tsx', 'watch', 'src/index.ts'], {
     cwd: root,
     stdio: ['inherit', 'pipe', 'pipe'],
-    env: { ...process.env },
+    env: { ...process.env, III_URL },
   })
   children.push(worker)
   worker.stdout.on('data', (d) => process.stdout.write(`\x1b[2m[worker]\x1b[0m ${d}`))

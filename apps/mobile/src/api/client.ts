@@ -6,7 +6,7 @@
  * - 网络失败抛出 ApiError(NETWORK_ERROR)
  */
 
-export const DEFAULT_BASE_URL = 'http://localhost:3111';
+export const DEFAULT_BASE_URL = 'http://localhost:3888';
 
 export function resolveBaseUrl(): string {
   const url = process.env.EXPO_PUBLIC_API_URL?.trim();

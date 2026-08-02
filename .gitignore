@@ -1,0 +1,8 @@
+# 运行时日志（dev-up.sh / dev-down.sh 生成）
+logs/
+
+# graphify 运行时文件（可再生产物，非知识图谱本身）
+graphify-out/.graphify_python
+graphify-out/.graphify_root
+graphify-out/cost.json
+graphify-out/cache/

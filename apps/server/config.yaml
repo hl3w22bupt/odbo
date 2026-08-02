@@ -2,35 +2,14 @@
 # Docs: https://iii.dev/docs/how-to/configure-engine
 workers:
   - name: iii-http
-    config:
-      port: 3111
-      host: 0.0.0.0
-      default_timeout: 60000
-      concurrency_request_limit: 1024
-      cors:
-        allowed_origins:
-          - "*"
-        allowed_methods:
-          - GET
-          - POST
-          - PUT
-          - PATCH
-          - DELETE
+    # 'iii-http': value now lives in the configuration worker at ./data/configuration/iii-http.yaml. Edit at runtime via 'iii config set iii-http' (or 'configuration::set'); this block is no longer read.
 
   - name: iii-observability
+    # 'iii-observability': value now lives in the configuration worker at ./data/configuration/iii-observability.yaml. Edit at runtime via 'iii config set iii-observability' (or 'configuration::set'); this block is no longer read.
+
+  - name: iii-worker-manager
     config:
-      enabled: true
-      service_name: iii
-      exporter: memory
-      memory_max_spans: 10000
-      metrics_enabled: true
-      metrics_exporter: memory
-      logs_enabled: true
-      logs_exporter: memory
-      logs_console_output: true
-      sampling_ratio: 1.0
+      port: 49144
 
   - name: queue
-    config:
-      adapter:
-        name: builtin
+    # 'queue': value now lives in the configuration worker at ./data/configuration/queue.yaml. Edit at runtime via 'iii config set queue' (or 'configuration::set'); this block is no longer read.

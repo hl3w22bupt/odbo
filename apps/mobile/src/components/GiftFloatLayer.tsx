@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text } from 'react-native';
 import { colors, fontSizes, fontWeights } from '../theme';
 
@@ -79,7 +79,7 @@ export function GiftFloatLayer({ burst, emoji, label, intensity = 'medium' }: Gi
 
 const styles = StyleSheet.create({
   layer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',

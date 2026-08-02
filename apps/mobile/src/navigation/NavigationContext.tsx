@@ -2,6 +2,12 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { BackHandler } from 'react-native';
 import type { Route, RouteName, RouteParamsMap } from './types';
 
+function buildRoute<T extends RouteName>(name: T, params: RouteParamsMap[T]): Route {
+  // 调用方（push/replace/reset）已通过泛型约束保证 params 与 name 匹配，
+  // 此处按 name 判别联合构造路由变体。
+  return { key: nextKey(), name, params } as Route;
+}
+
 let keyCounter = 0;
 function nextKey(): string {
   keyCounter += 1;
@@ -54,17 +60,17 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   stackRef.current = state.stack;
 
   const push = useCallback(<T extends RouteName>(name: T, params: RouteParamsMap[T]) => {
-    dispatch({ type: 'PUSH', route: { key: nextKey(), name, params } });
+    dispatch({ type: 'PUSH', route: buildRoute(name, params) });
   }, []);
 
   const replace = useCallback(<T extends RouteName>(name: T, params: RouteParamsMap[T]) => {
-    dispatch({ type: 'REPLACE', route: { key: nextKey(), name, params } });
+    dispatch({ type: 'REPLACE', route: buildRoute(name, params) });
   }, []);
 
   const pop = useCallback(() => dispatch({ type: 'POP' }), []);
 
   const reset = useCallback(<T extends RouteName>(name: T, params: RouteParamsMap[T]) => {
-    dispatch({ type: 'RESET', route: { key: nextKey(), name, params } });
+    dispatch({ type: 'RESET', route: buildRoute(name, params) });
   }, []);
 
   useEffect(() => {

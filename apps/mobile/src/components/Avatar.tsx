@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, fontSizes, fontWeights, shadows } from '../theme';
+import { colors, fontWeights, shadows } from '../theme';
 import { avatarLetter } from '../utils/format';
 
 export interface AvatarProps {

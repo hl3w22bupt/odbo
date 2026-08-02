@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AINoticeBar } from '../components/AINoticeBar';
 import { PrimaryButton } from '../components/PrimaryButton';
@@ -15,7 +15,7 @@ export function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { push } = useNavigation();
   const { user, logout } = useAuth();
-  const { quota, isMember, membershipDaysLeft, refreshStatus } = useSession();
+  const { quota, isMember, membershipDaysLeft } = useSession();
   const [mode, setMode] = useState<ChatMode>('SINGLE');
 
   const remaining = quota?.remaining ?? 120;

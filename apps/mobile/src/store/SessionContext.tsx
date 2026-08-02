@@ -30,7 +30,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [compliance, setCompliance] = useState<ComplianceStatus | null>(null);
   const [activeSeconds, setActiveSeconds] = useState(0);
   const [antiAddictionVisible, setAntiAddictionVisible] = useState(false);
-  const lastTick = useRef<number>(Date.now());
+  const lastTick = useRef<number>(0);
   const accumulated = useRef(0);
 
   const refreshStatus = useCallback(async () => {
@@ -65,6 +65,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   // 活跃计时：每分钟累加一次（近似连续使用时长）
   useEffect(() => {
+    lastTick.current = Date.now();
     const timer = setInterval(() => {
       const now = Date.now();
       const delta = Math.round((now - lastTick.current) / 1000);
@@ -129,7 +130,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       requestAntiAddictionCheck,
       dismissAntiAddiction,
     };
-  }, [status, compliance, quota, isMember, membershipDaysLeft, antiAddictionVisible, activeSeconds, refreshStatus, refreshCompliance, notifyActivity, requestAntiAddictionCheck, dismissAntiAddiction]);
+  }, [status, compliance, antiAddictionVisible, activeSeconds, refreshStatus, refreshCompliance, notifyActivity, requestAntiAddictionCheck, dismissAntiAddiction]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

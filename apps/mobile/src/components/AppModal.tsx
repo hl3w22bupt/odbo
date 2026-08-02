@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
     zIndex: zIndex.modal,
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(26, 16, 38, 0.55)',
   },
   card: {

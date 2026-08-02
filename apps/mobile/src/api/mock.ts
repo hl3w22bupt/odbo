@@ -35,7 +35,7 @@ import { ApiError } from './client';
 
 const AI_NOTICE = '心伴AI 内所有角色均为 AI 虚拟形象，其言行由算法生成，不代表真实人物或观点。请理性看待，勿过度投入。';
 
-const BASE_CHARACTERS: Array<Omit<Character, 'affection' | 'locked'>> = [
+const BASE_CHARACTERS: Omit<Character, 'affection' | 'locked'>[] = [
   {
     id: 'char_linwanqing',
     name: '林晚晴',
@@ -106,7 +106,7 @@ const BASE_CHARACTERS: Array<Omit<Character, 'affection' | 'locked'>> = [
   },
 ];
 
-const BASE_GIFTS: Array<Omit<Gift, 'locked'>> = [
+const BASE_GIFTS: Omit<Gift, 'locked'>[] = [
   { id: 'gift_rose', name: '玫瑰花', description: '经典表白，人人都爱', price: 100, priceYuan: '1.00', icon: '🌹', imageUrl: null, isLimited: false, memberOnly: false, stock: null },
   { id: 'gift_coffee', name: '暖心咖啡', description: '暖胃更暖心', price: 200, priceYuan: '2.00', icon: '☕', imageUrl: null, isLimited: false, memberOnly: false, stock: null },
   { id: 'gift_cake', name: '生日蛋糕', description: '陪你过每一个值得纪念的日子', price: 300, priceYuan: '3.00', icon: '🎂', imageUrl: null, isLimited: false, memberOnly: false, stock: null },
@@ -262,6 +262,7 @@ const affectionValues: Record<string, number> = {
 };
 const customizations: Record<string, CustomizationResult> = {};
 const conversations = new Map<string, Message[]>();
+const convMeta = new Map<string, { characterId: string | null; mode: string }>();
 const orders: Order[] = [];
 let orderSeq = 1;
 
@@ -383,6 +384,7 @@ export const mockApi = {
     if (!convId) {
       convId = genId('conv');
       conversations.set(convId, []);
+      convMeta.set(convId, { characterId: character.id, mode: 'SINGLE' });
     }
     const list = conversations.get(convId)!;
     const userMsg: Message = {
@@ -449,6 +451,7 @@ export const mockApi = {
     if (!convId) {
       convId = genId('conv');
       conversations.set(convId, []);
+      convMeta.set(convId, { characterId: null, mode: 'MULTI' });
     }
     const list = conversations.get(convId)!;
     const userMsg: Message = {
@@ -505,8 +508,14 @@ export const mockApi = {
 
   async triggerProactive(characterId: string): Promise<{ triggered: boolean; messageId: string }> {
     const character = findChar(characterId);
-    const last = [...conversations.values()].flat().reverse().find((m) => m.conversationId);
-    const convId = last?.conversationId;
+    // 找到该角色的最近单角色会话（与后端 proactiveShareNow 行为一致）
+    const convId = [...convMeta.entries()]
+      .filter(([, meta]) => meta.characterId === characterId && meta.mode === 'SINGLE')
+      .sort((a, b) => {
+        const la = [...(conversations.get(a[0]) ?? [])].pop();
+        const lb = [...(conversations.get(b[0]) ?? [])].pop();
+        return String(lb?.createdAt ?? '').localeCompare(String(la?.createdAt ?? ''));
+      })[0]?.[0];
     if (!convId) throw new ApiError(404, 'NOT_FOUND', '暂无会话，请先开始聊天');
     const list = conversations.get(convId)!;
     const msg: Message = {
@@ -550,7 +559,6 @@ export const mockApi = {
     const quantity = Math.min(99, Math.max(1, params.quantity ?? 1));
     const delta = quantity * 5;
     affectionValues[character.id] = (affectionValues[character.id] ?? 0) + delta;
-    const name = BASE_CHARACTERS.find((x) => x.id === character.id)?.name ?? '';
     const reply = replyFor(character, gift.name) || `谢谢你送我的${gift.name}，我心里特别暖。`;
     return {
       gift: { id: gift.id, name: gift.name, icon: gift.icon, isLimited: gift.isLimited },
@@ -650,13 +658,21 @@ export const mockApi = {
   async customizeCharacter(characterId: string, payload: CustomizationPayload): Promise<CustomizationResult> {
     findChar(characterId);
     const existing = customizations[characterId] ?? {};
+    let avatarUrl = existing.avatarUrl ?? null;
+    // 需要生成专属照片时，走图像生成（mock 供应商）
+    if (payload.generateImage) {
+      const name = payload.customName ?? existing.customName ?? '心伴';
+      avatarUrl =
+        `https://api.dicebear.com/9.x/adventurer-neutral/png?seed=${encodeURIComponent(name)}-${Math.floor(Math.random() * 999)}` +
+        `&backgroundColor=f7dbe8&size=512`;
+    }
     const next: CustomizationResult = {
       id: genId('custom'),
       customName: payload.customName ?? existing.customName ?? null,
       hairstyle: payload.hairstyle ?? existing.hairstyle ?? null,
       outfit: payload.outfit ?? existing.outfit ?? null,
       voice: payload.voice ?? existing.voice ?? null,
-      avatarUrl: existing.avatarUrl ?? null,
+      avatarUrl,
     };
     customizations[characterId] = next;
     return next;

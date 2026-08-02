@@ -1,0 +1,21 @@
+{
+  "name": "run-de22da31",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hl3w22bupt/odbo.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/hl3w22bupt/odbo/issues"
+  },
+  "homepage": "https://github.com/hl3w22bupt/odbo#readme"
+}

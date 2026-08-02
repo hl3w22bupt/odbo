@@ -144,7 +144,7 @@ async function refresh(ctx: HttpRouteContext) {
     ip: ctx.ip ?? null,
     userAgent: headerStr(ctx.headers['user-agent']) ?? null,
   })
-  await audit('TOKEN_REFRESH', { userId: tokens.sessionId, ip: ctx.ip ?? null })
+  await audit('TOKEN_REFRESH', { userId: tokens.userId, ip: ctx.ip ?? null })
   return ok({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }, '刷新成功')
 }
 

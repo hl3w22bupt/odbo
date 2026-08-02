@@ -18,7 +18,7 @@ interface CharacterSelectScreenProps {
 }
 
 export function CharacterSelectScreen({ mode }: CharacterSelectScreenProps) {
-  const { push, pop } = useNavigation();
+  const { push } = useNavigation();
   const { isMember } = useSession();
   const { showToast } = useToast();
 

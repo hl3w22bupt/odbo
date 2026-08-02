@@ -3,7 +3,7 @@ import { Animated, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from '
 import { colors, fontSizes, fontWeights, radii } from '../theme';
 
 interface SegmentedToggleProps<T extends string> {
-  options: Array<{ value: T; label: string; icon?: string }>;
+  options: { value: T; label: string; icon?: string }[];
   value: T;
   onChange: (value: T) => void;
 }

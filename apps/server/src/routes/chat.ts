@@ -9,7 +9,7 @@ import { authenticate } from '../http.js'
 import { AppError } from '../lib/errors.js'
 import { consumeQuota, getQuotaStatus } from '../lib/quota.js'
 import { checkAntiAddiction } from '../lib/antiAddiction.js'
-import { filterContent, blockedFallbackReply } from '../lib/contentFilter.js'
+import { filterContent } from '../lib/contentFilter.js'
 import { contentAudit } from '../lib/audit.js'
 import {
   runTypingAndReply,
@@ -18,7 +18,6 @@ import {
 } from '../lib/chatEngine.js'
 import { getAffectionsForUser } from '../lib/affection.js'
 import { hasActiveMembership } from '../lib/quota.js'
-import { getImageProvider } from '../lib/image.js'
 import { logger } from '../lib/logger.js'
 
 function safeJson(s: string): unknown {

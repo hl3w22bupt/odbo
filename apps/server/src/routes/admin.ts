@@ -52,7 +52,7 @@ async function setUserStatus(ctx: HttpRouteContext, status: 'BANNED' | 'ACTIVE')
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) throw AppError.notFound('用户不存在')
   await prisma.user.update({ where: { id: userId }, data: { status } })
-  await audit(status === 'BANNED' ? 'ADMIN_USER_BAN' : 'ADMIN_USER_BAN', {
+  await audit(status === 'BANNED' ? 'ADMIN_USER_BAN' : 'ADMIN_USER_UNBAN', {
     userId: admin.id,
     ip: ctx.ip ?? null,
     detail: { targetUserId: userId, action: status },

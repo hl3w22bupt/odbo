@@ -139,7 +139,7 @@ export async function issueTokens(
 export async function refreshTokens(
   refreshToken: string,
   opts: { ip?: string | null; userAgent?: string | null } = {},
-): Promise<{ accessToken: string; refreshToken: string; sessionId: string }> {
+): Promise<{ accessToken: string; refreshToken: string; sessionId: string; userId: string }> {
   const payload = await verifyRefreshToken(refreshToken)
   const session = await prisma.deviceSession.findUnique({ where: { id: payload.sid } })
   if (!session || session.revoked) {
@@ -160,10 +160,11 @@ export async function refreshTokens(
     where: { id: session.id },
     data: { revoked: true },
   })
-  return issueTokens(
+  const tokens = await issueTokens(
     { id: user.id, phone: user.phone, role: user.role, status: user.status },
     opts,
   )
+  return { ...tokens, userId: user.id }
 }
 
 /**

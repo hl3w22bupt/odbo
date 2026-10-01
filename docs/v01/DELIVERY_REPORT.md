@@ -100,7 +100,7 @@
 
 ### `GET /api/v1/characters`
 
-响应 `data`：`Character[]`；首项必须 `status=ACTIVE`（序列化层以可用角色返回）且非会员可用角色 `locked=false`。
+响应 `data`：`Character[]`；列表只查询 `ACTIVE` 角色，序列化项含 `id/name/title/isMemberOnly/locked/affection`。
 
 ### `POST /api/v1/conversations`
 

@@ -7,7 +7,8 @@
         "/Users/leo/workspace/myrd/src/mcp-knowledge/server.ts"
       ],
       "env": {
-        "DATABASE_URL": "postgresql://leo:password@localhost:5432/myrd?schema=public"
+        "DATABASE_URL": "postgresql://leo:password@localhost:5432/myrd?schema=public",
+        "PROJECT_ID": "cms1g8itk000am9fyr4l0vp35"
       }
     }
   }

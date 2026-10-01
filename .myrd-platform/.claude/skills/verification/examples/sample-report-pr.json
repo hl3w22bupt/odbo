@@ -1,0 +1,174 @@
+{
+  "schemaVersion": "1.0",
+  "reportId": "vrf_prsample000000001",
+  "target": {
+    "type": "pr",
+    "id": "hl3w22bupt/myrd#601",
+    "ref": "https://github.com/hl3w22bupt/myrd/pull/601",
+    "title": "docs(verification-skill): Verification skill 方法论框架（验收核对/证据链/红队/评分与报告）"
+  },
+  "prMapping": {
+    "status": "mapped",
+    "method": "pr_body",
+    "requirements": [
+      "cmtwygpt8005im9wnm4wyucnj"
+    ],
+    "goals": [],
+    "note": "PR 描述首行命中 Req: cmtwygpt8005im9wnm4wyucnj"
+  },
+  "triggeredBy": {
+    "scenario": "pr_created_or_updated",
+    "actor": "workflow:pr-verify",
+    "at": "2026-09-11T12:00:00Z"
+  },
+  "criteriaHash": "sha256:6b4aa92254c000116484ae5b917e0f12f221401f57b58072276389f0280d6828",
+  "criteria": [
+    {
+      "id": "AC-01",
+      "text": "给定任一条带验收标准的需求，skill 能逐条输出 pass/fail/partial 判定，且每条判定均附可追溯证据",
+      "weight": 1,
+      "kind": "core",
+      "verifiable": true,
+      "originTarget": {
+        "type": "requirement",
+        "id": "cmtwygpt8005im9wnm4wyucnj"
+      },
+      "parseNote": ""
+    },
+    {
+      "id": "AC-02",
+      "text": "PR 场景下，skill 能读取 PR diff 与 CI 结果，在 5 分钟内产出验证报告，报告中包含与关联需求的映射关系",
+      "weight": 1,
+      "kind": "core",
+      "verifiable": true,
+      "originTarget": {
+        "type": "requirement",
+        "id": "cmtwygpt8005im9wnm4wyucnj"
+      },
+      "parseNote": ""
+    }
+  ],
+  "adjudications": [
+    {
+      "criterionId": "AC-01",
+      "verdict": "pass",
+      "rationale": "本 PR diff 含 verification-report.schema.json：adjudication 的 allOf 强制 pass 判定 evidenceIds minItems=1（EV-03 diff 片段）；selftest 双向用例覆盖逐条判定输出",
+      "evidenceIds": [
+        "EV-01",
+        "EV-03"
+      ],
+      "checkedAt": "2026-09-11T12:02:00Z",
+      "downgradedBy": null
+    },
+    {
+      "criterionId": "AC-02",
+      "verdict": "pass",
+      "rationale": "CI run 记录 durationMs=234000（<300000 预算）且报告含 prMapping.status=mapped（EV-02），映射关系经 pr_body 命中需求 id",
+      "evidenceIds": [
+        "EV-02"
+      ],
+      "checkedAt": "2026-09-11T12:04:00Z",
+      "downgradedBy": null
+    }
+  ],
+  "evidence": [
+    {
+      "id": "EV-01",
+      "type": "test_run",
+      "uri": "https://github.com/hl3w22bupt/myrd/actions/runs/1001",
+      "fetchedAt": "2026-09-11T12:02:00Z",
+      "digest": "sha256:4264edcb8e48d7d248d67f6a6b651970c274081642b113b3c82aef294117f17e",
+      "excerpt": "npm run test --prefix frontend\nTest Files  12 passed (12)",
+      "reliability": "direct",
+      "status": "ok"
+    },
+    {
+      "id": "EV-02",
+      "type": "ci_check",
+      "uri": "https://github.com/hl3w22bupt/myrd/actions/runs/1002",
+      "fetchedAt": "2026-09-11T12:04:00Z",
+      "digest": "sha256:0585c58f9e08ce718f18d79b1fa72c58147fa3e5af4c445908a886d9eab00ec5",
+      "excerpt": "verify-report 5min budget: durationMs=234000 mappingStatus=mapped",
+      "reliability": "direct",
+      "status": "ok"
+    },
+    {
+      "id": "EV-03",
+      "type": "pr_diff",
+      "uri": "https://github.com/hl3w22bupt/myrd/pull/601/files",
+      "fetchedAt": "2026-09-11T12:01:00Z",
+      "digest": "sha256:2b647d74dc564d9ed32efdf1be0078c7f662f2057f289f8ac9dfd353ca3bec12",
+      "excerpt": "diff --git a/std-skills/verification/SKILL.md b/std-skills/verification/SKILL.md",
+      "reliability": "direct",
+      "status": "ok"
+    }
+  ],
+  "redTeam": {
+    "status": "completed",
+    "summary": "对 2 条 pass 各尝试 1 个反例，抽查证据 2/3（含全部 indirect），均未成立",
+    "uncoveredAttackSurface": [],
+    "challenges": [
+      {
+        "id": "RT-01",
+        "targetCriterionId": "AC-02",
+        "attackType": "probing",
+        "severity": "minor",
+        "claim": "EV-02 的 CI run 是否真的属于本 PR 的 head commit（而非基线分支）",
+        "evidenceIds": [
+          "EV-02"
+        ],
+        "outcome": "overturned",
+        "arbitrationNote": "run 的 headSha 与 PR head commit 一致（EV-03 复核记录），挑战不成立"
+      }
+    ]
+  },
+  "scoring": {
+    "score": 100,
+    "passed": 2,
+    "partial": 0,
+    "failed": 0,
+    "unverified": 0,
+    "total": 2,
+    "breakdown": [
+      {
+        "criterionId": "AC-01",
+        "verdict": "pass",
+        "weighted": 1
+      },
+      {
+        "criterionId": "AC-02",
+        "verdict": "pass",
+        "weighted": 1
+      }
+    ]
+  },
+  "verdict": {
+    "value": "CERTIFIED",
+    "reasons": [
+      "RULE_ALL_PASS: AC-01,AC-02",
+      "RULE_REDTEAM_CLEAN: upheld blocker=0 major=0",
+      "RULE_MAPPING_MAPPED: cmtwygpt8005im9wnm4wyucnj"
+    ],
+    "summary": "两条核心标准均有直接证据支撑且红队未成立任何 blocker/major 挑战，PR 在 5 分钟预算内完成认证并携带需求映射"
+  },
+  "durationMs": 234000,
+  "createdAt": "2026-09-11T12:04:30Z",
+  "writeBack": {
+    "status": "success",
+    "targets": [
+      {
+        "kind": "pr_comment",
+        "ref": "https://github.com/hl3w22bupt/myrd/pull/601"
+      },
+      {
+        "kind": "requirement_verification_result",
+        "ref": "/api/v1/requirements/cmtwygpt8005im9wnm4wyucnj"
+      },
+      {
+        "kind": "notification",
+        "ref": "assignee:cmtwygpt8005im9wnm4wyucnj"
+      }
+    ],
+    "attempts": 1
+  }
+}

@@ -15,11 +15,11 @@ PID_FILE="${RUN_DIR}/server.pid"
 BODY="${RUN_DIR}/body.json"
 PASS=0
 
-green() { printf '\033[32m%s\033[0m\n' "$1"; PASS=$((PASS + 1)); }
-red()   { printf '\033[31m%s\033[0m\n' "$1"; exit 1; }
+green() { printf '\033[32m✅ %s\033[0m\n' "$1"; PASS=$((PASS + 1)); }
+red()   { printf '\033[31m❌ %s\033[0m\n' "$1"; exit 1; }
 json_get() { node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const v=JSON.parse(s).data;const k=process.argv[1];const out=k.split(".").reduce((a,key)=>a?.[key],v);process.stdout.write(String(out ?? ""))})' "$1"; }
-assert_eq() { if [ "$2" = "$3" ]; then green "✅ $1"; else red "❌ $1（expected=$2 actual=$3）"; fi; }
-assert_contains() { if printf '%s' "$2" | grep -q "$3"; then green "✅ $1"; else red "❌ $1（missing=$3 body=$2）"; fi; }
+assert_eq() { if [ "$2" = "$3" ]; then green "$1"; else red "$1（expected=$2 actual=$3）"; fi; }
+assert_contains() { if printf '%s' "$2" | grep -q "$3"; then green "$1"; else red "$1（missing=$3 body=$2）"; fi; }
 
 cleanup() {
   if [ -f "$PID_FILE" ]; then

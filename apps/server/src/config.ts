@@ -3,7 +3,7 @@
  * 统一从 process.env 读取，提供类型安全访问与默认值。
  */
 import dotenv from 'dotenv'
-dotenv.config({ override: process.env.NODE_ENV !== 'production' })
+dotenv.config()
 
 function int(value: string | undefined, fallback: number): number {
   if (value === undefined || value === '') return fallback
@@ -23,7 +23,7 @@ function str(value: string | undefined, fallback: string): string {
 export const config = {
   // 引擎
   iiiUrl: str(process.env.III_URL, 'ws://localhost:49134'),
-  httpPort: int(process.env.HTTP_PORT, 3111),
+  httpPort: int(process.env.HTTP_PORT, 3888),
 
   // 数据库
   databaseUrl: str(process.env.DATABASE_URL, 'file:./dev.db'),

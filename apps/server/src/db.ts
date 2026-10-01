@@ -3,12 +3,15 @@
  * Prisma 7 使用驱动适配器连接数据库（默认 PostgreSQL / @prisma/adapter-pg）。
  */
 import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import { PrismaClient } from './generated/prisma/client.js'
 import { config } from './config.js'
 
 function createPrisma(): PrismaClient {
-  const adapter = new PrismaPg({ connectionString: config.databaseUrl })
-  return new PrismaClient({ adapter })
+  const adapter = config.databaseUrl.startsWith('file:')
+    ? new PrismaBetterSqlite3({ url: config.databaseUrl })
+    : new PrismaPg({ connectionString: config.databaseUrl })
+  return new PrismaClient({ adapter: adapter as never })
 }
 
 declare global {

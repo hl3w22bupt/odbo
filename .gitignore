@@ -6,3 +6,6 @@ graphify-out/.graphify_python
 graphify-out/.graphify_root
 graphify-out/cost.json
 graphify-out/cache/
+
+# Expo Web generated export
+/apps/mobile/dist-web/

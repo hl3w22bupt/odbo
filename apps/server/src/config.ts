@@ -26,7 +26,10 @@ export const config = {
   httpPort: int(process.env.HTTP_PORT, 3888),
 
   // 数据库
-  databaseUrl: str(process.env.DATABASE_URL, 'file:./dev.db'),
+  databaseUrl: (() => {
+    const value = str(process.env.DATABASE_URL, 'file:./data/xinban-dev.db')
+    return value.startsWith('file:') ? value : 'file:./data/xinban-dev.db'
+  })(),
 
   // JWT
   accessTokenSecret: str(process.env.ACCESS_TOKEN_SECRET, 'xinban-access-secret'),

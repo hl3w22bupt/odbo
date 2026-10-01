@@ -6,6 +6,8 @@
 Worker 通过 `registerWorker(process.env.III_URL)` 连接引擎，用 `worker.registerFunction(...)` 注册业务函数，
 再用 `worker.registerTrigger({ type: 'http', function_id, config: { api_path, http_method } })` 绑定为 REST 接口。
 
+> **v0.1 演示/验收入口是 standalone runtime**（`npm run dev:standalone`，`src/localServer.ts`）：Node 内置 HTTP 直接调度同一套业务 handler，默认 SQLite，无外部进程依赖。iii 生产编排延后到 v0.2+。
+
 ## 功能总览
 
 | 模块 | 说明 |
@@ -21,7 +23,7 @@ Worker 通过 `registerWorker(process.env.III_URL)` 连接引擎，用 `worker.r
 ## 技术栈
 
 - **iii-sdk** `0.22` — iii engine 的 TypeScript Worker
-- **Prisma** `7.9`（`prisma-client` generator + 驱动适配器，PostgreSQL）
+- **Prisma** `7.9`（`prisma-client` generator + 驱动适配器；v0.1 默认 SQLite `better-sqlite3`，PostgreSQL 为 v0.2+ 生产目标）
 - **jose** `6` — JWT
 - **openai** `7` — DeepSeek / OpenAI 兼容 LLM 客户端
 - **zod** — 参数校验（可扩展）
@@ -36,7 +38,8 @@ apps/server/
 ├── prisma/
 │   ├── schema.prisma       # 全量数据模型
 │   └── seed.ts             # 种子：4 角色 / 商品 / 礼物 / 管理账号 / 敏感词
-├── scripts/dev.mjs         # dev：启动引擎 + 连接 worker
+├── scripts/dev.mjs         # dev：启动引擎 + 连接 worker（v0.2+ 生产编排）
+│                           # v0.1 演示入口：npm run dev:standalone → src/localServer.ts
 ├── src/
 │   ├── index.ts            # 入口：registerWorker + 注册所有函数/触发器
 │   ├── http.ts             # HTTP 路由层（function + http trigger 封装）
@@ -61,30 +64,29 @@ npm install
 
 ```bash
 cp .env.example .env
-# 编辑 .env：
-#   DATABASE_URL=postgresql://<user>:<password>@localhost:5432/<db>?schema=public
-#   DEEPSEEK_API_KEY=sk-xxx        # 未配置时使用离线回退回复
-#   SMS_PROVIDER=dev               # 开发期验证码固定 123456
+# 编辑 .env（v0.1 默认即可运行）：
+#   DATABASE_URL=file:./data/xinban-dev.db   # 默认 SQLite 文件库，冷启动可复现
+#   HTTP_PORT=3888                           # standalone HTTP 端口
+#   DEEPSEEK_API_KEY=sk-xxx                  # 未配置时使用离线回退回复
+#   SMS_PROVIDER=dev                         # 开发期验证码固定 123456
+# PostgreSQL 为 v0.2+ 生产目标，配置见 .env.example 注释
 ```
 
 ### 3. 初始化数据库
 
 ```bash
-npx prisma generate   # 生成客户端（已跑通）
-npx prisma db push    # 建表
-npm run prisma:seed   # 初始化种子数据
+npm run db:setup      # prisma generate + db push + seed（SQLite，无需外部数据库）
 ```
 
 ### 4. 启动服务
 
 ```bash
-npm run dev
+npm run dev:standalone     # v0.1 演示/验收入口：Node 内置 HTTP + 同一套业务 handler
 ```
 
-脚本会：① 启动 iii 引擎（读取 `config.yaml`）；② 等待引擎 WebSocket 就绪；③ 连接 TypeScript Worker。
-
-- HTTP API：`http://localhost:3111`
-- 引擎 WebSocket：`ws://localhost:49134`
+- HTTP API：`http://127.0.0.1:3888`（`HTTP_PORT` 可覆盖）
+- 健康检查：`curl http://127.0.0.1:3888/health` → `{"status":"up"}`
+- 生产 iii 引擎编排（`npm run dev`，读取 `config.yaml`，引擎 WebSocket 49134）延后到 v0.2+
 
 ### 5. 测试 / 构建
 

@@ -57,11 +57,13 @@ EXPO_PUBLIC_API_URL=http://127.0.0.1:3888 npx expo start --web
 
 ```bash
 cd apps/mobile
-EXPO_PUBLIC_API_URL=http://127.0.0.1:3888 npm run export -- --platform web --output-dir dist-web
+EXPO_PUBLIC_API_URL=http://127.0.0.1:3888 npm run export -- --platform web --output-dir dist-web --clear
 python3 -m http.server 4173 --directory dist-web
 ```
 
 浏览器打开 `http://127.0.0.1:4173`。
+
+> **重要**：`EXPO_PUBLIC_API_URL` 在构建期固化进产物。根目录 `npm run build` 已默认注入 `http://127.0.0.1:3888` 并加 `--clear` 清 Metro 缓存（Metro transform 缓存不感知该环境变量变化，缺 `--clear` 时可能导出旧配置/演示数据模式）。手动导出务必带 `--clear`。
 
 ## 4. 人读主链路步骤
 
@@ -89,5 +91,7 @@ python3 -m http.server 4173 --directory dist-web
 | `EADDRINUSE` / 3888 占用 | 换 `HTTP_PORT=13888 npm run server:dev`，同时把 `EXPO_PUBLIC_API_URL` 指向同端口 |
 | 首次报 Prisma client 未生成 | 在 `apps/server` 执行 `npx prisma generate`，或重跑 `npm run setup` |
 | Web 页网络失败 | 确认 `EXPO_PUBLIC_API_URL` 在启动/导出前设置；静态导出后环境变量已固化 |
+| Web 页显示演示数据、不走真实登录 | 导出时缺 `EXPO_PUBLIC_API_URL` 或缺 `--clear`（Metro 缓存）；重跑 `npm run build`，或手动导出补两个参数 |
+| `apps/server/.env` 覆盖了文档默认端口 | `.env` 优先级高于默认值；以 `npm run server:dev` 启动日志打印的 `port` 为准，或直接改 `.env` 的 `HTTP_PORT` |
 | 验证码 60 秒限制 | 换一个手机号，或等待 60 秒 |
 | 冒烟端口占用 | `XINBAN_SMOKE_PORT=13889 npm run smoke` |

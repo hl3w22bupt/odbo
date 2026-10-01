@@ -4,7 +4,7 @@
   "description": "心伴 v0.1 · end-to-end runnable demo",
   "scripts": {
     "setup": "cd apps/server && npm ci --no-audit --no-fund && cd ../mobile && npm ci --no-audit --no-fund && cd ../server && npm run db:setup",
-    "build": "cd apps/server && npm run build && cd ../mobile && npm run typecheck && npm run export -- --platform web --output-dir dist-web",
+    "build": "cd apps/server && npm run build && cd ../mobile && npm run typecheck && EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-http://127.0.0.1:3888} npm run export -- --platform web --output-dir dist-web --clear",
     "test": "cd apps/server && npm test && cd ../mobile && npm test",
     "smoke": "./scripts/smoke.sh",
     "server:dev": "cd apps/server && npm run dev:standalone",

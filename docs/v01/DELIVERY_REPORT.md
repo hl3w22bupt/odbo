@@ -6,19 +6,26 @@
 
 ## 1. 现状盘点
 
-### 1.1 已有能力清单（按主链路覆盖度）
+> 本节为**续跑盘点（2026-10-02）**：三条命令（构建/启动/测试）全部实测复核，结论替代上轮声明。
+> 实测环境：Node 26.7.0 / npm 11.19.0，平台装配 worktree + 继续分支。
 
-| 环节 | 能力 | v0.1 覆盖度 |
-|---|---|---|
-| 注册/登录 | 手机号验证码、开发码 `123456`、JWT access/refresh、刷新轮换、401 拦截、Expo 登录页 | 覆盖 |
-| 核心交互 | 角色列表、单角色会话、用户消息、后台 AI 回复、配额、内容过滤、好感度 | 主链路覆盖；真实 LLM 可配置，未配置时确定性离线回复 |
-| 持久化 | Prisma schema：用户/会话/消息/配额/JWT 会话；种子角色 | 覆盖；SQLite 冷启动与重启校验 |
-| 展示 | 登录页、首页、角色选择、聊天页、状态条；Expo Web 静态导出 | 覆盖；原生/桌面模拟器非 v0.1 阻塞 |
+### 1.1 已有能力清单（按主链路覆盖度，均实测）
 
-### 1.2 缺口清单
+| 环节 | 能力 | v0.1 覆盖度 | 本轮实测锚点 |
+|---|---|---|---|
+| 注册/登录 | 手机号验证码（60s 防刷）、开发码 `123456`、JWT HS256 access/refresh、刷新轮换 + 会话撤销、RBAC、401 拦截、Expo 登录页 | 覆盖 | smoke 02-04/13 过；`auth.test.ts` 过；`lib/auth.ts` 代码走查无硬伤 |
+| 核心交互 | 角色列表（4 种子角色）、单角色会话、用户消息落库、后台 AI 回复 TYPING→COMPLETED、配额、内容过滤、好感度 | 主链路覆盖；真实 LLM 可配置，未配置时确定性离线回复 | smoke 05、07-09 过；`characters.test.ts` 过 |
+| 持久化 | Prisma 7 + better-sqlite3 适配：用户/会话/消息/配额/JWT 会话；种子角色 | 覆盖；SQLite 冷启动与重启校验 | smoke 10-12 过（重启同一 DB 文件后消息与状态一致） |
+| 展示 | 登录页、首页、角色选择、聊天页、状态条；Expo Web 静态导出 | **部分覆盖**：导出可构建，但普通 `npm run build` 产物默认落 mock 模式（缺口 G1） | build 过；导出包字符串核验（`isMockMode` 编译为 `return !undefined`） |
+
+### 1.2 缺口清单（必需/可延后二分）
 
 | 分类 | 缺口 | 处理 |
 |---|---|---|
+| 必需·本轮新增 | **G1**：`npm run build` 未设 `EXPO_PUBLIC_API_URL`，导出包 `isMockMode()` 恒为 true → 静态站点演示的是内置 mock 数据而非真实后端；且 Metro transform 缓存不感知 `EXPO_PUBLIC_*` 变化（实测设 env 与不设 env 产出**同哈希**包，`--clear` 后才内联成功） | 待修（增量 1，对应 F-4/F-5） |
+| 必需·本轮新增 | **G2**：`apps/server/README.md` 仍为旧 iii 引擎口径（PostgreSQL / 端口 3111 / 49134 / `npm run dev` 引擎编排），`apps/mobile/src/api/index.ts` 头注释亦写 3111，与 standalone + SQLite + 3888 实际相悖，误导人读冒烟 | 待修（增量 2，对应 F-6/F-8） |
+| 必需·本轮新增 | **G3**：`scripts/smoke.sh` 步骤 07-09 输出缺 ✅ 前缀（`green()` 不打印勾），与 01-06/10-13 输出不一致，机器解析与人工核对易漏判 | 待修（增量 3，对应 F-7） |
+| 必需·本轮新增 | **G4**：工作区遗留未跟踪 `.env` 将 `HTTP_PORT` 钉在 13888，与文档默认 3888 不一致（本轮实测曾因此误判启动失败） | 已修：本地 `.env` 对齐 3888（未跟踪文件不入库）；SMOKE.md 补充 `.env` 优先级说明 |
 | 必需 | 原 HTTP 路由只绑定 iii 引擎，演示启动受外部进程/端口影响 | 已补 standalone runtime |
 | 必需 | 默认 Prisma 数据源与运行适配器不一致，新环境无确定性数据库 | 已切 SQLite + 驱动适配器 |
 | 必需 | 无一条命令跑注册/聊天/重启持久化 | 已补 `scripts/smoke.sh` |
@@ -29,15 +36,20 @@
 | 可延后 | iii 引擎部署、Prisma migrations、PostgreSQL 生产库 | v0.2+ |
 | 可延后 | 自动化浏览器 UI 断言、iOS/Android 真机冒烟 | v0.2+ |
 
-### 1.3 测试结果清单
+### 1.3 测试结果清单（过/挂/死三分）
 
-| 测试 | 基线结果 | 当前结果 |
+| 测试 | 基线结果 | 本轮实测结果 |
 |---|---|---|
-| `apps/server` Vitest | 初次安装后 3 个 suite 因未生成 Prisma client 导入失败；生成后 5/5 过、20/20 过 | 过：5 suite / 20 tests |
-| `apps/mobile` Vitest | 过：2 suite / 21 tests | 过：2 suite / 21 tests |
-| `npm run smoke` | 原脚本仅覆盖 API 建会话，未覆盖聊天回复/重启 | 过：13/13 |
-| 主链路死测试 | 无 | 无 |
+| `apps/server` Vitest | 初次安装后 3 个 suite 因未生成 Prisma client 导入失败；生成后 5/5 过、20/20 过 | **过**：5 suite / 20 tests（232ms） |
+| `apps/mobile` Vitest | 过：2 suite / 21 tests | **过**：2 suite / 21 tests（116ms） |
+| `npm run build` | 上轮声明通过 | **过**：server tsc + mobile typecheck + Expo Web 导出（index.html + 650KB bundle） |
+| `npm run server:dev` + `/health` | 上轮声明通过 | **过**：44 条路由注册、`status=up`；注意 `.env` 可覆盖端口（见 G4） |
+| `npm run smoke` | 上轮声明 13/13 | **过**：13/13，退出码 0（实测两次独立运行） |
+| 挂掉的测试 | 无 | **无** |
+| 主链路死测试（skip/only/todo/恒真） | 无 | **无**（全仓 grep 无 `.skip`/`.only`/`.todo`/`xit`） |
 | Skip 测试 | 无 | 无；本轮未删除测试 |
+
+**基线技术建议：部分可构建 → 修复续用**（与上轮判定一致，不重写）。既有前端、业务 handler、Prisma 模型与测试全部保留；本轮只需修 G1-G4 增量缺口。
 
 基线技术建议：**部分可构建 → 修复续用**。不重写；保留前端、业务 handler、Prisma 模型与测试。
 

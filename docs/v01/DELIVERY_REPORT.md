@@ -120,7 +120,7 @@
 }
 ```
 
-响应 `data`：`{ conversationId, userMessage: Message, assistantMessage: Message, quota, affection, typing: true }`。  
+响应 `data`：`{ conversationId, userMessage: Message, assistantMessage: Message, quota, affection, typing: true }`。
 `assistantMessage` 初始为 `TYPING`，后台落库完成后通过消息列表轮询为 `COMPLETED`。
 
 ### `GET /api/v1/conversations/:id/messages`

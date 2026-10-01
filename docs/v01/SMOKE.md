@@ -80,6 +80,7 @@ python3 -m http.server 4173 --directory dist-web
 | 2 后端健康 | 01 | `/health` 包含 `status=up` |
 | 4.1 发码/登录 | 02-04 | 返回 token；无 token 401 |
 | 4.2 角色展示 | 05 | 返回林晚晴 |
+| 4.1 登录态资料 | 06 | `/users/me` 返回登录手机号 |
 | 4.3 发消息/回复 | 07-09 | USER 落库，ASSISTANT 最终 `COMPLETED` |
 | 4.4 重启保留 | 10-12 | 重启后消息与状态存在 |
 | 登录态维持 | 13 | refresh token 换新 access token |

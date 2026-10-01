@@ -64,11 +64,13 @@
 | F-1 | 注册/登录 | 新手机号可获取开发验证码并以 `123456` 登录；返回 access/refresh token；无 token 访问受保护 API 返回 401 | `npm run smoke` 步骤 02-04；`apps/server/src/lib/auth.test.ts` | [x] |
 | F-2 | 核心交互 | 能读取至少 1 个可用角色；向会话发送文本后创建 USER 消息并生成 ASSISTANT 回复；回复最终 `COMPLETED` | `npm run smoke` 步骤 05、08-09；`apps/server/src/lib/chatEngine.ts` | [x] |
 | F-3 | 持久化 | 服务使用同一 SQLite 文件重启后，会话、用户消息、助手消息仍可读取且消息状态一致 | `npm run smoke` 步骤 07、10-12 | [x] |
-| F-4 | 展示 | Expo Web 可构建出静态 `index.html`；登录页可调用后端登录，聊天页可显示用户与助手消息 | `npm run build`；`docs/v01/SMOKE.md` 人读步骤 W1-W5 | [x] |
-| F-5 | 全局构建 | 根目录一条命令完成后端编译、前端类型检查与 Web 静态导出 | `npm run build` | [x] |
+| F-4 | 展示 | Expo Web 可构建出静态 `index.html`；**导出包必须接线真实后端**（包内可检出内联 API URL，`isMockMode()` 编译为 false）；登录页可调用后端登录，聊天页可显示用户与助手消息 | `npm run build` 后 `grep` 导出 bundle 内联 URL；`docs/v01/SMOKE.md` 人读步骤 4.1-4.5 | [ ] → 修复 G1 后复勾 |
+| F-5 | 全局构建 | 根目录一条命令完成后端编译、前端类型检查与 Web 静态导出，**且产物为接线真实后端的演示件**（构建脚本需注入默认 API URL 并清 Metro 缓存） | `npm run build`；bundle 字符串核验 | [ ] → 修复 G1 后复勾 |
 | F-6 | 全局启动 | 后端 standalone 服务一条命令启动，`/health` 返回 `status=up` | `npm run server:dev` + `curl /health`；smoke 步骤 01 | [x] |
 | F-7 | 冒烟脚本 | 一条命令创建临时 SQLite、启动、登录、发消息、重启、校验持久化并返回 0 | `npm run smoke` 输出 13/13 | [x] |
 | F-8 | 冒烟文档 | 人读复现步骤与脚本步骤一致，包含环境变量、成功判据、常见失败 | `docs/v01/SMOKE.md` | [x] |
+
+**冻结复核说明（续跑轮）**：范围**不扩不缩**，沿用上轮 F-1..F-8 与 v0.2+ 停车场。盘点缺口与 DoD 映射：G1→F-4/F-5（唯一实质缺口，修复前 F-4/F-5 保持未勾）；G2→F-6/F-8（文档口径一致性）；G3→F-7（冒烟输出一致性）；G4→F-6（本地环境一致性，已修，不入库）。主链路 API 契约见第 3 节，随并行开发使用，契约字段不变。
 
 ### 2.2 v0.2+ 停车场
 

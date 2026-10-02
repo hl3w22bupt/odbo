@@ -187,3 +187,15 @@
 3. smoke 总结行与步骤行可拆分计数口径，便于外部系统直接解析。
 
 红线遵守：未探测、未依赖、未记录 Open Design daemon（7456）为任何依赖或阻塞证据；所有验证均在本平台装配 worktree 与继续分支执行；部署保留给默认工作流 deploy 节点。
+
+## 6. 交付前独立复验（2026-10-02 第二次实测）
+
+工作区干净（无未提交改动）前提下，对 DoD 全勾结论做二次独立复验，结论一致：
+
+| 复验项 | 命令 | 结果 |
+|---|---|---|
+| 测试 | `npm test` | 退出码 0；server 5 suite/20 tests + mobile 2 suite/21 tests；全仓无 `.skip`/`.only`/`.todo` 死测试标记 |
+| 构建 | `npm run build` | 退出码 0；bundle（650KB）内联 `http://127.0.0.1:3888`，`isMockMode` 编译为常量 URL 判空（mock 分支不可达） |
+| 冒烟 | `npm run smoke` | 退出码 0；步骤 01-13 均以 `✅` 开头 + 总结行（日志 `logs/verify-smoke.log`，gitignore 不入库） |
+
+复验日志：`logs/verify-build.log`、`logs/verify-smoke.log`（均为运行时产物，不入库；可按 SMOKE.md 一键重放）。**DoD F-1..F-8 维持全勾，交付放行条件成立。**

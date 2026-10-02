@@ -1,0 +1,129 @@
+{
+  "schemaVersion": "1.0",
+  "reportId": "vrf_sample0000000000001",
+  "criteriaHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "target": {
+    "type": "requirement",
+    "id": "cmtwygpt8005im9wnm4wyucnj",
+    "ref": "/api/v1/requirements/cmtwygpt8005im9wnm4wyucnj",
+    "title": "平台 Verification skill：可对目标/需求/PR 做认证评估的验证技能"
+  },
+  "triggeredBy": {
+    "scenario": "explicit_invoke",
+    "actor": "user_example",
+    "at": "2026-09-11T12:00:00Z"
+  },
+  "criteria": [
+    {
+      "id": "AC-01",
+      "text": "给定任一条带验收标准的需求，skill 能逐条输出 pass/fail/partial 判定，且每条判定均附可追溯证据",
+      "weight": 1,
+      "kind": "core",
+      "verifiable": true,
+      "originTarget": { "type": "requirement", "id": "cmtwygpt8005im9wnm4wyucnj" },
+      "parseNote": ""
+    },
+    {
+      "id": "AC-02",
+      "text": "PR 场景下 5 分钟内产出验证报告，报告中包含与关联需求的映射关系",
+      "weight": 1,
+      "kind": "core",
+      "verifiable": true,
+      "originTarget": { "type": "requirement", "id": "cmtwygpt8005im9wnm4wyucnj" },
+      "parseNote": ""
+    }
+  ],
+  "adjudications": [
+    {
+      "criterionId": "AC-01",
+      "verdict": "pass",
+      "rationale": "e2e 用例 requirements-verify.spec.ts 断言 5 条标准各自产出判定且 evidenceIds 非空，运行结果 5 passed",
+      "evidenceIds": ["EV-01", "EV-03"],
+      "checkedAt": "2026-09-11T12:03:00Z",
+      "downgradedBy": null
+    },
+    {
+      "criterionId": "AC-02",
+      "verdict": "partial",
+      "rationale": "报告含 mappingStatus 字段（EV-02），但本例 CI 排队 6 分钟超出 5 分钟预算，仅 direct 场景实测达标",
+      "evidenceIds": ["EV-02"],
+      "checkedAt": "2026-09-11T12:04:00Z",
+      "downgradedBy": null
+    }
+  ],
+  "evidence": [
+    {
+      "id": "EV-01",
+      "type": "test_run",
+      "uri": "https://github.com/owner/repo/actions/runs/1001",
+      "fetchedAt": "2026-09-11T12:03:00Z",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "excerpt": "requirements-verify.spec.ts: 5 passed, 0 failed",
+      "reliability": "direct",
+      "status": "ok"
+    },
+    {
+      "id": "EV-02",
+      "type": "trajectory",
+      "uri": "/api/v1/trajectories/trj_example",
+      "fetchedAt": "2026-09-11T12:04:00Z",
+      "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "excerpt": "PR verify run durationMs=361000, mappingStatus=mapped",
+      "reliability": "direct",
+      "status": "ok"
+    },
+    {
+      "id": "EV-03",
+      "type": "platform_record",
+      "uri": "/api/v1/requirements/cmtwygpt8005im9wnm4wyucnj",
+      "fetchedAt": "2026-09-11T12:05:00Z",
+      "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "excerpt": "verificationResult.verdict=CERTIFIED 可经 API 查询",
+      "reliability": "indirect",
+      "status": "ok"
+    }
+  ],
+  "redTeam": {
+    "status": "completed",
+    "summary": "对 2 条 pass 尝试反例 3 个，抽查证据 2/3，均未成立",
+    "uncoveredAttackSurface": [],
+    "challenges": [
+      {
+        "id": "RT-01",
+        "targetCriterionId": "AC-01",
+        "attackType": "probing",
+        "severity": "minor",
+        "claim": "EV-03 为间接证据，digest 为事后补填可能不同源",
+        "evidenceIds": ["EV-03"],
+        "outcome": "overturned",
+        "arbitrationNote": "重新拉取 API 响应计算 digest 与报告一致（EV-01 复核记录）"
+      }
+    ]
+  },
+  "scoring": {
+    "score": 75,
+    "passed": 1,
+    "partial": 1,
+    "failed": 0,
+    "unverified": 0,
+    "total": 2,
+    "breakdown": [
+      { "criterionId": "AC-01", "verdict": "pass", "weighted": 1.0 },
+      { "criterionId": "AC-02", "verdict": "partial", "weighted": 0.5 }
+    ]
+  },
+  "verdict": {
+    "value": "NEEDS_WORK",
+    "reasons": ["RULE_PARTIAL_PRESENT: AC-02"],
+    "summary": "核心判定与证据链达标，PR 场景 5 分钟时延在排队高峰不达标，需优化 CI 轮询预算"
+  },
+  "durationMs": 234000,
+  "createdAt": "2026-09-11T12:05:30Z",
+  "writeBack": {
+    "status": "success",
+    "targets": [
+      { "kind": "requirement_verification_result", "ref": "/api/v1/requirements/cmtwygpt8005im9wnm4wyucnj" }
+    ],
+    "attempts": 1
+  }
+}

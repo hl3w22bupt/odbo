@@ -1,14 +1,14 @@
 /**
  * 心伴AI · Prisma 客户端
- * Prisma 7 使用驱动适配器连接数据库（默认 PostgreSQL / @prisma/adapter-pg）。
+ * Prisma 7 使用 SQLite 驱动适配器，保证 v0.1 冷启动与重启演示一致。
  */
-import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import { PrismaClient } from './generated/prisma/client.js'
 import { config } from './config.js'
 
 function createPrisma(): PrismaClient {
-  const adapter = new PrismaPg({ connectionString: config.databaseUrl })
-  return new PrismaClient({ adapter })
+  const adapter = new PrismaBetterSqlite3({ url: config.databaseUrl })
+  return new PrismaClient({ adapter: adapter as never })
 }
 
 declare global {

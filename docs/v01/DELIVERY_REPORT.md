@@ -1,0 +1,201 @@
+# 心伴 v0.1 交付报告（冻结执行版）
+
+- 分支：`myrd/v01-cancelled-dod-v02-cmuq57cax00aym9dhcxbj8pqw`
+- 结论：**可交付**。主链路“注册/登录 → 核心交互 → 持久化 → 展示”已实现、可构建、可启动、可验收。
+- 技术路径：沿用既有 Expo/React Native 前端与 TypeScript/Prisma 后端资产；为 v0.1 增加**零第三方框架的 standalone Node HTTP runtime**，复用原有 iii handler，避免演示启动依赖外部引擎进程。持久化采用 SQLite 文件数据库（`file:./data/xinban-dev.db`），保证一条命令冷启动、种子化与重启数据可复现。PostgreSQL/iii 生产编排延后到 v0.2+。
+
+## 1. 现状盘点
+
+> 本节为**续跑盘点（2026-10-02）**：三条命令（构建/启动/测试）全部实测复核，结论替代上轮声明。
+> 实测环境：Node 26.7.0 / npm 11.19.0，平台装配 worktree + 继续分支。
+
+### 1.1 已有能力清单（按主链路覆盖度，均实测）
+
+| 环节 | 能力 | v0.1 覆盖度 | 本轮实测锚点 |
+|---|---|---|---|
+| 注册/登录 | 手机号验证码（60s 防刷）、开发码 `123456`、JWT HS256 access/refresh、刷新轮换 + 会话撤销、RBAC、401 拦截、Expo 登录页 | 覆盖 | smoke 02-04/13 过；`auth.test.ts` 过；`lib/auth.ts` 代码走查无硬伤 |
+| 核心交互 | 角色列表（4 种子角色）、单角色会话、用户消息落库、后台 AI 回复 TYPING→COMPLETED、配额、内容过滤、好感度 | 主链路覆盖；真实 LLM 可配置，未配置时确定性离线回复 | smoke 05、07-09 过；`characters.test.ts` 过 |
+| 持久化 | Prisma 7 + better-sqlite3 适配：用户/会话/消息/配额/JWT 会话；种子角色 | 覆盖；SQLite 冷启动与重启校验 | smoke 10-12 过（重启同一 DB 文件后消息与状态一致） |
+| 展示 | 登录页、首页、角色选择、聊天页、状态条；Expo Web 静态导出 | **部分覆盖**：导出可构建，但普通 `npm run build` 产物默认落 mock 模式（缺口 G1） | build 过；导出包字符串核验（`isMockMode` 编译为 `return !undefined`） |
+
+### 1.2 缺口清单（必需/可延后二分）
+
+| 分类 | 缺口 | 处理 |
+|---|---|---|
+| 必需·本轮新增 | **G1**：`npm run build` 未设 `EXPO_PUBLIC_API_URL`，导出包 `isMockMode()` 恒为 true → 静态站点演示的是内置 mock 数据而非真实后端；且 Metro transform 缓存不感知 `EXPO_PUBLIC_*` 变化（实测设 env 与不设 env 产出**同哈希**包，`--clear` 后才内联成功） | 已修（`c82e363`，F-4/F-5 复勾） |
+| 必需·本轮新增 | **G2**：`apps/server/README.md` 仍为旧 iii 引擎口径（PostgreSQL / 端口 3111 / 49134 / `npm run dev` 引擎编排），`apps/mobile/src/api/index.ts` 头注释亦写 3111，与 standalone + SQLite + 3888 实际相悖，误导人读冒烟 | 已修（`87dcd72`） |
+| 必需·本轮新增 | **G3**：`scripts/smoke.sh` 步骤 07-09 输出缺 ✅ 前缀（`green()` 不打印勾），与 01-06/10-13 输出不一致，机器解析与人工核对易漏判 | 已修（`f2e681c`） |
+| 必需·本轮新增 | **G4**：工作区遗留未跟踪 `.env` 将 `HTTP_PORT` 钉在 13888，与文档默认 3888 不一致（本轮实测曾因此误判启动失败） | 已修：本地 `.env` 对齐 3888（未跟踪文件不入库）；SMOKE.md 补充 `.env` 优先级说明 |
+| 必需 | 原 HTTP 路由只绑定 iii 引擎，演示启动受外部进程/端口影响 | 已补 standalone runtime |
+| 必需 | 默认 Prisma 数据源与运行适配器不一致，新环境无确定性数据库 | 已切 SQLite + 驱动适配器 |
+| 必需 | 无一条命令跑注册/聊天/重启持久化 | 已补 `scripts/smoke.sh` |
+| 必需 | Expo Web 缺少 `react-dom` / `react-native-web`，静态导出失败 | 已补依赖并通过导出 |
+| 必需 | 端口文档不一致（3111/3888） | 统一默认 3888，脚本可用环境变量覆盖 |
+| 可延后 | 真实短信、微信/支付宝、真实 DeepSeek、Seedream 图像 | v0.2+，保留 provider 抽象 |
+| 可延后 | 礼物、会员、多角色、形象定制、防沉迷深夜策略、管理后台 | v0.2+ |
+| 可延后 | iii 引擎部署、Prisma migrations、PostgreSQL 生产库 | v0.2+ |
+| 可延后 | 自动化浏览器 UI 断言、iOS/Android 真机冒烟 | v0.2+ |
+
+### 1.3 测试结果清单（过/挂/死三分）
+
+| 测试 | 基线结果 | 本轮实测结果 |
+|---|---|---|
+| `apps/server` Vitest | 初次安装后 3 个 suite 因未生成 Prisma client 导入失败；生成后 5/5 过、20/20 过 | **过**：5 suite / 20 tests（232ms） |
+| `apps/mobile` Vitest | 过：2 suite / 21 tests | **过**：2 suite / 21 tests（116ms） |
+| `npm run build` | 上轮声明通过 | **过**：server tsc + mobile typecheck + Expo Web 导出（index.html + 650KB bundle） |
+| `npm run server:dev` + `/health` | 上轮声明通过 | **过**：44 条路由注册、`status=up`；注意 `.env` 可覆盖端口（见 G4） |
+| `npm run smoke` | 上轮声明 13/13 | **过**：13/13，退出码 0（实测两次独立运行） |
+| 挂掉的测试 | 无 | **无** |
+| 主链路死测试（skip/only/todo/恒真） | 无 | **无**（全仓 grep 无 `.skip`/`.only`/`.todo`/`xit`） |
+| Skip 测试 | 无 | 无；本轮未删除测试 |
+
+**基线技术建议：部分可构建 → 修复续用**（与上轮判定一致，不重写）。既有前端、业务 handler、Prisma 模型与测试全部保留；本轮只需修 G1-G4 增量缺口。
+
+基线技术建议：**部分可构建 → 修复续用**。不重写；保留前端、业务 handler、Prisma 模型与测试。
+
+## 2. 冻结范围与 DoD
+
+范围冻结原则：只保主链路四环节 + 四个全局项。表外能力进入 v0.2+ 停车场，不在本轮扩范围。
+
+### 2.1 DoD 打勾表
+
+| # | 验收项 | 可判定口径 | 验证锚点 | 状态 |
+|---|---|---|---|---|
+| F-1 | 注册/登录 | 新手机号可获取开发验证码并以 `123456` 登录；返回 access/refresh token；无 token 访问受保护 API 返回 401 | `npm run smoke` 步骤 02-04；`apps/server/src/lib/auth.test.ts` | [x] |
+| F-2 | 核心交互 | 能读取至少 1 个可用角色；向会话发送文本后创建 USER 消息并生成 ASSISTANT 回复；回复最终 `COMPLETED` | `npm run smoke` 步骤 05、08-09；`apps/server/src/lib/chatEngine.ts` | [x] |
+| F-3 | 持久化 | 服务使用同一 SQLite 文件重启后，会话、用户消息、助手消息仍可读取且消息状态一致 | `npm run smoke` 步骤 07、10-12 | [x] |
+| F-4 | 展示 | Expo Web 可构建出静态 `index.html`；**导出包必须接线真实后端**（包内可检出内联 API URL，`isMockMode()` 编译为 false）；登录页可调用后端登录，聊天页可显示用户与助手消息 | `npm run build` 后 `grep` 导出 bundle 内联 URL（本轮实测 `127.0.0.1:3888` 已内联、mock 恒真模式消失）；`docs/v01/SMOKE.md` 人读步骤 4.1-4.5 | [x] |
+| F-5 | 全局构建 | 根目录一条命令完成后端编译、前端类型检查与 Web 静态导出，**且产物为接线真实后端的演示件**（构建脚本需注入默认 API URL 并清 Metro 缓存） | `npm run build`（本轮实测退出码 0）；bundle 字符串核验 | [x] |
+| F-6 | 全局启动 | 后端 standalone 服务一条命令启动，`/health` 返回 `status=up` | `npm run server:dev` + `curl /health`；smoke 步骤 01 | [x] |
+| F-7 | 冒烟脚本 | 一条命令创建临时 SQLite、启动、登录、发消息、重启、校验持久化并返回 0 | `npm run smoke` 输出 13/13 | [x] |
+| F-8 | 冒烟文档 | 人读复现步骤与脚本步骤一致，包含环境变量、成功判据、常见失败 | `docs/v01/SMOKE.md` | [x] |
+
+**冻结复核说明（续跑轮）**：范围**不扩不缩**，沿用上轮 F-1..F-8 与 v0.2+ 停车场。盘点缺口与 DoD 映射：G1→F-4/F-5（唯一实质缺口，修复前 F-4/F-5 保持未勾）；G2→F-6/F-8（文档口径一致性）；G3→F-7（冒烟输出一致性）；G4→F-6（本地环境一致性，已修，不入库）。主链路 API 契约见第 3 节，随并行开发使用，契约字段不变。
+
+### 2.2 v0.2+ 停车场
+
+真实短信/LLM/支付/图像供应商、礼物与会员完整商业化、多角色同台、形象定制、管理后台、防沉迷深夜策略、PostgreSQL 生产迁移、iii 生产编排、浏览器自动化 UI 测试、真机上架合规。
+
+## 3. 主链路 API 契约
+
+统一响应信封：HTTP 200/201/4xx/5xx + `{ "code": string, "message": string, "data": unknown }`；错误码示例 `BAD_REQUEST`、`UNAUTHORIZED`、`NOT_FOUND`。
+
+### `GET /health`
+
+响应 `data`：`{ service: 'xinban-ai', status: 'up', mode: 'standalone', time: string }`
+
+### `POST /api/v1/auth/sms-code`
+
+```json
+{ "phone": "13900000000", "purpose": "LOGIN" }
+```
+
+响应 `data`：`{ sent: true, expiresIn: 300, devCode?: '123456' }`；开发 SMS provider 固定返回 `devCode`。
+
+### `POST /api/v1/auth/login`
+
+```json
+{ "phone": "13900000000", "code": "123456" }
+```
+
+响应 `data`：
+
+```ts
+{
+  accessToken: string
+  refreshToken: string
+  expiresIn: number
+  user: { id: string; phone: string; nickname?: string | null; avatarUrl?: string | null; role: 'USER' | 'ADMIN' }
+  compliance: { aiNotice: string }
+}
+```
+
+后续受保护请求带 `Authorization: Bearer <accessToken>`。
+
+### `GET /api/v1/characters`
+
+响应 `data`：`Character[]`；列表只查询 `ACTIVE` 角色，序列化项含 `id/name/title/isMemberOnly/locked/affection`。
+
+### `POST /api/v1/conversations`
+
+```json
+{ "characterId": "<id>", "mode": "SINGLE" }
+```
+
+响应 201，`data.conversationId` 使用字段 `id`；包含 `userId`、`characterId`、`mode`、`messages: []`。
+
+### `POST /api/v1/chat/send`
+
+```json
+{
+  "conversationId": "<id>",
+  "characterId": "<id>",
+  "content": "今天想听你说说话"
+}
+```
+
+响应 `data`：`{ conversationId, userMessage: Message, assistantMessage: Message, quota, affection, typing: true }`。
+`assistantMessage` 初始为 `TYPING`，后台落库完成后通过消息列表轮询为 `COMPLETED`。
+
+### `GET /api/v1/conversations/:id/messages`
+
+响应 `data`：`{ items: Message[], hasMore: boolean }`；`Message.role` 为 `USER|ASSISTANT`，`Message.status` 为 `TYPING|COMPLETED`。
+
+### `GET /api/v1/users/me/status`
+
+响应 `data.quota`：`{ used, limit, remaining, unlimited }`；`data.compliance.aiNotice` 必须展示。
+
+## 4. 交付顺序与增量审查
+
+### 4.1 上轮增量（cancelled 前已合入，本轮复核）
+
+| 顺序 | 增量 | 复核结论 |
+|---|---|---|
+| 1 | 冻结报告/契约/清单 | 通过（本轮复核口径并收紧 F-4/F-5） |
+| 2 | standalone router + Node HTTP + SQLite 适配 + 端口统一 | 通过（本轮实测 server:dev 启动 + /health） |
+| 3 | 全链路冒烟脚本与重启持久化断言 | 通过（本轮实测 13/13 × 3 次独立运行） |
+| 4 | Expo Web build + 根编排 + 人读冒烟文档 | 通过+建议（遗留 G1 mock 产物与 G2 文档口径，本轮已修） |
+
+### 4.2 续跑轮增量（本轮）
+
+| 顺序 | 增量 | commit | 三态结论 |
+|---|---|---|---|
+| 5 | 盘点三清单落盘（构建/启动/测试实测） | `b5a54c2` | 通过 |
+| 6 | 范围冻结复核（DoD 口径收紧 + 缺口映射） | `4028e0a` | 通过 |
+| 7 | G1：build 产物接线真实后端（默认 API URL + `--clear`） | `c82e363` | 通过（bundle 内联 URL 实测，mock 恒真模式消失） |
+| 8 | G2：旧 iii 口径文档对齐 standalone 实际 | `87dcd72` | 通过（typecheck 通过） |
+| 9 | G3：smoke 13 步输出统一 ✅ | `f2e681c` | 通过（smoke 13/13 退出码 0，输出格式一致） |
+| 10 | 终检：SMOKE.md §5 补 06 映射 + 三对一终检记录 | 本提交 | 通过 |
+
+阻塞级审查项（主链路走不通 / 主链路死挂测试 / 冒烟与实际不符 / 持久化丢失不一致 / 登录安全硬伤）均未发现。
+
+## 5. 终检（续跑轮，2026-10-02，全量实测）
+
+**三对一终检：冒烟实跑 ↔ 冒烟文档 ↔ DoD 表**
+
+| 核对面 | 结果 | 证据 |
+|---|---|---|
+| 冒烟实跑 | ✅ 13/13，退出码 0 | `logs/smoke-final.log`：13 步均以 ✅ 开头 + 总结行 |
+| 冒烟文档 ↔ 脚本 | ✅ 一一对应 | SMOKE.md §1 判据（退出码 0 / 最后一行包含总结 / 13 步 ✅）；§5 对照表 01-13 全映射（含补齐的 06 行） |
+| DoD 表 ↔ 实测 | ✅ F-1..F-8 全勾且锚点均有本轮证据 | build 退出码 0 + bundle 内联 `127.0.0.1:3888` + mock 恒真模式消失；`npm test` 退出码 0（server 20/20 + mobile 21/21）；`npm run server:dev` 启动 + `/health` up |
+
+**结论：DoD 全勾，满足交付放行条件。**
+
+非阻塞建议（记入 v0.2+，不拦交付）：
+1. 浏览器自动化 UI 断言（Playwright）覆盖登录页/聊天页人读步骤（已列停车场）。
+2. 生产环境强制 `ACCESS_TOKEN_SECRET`/`REFRESH_TOKEN_SECRET` 覆盖默认值，并在 `SMS_PROVIDER=dev` 时输出醒目告警。
+3. smoke 总结行与步骤行可拆分计数口径，便于外部系统直接解析。
+
+红线遵守：未探测、未依赖、未记录 Open Design daemon（7456）为任何依赖或阻塞证据；所有验证均在本平台装配 worktree 与继续分支执行；部署保留给默认工作流 deploy 节点。
+
+## 6. 交付前独立复验（2026-10-02 第二次实测）
+
+工作区干净（无未提交改动）前提下，对 DoD 全勾结论做二次独立复验，结论一致：
+
+| 复验项 | 命令 | 结果 |
+|---|---|---|
+| 测试 | `npm test` | 退出码 0；server 5 suite/20 tests + mobile 2 suite/21 tests；全仓无 `.skip`/`.only`/`.todo` 死测试标记 |
+| 构建 | `npm run build` | 退出码 0；bundle（650KB）内联 `http://127.0.0.1:3888`，`isMockMode` 编译为常量 URL 判空（mock 分支不可达） |
+| 冒烟 | `npm run smoke` | 退出码 0；步骤 01-13 均以 `✅` 开头 + 总结行（日志 `logs/verify-smoke.log`，gitignore 不入库） |
+
+复验日志：`logs/verify-build.log`、`logs/verify-smoke.log`（均为运行时产物，不入库；可按 SMOKE.md 一键重放）。**DoD F-1..F-8 维持全勾，交付放行条件成立。**

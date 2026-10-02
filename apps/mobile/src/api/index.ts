@@ -1,8 +1,9 @@
 /**
  * 心伴AI · API 领域函数
  * 自动在「真实后端」与「离线演示」之间切换：
- *   - 配置 EXPO_PUBLIC_API_URL → 真实后端（apps/server，HTTP 端口 3111）
+ *   - 配置 EXPO_PUBLIC_API_URL → 真实后端（apps/server standalone，默认 http://127.0.0.1:3888）
  *   - 未配置或 EXPO_PUBLIC_ENABLE_MOCK=true → 内置演示数据
+ *   - 注意：该变量在构建期固化；导出需带 --clear，否则 Metro 缓存可能沿用旧值
  */
 import type {
   Affection,

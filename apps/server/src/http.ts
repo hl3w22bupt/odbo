@@ -1,7 +1,7 @@
 /**
  * 心伴AI · HTTP 路由层
- * 将业务 handler 注册为 iii 引擎的 function + http trigger。
- * handler 入参兼容 iii http trigger 输入，返回 { status_code, body, headers }。
+ * iii 部署：业务 handler 注册为 iii function + http trigger。
+ * standalone 部署：同一个 router 可直接被 Node HTTP server 调度。
  */
 import type { IIIClient } from 'iii-sdk'
 import type { HttpResponse } from './lib/response.js'
@@ -28,6 +28,10 @@ export interface HttpRouter {
   define(fnId: string, apiPath: string, method: string, handler: HttpHandler): void
 }
 
+export interface LocalHttpRouter extends HttpRouter {
+  dispatch(method: string, path: string, ctx: Omit<HttpRouteContext, 'method' | 'path'>): Promise<HttpResponse>
+}
+
 interface RawHttpInput {
   path_params?: Record<string, string>
   query_params?: Record<string, string | string[]>
@@ -35,6 +39,13 @@ interface RawHttpInput {
   headers?: Record<string, string | string[]>
   method?: string
   path?: string
+}
+
+interface RegisteredRoute {
+  fnId: string
+  apiPath: string
+  method: string
+  handler: HttpHandler
 }
 
 function normalizeQuery(query: Record<string, string | string[]> | undefined): Record<string, string> {
@@ -53,12 +64,42 @@ function normalizeHeaders(headers: Record<string, string | string[]> | undefined
   return out
 }
 
-export function createRouter(worker: IIIClient): HttpRouter {
-  const routes: Array<{ fnId: string; apiPath: string; method: string }> = []
+function decodeSegment(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
 
-  const router: HttpRouter = {
+function matchPath(pattern: string, path: string): Record<string, string> | undefined {
+  const expected = pattern.split('/').filter(Boolean)
+  const actual = path.split('/').filter(Boolean)
+  if (expected.length !== actual.length) return undefined
+  const params: Record<string, string> = {}
+  for (let i = 0; i < expected.length; i += 1) {
+    const part = expected[i]
+    const value = actual[i]
+    if (!part || !value) return undefined
+    if (part.startsWith(':')) {
+      params[part.slice(1)] = decodeSegment(value)
+    } else if (part !== value) {
+      return undefined
+    }
+  }
+  return params
+}
+
+export function createRouter(worker: IIIClient, registerWithEngine = true): LocalHttpRouter {
+  const routes: RegisteredRoute[] = []
+
+  const router: LocalHttpRouter = {
     define(fnId, apiPath, method, handler) {
-      routes.push({ fnId, apiPath, method })
+      routes.push({ fnId, apiPath, method: method.toUpperCase(), handler })
+      if (!registerWithEngine) {
+        logger.info(`[route] ${method} ${apiPath} -> ${fnId}`)
+        return
+      }
       worker.registerFunction(
         fnId,
         async (input: RawHttpInput) => {
@@ -90,6 +131,33 @@ export function createRouter(worker: IIIClient): HttpRouter {
         config: { api_path: apiPath, http_method: method },
       })
       logger.info(`[route] ${method} ${apiPath} -> ${fnId}`)
+    },
+
+    async dispatch(method, path, ctxInput) {
+      const normalizedMethod = method.toUpperCase()
+      for (const route of [...routes].reverse()) {
+        if (route.method !== normalizedMethod) continue
+        const params = matchPath(route.apiPath, path)
+        if (!params) continue
+        const ip = clientIp(ctxInput.headers)
+        const ctx: HttpRouteContext = {
+          ...ctxInput,
+          method: normalizedMethod,
+          path,
+          params,
+          ...(ip !== undefined ? { ip } : {}),
+        }
+        try {
+          return await route.handler(ctx)
+        } catch (err) {
+          logger.warn(`[http] ${normalizedMethod} ${path} 处理失败`, {
+            code: err instanceof AppError ? err.code : 'INTERNAL_ERROR',
+            message: err instanceof Error ? err.message : String(err),
+          })
+          return fromError(err)
+        }
+      }
+      return fromError(AppError.notFound('接口不存在'))
     },
   }
 

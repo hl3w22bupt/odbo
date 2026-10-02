@@ -1,0 +1,249 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://myrd.dev/schemas/verification-report.schema.json",
+  "title": "MyRD Verification Report",
+  "description": "Verification skill 结构化验证报告。需求验收标准 5 的字段完整性以本 schema 为准；报告落库/回写前必须通过校验。本副本相对设计源头（docs/verification-skill/，PR #601）有一处向后兼容扩展：新增可选 prMapping 字段（PR 场景必填），承载 PR→需求/Goal 的映射关系（验收标准 2），并使结论 CERTIFIED 规则 2c（映射存在）可机判。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "reportId",
+    "target",
+    "triggeredBy",
+    "criteria",
+    "adjudications",
+    "evidence",
+    "redTeam",
+    "scoring",
+    "verdict",
+    "durationMs",
+    "createdAt",
+    "writeBack"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0" },
+    "reportId": { "type": "string", "pattern": "^vrf_[0-9a-z]+$", "description": "全局唯一，幂等与追溯主键" },
+    "criteriaHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "解析后 Criterion[] 的指纹，防标准错位" },
+    "target": { "$ref": "#/definitions/target" },
+    "triggeredBy": { "$ref": "#/definitions/triggeredBy" },
+    "criteria": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/criterion" } },
+    "adjudications": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/adjudication" } },
+    "evidence": { "type": "array", "items": { "$ref": "#/definitions/evidence" } },
+    "redTeam": { "$ref": "#/definitions/redTeam" },
+    "scoring": { "$ref": "#/definitions/scoring" },
+    "verdict": { "$ref": "#/definitions/verdict" },
+    "durationMs": { "type": "integer", "minimum": 0 },
+    "createdAt": { "$ref": "#/definitions/isoDateTime" },
+    "writeBack": { "$ref": "#/definitions/writeBack" },
+    "prMapping": { "$ref": "#/definitions/prMapping" }
+  },
+  "allOf": [
+    {
+      "description": "PR 场景必须携带映射关系（验收标准 2；orphan 亦须显式声明，结论据此封顶 NEEDS_WORK）",
+      "if": { "properties": { "target": { "properties": { "type": { "const": "pr" } } } } },
+      "then": { "required": ["prMapping"] }
+    }
+  ],
+  "definitions": {
+    "isoDateTime": { "type": "string", "format": "date-time" },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "ref", "title"],
+      "properties": {
+        "type": { "enum": ["goal", "requirement", "pr"] },
+        "id": { "type": "string", "minLength": 1 },
+        "ref": { "type": "string", "minLength": 1, "description": "平台 API URL 或 repo#number" },
+        "title": { "type": "string" }
+      }
+    },
+    "triggeredBy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario", "actor", "at"],
+      "properties": {
+        "scenario": { "enum": ["status_change_auto", "pr_created_or_updated", "explicit_invoke"] },
+        "actor": { "type": "string", "description": "触发者（user id / system / workflow node）" },
+        "at": { "$ref": "#/definitions/isoDateTime" }
+      }
+    },
+    "criterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text", "weight", "kind", "verifiable"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^AC-\\d{2,}$" },
+        "text": { "type": "string", "minLength": 1 },
+        "weight": { "type": "number", "exclusiveMinimum": 0 },
+        "kind": { "enum": ["core", "normal"] },
+        "verifiable": { "type": "boolean" },
+        "originTarget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "id"],
+          "properties": {
+            "type": { "enum": ["goal", "requirement", "pr"] },
+            "id": { "type": "string" }
+          }
+        },
+        "parseNote": { "type": "string" }
+      }
+    },
+    "adjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criterionId", "verdict", "rationale", "evidenceIds", "checkedAt"],
+      "properties": {
+        "criterionId": { "type": "string", "pattern": "^AC-\\d{2,}$" },
+        "verdict": { "enum": ["pass", "partial", "fail", "unverified"] },
+        "rationale": { "type": "string", "minLength": 1, "description": "必须引用证据内容；unverified 时说明缺失的证据" },
+        "evidenceIds": { "type": "array", "items": { "type": "string", "pattern": "^EV-\\d{2,}$" } },
+        "checkedAt": { "$ref": "#/definitions/isoDateTime" },
+        "downgradedBy": { "type": ["string", "null"], "description": "红队降级来源 challengeId" }
+      },
+      "allOf": [
+        {
+          "description": "P1 证据优先：pass 判定必须至少绑定 1 条证据",
+          "if": { "properties": { "verdict": { "const": "pass" } } },
+          "then": { "properties": { "evidenceIds": { "minItems": 1 } } }
+        }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "uri", "fetchedAt", "digest", "excerpt", "reliability", "status"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^EV-\\d{2,}$" },
+        "type": { "enum": ["test_run", "ci_check", "api_response", "git_commit", "pr_diff", "doc_link", "screenshot", "log", "trajectory", "platform_record"] },
+        "uri": { "type": "string", "minLength": 1 },
+        "fetchedAt": { "$ref": "#/definitions/isoDateTime" },
+        "digest": { "$ref": "#/definitions/sha256" },
+        "excerpt": { "type": "string", "maxLength": 200 },
+        "reliability": { "enum": ["direct", "indirect", "hearsay"] },
+        "status": { "enum": ["ok", "timeout", "unreachable", "digest_mismatch"] }
+      }
+    },
+    "redTeam": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "challenges"],
+      "properties": {
+        "status": { "enum": ["completed", "skipped"] },
+        "skipReason": { "type": "string" },
+        "summary": { "type": "string" },
+        "uncoveredAttackSurface": { "type": "array", "items": { "type": "string" } },
+        "challenges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "targetCriterionId", "attackType", "severity", "claim", "evidenceIds", "outcome"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^RT-\\d{2,}$" },
+              "targetCriterionId": { "type": "string", "pattern": "^AC-\\d{2,}$" },
+              "attackType": { "enum": ["falsification", "probing", "scope"] },
+              "severity": { "enum": ["blocker", "major", "minor"] },
+              "claim": { "type": "string", "minLength": 1 },
+              "evidenceIds": { "type": "array", "items": { "type": "string" } },
+              "outcome": { "enum": ["upheld", "overturned"] },
+              "arbitrationNote": { "type": "string" }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "skipped" } } },
+          "then": { "required": ["status", "challenges", "skipReason"] }
+        }
+      ]
+    },
+    "scoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "passed", "partial", "failed", "unverified", "total", "breakdown"],
+      "properties": {
+        "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "partial": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "unverified": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 1 },
+        "breakdown": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["criterionId", "verdict", "weighted"],
+            "properties": {
+              "criterionId": { "type": "string", "pattern": "^AC-\\d{2,}$" },
+              "verdict": { "enum": ["pass", "partial", "fail", "unverified"] },
+              "weighted": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "prMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "description": "PR→需求/Goal 映射（README §3 确定性优先级：pr_body > branch_name > commit_message；均未命中 = orphan，结论封顶 NEEDS_WORK）",
+      "properties": {
+        "status": { "enum": ["mapped", "orphan"] },
+        "method": { "enum": ["pr_body", "branch_name", "commit_message"] },
+        "requirements": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "goals": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "note": { "type": "string", "description": "orphan 时说明尝试过哪些映射途径" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "mapped" } } },
+          "then": {
+            "required": ["status", "method"],
+            "anyOf": [ { "required": ["requirements"] }, { "required": ["goals"] } ]
+          }
+        }
+      ]
+    },
+    "verdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "reasons"],
+      "properties": {
+        "value": { "enum": ["CERTIFIED", "NEEDS_WORK", "REJECTED"] },
+        "reasons": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^RULE_[A-Z_]+:" }
+        },
+        "summary": { "type": "string", "description": "给人类的一句话结论" }
+      }
+    },
+    "writeBack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["pending", "success", "failed", "revoked"] },
+        "targets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "ref"],
+            "properties": {
+              "kind": { "enum": ["requirement_verification_result", "goal_loop_history", "pr_comment", "commit_status", "notification"] },
+              "ref": { "type": "string" }
+            }
+          }
+        },
+        "attempts": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "error": { "type": "string" },
+        "revokedReason": { "type": "string" }
+      }
+    }
+  }
+}

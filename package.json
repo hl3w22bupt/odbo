@@ -9,6 +9,8 @@
     "smoke": "./scripts/smoke.sh",
     "server:dev": "cd apps/server && npm run dev:standalone",
     "server:start": "cd apps/server && npm run start:standalone",
+    "persistence:v02": "./scripts/persistence-v02.sh",
+    "deploy:v02": "./scripts/deploy-v02.sh",
     "mobile:start": "cd apps/mobile && npm run start"
   },
   "repository": {

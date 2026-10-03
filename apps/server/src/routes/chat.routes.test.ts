@@ -19,4 +19,14 @@ describe('chat v0.3 read contracts', () => {
       path: '/api/v1/conversations/:id/memory',
     })
   })
+
+  it('exposes the structured mood timeline read API', () => {
+    const router = new ContractRouter()
+    registerChatRoutes(router as never)
+    expect(router.routes).toContainEqual({
+      name: 'chat::conversation-mood-timeline',
+      method: 'GET',
+      path: '/api/v1/conversations/:id/mood-timeline',
+    })
+  })
 })

@@ -4,7 +4,9 @@ import {
   memoryReadDegraded,
   memoryReadEmpty,
   readableMemories,
+  readableMoodTimeline,
   serializeMemory,
+  serializeMood,
 } from './conversationInsights.js'
 
 const memoryRow = {
@@ -56,5 +58,32 @@ describe('conversation memory contract', () => {
       items: [],
     })
     expect(readableMemories('conv_1', [{ ...memoryRow, content: '半写脏数据' }], true)).toEqual(degraded)
+  })
+})
+
+describe('mood timeline contract', () => {
+  it('serializes mood snapshots with structured keywords', () => {
+    const point = serializeMood({
+      id: 'mood_1',
+      conversationId: 'conv_1',
+      characterId: 'char_1',
+      sourceMessageId: 'msg_1',
+      memoryId: 'mem_1',
+      mood: 'POSITIVE',
+      score: 1,
+      keywords: '开心,顺利',
+      createdAt: new Date('2026-01-02T00:00:00.000Z'),
+    })
+    const row = {
+      ...point,
+      keywords: '开心,顺利',
+      createdAt: new Date('2026-01-02T00:00:00.000Z'),
+    }
+    expect(readableMoodTimeline('conv_1', [row])).toEqual({
+      conversationId: 'conv_1',
+      available: true,
+      degraded: false,
+      points: [{ ...point, keywords: ['开心', '顺利'] }],
+    })
   })
 })

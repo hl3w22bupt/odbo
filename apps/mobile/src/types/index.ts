@@ -86,6 +86,27 @@ export interface MemoryReadResult {
   items: ConversationMemory[];
 }
 
+export type ConversationMood = 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE';
+
+export interface MoodSnapshot {
+  id: string;
+  conversationId: string;
+  characterId: string | null;
+  sourceMessageId: string | null;
+  memoryId: string | null;
+  mood: ConversationMood;
+  score: -1 | 0 | 1;
+  keywords: string[];
+  createdAt: string;
+}
+
+export interface MoodTimelineResult {
+  conversationId: string;
+  available: boolean;
+  degraded: boolean;
+  points: MoodSnapshot[];
+}
+
 export interface QuotaStatus {
   used: number;
   limit: number;
@@ -241,6 +262,7 @@ export interface ChatSendResult {
   quota: QuotaStatus;
   affection: Affection;
   memory?: MemoryReadResult;
+  moodTimeline?: MoodTimelineResult;
   typing: boolean;
 }
 

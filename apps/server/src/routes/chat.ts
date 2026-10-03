@@ -21,9 +21,13 @@ import { hasActiveMembership } from '../lib/quota.js'
 import { logger } from '../lib/logger.js'
 import {
   extractMemoryContent,
+  classifyMood,
+  moodTimelineDegraded,
+  moodTimelineEmpty,
   memoryReadDegraded,
   memoryReadEmpty,
   readableMemories,
+  readableMoodTimeline,
   serializeMemory,
 } from '../lib/conversationInsights.js'
 
@@ -205,6 +209,32 @@ async function conversationMemory(ctx: HttpRouteContext) {
 }
 
 /**
+ * v0.3 P1 读接口：情绪轨迹结构化快照。
+ * 断言内容与排序，不断言像素；快照只从已成功保存的 P0 记忆派生。
+ */
+async function conversationMoodTimeline(ctx: HttpRouteContext) {
+  const user = await authenticate(ctx)
+  const id = ctx.params.id
+  if (!id) throw AppError.badRequest('缺少会话 id')
+
+  try {
+    const conversation = await prisma.conversation.findFirst({ where: { id, userId: user.id } })
+    if (!conversation) throw AppError.notFound('会话不存在')
+
+    const rows = await prisma.moodSnapshot.findMany({
+      where: { conversationId: id },
+      orderBy: { createdAt: 'asc' },
+      take: 50,
+    })
+    return ok(readableMoodTimeline(id, rows))
+  } catch (err) {
+    if (err instanceof AppError) throw err
+    logger.warn('[chat] mood timeline read degraded', { err: String(err), conversationId: id })
+    return ok(moodTimelineDegraded(id))
+  }
+}
+
+/**
  * 单角色聊天发送。
  * 返回用户消息 + 输入中的占位回复（TYPING），后台异步生成回复。
  */
@@ -321,6 +351,25 @@ async function chatSend(ctx: HttpRouteContext) {
     logger.warn('[chat] memory write degraded', { err: String(err), conversationId: conversation.id })
   }
 
+  // P1：只从成功保存的 P0 记忆派生情绪快照；写失败同样降级，不阻断聊天。
+  let mood = null
+  if (memory) {
+    const moodData = {
+      conversationId: conversation.id,
+      userId: user.id,
+      characterId,
+      sourceMessageId: userMessage.id,
+      memoryId: memory.id,
+      ...classifyMood(memory.content),
+      keywords: classifyMood(memory.content).keywords.join(','),
+    }
+    try {
+      mood = await prisma.moodSnapshot.create({ data: moodData })
+    } catch (err) {
+      logger.warn('[chat] mood snapshot write degraded', { err: String(err), conversationId: conversation.id })
+    }
+  }
+
   // 后台生成回复
   const ctx2: ReplyContext = {
     conversationId: conversation.id,
@@ -347,6 +396,9 @@ async function chatSend(ctx: HttpRouteContext) {
       memory: memory
         ? readableMemories(conversation.id, [memory])
         : memoryReadDegraded(conversation.id),
+      moodTimeline: mood
+        ? readableMoodTimeline(conversation.id, [mood])
+        : moodTimelineDegraded(conversation.id),
       typing: true,
     },
     '消息已发送，回复生成中',
@@ -546,6 +598,7 @@ export function registerChatRoutes(router: HttpRouter): void {
   router.define('chat::conversation-detail', '/api/v1/conversations/:id', 'GET', conversationDetail)
   router.define('chat::list-messages', '/api/v1/conversations/:id/messages', 'GET', listMessages)
   router.define('chat::conversation-memory', '/api/v1/conversations/:id/memory', 'GET', conversationMemory)
+  router.define('chat::conversation-mood-timeline', '/api/v1/conversations/:id/mood-timeline', 'GET', conversationMoodTimeline)
   router.define('chat::send', '/api/v1/chat/send', 'POST', chatSend)
   router.define('chat::multi-send', '/api/v1/chat/multi/send', 'POST', chatMultiSend)
   router.define('chat::proactive-now', '/api/v1/chat/proactive', 'POST', proactiveShareNow)

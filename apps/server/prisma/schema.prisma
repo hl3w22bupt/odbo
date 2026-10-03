@@ -362,3 +362,22 @@ model ContentAuditLog {
   @@index([userId])
   @@index([createdAt])
 }
+
+// ============ v0.3 · 核心交互价值闭环 ============
+
+/// 会话长期记忆点（P0）：只读展示并可注入后续对话提示词
+model ConversationMemory {
+  id              String   @id @default(cuid())
+  conversationId  String
+  userId          String
+  characterId     String?
+  sourceMessageId String?
+  content         String
+  status          String   @default("ACTIVE") // ACTIVE | QUARANTINED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([conversationId, status, createdAt])
+  @@index([userId, createdAt])
+}
+

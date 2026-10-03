@@ -19,6 +19,13 @@ import {
 import { getAffectionsForUser } from '../lib/affection.js'
 import { hasActiveMembership } from '../lib/quota.js'
 import { logger } from '../lib/logger.js'
+import {
+  extractMemoryContent,
+  memoryReadDegraded,
+  memoryReadEmpty,
+  readableMemories,
+  serializeMemory,
+} from '../lib/conversationInsights.js'
 
 function safeJson(s: string): unknown {
   try {
@@ -172,6 +179,32 @@ async function listMessages(ctx: HttpRouteContext) {
 }
 
 /**
+ * v0.3 P0 读接口：会话记忆展示。
+ * 存储查询失败时进入显式降级态，返回空列表，绝不暴露半写或脏数据。
+ */
+async function conversationMemory(ctx: HttpRouteContext) {
+  const user = await authenticate(ctx)
+  const id = ctx.params.id
+  if (!id) throw AppError.badRequest('缺少会话 id')
+
+  try {
+    const conversation = await prisma.conversation.findFirst({ where: { id, userId: user.id } })
+    if (!conversation) throw AppError.notFound('会话不存在')
+
+    const rows = await prisma.conversationMemory.findMany({
+      where: { conversationId: id },
+      orderBy: { createdAt: 'asc' },
+      take: 50,
+    })
+    return ok(readableMemories(id, rows))
+  } catch (err) {
+    if (err instanceof AppError) throw err
+    logger.warn('[chat] memory read degraded', { err: String(err), conversationId: id })
+    return ok(memoryReadDegraded(id))
+  }
+}
+
+/**
  * 单角色聊天发送。
  * 返回用户消息 + 输入中的占位回复（TYPING），后台异步生成回复。
  */
@@ -268,6 +301,26 @@ async function chatSend(ctx: HttpRouteContext) {
   })
   await prisma.user.update({ where: { id: user.id }, data: { lastActiveAt: new Date() } })
 
+  // P0：消息主体已提交后写记忆；失败只降级，不阻断聊天主链路。
+  const characterId: string = character.id
+  const memoryData = {
+    conversationId: conversation.id,
+    userId: user.id,
+    characterId,
+    sourceMessageId: userMessage.id,
+    content: extractMemoryContent(safeContent),
+    status: 'ACTIVE',
+  }
+  let memory: Awaited<ReturnType<typeof createMemory>> | null = null
+  async function createMemory() {
+    return prisma.conversationMemory.create({ data: memoryData })
+  }
+  try {
+    memory = await createMemory()
+  } catch (err) {
+    logger.warn('[chat] memory write degraded', { err: String(err), conversationId: conversation.id })
+  }
+
   // 后台生成回复
   const ctx2: ReplyContext = {
     conversationId: conversation.id,
@@ -291,6 +344,9 @@ async function chatSend(ctx: HttpRouteContext) {
         unlimited: quota.unlimited,
       },
       affection: affection[character.id],
+      memory: memory
+        ? readableMemories(conversation.id, [memory])
+        : memoryReadDegraded(conversation.id),
       typing: true,
     },
     '消息已发送，回复生成中',
@@ -489,6 +545,7 @@ export function registerChatRoutes(router: HttpRouter): void {
   router.define('chat::list-conversations', '/api/v1/conversations', 'GET', listConversations)
   router.define('chat::conversation-detail', '/api/v1/conversations/:id', 'GET', conversationDetail)
   router.define('chat::list-messages', '/api/v1/conversations/:id/messages', 'GET', listMessages)
+  router.define('chat::conversation-memory', '/api/v1/conversations/:id/memory', 'GET', conversationMemory)
   router.define('chat::send', '/api/v1/chat/send', 'POST', chatSend)
   router.define('chat::multi-send', '/api/v1/chat/multi/send', 'POST', chatMultiSend)
   router.define('chat::proactive-now', '/api/v1/chat/proactive', 'POST', proactiveShareNow)

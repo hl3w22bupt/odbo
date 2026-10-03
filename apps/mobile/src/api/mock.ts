@@ -12,6 +12,7 @@ import type {
   ChatSendResult,
   ComplianceStatus,
   Conversation,
+  ConversationMemory,
   CustomizationPayload,
   CustomizationResult,
   GeneratedImageResult,
@@ -20,6 +21,7 @@ import type {
   LoginResult,
   MembershipInfo,
   MembershipPlan,
+  MemoryReadResult,
   Message,
   Order,
   PayResult,
@@ -32,6 +34,12 @@ import { genId } from '../utils/format';
 import { ApiError } from './client';
 
 // ===================== 常量 =====================
+
+const memories = new Map<string, ConversationMemory[]>();
+
+function normalizeMemory(content: string): string {
+  return content.replace(/\s+/g, ' ').trim().slice(0, 160);
+}
 
 const AI_NOTICE = '心伴AI 内所有角色均为 AI 虚拟形象，其言行由算法生成，不代表真实人物或观点。请理性看待，勿过度投入。';
 
@@ -410,6 +418,20 @@ export const mockApi = {
       createdAt: nowIso(),
     };
     list.push(userMsg, assistantMsg);
+    const memoryContent = normalizeMemory(params.content);
+    if (memoryContent) {
+      const items = memories.get(convId) ?? [];
+      items.push({
+        id: genId('memory'),
+        conversationId: convId,
+        characterId: character.id,
+        sourceMessageId: userMsg.id,
+        content: memoryContent,
+        status: 'ACTIVE',
+        createdAt: nowIso(),
+      });
+      memories.set(convId, items);
+    }
 
     // 好感度小幅上涨
     affectionValues[character.id] = (affectionValues[character.id] ?? 0) + (character.type === 'POSSESSIVE' ? 3 : 2);
@@ -426,7 +448,22 @@ export const mockApi = {
       assistantMessage: assistantMsg,
       quota: quotaStatus(),
       affection: computeAffection(affectionValues[character.id] ?? 0),
+      memory: {
+        conversationId: convId,
+        available: true,
+        degraded: false,
+        items: memories.get(convId) ?? [],
+      },
       typing: true,
+    };
+  },
+
+  async getConversationMemory(conversationId: string): Promise<MemoryReadResult> {
+    return {
+      conversationId,
+      available: true,
+      degraded: false,
+      items: memories.get(conversationId) ?? [],
     };
   },
 

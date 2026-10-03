@@ -69,6 +69,23 @@ export interface Conversation {
   createdAt: string;
 }
 
+export interface ConversationMemory {
+  id: string;
+  conversationId: string;
+  characterId: string | null;
+  sourceMessageId: string | null;
+  content: string;
+  status: 'ACTIVE' | 'QUARANTINED';
+  createdAt: string;
+}
+
+export interface MemoryReadResult {
+  conversationId: string;
+  available: boolean;
+  degraded: boolean;
+  items: ConversationMemory[];
+}
+
 export interface QuotaStatus {
   used: number;
   limit: number;
@@ -223,6 +240,7 @@ export interface ChatSendResult {
   assistantMessage: Message;
   quota: QuotaStatus;
   affection: Affection;
+  memory?: MemoryReadResult;
   typing: boolean;
 }
 

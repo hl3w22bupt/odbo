@@ -7,7 +7,7 @@
 3. **持久层增量**：沿用 Prisma 7 + SQLite 与现有 standalone HTTP runtime，不引入新数据库，不改既有对外请求/响应契约，只新增受保护的情绪状态资源。
 4. **降级边界**：会话与消息是主链路数据；情绪状态是伴生数据。情绪写入失败仅记日志，不阻断聊天主链路。
 5. **脚本验收**：用真实 HTTP + 独立 SQLite 临时库验证“写入 → kill → 重启 → 读回一致”，并用 SQLite 删除情绪表制造真实持久层失败，断言主链路仍可写消息。
-6. **部署复验**：build 后用 `server:start` 部署，健康探针通过，再重跑 build/start/test 并回填 deploy 段。
+6. **部署复验**：build 后用 `server:start` 部署，健康探针通过，再重跑 build/start/test 并回填 deploy 段。陷阱备忘：启动 dist 产物必须在**子 shell** 内 `cd apps/server`（或用 `pushd/popd`），否则主流程 cwd 被污染，部署后重跑会静默退化为 server 子包命令——退出码仍为 0 但 mobile 段未执行，验收对象被偷换。
 
 ## 2. 模块边界
 

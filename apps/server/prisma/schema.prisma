@@ -145,9 +145,26 @@ model Conversation {
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   character Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
   messages  Message[]
+  emotion   ConversationEmotion?
 
   @@index([userId, updatedAt])
   @@index([characterId])
+}
+
+/// 会话情绪伴生态（v0.2 持久化增量；失败不阻塞消息主链路）
+model ConversationEmotion {
+  id             String    @id @default(cuid())
+  conversationId String    @unique
+  emotion        String    @default("NEUTRAL") // NEUTRAL | POSITIVE | CALM | ANXIOUS | SAD
+  score          Float     @default(0)
+  version        Int       @default(1)
+  payload        String    @default("{}") // 兼容扩展 JSON；不可读时整体丢弃
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([emotion])
 }
 
 /// 消息

@@ -31,11 +31,11 @@
 
 | # | 验收项 | 可判定口径 | 验证锚点 | 状态 |
 |---|---|---|---|---|
-| V3-1 | P0 会话记忆展示利用 | 空态返回 `available=true/items=[]`；写后返回原文规范化内容；`degraded=true` 时不返回内容；prompt 包含记忆 | `conversationInsights.test.ts`、`chat.routes.test.ts`、`smoke.sh` 14-15 | [x] |
-| V3-2 | P1 情绪轨迹读视图 | 从 memoryId 派生结构化 `mood/score/keywords`；读接口按内容断言；降级态为空 | `conversationInsights.test.ts`、`insights.test.ts`、`smoke.sh` 16-17 | [x] |
+| V3-1 | P0 会话记忆展示利用 | 空态返回 `available=true/items=[]`；写后返回原文规范化内容；`degraded=true` 时不返回内容；prompt 包含记忆 | `conversationInsights.test.ts`、`chat.routes.test.ts > serves the explicit empty memory state for a fresh conversation / degrades the memory read to an empty list when storage fails`、`smoke.sh` 14-15、18 | [x] |
+| V3-2 | P1 情绪轨迹读视图 | 从 memoryId 派生结构化 `mood/score/keywords`；读接口按内容断言；降级态为空 | `conversationInsights.test.ts`、`insights.test.ts`、`chat.routes.test.ts > serves the explicit empty mood timeline before the first snapshot / degrades the mood timeline read to an empty list when storage fails`、`smoke.sh` 16-17、19 | [x] |
 | V3-3 | 新增数据跨重启持久 | `npm run persist:check` exit 0，含 P02 写、P05 kill、P06 重启、P07/P08 读回一致 | `scripts/persistence-regression.sh` P01-P08 | [x] |
-| V3-4 | 写失败降级 | writer throw 后返回 `available=false/degraded=true/items=[]`，无脏数据 | `conversationInsights.test.ts > maps a memory write failure...`；persist P09 | [x] |
-| V3-5 | v0.3 冒烟全局项 | 01-13 基线全绿且 14-17 增量全绿，exit 0 | `npm run smoke`；`docs/smoke/v0.3.md` | [x] |
+| V3-4 | 写失败降级 | writer throw 后返回 `available=false/degraded=true/items=[]`，无脏数据 | `conversationInsights.test.ts > maps a memory write failure...`；`chat.routes.test.ts > degrades the memory read...`；persist P09 | [x] |
+| V3-5 | v0.3 冒烟全局项 | 01-13 基线全绿且 14-19 增量全绿，exit 0 | `npm run smoke`；`docs/smoke/v0.3.md` | [x] |
 | V3-6 | v0.2 死测试处置 | 基线 0 个 → 修 0 / 删 0 / 缓 0，全仓无死测试标记 | `docs/smoke/v0.2-base.md`、本轮 grep | [x] |
 
 ## 5. 契约增量
@@ -89,3 +89,12 @@
 ```
 
 `POST /api/v1/chat/send` 只做向后兼容增量：`data.memory`、`data.moodTimeline` 可选新增；既有字段不变。
+
+### 契约测试绑定（冻结后以测试红为契约被改的判定）
+
+| 接口 | 绑定契约测试 |
+|---|---|
+| `GET /api/v1/conversations/:id/memory` | `apps/server/src/routes/chat.routes.test.ts > exposes the conversation memory read API`（路由注册）；`> serves the explicit empty memory state for a fresh conversation`（空态）；`> degrades the memory read to an empty list when storage fails`（降级态）；`apps/server/src/lib/conversationInsights.test.ts > returns an explicit empty state before any memory is written`（信封形状） |
+| `GET /api/v1/conversations/:id/mood-timeline` | `chat.routes.test.ts > exposes the structured mood timeline read API`（路由注册）；`> serves the explicit empty mood timeline before the first snapshot`（空态）；`> degrades the mood timeline read to an empty list when storage fails`（降级态）；`conversationInsights.test.ts > serializes mood snapshots with structured keywords`（内容快照） |
+| `POST /api/v1/chat/send`（`data.memory` / `data.moodTimeline` 增量） | `conversationInsights.test.ts > maps a memory write failure to the degraded read contract`（写失败降级回填）；`scripts/persistence-regression.sh` P02-P04（写后返回字段） |
+| Web 展示层（空态/就绪态/降级态） | `apps/mobile/src/utils/insights.test.ts`（`renders an explicit empty state...`、`hides dirty data and enters the degraded state`、`asserts timeline content instead of pixels`、`uses empty and degraded states without exposing partial rows`） |

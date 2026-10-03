@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 心伴 v0.1 · 一条命令全链路冒烟
+# 心伴 v0.3 · 一条命令全链路冒烟（01-13 v0.2 基线段 + 14-17 增量段）
 # 用法：npm run smoke
 # 可用环境变量：XINBAN_SMOKE_PORT（默认 13888）、KEEP_SMOKE_DIR=1（保留临时目录）
 set -euo pipefail
@@ -146,4 +146,13 @@ assert_contains '12 消息状态一致' "$messages" '"status":"COMPLETED"'
 refresh="$(http POST /api/v1/auth/refresh '' "{\"refreshToken\":\"$(printf '%s' "$login" | json_get refreshToken)\"}")"
 assert_contains '13 令牌刷新' "$refresh" '"accessToken"'
 
-green "心伴 v0.1 冒烟通过：$PASS 项 / 13 项"
+# ---------- v0.3 增量段：核心交互价值闭环 ----------
+memory="$(http GET "/api/v1/conversations/$CONVERSATION_ID/memory" "$TOKEN")"
+assert_contains '14 会话记忆重启后可读' "$memory" '冒烟测试：今天想听你说说话'
+assert_contains '15 会话记忆契约无降级' "$memory" '"degraded":false'
+
+mood="$(http GET "/api/v1/conversations/$CONVERSATION_ID/mood-timeline" "$TOKEN")"
+assert_contains '16 情绪轨迹结构化快照' "$mood" '"mood":"NEUTRAL"'
+assert_contains '17 情绪轨迹内容非像素契约' "$mood" '"score":0'
+
+green "心伴 v0.3 冒烟通过：$PASS 项 / 17 项"

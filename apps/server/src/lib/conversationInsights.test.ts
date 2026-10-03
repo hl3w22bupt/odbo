@@ -3,6 +3,7 @@ import {
   extractMemoryContent,
   memoryReadDegraded,
   memoryReadEmpty,
+  persistMemoryOrDegrade,
   readableMemories,
   readableMoodTimeline,
   serializeMemory,
@@ -58,6 +59,14 @@ describe('conversation memory contract', () => {
       items: [],
     })
     expect(readableMemories('conv_1', [{ ...memoryRow, content: '半写脏数据' }], true)).toEqual(degraded)
+  })
+
+  it('maps a memory write failure to the degraded read contract', async () => {
+    const result = await persistMemoryOrDegrade('conv_1', async () => {
+      throw new Error('sqlite write failed')
+    })
+    expect(result.memory).toBeNull()
+    expect(result.read).toEqual(memoryReadDegraded('conv_1'))
   })
 })
 

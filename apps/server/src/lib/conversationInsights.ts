@@ -89,6 +89,26 @@ export function serializeMemory(row: {
 }
 
 /** 降级态是契约的一部分：存储不可用时必须返回空列表，不能把半写/脏数据展示给用户。 */
+export interface MemoryWriteResult<T> {
+  memory: T | null
+  read: MemoryReadContract
+}
+
+/**
+ * P0 写路径统一降级器：记忆写失败时主聊天继续，读回契约强制为空。
+ */
+export async function persistMemoryOrDegrade<T>(
+  conversationId: string,
+  write: () => Promise<T>,
+): Promise<MemoryWriteResult<T>> {
+  try {
+    const memory = await write()
+    return { memory, read: memoryReadEmpty(conversationId) }
+  } catch {
+    return { memory: null, read: memoryReadDegraded(conversationId) }
+  }
+}
+
 export function readableMemories(
   conversationId: string,
   rows: Array<Parameters<typeof serializeMemory>[0]>,

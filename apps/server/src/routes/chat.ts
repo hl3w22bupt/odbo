@@ -26,6 +26,7 @@ import {
   moodTimelineEmpty,
   memoryReadDegraded,
   memoryReadEmpty,
+  persistMemoryOrDegrade,
   readableMemories,
   readableMoodTimeline,
   serializeMemory,
@@ -333,22 +334,21 @@ async function chatSend(ctx: HttpRouteContext) {
 
   // P0：消息主体已提交后写记忆；失败只降级，不阻断聊天主链路。
   const characterId: string = character.id
-  const memoryData = {
-    conversationId: conversation.id,
-    userId: user.id,
-    characterId,
-    sourceMessageId: userMessage.id,
-    content: extractMemoryContent(safeContent),
-    status: 'ACTIVE',
-  }
-  let memory: Awaited<ReturnType<typeof createMemory>> | null = null
-  async function createMemory() {
-    return prisma.conversationMemory.create({ data: memoryData })
-  }
-  try {
-    memory = await createMemory()
-  } catch (err) {
-    logger.warn('[chat] memory write degraded', { err: String(err), conversationId: conversation.id })
+  const memoryResult = await persistMemoryOrDegrade(conversation.id, () =>
+    prisma.conversationMemory.create({
+      data: {
+        conversationId: conversation.id,
+        userId: user.id,
+        characterId,
+        sourceMessageId: userMessage.id,
+        content: extractMemoryContent(safeContent),
+        status: 'ACTIVE',
+      },
+    }),
+  )
+  const memory = memoryResult.memory
+  if (!memory) {
+    logger.warn('[chat] memory write degraded', { conversationId: conversation.id })
   }
 
   // P1：只从成功保存的 P0 记忆派生情绪快照；写失败同样降级，不阻断聊天。
@@ -395,7 +395,7 @@ async function chatSend(ctx: HttpRouteContext) {
       affection: affection[character.id],
       memory: memory
         ? readableMemories(conversation.id, [memory])
-        : memoryReadDegraded(conversation.id),
+        : memoryResult.read,
       moodTimeline: mood
         ? readableMoodTimeline(conversation.id, [mood])
         : moodTimelineDegraded(conversation.id),

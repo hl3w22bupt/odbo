@@ -121,3 +121,85 @@ describe('chat v0.3 read handler behavior', () => {
     })
   })
 })
+
+describe('chat v0.4 insight summary', () => {
+  const conversationId = 'conv_1'
+  let handlers: Map<string, HttpHandler>
+
+  beforeEach(() => {
+    handlers = captureHandlers()
+    vi.clearAllMocks()
+    prismaMock.conversation.findFirst.mockResolvedValue({ id: conversationId, userId: 'user_1' })
+  })
+
+  it('exposes the insight summary read API', () => {
+    const router = new ContractRouter()
+    registerChatRoutes(router as never)
+    expect(router.routes).toContainEqual({
+      name: 'chat::conversation-insight-summary',
+      method: 'GET',
+      path: '/api/v1/conversations/:id/insight-summary',
+    })
+  })
+
+  it('serves the explicit empty insight summary before any valid point', async () => {
+    prismaMock.conversationMemory.findMany.mockResolvedValue([])
+    prismaMock.moodSnapshot.findMany.mockResolvedValue([])
+    const res = await handlers.get('chat::conversation-insight-summary')!(readContext(conversationId))
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toEqual({
+      conversationId,
+      available: true,
+      degraded: false,
+      summary: null,
+    })
+  })
+
+  it('degrades the insight summary when storage fails', async () => {
+    prismaMock.conversationMemory.findMany.mockRejectedValue(new Error('sqlite locked'))
+    prismaMock.moodSnapshot.findMany.mockResolvedValue([])
+    const res = await handlers.get('chat::conversation-insight-summary')!(readContext(conversationId))
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toEqual({
+      conversationId,
+      available: false,
+      degraded: true,
+      summary: null,
+    })
+  })
+
+  it('degrades the insight summary when aggregation cannot safely complete', async () => {
+    prismaMock.conversationMemory.findMany.mockResolvedValue([
+      {
+        id: 'mem_1',
+        conversationId,
+        characterId: 'char_1',
+        sourceMessageId: 'msg_1',
+        content: '女儿下周生日',
+        status: 'ACTIVE',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
+    ])
+    prismaMock.moodSnapshot.findMany.mockResolvedValue([
+      {
+        id: 'mood_1',
+        conversationId,
+        characterId: 'char_1',
+        sourceMessageId: 'msg_1',
+        memoryId: 'mem_1',
+        mood: 'POSITIVE',
+        score: 1,
+        keywords: '开心',
+        createdAt: { toISOString() { throw new Error('invalid persisted timestamp') } } as never,
+      },
+    ])
+    const res = await handlers.get('chat::conversation-insight-summary')!(readContext(conversationId))
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toEqual({
+      conversationId,
+      available: false,
+      degraded: true,
+      summary: null,
+    })
+  })
+})

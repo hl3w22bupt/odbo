@@ -1,0 +1,9 @@
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmuufi2ip0019icry302mk1em/apps/server
+
+
+ Test Files  2 passed (2)
+      Tests  14 passed (14)
+   Start at  07:16:24
+   Duration  211ms (transform 95ms, setup 0ms, import 157ms, tests 8ms, environment 0ms)
+

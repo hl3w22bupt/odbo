@@ -40,6 +40,10 @@ import {
   readableMoodTimeline,
   serializeMemory,
 } from '../lib/conversationInsights.js'
+import {
+  readableMoodInsightSummary,
+  moodInsightDegraded as moodInsightSummaryDegraded,
+} from '../lib/moodInsight.js'
 
 function safeJson(s: string): unknown {
   try {
@@ -245,9 +249,44 @@ async function conversationMoodTimeline(ctx: HttpRouteContext) {
 }
 
 /**
- * 单角色聊天发送。
- * 返回用户消息 + 输入中的占位回复（TYPING），后台异步生成回复。
+ * v0.4 读接口：情绪洞察摘要。
+ * 只消费既有 ACTIVE 记忆与情绪轨迹，聚合失败时显式降级为空摘要。
  */
+async function conversationInsightSummary(ctx: HttpRouteContext) {
+  const user = await authenticate(ctx)
+  const id = ctx.params.id
+  if (!id) throw AppError.badRequest('缺少会话 id')
+
+  try {
+    const conversation = await prisma.conversation.findFirst({ where: { id, userId: user.id } })
+    if (!conversation) throw AppError.notFound('会话不存在')
+
+    const [memoryRows, moodRows] = await Promise.all([
+      prisma.conversationMemory.findMany({
+        where: { conversationId: id },
+        orderBy: { createdAt: 'asc' },
+        take: 50,
+      }),
+      prisma.moodSnapshot.findMany({
+        where: { conversationId: id },
+        orderBy: { createdAt: 'asc' },
+        take: 50,
+      }),
+    ])
+    return ok(
+      readableMoodInsightSummary(
+        id,
+        readableMemories(id, memoryRows),
+        readableMoodTimeline(id, moodRows),
+      ),
+    )
+  } catch (err) {
+    if (err instanceof AppError) throw err
+    logger.warn('[chat] insight summary degraded', { err: String(err), conversationId: id })
+    return ok(moodInsightSummaryDegraded(id))
+  }
+}
+
 async function chatSend(ctx: HttpRouteContext) {
   const user = await authenticate(ctx)
   const body = ctx.body as { conversationId?: string; characterId?: string; content?: string }
@@ -670,6 +709,7 @@ export function registerChatRoutes(router: HttpRouter): void {
   router.define('chat::list-messages', '/api/v1/conversations/:id/messages', 'GET', listMessages)
   router.define('chat::conversation-memory', '/api/v1/conversations/:id/memory', 'GET', conversationMemory)
   router.define('chat::conversation-mood-timeline', '/api/v1/conversations/:id/mood-timeline', 'GET', conversationMoodTimeline)
+  router.define('chat::conversation-insight-summary', '/api/v1/conversations/:id/insight-summary', 'GET', conversationInsightSummary)
   router.define('chat::send', '/api/v1/chat/send', 'POST', chatSend)
   router.define('chat::multi-send', '/api/v1/chat/multi/send', 'POST', chatMultiSend)
   router.define('chat::proactive-now', '/api/v1/chat/proactive', 'POST', proactiveShareNow)

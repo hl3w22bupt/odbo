@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 心伴 v0.1 · 一条命令全链路冒烟
+# 心伴 v0.3 · 一条命令全链路冒烟（01-13 v0.2 基线段 + 14-19 增量段）
 # 用法：npm run smoke
 # 可用环境变量：XINBAN_SMOKE_PORT（默认 13888）、KEEP_SMOKE_DIR=1（保留临时目录）
 set -euo pipefail
@@ -19,7 +19,7 @@ green() { printf '\033[32m✅ %s\033[0m\n' "$1"; PASS=$((PASS + 1)); }
 red()   { printf '\033[31m❌ %s\033[0m\n' "$1"; exit 1; }
 json_get() { node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const v=JSON.parse(s).data;const k=process.argv[1];const out=k.split(".").reduce((a,key)=>a?.[key],v);process.stdout.write(String(out ?? ""))})' "$1"; }
 assert_eq() { if [ "$2" = "$3" ]; then green "$1"; else red "$1（expected=$2 actual=$3）"; fi; }
-assert_contains() { if printf '%s' "$2" | grep -q "$3"; then green "$1"; else red "$1（missing=$3 body=$2）"; fi; }
+assert_contains() { if printf '%s' "$2" | grep -qF -- "$3"; then green "$1"; else red "$1（missing=$3 body=$2）"; fi; }
 
 cleanup() {
   if [ -f "$PID_FILE" ]; then
@@ -146,4 +146,22 @@ assert_contains '12 消息状态一致' "$messages" '"status":"COMPLETED"'
 refresh="$(http POST /api/v1/auth/refresh '' "{\"refreshToken\":\"$(printf '%s' "$login" | json_get refreshToken)\"}")"
 assert_contains '13 令牌刷新' "$refresh" '"accessToken"'
 
-green "心伴 v0.1 冒烟通过：$PASS 项 / 13 项"
+# ---------- v0.3 增量段：核心交互价值闭环 ----------
+memory="$(http GET "/api/v1/conversations/$CONVERSATION_ID/memory" "$TOKEN")"
+assert_contains '14 会话记忆重启后可读' "$memory" '冒烟测试：今天想听你说说话'
+assert_contains '15 会话记忆契约无降级' "$memory" '"degraded":false'
+
+mood="$(http GET "/api/v1/conversations/$CONVERSATION_ID/mood-timeline" "$TOKEN")"
+assert_contains '16 情绪轨迹结构化快照' "$mood" '"mood":"NEUTRAL"'
+assert_contains '17 情绪轨迹内容非像素契约' "$mood" '"score":0'
+
+# 空态契约：全新会话在没有任何记忆/快照时，读接口必须显式返回空列表而非降级。
+fresh_conversation="$(http POST /api/v1/conversations "$TOKEN" "{\"characterId\":\"$CHARACTER_ID\",\"mode\":\"SINGLE\"}")"
+FRESH_CONVERSATION_ID="$(printf '%s' "$fresh_conversation" | json_get id)"
+[ -n "$FRESH_CONVERSATION_ID" ] || red '❌ 空态验证会话创建失败'
+fresh_memory="$(http GET "/api/v1/conversations/$FRESH_CONVERSATION_ID/memory" "$TOKEN")"
+assert_contains '18 新会话记忆空态契约' "$fresh_memory" '"available":true,"degraded":false,"items":[]'
+fresh_mood="$(http GET "/api/v1/conversations/$FRESH_CONVERSATION_ID/mood-timeline" "$TOKEN")"
+assert_contains '19 新会话情绪轨迹空态契约' "$fresh_mood" '"available":true,"degraded":false,"points":[]'
+
+green "心伴 v0.3 冒烟通过：$PASS 项 / 19 项"

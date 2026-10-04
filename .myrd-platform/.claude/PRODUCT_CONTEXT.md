@@ -1743,6 +1743,780 @@ Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`�
 
 关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
 
+## 沉淀 game-14 Godot Web 导出与移动端门禁经验
+
+> 来源：goal cmusp1rab0028ic7q9shcdzyl（项目 cmusp1ra00022ic7qnk18nofm）「小游戏工坊 · game-14」工作流执行沉淀。上游输入：需求《game-14 太空飞船躲陨石捡金币》（cmusphfbp0062ic7qrxlt2nk4）、GameDesignSpec v1（cmuspm7sm006uic7qzrbqyilp，approved）。工作流 run cmuspmlex0072ic7qnjiqxmpc **真实结局 = failed，且失败于工作区准备阶段，四个节点全部 pending**。本卡如实记录本轮真实结论（失败模式与补救路径），并把 game-14 真正进入开发后要带上的导出/门禁契约收拢成清单（引用既有基线、不重复）。**本轮没有产生任何 game-14 代码、导出产物、门禁判定或部署事实——请勿把本卡第 4~6 节的复用清单误读为 game-14 实测数据。**
+
+## 一、本轮真实结局：准备阶段 git clone 失败，门禁与导出根本未执行
+
+- 时间线：run 创建 2026-10-03T18:12:57Z → failed 2026-10-03T18:15:25Z（存活 2 分 28 秒）；prepSteps 仅「解析模型配置 3ms」；失败点 = preparationPhase「正在准备代码工作区（克隆仓库、拉取最新代码）」。
+- run.result.error 逐字：`git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmusp1ra00022ic7qnk18nofm/run-cmuspmlex0072ic7qnjiqxmpc'... fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75009 ms: Couldn't connect to server`。
+- 节点状态：脚手架 / 实现玩法 / 导出并部署 / 试玩验收 全部 pending；implement 与 deploy 的 godot-smoke preHook、playtest 的 mobile-web-smoke preHook 也均 pending——**门禁一次都没跑过，不存在「门禁打回」**。
+- 复盘纪律：「已启动 ≠ 已成功」在本轮的具体形态就是「run 状态 failed + 节点全 pending」；判定真实结局唯一依据 run 状态与 run.result.error，禁止凭预期脑补「门禁打到第几轮」。
+
+## 二、根因分类与补救：环境不可用 ≠ 代码缺陷，正确动作是重跑而非改代码
+
+- 根因：github.com:443 连接 75 秒超时（connect 阶段即失败，非认证/仓库问题），属瞬时网络故障——与 godot-smoke 退出码 2「环境不可用」同层语义：**禁止为它改游戏代码，更不允许宣称门禁失败**。
+- 恢复复核（2026-10-04）：`curl https://github.com` → 200（0.59s）；`git ls-remote https://github.com/hl3w22bupt/myrd-playground.git` 正常返回分支列表 → 复跑条件已具备。
+- 补救动作：`POST /api/v1/workflows/runs/cmuspmlex0072ic7qnjiqxmpc/rerun`（平台手册 rerun 入口）。DAG 输入不变：需求 cmusphfbp0062ic7qrxlt2nk4 + spec cmuspm7sm006uic7qzrbqyilp（v1 approved）仍是唯一权威。
+- 若同签名（clone exit 128 / 443 connect timeout）复现：先做宿主机连通性探针（curl github.com + git ls-remote），如实按「环境不可用」上报等待恢复；不得降级为纸面交付，也不得空转烧修复预算。
+
+## 三、game-14 工坊流水线契约（经本轮 run 定义实测核实）
+
+- 四棒 DAG：脚手架 scaffold → 实现玩法 implement → 导出并部署 deploy → 试玩验收 playtest；仓库 github.com/hl3w22bupt/myrd-playground（game-14 预期落位 `games/game-14`，以 scaffold 实际产物为准）。
+- 门禁挂点：**implement、deploy 两棒都挂 godot-smoke；playtest 挂 mobile-web-smoke**。routine 均 gate:false、由 preHook 显式引用；`{{liveUrl}}` 无默认值 = fail-closed（不传就报错，不会静默跳过门禁）；`{{gamePath}}` 必须经 preHookParams 显式传参（默认值指向不存在工程的坑见 27407691 §1.3）。
+- 判定资产唯一来源：仓库 `std-skills/godot-game-dev/scripts/`（mobile-web-smoke 判定脚本 mobile-web-smoke.mjs + 负例自测 mobile_smoke_selftest.mjs + routine 片段模板已随 commit 4a8e4b76 落地）；被检工程不得自造判定器，scaffold 只校验不自造。
+
+## 四、game-14 验收标准 → 门禁断言映射（approved spec v1 的可机判数值）
+
+| 验收项 | spec v1 锚点 | 机判断言落法 |
+| --- | --- | --- |
+| 难度阶梯 | 陨石生成间隔 950ms 逐档递减至封顶 430ms、下落速度 130px/s 逐档递增至封顶 270px/s，共 5 档（每 100 分一档） | 冒烟分相位读各档生成间隔/单位位移帧数，断言逐档单调变化且封顶后不再变化；档位边界按得分 100/200/300/400 推导写进断言注释 |
+| 状态机与持久化 | 开始（含操作说明）/进行中/暂停恢复/游戏结束/一键重开五状态；最高分 localStorage 键 `game14.highScore` | 状态标志断言；重开后断言分数清零而最高分保留；localStorage 属线上行为，由 mobile-web-smoke 打 liveUrl 验证 |
+| 操控与边界 | 键盘 ←→/A/D（含上下）+ 触摸拖动，飞船不可越出画布 | E-08 纪律：按住方向键测位移与动作注入分帧做；越界 clamp 断言；触摸拖动必须真实改变飞船目标位置（mobile 门禁 touch-response 预修，见 §六） |
+| 计分与生命 | 拾金币 +10 实时显示；撞陨石 −1 命（共 3 命），命尽进游戏结束页并展示本局得分 + 历史最高分 | 拾取/碰撞事件计数断言；连续碰撞或生命归零路径必须可达并断言 GAME_OVER |
+| 视听契约 | 三层星空视差滚动；碰撞爆炸闪烁 + 300ms 震屏 + 1.2s 无敌闪烁；+10 飘分 | 事件标志/帧差断言；无敌期 = 「碰撞不再扣命」的断言窗口 |
+| 音频契约 | coin-pickup / meteor-explosion / game-over 三 SFX 可编程触发；M 键静音且不影响逻辑 | headless 侧编程触发断言；AudioContext 解锁契约（__audioDebug）归 mobile-web-smoke 第 8 项 |
+| 性能 | 连续游玩 60s 帧率 ≥ 30fps；页面无控制台报错 | **阈值辨析：mobile-web-smoke 的 FPS≥8 是底线门禁，≥30fps 是需求验收线——门禁全绿 ≠ 验收达标，验收仍按 spec 执行** |
+
+## 五、复用基线指针（执行时直接带上，本卡不重复其内容）
+
+- **27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 总论）**：Godot 4.3 Web 导出参数基线（`variant/thread_support=false` 免 COOP/COEP、`canvas_resize_policy=2`、中文必须 theme/custom_font=P13、导出 7 件套与 wasm≈35MB 量级）；AppHost 部署契约（**一游戏一清单**——game-14 必须 `name="game-14"`、`assets_dir="games/game-14/export/web"`，绝不沿用他游戏 apphost.toml；部署 gitRef 必须是部署分支 `myrd/games-goal-<goalId>` 不是 main；`/export/` 产物必须入库否则上线全 404；M1 网关拦二进制 → gzip+b64 文本回传；壳内资源全走相对路径）；godot-smoke 三层门禁与退出码语义 0/1/2/3；error-signatures 修复循环纪律；部署终态独立复核四步。
+- **00314649-c4d2-407c-871b-62f7de91b07d（game-12）**：mobile-web-smoke 10 项明细（网络/console/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约/无横溢/FPS≥8）与「必须打部署后 liveUrl」纪律（本地静态伺服只能当预检）；标记辨析（判定脚本 stdout 小写 `godot-smoke: PASS` vs 引擎日志大写 `GODOT_SMOKE: PASS`）；证据随仓归档（`games/<game>/qa/mobile/report.json` + phase 截图）。
+- **82e419bb-b641-4b5e-bb58-d8b9633169ca**：移动端触屏虚拟摇杆与 AudioContext 解锁三件套（首手势解锁 + 解锁前记账 + 退后台回来再解锁），壳页与游戏侧都要进。
+- **36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）/ 78180e88-6486-404e-9265-e315e0da3c66（hello）**：同系列工程结构、模板与门禁增量结论。
+
+## 六、mobile-web-smoke 已知失败图谱（5 款游戏实测 → game-14 预修清单）
+
+仓库 mobile-gate 系列实测 verdict（commits 11957bd3~585db60c）：game-3 疾风忍者跑 **PASS**（十项全绿，tap 触发跳跃实证触摸驱动玩法）；game-2 星尘收集者 FAIL（console Godot 缺 cfg 告警 + tap 后零帧差）；game-4 光路谜阵 FAIL（tap 落空格零帧差，探针坐标与 letterbox 棋盘错位）；game-9 推箱子 FAIL（探针落点错位，摇杆实际 CSS(44,502)）；game-10 天天酷跑 FAIL（tap 落横带无响应，尚需探针区分「点按开始未实现」与「落点错位」）。
+
+- 主失败源集中在 **touch-response**，两类根因：①游戏触摸未真正接入玩法状态（UI 自称支持触摸但点按无效）；②探针坐标与画布 letterbox/控件 CSS 实际位置错位（屏幕坐标 ≠ 游戏坐标）。
+- game-14 预修清单：触摸拖动直接改飞船目标位置并与键盘同路径（game-12「单源单相」范式：多输入源汇一个判定入口）；可交互热区 ≥44px，避免依赖 letterbox 偏移的绝对坐标；开始页不要做成纯静止层（会触发「画面在动」误判，game-12 用待机呼吸脉冲拿到确定性非零帧差）；音频解锁契约随壳页一并实现。
+- 证据纪律：verdict 逐字进 commit message + report.json + phase-load/tap/joystick 三截图入库，供复跑比对。
+
+## 七、关联知识与权威来源
+
+- 知识卡：27407691-bcf8-4e73-b686-1bb8df684e5c（导出+门禁+AppHost 总论）、00314649-c4d2-407c-871b-62f7de91b07d（双门禁与 mobile-web-smoke 10 项）、82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏/音频解锁）、36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）、78180e88-6486-404e-9265-e315e0da3c66（hello 工坊）、b07a928a-414b-4d48-9535-5b6d6cc859ae（平台仓库结构与路径陷阱）。
+- 仓库权威文件：`std-skills/godot-game-dev/scripts/{smoke.sh,preflight.py,input-fuzz.sh,resolve-godot.sh,mobile-web-smoke.mjs,mobile_smoke_selftest.mjs}`、`std-skills/godot-game-dev/references/{godot-smoke-routine.md,mobile-smoke-routine.md,error-signatures.md}`、`.myrd/routines.yaml`。
+- 平台事实源：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`（rerun 入口、「已启动 ≠ 已成功」纪律）；工作流 spec 与需求以平台登记产物为准。
+
+
+## 沉淀知识：Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+# Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+> 来源：目标「森林收集水果限时赛」（goal=cmuspb558003tic7qwgyd02c2）的小游戏工坊流水线（workflow=cmuspb55m003xic7q9o18vjk2 v1，scaffold→implement→deploy→playtest）首轮执行（run=cmuspld10006ric7qup55soew，2026-10-03T18:12:00Z 起、18:14:30Z 判 failed）。固定参数：工程 games/60-2，功能分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2，AppHost cmuspb3xg003ric7q1ksya6c3（slug 60-2），liveUrl https://leomac-studio.tail49399e.ts.net/apps/60-2/（部署前即确定）。本文只写本轮实测增量：①双门禁在 60-2 的挂点与分工；②本次 run 的真实卡点——双门禁之前的第一堵墙；③一次「参数漂移」疑云的证伪过程；④知识沉淀节点自身的 API 事实。godot-smoke 三层门禁体系、打回修复签名表、AppHost 部署总论见关联知识（§八），不重复。
+
+## 一、结论速览
+
+| # | 要点 | 结论 | 依据 |
+| --- | --- | --- | --- |
+| 1 | 双门禁分工 | 工程门（godot-smoke，挂 implement 与 deploy 之前，判工程本体）×线上门（mobile-web-smoke，只挂 playtest 之前，判公网 liveUrl）——判定对象、执行环境、证据落点都不同，不可合并为一道 | 工作流定义逐节点核对 |
+| 2 | 本次失败层级 | run 级失败发生在**门禁之前**：工作区 git clone 连不上 github.com（443 端口 75s 连接超时），四个节点全部 pending，双门禁一次都没执行 | run.result.error 原文 |
+| 3 | 根因定性 | 环境阻塞，非代码/配置缺陷：github.com 从执行机**持续性**不可达（2026-10-03 run 失败 + 2026-10-04 复测 `curl -m 10 https://github.com` 仍超时，连接建立不了） | run 错误 + 本机复测 |
+| 4 | 重跑纪律 | 网络不通时重跑 run = 空烧：先 `curl -m 10 https://github.com` 验连通（10 秒成本），通了自己重跑（工作流定义无需改动），持续不通按「blocked 比空烧有用」上报运维（代理/镜像），禁止为绕过网络改仓库来源 | 本轮 2.5 分钟烧掉一次 run 的直接教训 |
+| 5 | 工作流定义健康度 | 60-2 四节点参数已逐一核对**全部正确**指向 games/60-2 / 60-2 分支 / 60-2 AppHost / 60-2 liveUrl，不存在「模板实例化只替换了首个节点」的漂移 | 8 个关键词 × 4 节点计数复核 |
+| 6 | 沉淀 API 事实 | 本部署**没有** `/api/v1/knowledge/search`（404）；等效做法与写入契约见 §七 | 本次实测 + 平台源码 src/routes/knowledge.ts |
+
+## 二、60-2 双门禁挂点与分工（逐节点实例核对）
+
+| 节点 | preHook | preHookParams | 判定对象 | 证据落点 |
+| --- | --- | --- | --- | --- |
+| scaffold | 无 | — | 资产存在性自检（门禁脚本/routines.yaml/模板，缺失→blocked） | 节点 detail |
+| implement | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（静态一致性 + 无头运行） | 门禁日志 |
+| deploy | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（部署前再拦一次，防止部署带病产物） | 门禁日志 |
+| playtest | mobile-web-smoke | gamePath=games/60-2, liveUrl=https://leomac-studio.tail49399e.ts.net/apps/60-2/ | **线上公网 liveUrl**（headless Chrome 移动仿真） | games/60-2/qa/mobile/（report.json + 分阶段截图） |
+
+要点展开：
+
+1. **工程门挂两道、线上门只挂一道，是有意设计**：godot-smoke 的判定对象是仓库内工程（preflight 静态 + headless 运行），所以在写代码（implement）和出产物（deploy）两处都要拦；mobile-web-smoke 的判定对象是已部署的线上地址，只有 playtest（试玩验收）消费它，且 liveUrl 在部署前就已锁定，preHook 可以在节点启动前先跑门禁、节点启动后直接读证据。
+2. **判定协议（与门禁同源，agent 本地自检命令完全一致）**：退出码 `0` 且日志含标记才算通过——`GODOT_SMOKE: PASS`（冒烟）/ `GODOT_FUZZ: PASS`（fuzz）/ `GODOT_PLAYTEST: PASS`（机器人试玩）；退出码 `2` = 环境不可用（装环境/上报，**禁止为过门禁改判定脚本或改松断言**）。
+3. **判定器独立性**：`preflight.py / smoke.sh / input-fuzz.sh / playtest.sh / resolve-godot.sh / mobile-web-smoke.mjs` 唯一合法来源是仓库 `std-skills/godot-game-dev/scripts/`（模板仓库预置）；平台注入的 `.myrd-platform/.claude/skills/godot-game-dev/` 只是阅读副本，不得当判定来源、不得现场改写、不得自造等价脚本——被检方自己写判定器，PASS 一文不值。缺任何一个 → status=blocked 上报（「模板仓库未预置门禁脚本：<文件名>；请运维补模板仓库」），**不要现场补**。
+4. **参数化必须显式传**：`.myrd/routines.yaml` 中 `godot-smoke` 与 `mobile-web-smoke` 的 `{{gamePath}}`/`{{liveUrl}}` 由工作流节点 preHookParams 按工程覆盖。仓库默认值指向别的工程——不传参要么报错、要么（更糟）静默测错工程给出假 PASS（坑实录见关联知识 27407691 §1.3）。
+5. **中文字体是 preflight P13 的拦截项**：Web 导出跑在浏览器沙箱里拿不到系统字体，模板自带 `assets/fonts/` 全局中文字体与 `project.godot` 的 `[gui] theme/custom_font` 配置必须原样保留；「有中文文案但无字体」直接被 P13 拦下。禁止为躲缺字把文案英化——那是字体缺失的症状，不是修复。
+
+## 三、本次 run 的真实卡点：双门禁之前的第一堵墙
+
+**时间线**：18:12:00 run 启动 → 引导阶段执行工作区 `git clone https://github.com/hl3w22bupt/myrd-playground.git` → 75 秒连接超时 → 18:14:30 run 判 failed。错误原文：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspb3xd003nic7qm25pu8si/run-cmuspld10006ric7qup55soew'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75003 ms: Couldn't connect to server
+```
+
+**为什么门禁体系没接住**：门禁全部挂在**节点**上（preHook），而 clone 是 run 引导步骤，发生在第一个节点之前。clone 失败的后果是：①直接置 run=failed（result.error），②四个节点永远 pending，③没有 reject 打回循环、没有 blocked 语义、没有证据落点——门禁体系（preflight/smoke/fuzz/playtest/mobile-web-smoke 六个判定器）覆盖的是「工程与线上」，不覆盖「工作区引导」这第 0 步。
+
+**连锁依赖链**（为什么这一断全断）：clone 可用 → 功能分支可推送 → AppHost 按 gitRef 拉取构建 → liveUrl 可访问 → mobile-web-smoke 有东西可测 → 试玩验收有地方可玩。第 0 依赖断了，双门禁与验收全部空转。
+
+**恢复路径（给下一轮执行，按序）**：
+
+1. 先验连通（成本 10 秒，避免空烧一次 2.5 分钟的 run）：`curl -s -o /dev/null -m 10 -w "%{http_code}" https://github.com`；
+2. 通了 → 直接重跑工作流，**定义无需任何改动**（四节点参数已核对全部正确，见 §四）；
+3. 持续不通 → 不要重跑，回写 status=blocked 上报运维（网络代理 / GitHub 镜像 / 出网白名单），写清「clone github.com:443 连接超时，全链被第 0 依赖阻塞」——与门禁「退出码 2 = 环境不可用，禁止为过门禁改代码」是同一条纪律的 run 级推广：**环境不通时，重跑是空烧，先修环境或如实上报**；
+4. 禁止为绕过网络私自换镜像仓库/改 remote——仓库来源是部署与门禁的信任锚，变更必须走运维。
+
+## 四、诊断方法论：一次「模板参数漂移」疑云的证伪
+
+**现象**：核对工作流定义时，scaffold 节点参数正确指向 games/60-2，而读到的 implement/deploy/playtest 节点 prompt 里满是上一个游戏 app-2 的固定参数（gamePath=games/app-2、分支 cmuspfeyw…、AppHost cmuspfdr…、liveUrl /apps/app-2/）→ 一度形成高价值假设：「工作流模板实例化只替换了首个节点的参数」。
+
+**证伪过程**：换独立文件名重新拉取同一工作流，对 8 个关键词（games/60-2、games/app-2、两个 goal id、两个 liveUrl、两个 AppHost id）× 4 节点逐一计数——**四节点全部正确指向 60-2**。真因：诊断用的 `/tmp` 共享临时文件被本机并发进程覆盖，中间那几步读到的其实是另一个工作流（app-2）的同名缓存文件。
+
+**沉淀三条**：
+
+1. 结论必须落在「重新独立取证」上，不落在「上一次读到的内容」上——尤其对「上游模板缺陷」这类会被写进知识、触发他人返工的高价值指控，先证伪再落笔；
+2. 诊断脚本对临时文件用唯一文件名（本次 `/tmp/wf.json` 与并发工作流进程撞名），或直接管道内消费不落盘；
+3. 证伪本身也是产出：本文档差点把一个不存在的平台缺陷写成结论，§一第 5 条的「定义健康度」结论就是证伪的成果，它让下一轮可以放心直接重跑。
+
+## 五、Web 导出与 AppHost 部署：60-2 落位值与硬约束清单
+
+机制细节与打回修复总论见关联知识 27407691（oak-key 全链路）与 82e419bb（触屏/音频），本节只列 60-2 的具体落位值和逐项易错点：
+
+| 项 | 60-2 落位值 | 易错点（违反后果） |
+| --- | --- | --- |
+| 部署来源分支 | myrd/games-goal-cmuspb558003tic7qwgyd02c2 | gitRef 传 main → main 上没有本游戏的 apphost.toml/导出产物，构建失败或把别的壳部署出去 |
+| 部署 API | POST /api/v1/apphost/apps/cmuspb3xg003ric7q1ksya6c3/deployments，mode=bundle | sourceId 必须是 goal id cmuspb558003tic7qwgyd02c2；带别的应用 id → 403 APP_BOUND_TO_OTHER_SOURCE（选错坑，回来核对 hostedAppId，不要换坑硬试） |
+| 导出预设 | games/60-2/export_presets.cfg 配 Web(HTML5)，产物落 games/60-2/export/web/（必须含 index.html） | 缺 index.html → 壳无入口页 |
+| 资产出 bundle | apphost.toml 声明 `assets_dir = "games/60-2/export/web"`，平台把该目录上传对象存储，25MB 上限不再约束资产体积 | 不声明 assets_dir → 产物挤进 bundle，体积立刻顶 25MB 上限 |
+| 壳资产路由 | asset-store `getAsset` 懒加载，路由 `/api/public/assets/:name`；`gzip+b64` → 回 text/plain 的 base64（壳端 DecompressionStream 解压）；`raw` → 按 contentType 回原文 | M1 网关**只透传文本响应**：octet-stream/gzip/图片/音视频 → 502 UNSUPPORTED_BINARY；资产一律 base64 文本回传 |
+| 路径口径 | 壳页面拉资源**一律相对路径**（`api/public/assets/index.wasm`）；`?p=` 是网关保留 query | 绝对路径 `/assets/...` 或 `?p=` 手拼 → 404/被登录墙拦 → 黑屏 |
+| wasm 初始化 | `WebAssembly.instantiate(bytes)`（base64 → Uint8Array → 解压） | instantiateStreaming 要求 application/wasm MIME，本链路不满足 |
+| b64 内联降级 | 仅当 asset-store 不可用；原始产物 ≤ 18MB（b64 膨胀 1.33×，bundle 上限 25MB） | 超限 → 降级「说明页 + 下载指引」，不得声称可玩 |
+| 音频手势解锁 | 壳页面在引擎加载**之前**：①包 AudioContext 构造器捕获引擎实例；②document 级 `touchstart/touchend/pointerdown/keydown/click`（capture+passive，不消费事件）同步 `ctx.resume()`；③暴露 `window.__audioDebug()` | 缺任一 → 移动端全部音效静默且控制台零报错（WebKit 创建即 suspended、切后台变 interrupted、引擎只在输入回调 resume）；有音效的游戏壳缺解锁器 = 验收不通过 |
+| 调参桥 | 壳页面引擎加载前解析 `?tuning=<JSON>` 进 `window.__GAME_TUNING__`，游戏侧 GameState 启动按 TUNING_META 声明的键钳制覆盖 | 缺 → 试玩调好的参数无法用 URL 复现，调参回写流程断裂 |
+| 部署后自测 | /health 与 / 都 200 只是起点，**必须**跑 mobile-web-smoke | 只 curl 200 就宣称部署成功 = 跳过移动端硬门槛 |
+
+## 六、mobile-web-smoke 移动端模拟门禁要点
+
+- **机判方式与维度**：headless Chrome 移动仿真打开线上 liveUrl，机判六项——网络（资源可达）、console（无报错）、渲染（画面在动）、触摸（可交互）、音频契约（解锁层在位）、视口（移动端尺寸正确）。
+- **证据落点**：`games/60-2/qa/mobile/`（report.json + 分阶段截图）。试玩节点（playtest）据此写试玩指引；若发现证据缺失或与 preHook 结论矛盾，如实回写 detail，不替门禁背书。
+- **已知边界一：静止页会被误判渲染冻结**。完全静止的页面「画面在动」检查会 FAIL——解法是给核心按钮加待机呼吸脉冲（game-12 实测：scale 1.00→1.06 / 0.9s，极差 0.060 ≥ 阈值 0.02），既是门禁过检又是移动端可点示能（关联知识 00314649）。
+- **已知边界二：门禁全绿 ≠ 真机可用**。触摸事件分发顺序（E-18：`mouse_filter=STOP` 的 Control 在 GUI 命中阶段吃掉触摸，永远到不了 `_unhandled_input`）与 InputEventAction 互踩（E-19）都属于「headless 门禁全绿、真机必挂」型，机判之后仍需真人真机过一次「开局可动、摇杆不误触」（关联知识 82e419bb）。
+- **与试玩验收的衔接**：mobile-web-smoke 全绿只是准入，试玩节点产出「试玩验收包」（试玩指引 + 四问量表 + 调参工作台入口 `<liveUrl>?tuning=1`）；试玩结论只能来自用户，量表未回填就如实标「待回填」，detail 里不得出现没有出处的「试玩通过」。
+
+## 七、知识沉淀节点自身的 API 事实（本次实测，供后续沉淀节点直接复用）
+
+- **本部署不存在 `GET /api/v1/knowledge/search`**（返回 404）。等效「先搜后写」：`GET /api/v1/knowledge?scope=global&limit=200` 拉全量后客户端按 title/内容过滤（服务端源码 src/routes/knowledge.ts 的 GET 只支持 scope/category/projectId 过滤，无全文检索；列表默认只返回 parentId=null 且 isPublished=true 的文档）。
+- **新增**：`POST /api/v1/knowledge`，必填 `title` + `scope`（'global'|'project'）；`title+scope` 重复 → 409 CONFLICT（先搜后写可顺便避开）；`tags` 必须是字符串数组；`category` 建议对齐既有口径（本文用「技术方案」，与同类游戏知识一致）；创建即 isPublished=true 并自动生成 v1 版本快照。
+- **更新**：`PATCH /api/v1/knowledge/doc?id=<docId>`，支持部分更新 title/content/category/tags/icon/scope/projectIds；平台自动做版本化（更新前快照旧版 → version+1 → parentVersion=`id@vN`），不需要调用方自己处理版本。
+- **单篇读取**：`GET /api/v1/knowledge/doc?id=<docId>`（返回 doc + associatedProjectIds；已删除文档也能读到，便于历史链接）。
+- **写入姿势**：JSON body 直接 PUT 不便时，用 python3 `json.dumps` 构造 payload 再交 curl 发送，避免 shell 转义事故。
+
+## 八、关联知识（互为补充，不重复）
+
+- `27407691-bcf8-4e73-b686-1bb8df684e5c`：Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路实战（oak-key）——三层门禁体系、退出码语义、routine 参数化、GODOT_BIN 单一实现、error-signatures 打回修复表。
+- `00314649-c4d2-407c-871b-62f7de91b07d`：game-12 双门禁通过路径——mobile-web-smoke PASS 10/10 实测、静止页呼吸脉冲、负例验证纪律。
+- `82e419bb-b641-4b5e-bb58-d8b9633169ca`：game-5 触屏虚拟摇杆与 AudioContext 解锁规范——E-18/E-19 机制、统一移动向量出口、音频门控三件套。
+- `6e91a11d-3632-4721-a3ea-d433e9622f9b`：game-5 玩法设计要点——与 60-2 同属「森林收集水果限时赛」玩法族（60 秒限时收集），数值基准可对照。
+- 设计 spec（platform）：`cmuspl1bw006lic7qkcplv73e`——60-2 的水果分值表（+1/+3/+10）、生成节奏与 60 秒结算契约及契约测试清单，实现与验收以此为准。
+
+## 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+# 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+> 来源：需求《《森林收集水果限时赛》游戏需求》（id=cmusp9cd00035ic7qxi8c4il3，验收节点 completed）→ GameDesignSpec《水果分值表与收集循环》（id=cmuspeqza004uic7qusqyn7gr）→ 小游戏工坊两次工作流运行皆 failed → 主策划验收指派（id=cmtn5fhk8000hjqckrib9i3bb，completed）。全部平台终态于 2026-10-04 经 API 与线上 URL 实测取证（见 §一）。
+>
+> 本文写三件事：① 可复用的「分值分档点按收集」玩法模板（+1/+2/+5 三档）；② Web 导出 + 双门禁的复用要点；③ 本 goal 双跑皆败的流程复盘教训。**不重复**总论：门禁三层体系与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key）；工程结构最小契约与帧预算推导见 78180e88-6486-404e-9265-e315e0da3c66（hello）；时间注入机判与单源单相见 00314649-c4d2-407c-871b-62f7de91b07d（game-12）；触屏适配与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca；**同名 IP 的另一机制变体**（松鼠移动+原木躲避+连击）见 6e91a11d-3632-4721-a3ea-d433e9622f9b（game-5 老版）。
+
+## 一、事实基线（本 goal 真实终态，先看这个再谈复用）
+
+| 对象 | 标识 | 终态 | 取证方式 |
+| --- | --- | --- | --- |
+| 需求 | cmusp9cd00035ic7qxi8c4il3 | completed | goal DAG 记录 |
+| GameDesignSpec（分值表与收集循环） | cmuspeqza004uic7qusqyn7gr | completed | goal DAG 记录 |
+| 工坊运行 #1 | workflow=cmusp1yao002pic7q384xxfse，run=cmuspf4oo0050ic7qfjj0azwh（工程 games/60，分支 myrd/games-goal-cmusp1ya8002lic7qk39zog9o） | **failed** | GET /api/v1/workflows/{id} 的 runs 字段 |
+| 工坊运行 #2（换 slug 重试） | workflow=cmuspb55m003xic7q9o18vjk2，run=cmuspld10006ric7qup55soew（工程 games/60-2，分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2） | **failed** | 同上 |
+| AppHost 记录 | 60=cmusp1ya6002jic7qz3dhps7r；60-2=cmuspb3xg003ric7q1ksya6c3 | 均卡在 status=creating，publicUrl=null，publishedAt=null | GET /api/v1/apps |
+| 线上地址 | https://leomac-studio.tail49399e.ts.net/apps/60 与 /apps/60-2（含 /gw 变体） | **404「应用不存在」** | curl -L 实测 2026-10-04 |
+| 主策划验收指派 | cmtn5fhk8000hjqckrib9i3bb（标题「验收复核线上版并回写产物标识」） | completed（节点完成；其结论正文经多个 API 路由探测不可回读） | goal DAG 记录 |
+| 同名老变体 game-5 | AppHost=cmuipis4f0063m9l6hagvvvd4，goal=cmuipis4g0065m9l69hew4nng，需求=cmuipol63006rm9l6cp2ww5r5 | ready，publicUrl=/apps/game-5，3 次工坊 run 全 completed | GET /api/v1/apps、/api/v1/workflows |
+
+结论一句话：**本 goal 的「点按分档版」截至 2026-10-04 没有可玩的线上版**；平台里唯一在线的「森林收集水果限时赛」是老变体 game-5（玩法口径完全不同）。后续任何验收、试玩、传播链接都必须先对照本表，别拿老 game-5 顶数。
+
+## 二、分值驱动收集玩法模板（+1/+2/+5 三档 · 点按拾取）
+
+### 2.1 分值表与频率反相关（需求硬性口径 + 建议校准值）
+
+| 档位 | 分值（需求硬性） | 出现权重（建议起点） | 期望得分贡献占比（建议） | 视觉要求 |
+| --- | --- | --- | --- | --- |
+| 低（苹果） | +1 | ~70% | ~45% | 常规色调 |
+| 中（橙子） | +2 | ~25% | ~35% | 提亮一档 |
+| 高（稀有水果） | +5 | ~5% | ~20% | 高对比 + 特效标识 |
+
+- **分值与频率必须反相关**且两者解耦配置（权重表与分值表分开两张常量表）——需求只锁「高分水果出现频率更低」，斜率是实现自由度；但三档贡献占比是手感核心，建议按上表起步、用冒烟统计实测校准（240 帧冒烟里统计三类生成次数的比例，替代人工目测）。
+- **期望值校准法**：单局期望总分 = 60s × 刷新速率 × Σ(权重ᵢ × 分值ᵢ)。先定「单局期望分」这一产品目标，再反推刷新速率，不要拍脑袋调刷新率。
+- **计分唯一入口**：所有得分变更走同一个 `add_score(points)`，分值查表发生在水果节点持有 `tier` 字段 → 入口处查表，禁止 UI 层或触摸回调里散落 `score += 1` 字面量。这是「+1/+2/+5 各自累加正确」能被机判断言的前提（同 game-12 的单源纪律）。
+
+### 2.2 60 秒计时的 ±1 秒验收实现口径
+
+- 用 `float` 剩余时间在 `_process(delta)` 里累积递减，显示层取 `ceil()`；归零判定用 `time_left <= 0.0` 触发结算，**不要**用「Timer 节点每 1 秒 tick 一次、tick 里 -1」的实现——tick 计数在暂停/掉帧/场景切换时会漂移，±1 秒容差经不起移动端浏览器节流（切后台回来一次就能漂 1~2 秒）。
+- 冒烟断言：读 UI 计时文本两次间隔 1~2 秒断言递减；用引擎时间注入（同 game-12 `try_count(now_ms)` 模式）把 `time_left` 直接压到 0，断言进入结算场景。显示值与内部值分离，断言内部值。
+
+### 2.3 点按拾取：单源单相 + 热区（移动端唯一操作）
+
+- Godot 4 默认 `emulate_mouse_from_touch=true` → 一次触摸可能产生 touch + mouse 双事件，再加 `_unhandled_input` 的动作路径，同一「点击」多来源。收敛方式与 game-12 相同：所有来源只调唯一入口 `attempt_collect(fruit)`，判定收口在 GameState 一处。
+- 触摸热区按「水果视觉半径 + 容差」配置，最小可点直径 ≥ 44~48 逻辑 px，且注意 DPR 换算（引 82e419bb）；相邻水果刷新点最小间距 ≥ 1.5 个水果直径，防误触串档（点到低档实际想点中档）。
+- 高分水果「稀有」也必须**可点**：特效动画不要吃掉点击区（动画节点 `mouse_filter=IGNORE`），否则会出现「看得见点不中」的体感灾难——美术动效是 Area2D 之外的子节点，别挂在碰撞体上。
+
+### 2.4 供给节奏与场上管理（点按版的补货口径）
+
+- 两段式供给（引 6e91a11d §二并适配）：开局铺场 8~12 个 → 场上存量低于下限（建议 6）时按 0.8~1.5 秒补 1 个。60 秒点按版的失败模式比躲避版更隐蔽：**可收目标耗尽 = 玩家空转**，补货下限是硬保障。
+- 三档各自独立掷骰，不共用计时器；高档（稀有）另加「场上同屏最多 1 个」约束，防止稀有权重 5% 在随机聚类下同屏堆 3 个、破坏「稀有」体感。
+- 场景边界内边距 ≥ 半个水果直径，保证边缘刷新可点；不做与障碍物的路径重叠问题（本变体无移动障碍），但要避免刷新点落在 UI 计时条/得分条下方。
+
+### 2.5 一键重开的完整重置清单（验收 5 的坑点）
+
+结算界面「重新开始」必须复位**全部**运行态，逐项列出防漏：倒计时回 60、得分清零、场上水果全部回收、三档刷新计时器重置、稀有水果在场标记清除、飘分/特效节点队列清空、结算面板隐藏。重开入口双通道（触摸可点 + 键盘 Enter/Space），坑源见 ed31081f-82be-4a76-a28b-476f7e18a00b（game-3 只有触摸入口导致桌面端无法重开）。冒烟断言：先打完一局（注入 time 归零）→ 点/按重开 → 断言计时==60 且得分==0 且场上水果数==铺场数。
+
+### 2.6 森林主题的可机判底线（验收 3）
+
+美术质量不进门禁，但结构可以机判：断言主场景节点树中存在 ≥ 2 类森林装饰元素组（如 Trees/Grass 两个 Node2D 组各自子节点数 > 0）；水果节点与背景装饰分属不同层级（水果层 z_index 更高且不被装饰遮罩覆盖）。preflight 不查这些，要写进工程内 `tests/smoke.gd` 的玩法断言段。
+
+### 2.7 验收 → 冒烟断言映射（写进 verify.sh 的建议）
+
+| 需求验收条目 | 冒烟断言建议 |
+| --- | --- |
+| 1. 60 秒递减、归零自动结算、偏差 ≤ ±1s | 两次读计时文本断言递减；注入 time_left=0 断言进结算 |
+| 2. ≥3 种分值（+1/+2/+5）各自累加、实时显示 | 依次对三档水果坐标注入触摸，断言得分序列 +1/+2/+5；断言 UI 总分文本同步 |
+| 3. 森林主题 ≥2 类元素、水果不遮挡 | 断言装饰节点组存在且子节点 >0；断言水果层在装饰层之上 |
+| 4. 移动端触屏可完整跑一局、无明显卡顿 | mobile-web-smoke 门禁（双门禁第二道）跑 FPS 采样，参照 game-12 实测 FPS 39 的基线口径 |
+| 5. 一键重开、倒计时与得分重置 | 跑完一局 → 触发重开 → 断言 60/0/铺场数三值（见 §2.5） |
+
+## 三、Web 导出与双门禁复用要点
+
+本 goal 两次工作流的 scaffold 节点 prompt（工坊流水线模板实文）把门禁资产判据钉死为**四件套**：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, resolve-godot.sh, mobile-web-smoke.mjs}` 全部在仓库内且不被 .gitignore 排除，缺任一 → blocked 上报，禁止从平台注入的 `.myrd-platform/.claude/skills/` 阅读副本里复制脚本充当判定器，也禁止自造等价脚本。对比老 game-5 工作流只要求三件套——**mobile-web-smoke.mjs 是后来加入的第四件**，新工程照四件套验收。
+
+- **双门禁分工**：godot-smoke（preflight 静态 + headless 冒烟 + input-fuzz）证明「能跑能玩」，mobile-web-smoke 证明「移动端模拟下可玩且不掉帧」。两道各自独立出退出码，任何一道非 0 都不该进入 deploy。
+- **退出码语义**（与总论同源）：0 通过 / 1 冒烟失败→打回修复循环 / 2 环境不可用→装环境、禁止为过门禁改代码 / 3 静态不一致（verify.sh 单独编码）。存在性守卫先行判 2，防「脚本缺失」被误判成 3 诱导修游戏代码。
+- **Web 导出配置五要点**（引 78180e88 实测，不再展开）：渲染器钉死 gl_compatibility 且 `.mobile` 双写；`thread_support=false`；中文必须内置 NotoSansSC 等字体（preflight P13 拦 Web 中文缺字）；导出产物落 `games/<工程>/export/web/` 并 .gitignore 豁免入库；UI 挂独立 CanvasLayer 与游戏世界分离。
+- **AppHost 部署口径**：部署 gitRef 必须是 goal 功能分支（`myrd/games-goal-<goalId>`），绝不能用 main；liveUrl 在部署完成前即由工坊确定（本 goal 为 /apps/60、/apps/60-2），移动端门禁与试玩都以它为准。
+
+## 四、流程复盘：为什么本 goal 没有线上版（双跑皆败实录）
+
+时间线（全部平台记录）：17:56:54 创建 AppHost「60」+ 工作流 #1 → run cmuspf4oo0050ic7qfjj0azwh **failed** → 18:04:01 换 slug 重试，创建 AppHost「60-2」+ 工作流 #2 → run cmuspld10006ric7qup55soew **再 failed** → 验收指派节点 completed 回写产物标识 → 2026-10-04 实测线上 404。
+
+- **教训 A：节点完成态 ≠ 线上可玩。** 验收指派节点 completed，但平台记录里不存在任何可访问的线上版本。「验收复核」类节点的完成前置必须是硬证据：liveUrl 返回 200 且真实浏览器跑通「开始→拾取→结算→重开」闭环，产物标识回写附上 deployment/gitRef；否则完成态与线上态脱节，下游（频道播报、试玩通知、知识沉淀）全部建立在幻觉上。
+- **教训 B：同名变体串场是本 IP 的特有陷阱。**「森林收集水果限时赛」在仓库里有两个机制完全不同的变体：老 game-5（松鼠移动+原木躲避+连击，已上线）与本版（点按拾取+分值分档，未上线）。两者需求 id、goal id、工程目录（games/game-5 vs games/60、60-2）、分支、slug 全不同。**一切定位以产物 id + 分支名 + 工程目录为准，禁止按游戏名搜索**——按名搜必然把老 game-5 的「已上线、3 run 全绿」误当成新版的现状。
+- **教训 C：换 slug 重试会留下孤儿 AppHost 空壳。** 60 失败后换 60-2 重试，AppHost 表留下两条 status=creating 的壳，publicUrl 均为 null。重试前应优先复用原 AppHost 记录；若必须换 slug，重试启动时把旧壳置为废弃态。排查「游戏上线了没」的正确顺序：先查 AppHost status（creating/ready/failed），再 curl liveUrl 实测——本 goal 的 404 就是这么确认的，不能只信工作流状态或节点状态。
+- **教训 D：复盘入口与取证边界。** 工作流 API 只回 run id + status，不回失败日志；复盘具体卡点需持 run id（cmuspf4oo0050ic7qfjj0azwh、cmuspld10006ric7qup55soew）到执行日志/workflow 详情页查。本机环境 GitHub 443 不通，`git ls-remote` 无法核实两条 goal 分支是否推上远端——分支存在性复核必须在能连 GitHub 的环境做，不要在本机下「分支不存在」的结论。
+
+## 五、给下一个同类小游戏的复用清单
+
+1. 玩法骨架直接抄 §二：三档分值表 + 反相关权重表 + `add_score` 单入口 + float 计时 + 两段式补货 + 完整重置清单，改数值不改结构。
+2. 工程起点抄 78180e88 §二的最小契约（project.godot 三类必接线、TUNING_META 白名单、tests/smoke.gd、verify.sh、export_presets.cfg）。
+3. 门禁四件套齐全性检查放在 scaffold 第一步（本 goal 工作流模板已内置该判据），双门禁全绿才允许 deploy。
+4. 验收断言按 §2.7 映射表逐条落进 smoke.gd，每条断言做负例验证（证明会真 FAIL）。
+5. 上线判定只认三件套：AppHost status=ready + liveUrl 200 + 实机操作闭环截图/录像；验收节点回写产物标识时必须附 deployment/gitRef。
+6. 涉及「森林收集水果限时赛」名字的一切操作，先对 §一事实基线表确认自己在操作哪个变体。
+
+## 六、关联知识
+
+- 门禁三层体系 + AppHost 部署总论：27407691-bcf8-4e73-b686-1bb8df684e5c
+- 工程结构最小契约 + 帧预算推导 + playtest blocked 实录：78180e88-6486-404e-9265-e315e0da3c66
+- 双门禁（godot-smoke + mobile-web-smoke）+ 时间注入机判 + 单源单相：00314649-c4d2-407c-871b-62f7de91b07d
+- 移动端触屏虚拟摇杆 + AudioContext 解锁：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- 同名 IP 老变体（松鼠+原木+连击）玩法口径：6e91a11d-3632-4721-a3ea-d433e9622f9b
+- game-9 单游戏部署先例：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 对抗性探索与机判方法论（QA 复用）：437f8129-89b5-4f46-95c0-2d475c3cead8
+
+## 沉淀 app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单（太空飞船躲陨石捡金币）
+
+# app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单
+
+> 来源：目标《创建小游戏应用：太空飞船躲陨石捡金币》（goal=cmuspfeyw0058ic7qrmh6qebm）首轮执行（2026-10-03 18:11~18:23 UTC）+ 次日（2026-10-04）知识沉淀时的时点复核。需求 id=cmuspmumf007cic7qlt6uwieo，GameDesignSpec id=cmuspqwhe007ric7qp0465dvk，工坊工作流 id=cmuspfez9005cic7q93j4fk74，失败运行 id=cmuspr5v7007xic7q5ng1aqqo。
+>
+> 本文只写本例增量：**工坊流水线在门禁一启动之前就整体失败**这一反面样本的取证、归类、复核方法论与重跑前置清单。godot-smoke 三层门禁体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-12 双门禁通过路径见 id=00314649-c4d2-407c-871b-62f7de91b07d；移动端触屏/音频规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；game-9 见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be。本文与它们互补：前面几篇讲「门禁怎么过」，本篇讲「门禁根本没来得及跑」时怎么定位、怎么复核、重跑前还要先解决什么。
+
+## 一、一手事实时间线（全部库内取证，非转述）
+
+| 时刻（UTC） | 事件 | 证据 |
+| --- | --- | --- |
+| 10-03 18:07:22 | hosted_apps 记录 app-2 创建（id=cmuspfdr20056ic7qm2ebhvwv，slug=app-2），status=creating | hosted_apps 行；updated_at 至 10-04 仍冻结在该时刻 |
+| 18:11~18:13 | 需求录入完成（含双门禁 + HostedApp 约束 + 4 条验收标准） | 需求 id=cmuspmumf007cic7qlt6uwieo |
+| 18:13~18:16 | GameDesignSpec v0 落账（八段、10 实体、数值写死） | spec id=cmuspqwhe007ric7qp0465dvk |
+| 18:16:30 → 18:17:36 | 工坊工作流运行启动后 **66 秒即 failed** | workflow_runs.status=failed |
+| 18:17:40 → 18:23:07 | express_lane 独立复核完成：app-2 未上线、验收 0/4、双门禁均未启动 | 复核结论（goal 会话） |
+| 10-04（本文写作时） | app-2 仍 status=creating、live_url 空、app_deployments **0 行**；该工作流**仅 1 次运行且为 failed，未重跑**；github.com 从 agent 环境再次 20s 超时不可达 | hosted_apps / app_deployments / workflow_runs 实查 + curl 探针 |
+
+失败报错原文（复现用）：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspfdqy0052ic7qnkimp4n5/run-cmuspr5v7007xic7q5ng1aqqo'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/':
+Failed to connect to github.com port 443 after 32655 ms: Couldn't connect to server
+```
+
+## 二、失败模式归类：不是「门禁失败」，是「门禁前基础设施失败」
+
+工坊四棒为 scaffold → implement → deploy → playtest（实现/部署两棒挂 godot-smoke preHook 240 帧，试玩棒挂 mobile-web-smoke）。本例失败的关键特征：
+
+1. **死在第 0 棒之前**：4 个节点状态全部 pending，工作流主体逻辑一行都没执行——失败发生在为运行准备 worktree 的 `git clone` 阶段。
+2. **零产物可判**：goal 分支 `myrd/games-goal-cmuspfeyw0058ic7qrmh6qebm` 在复核时不存在（`git ls-remote` 无此分支）→ 无任何代码/工程/导出物落库，不存在「半成品需要清理」的问题。
+3. **网络是间歇抖动，不是持久封锁**：复核时点（10-03 18:23）github.com HTTPS 200、`git ls-remote` 成功（HEAD=a592ea2）；次日（10-04）从 agent 环境又 20s 超时。两个时点结论相反，证明是**间歇性连接抖动**。
+4. **归类的处置含义**：门禁失败（godot-smoke 红、smoke 帧内崩溃）→ 修代码再过门禁；门禁前基础设施失败 → **不改任何代码，探针确认外网恢复后直接重跑**。两者处置路径完全不同，先归类再动手。
+
+## 三、独立复核方法论（本例实证有效，可整体复用）
+
+复核在「工作流已 failed」的背景下展开，五步证据链闭环：
+
+1. **不信状态字段，实测入口**：`status=creating` 不代表「正在部署中马上就好」——对内网 `$PLATFORM_API_URL/apps/app-2/gw` 与公网 `https://leomac-studio.tail49399e.ts.net/apps/app-2/` 双探测，均 404 `APP_NOT_FOUND`。应用记录侧 `publicUrl/publishedAt/version` 全空，项目侧 `resources=[]`、prodUrl/stagingUrl 空，app_deployments 0 行，四面证据一致。
+2. **对照实验排除平台故障**：同一 host 上其余 13 个 `status=ready` 应用（game-5/6/8/9/10/11/12、hello、app 等）全部 200 → 托管能力正常，是 app-2 自身从未部署的个案，不是平台级事故。
+3. **排他性核查防「张冠李戴」**：已上线 13 应用中无一款《太空飞船躲陨石捡金币》；题材相近的 `/apps/app/gw`「星云飞船收集」收集的是能量水晶、slug 与标题均不同，**不能冒充 app-2 交付物**。同类小游戏大量复用同套躲陨石玩法，验收时必须按 slug+标题+机制三重匹配认定交付物。
+4. **对账流程合规性**：需求 status=in-progress、close_reason 空 → 无人违规关闭需求，门禁二「未回填」是因「无入口」而非「被跳过」，流程无腐化。
+5. **失败棒位定位**：直接查 workflow_runs 的 result.error 与 nodes 状态数组，一眼定位「死在 scaffold 之前」，避免把失败误归因给某一棒的实现质量。
+
+## 四、⚠️ 规格冲突（重跑前必须拍板，否则白跑）
+
+工坊管线是 **Godot 4 → Web(HTML5) 导出**（工程 `games/app-2`、`export_presets.cfg` Web 预设、`--headless export` 构建步、godot-game-dev 技能包），而需求验收标准 4 明文要求「**纯前端 HTML/CSS/JS、无构建步骤、静态资源可直接打开运行**」。Godot 导出必然含构建步骤，两者直接冲突。
+
+- **不处理的后果**：即使部署成功、门禁一全绿，AC4 仍会判不达标——整条流水线白跑一轮。
+- **方案 A（推荐）**：把 AC4 措辞修订为「**导出产物为纯静态托管、无运行时后端、无外部 CDN 依赖**」。保留 Godot 管线，同时保住需求真正想约束的东西（免后端、免 CDN、双端可玩），且与既有门禁体系（27407691 总论）兼容。
+- **方案 B**：放弃 Godot 管线，改手写单文件 HTML/JS。仅当主人明确要求「字面意义无构建」时选它，代价是失去 godot-smoke 三层门禁与工坊流水线的既有能力。
+- **教训**：验收标准与管线能力要在**需求录入时**对齐。「无构建步骤」这类措辞对 Godot 管线应用天然不可满足，录入阶段就该识别。
+
+## 五、重跑修复路径（有序清单，供下一轮直接执行）
+
+1. **先探针再重跑**：从 runner 环境 `curl --max-time 20 https://github.com` + `git ls-remote <仓库>` 双探针确认恢复。网络是间歇抖动，盲目重跑可能再次 66 秒失败并空耗一轮。
+2. **先拍板第四节冲突**并回写需求措辞（方案 A 或 B），再触发重跑。
+3. **重跑即可，无需清理**：分支不存在、零产物，直接重跑工作流，从 scaffold 全新开始；不要试图「续跑」失败运行。
+4. **部署成功后先补门禁一**：由独立 agent 重做一轮线上可玩性复核（按第三节方法论），留证「全流程走通 + 控制台无报错」，之后才轮到 owner。
+5. **门禁二最后**：owner 桌面 + 移动各试玩一次并回填「试玩通过/不通过」，回填通过后需求方可关闭。当前门禁状态：**门禁一未启动（不可执行）、门禁二未启动（无入口）——注意是「未达」而非「失败」，回填话术要区分。**
+
+## 六、供后续 app 复用的教训清单
+
+1. **工作流失败 ≠ 游戏缺陷**：先查失败棒位。scaffold 之前死 = 基础设施层（网络/仓库可达性），与代码质量无关，处置是重跑而不是返工。
+2. **外网 git clone 是工坊流水线的第一单点**：仓库在 github.com，第一棒之前就要整仓克隆；网络抖动直接零产物。建议重跑前置「探针 + 失败自动退避重试」的习惯，并把「github 间歇不可达」记为平台环境的已知抖动源。
+3. **hosted_apps.status 不可单独作为「已上线」判据**：本例 status=creating 停滞超过 24h 且无任何部署行。判活必须「liveUrl 实测（内网+公网双探测）+ deployments 计数」双条件。
+4. **需求录入时做一次「AC × 管线」对齐检查**：把验收标准逐条对照工作流管线的既有能力（构建方式、导出形态、依赖服务），措辞冲突当场改，不要留到部署后才发现。
+5. **同题材应用排认**：平台同 slug 命名空间下有多款躲陨石/收集类小游戏，验收复核必须 slug+标题+核心机制三重匹配，防止把兄弟应用的 200 当成本应用的交付证据。
+
+---
+**一句话总结**：app-2 首轮执行是「门禁前基础设施失败」的完整样本——工坊四棒尚未启动即在 git clone 阶段遭遇 github.com 间歇性连接失败（66 秒即败、零产物、app-2 停在 creating），独立复核以五步证据链确认验收 0/4、双门禁均未达但流程未被违规绕过；修复路径 = 探针确认网络恢复 + 先拍板「Godot 构建管线 vs 无构建步骤」的规格冲突 + 直接重跑，重跑成功后再补门禁一自测与门禁二试玩回填。
+
+
+## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
+
+# game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战沉淀（推箱子点亮方块解谜 · 全四棒工作流）
+
+> 来源：需求《推箱子点亮方块解谜（game-9）》（id=cmupsx443003om9dh5dwd5w9u，goal=cmupsrc19002sm9dhp5su0zaj）走完「前置体检 → scaffold → implement → deploy → playtest」全流程后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-9`（Godot 4.3.stable.official）。线上：liveUrl https://leomac-studio.tail49399e.ts.net/apps/game-9/（deploymentId=cmupxibnn0087m9dhz3cfhap4，commit 19a6d59，838ms 上线，app.status=ready）。工作流运行 /workflows/cmupsrc1v002wm9dh68sljxoq/runs/cmuputtey006dm9dht78nbbtm。
+>
+> 本文只写 game-9 新踩的坑与增量打法。门禁三层体系总论（preflight/smoke/fuzz 分工、E-16 带病绿灯）与 AppHost 部署总论见《沉淀 Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路实战经验》（id=27407691-bcf8-4e73-b686-1bb8df684e5c，oak-key 实测）；移动端触屏摇杆与音频解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca。三篇互为补充、不重复。
+
+## 一、事实基线：四棒各留下什么（审计入口）
+
+| 棒 | 提交 | 内容 | 结果 |
+| --- | --- | --- | --- |
+| scaffold | d297996 | 以 templates/minimal-2d 初始化 games/game-9：推箱骨架（推动/点亮/Undo/Restart/换关）+ 5 关关卡册 + tools/level_solver.py + tests/smoke.gd + verify.sh | ✅ |
+| implement | 4bfdb00 | 见证解回放 / 死锁反馈 / touch_swipe / AC5 响应断言；is_solved 口径修复；.myrd/spec/design-spec.json 落盘 | ✅ |
+| deploy | 19a6d59 | export_presets.cfg + 导出产物入库 + apphost 壳切 game-9 + §3C 调参桥 + 移除 candy-crush 残留 | ✅ 已部署 |
+| playtest | 0103b33 | docs：playtest blocked 报告（缺 playtest.sh） | ⛔ blocked |
+
+- **部署形态**：底座 A「资产出 bundle」——`apphost.toml` 里 `assets_dir="games/game-9/export/web"`，37MB 导出经对象存储懒加载，bundle 本体不含游戏资源（25MB bundle 上限不再约束资产体积）。
+- **导出产物形态**：index.wasm 33.7MB / index.pck 2.4MB / index.js 331KB / index.html 4.9KB / index.audio.worklet.js 7.3KB。线上资产通道 `/api/public/assets/`：index.js 原文直出，wasm/pck 走 `*.gz.b64` 文本（10.7MB / 3.3MB），端到端解码验证过（b64→gzip→`WebAssembly.validate()=true`、pck 魔数 `GDPC`）。
+- **部署记录层 status=running 与应用已 ready 并存**：判断游戏死活以 /health 与实际可达为准，别拿 deployment.status 当真。
+
+### 分支审计坑：同一目标两条远端分支并存
+
+- `myrd/game-9-goal-<goalId>`：前置体检节点首次推送建立，停在 implement 棒（4bfdb00）。
+- `myrd/games-goal-<goalId>`：工作流四棒实际跑的分支，tip=0103b33（多出 deploy/playtest 两棒）。
+- 结论：**复现/审计认 goal artifacts 里的 `gitRef` 与 `app_deployments.commit_hash`（本次 = 19a6d59）**，别按「目标 id 搜分支」想当然——两条分支都能搜到且不同步。另：线上部署的是 19a6d59，其后 playtest 棒只追加 docs（0103b33）未重新部署，属 docs-only 差异，游戏本体无差。
+
+## 二、Godot Web 导出：模板不含预设，从零补齐的六个决策
+
+1. **模板仓库不含 `export_presets.cfg`**。games/game-9 的 README 在 scaffold 棒就记了：「export_presets.cfg 尚未配置（模板不含），部署节点需按 games/game/ 的 web 导出先例补齐」。每个新游戏都要从上一个游戏的先例抄一份再改，别等部署节点现场发明。
+2. **必须用单线程变体：`variant/thread_support=false`**。M1 网关不发 COOP/COEP 头，SharedArrayBuffer 不可用，线程版直接白屏。这是 Web 导出第一坑：配错不报错、上线才白屏。
+3. **导出产物必须入库，`.gitignore` 加 `!/export/web/` 豁免**。`assets_dir` 是平台构建输入，产物不在仓库里平台打包 bundle 就缺资产。Godot 工程 .gitignore 默认把 export/ 排掉，这里要反着来。
+4. **全局中文字体是 Web 导出的底线**（preflight P13 机判）。浏览器沙箱拿不到系统字体，引擎内置字体只有拉丁字形；`[gui] theme/custom_font` 必须指向子集化中文字体（本工程用 Noto Sans CJK SC：GB2312 全集 + ASCII + 常用符号，OFL 1.1），删了所有中文变缺字方块。字体约 2.9MB，是 pck 体积大头，但属中文游戏必要成本。
+5. **渲染器钉死 `gl_compatibility`**（`renderer/rendering_method` 与 `.mobile` 双写）。Forward+ 在 Web 上不可用。
+6. **接手模板仓库先清上一个游戏的残留**。deploy 棒移除了基线残留的 candy-crush 工程 `games/game/`（39MB 导出）——模板仓库是「单游戏位」惯例，根壳一次只服务一个游戏；残留工程还会污染门禁参照（前置体检时 gate-selftest 拿 games/game 当参照，因 player.gd 缺 `moved.emit`/`const SPEED` 模板契约锚点，D4/D5 注入失败，换官方参照 `templates/minimal-2d` 后 D1–D5 全拦）。
+
+**壳侧三件套 + 调参桥**（沿用 oak-key 先例并加一层）：相对路径资产路由；移动端音频手势解锁器（AudioContext 包装 / 手势 resume / `__audioDebug` 取证口）；worklet 防御；新增 **§3C 调参桥**：
+
+- 壳把 URL `?tuning=<json>` 解析成 `window.__GAME_TUNING__`；
+- 游戏侧 `GameState._apply_tuning_overrides()` 仅 `OS.has_feature("web")` 时经 `JavaScriptBridge.eval("JSON.stringify(window.__GAME_TUNING__ || null)")` 读取；
+- `TUNING_META` 白名单四键 + min/max 钳制 + round 取整：`move_anim_ms` 0–400、`push_anim_ms` 0–400、`key_repeat_interval_ms` 50–600、`win_overlay_delay_ms` 0–1000。
+- 价值：试玩期调手感不用改代码重导出——「试玩调好的参数用 URL 复现」，试玩入口直接发 `?tuning=1` 工作台链接。无头冒烟/桌面自动跳过，门禁行为不受影响。
+
+## 三、冒烟门禁：game-9 的四个增量打法
+
+四步 routine 不变（`.myrd/routines.yaml` id=godot-smoke：resolve-godot → preflight 13 类 → `GODOT_SMOKE_FRAMES=240` headless-smoke → input-fuzz，seed=20260913），`games/game-9/verify.sh` 只调用 std-skills 判定脚本、不重实现。本次实测：preflight PASS / `GODOT_SMOKE: PASS`（240 帧，exit 0）/ `GODOT_FUZZ: PASS`。增量全在冒烟断言本身（tests/smoke.gd，628 行，11 项断言清单）：
+
+### 3.1 见证解回放：把 AC4「关卡可解」变成引擎内机判
+
+离线求解器说「可解」只是一句话结论；game-9 把它做成冒烟断言：
+
+- `tools/level_solver.py --paths` 生成每关见证解（U/D/L/R 移动串，长度 == par），Python 侧重放自证后落盘进 `sokoban_levels.gd` 的 `solution` 字段（与 layout 同处，单一事实源，防两处数据漂移）；
+- 冒烟逐关回放见证解，断言三条：**必须通关、步数 == par、回放全程不得误报死锁**；
+- solver 直接解析 `sokoban_levels.gd`（不复制关卡数据），「策划案 → 关卡册 → 求解器 → 冒烟」四层数据同源，par 漂移会在冒烟里直接爆。
+
+### 3.2 通关判据口径：常亮 ≠ 通关（冒烟实测拦下的真 bug）
+
+点亮目标格是 `onceLitStaysLit`（入场常亮、永不熄灭），但 `is_solved` 不能跟着用「全部点亮」口径——**常亮口径会把 level-05 最优路径第 35 步误判通关、提前停走**（冒烟回放见证解时实测拦下）。修复：`is_solved` = 「全部接线槽有方块驻留」，与求解器 / spec parMoves 同口径；点亮只作视觉态。
+
+教训：**「视觉状态」与「胜负判据」是两个变量。凡有常亮/累计态的玩法，胜负判据必须与求解器同口径，并让冒烟回放最优解来兜底。**
+
+### 3.3 死锁反馈机判：报与不报都要有断言
+
+角死锁检测 + `deadlock_changed` 信号 + HUD 卡死警示 + 死锁方块变红。冒烟断言四条：角死锁必报、在槽角不报（在槽角是合法终态）、开阔局面不报（防假阳性）、真实关卡把方块顶进角后信号通知 UI 且 **Undo 可脱离死锁态**。「无假阳性」的论证写在检测函数注释里供复核。
+
+### 3.4 AC5 量化成帧预算断言
+
+- 响应延迟：spec 200ms ≈ 60FPS 下 12 帧 → 断言「注入输入 → 首次步进 + HUD 同步刷新」≤ `RESPONSE_BUDGET_FRAMES=12` 帧，验收口径直接写进门禁；
+- 触屏滑动：越过 24px 阈值（`spec.numeric.input.touchSwipeThresholdPx`）的一次滑动**恰好步进 1 格**；冒烟注入 48px 拖拽验证（`SWIPE_DRAG_PX=48`）。
+
+### 3.5 headless 输入注入的坑（error-signatures E-08 的 game-9 变体）
+
+- headless 下 `Input.parse_input_event()` 的缓冲冲刷会清掉 `Input.action_press()` 的按下状态，**同帧混用两种注入方式会让「移动断言」假失败** → 冒烟分 7 相位（噪声/移动/滑动/逻辑/等弹层/下一关/收尾）互不重叠；
+- 触点下标隔离：噪声相位用触点 0/1，滑动断言用触点 7，防互相回收；
+- 滑动起点 (500,280) 刻意避开左下摇杆热区（24..160 × 400..536）与右下按钮排，否则手势被控件吃掉；
+- 噪声相位（30 帧悬挂手势/孤儿释放/乱键）放在一切正式断言之前——上一游戏（糖果三消，commit bbb872f4「致胜滑动后指针脏状态吞掉下一关第一次手势」）就是靠这类对抗注入防回归的。
+
+### 3.6 verify.sh 退出码四态（给修复方向做机器路由）
+
+0=通过；1=smoke/fuzz 运行期未过（改游戏代码）；2=环境不可用（缺 Godot/技能脚本/python3，装环境而非改代码）；3=preflight 静态未过（先修静态，不必跑冒烟）。关键设计：技能脚本存在性守卫放在一切判定之前，缺脚本必须报 2——否则会掉进下游非零退出码被误判成 3，诱导修复节点去改游戏代码。
+
+## 四、关卡求解器：三段演进与两个真 bug（策划案阶段就要做）
+
+固化策划案（create_design_spec）时就要求每关机器可解、par 机器可算——这步做了，实现、冒烟、验收全链路都有基准。求解器三段演进：
+
+1. **BFS**：前三关（状态空间小）够用；
+2. **A* + 拉拽距离启发 + 死格剪枝**：大关用（启发值 = 每方块到最近接线槽的拉拽距离下界，可采纳；死格 = 角死锁 / 墙边不可拉出格）；
+3. **精确状态 A\***：修掉「区域归一化」bug 后的最终形态。
+
+两个真 bug（都在求解器侧，不在游戏侧）：
+
+- **区域归一化把玩家站位合并掉**：对「推动数」精确，对「玩家步数」只是松弛下界——level-02 手推最少 10 步，求解器报 5。修复：玩家坐标显式入状态；修复后 A* 与纯 BFS 交叉验证一致（2/10/18）。
+- **开阔房间 + 5 方块状态空间爆炸**：单关搜索超时。解法不是更强的剪枝，而是**改关卡布局**——level-05 换成更紧凑、隔断更多的「总控机房」，对人更难、对求解器更小，验证 3.8s，par=58 > level-04 的 40，难度曲线反而更成立。
+
+工程参数：`EXPANSION_CAP=4_000_000`、`MAX_DEPTH=200`；par 不一致只告警（布局或 par 漂移），可解性才是硬判据（exit 0/1）。最终 par 曲线 2/10/18/40/58，方块数 1→5 严格递增（AC4），策划案 `numeric.difficulty.parMoves`、关卡册、冒烟断言三方一致。
+
+## 五、playtest blocked：判定器独立性纪律的一次实战
+
+playtest 节点硬约束：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 五个判定脚本**全部由模板仓库预置**，缺任何一个 → 立即 blocked，**严禁现场自造、拷贝注入副本、或用等价命令替代**——它们是判定器，被检方自己写门禁即失去独立性。
+
+本次实测缺 `playtest.sh`（及 `playtest_driver.gd`），按纪律停止：
+
+- **证据链五步**：① 工作区分支 scripts 目录实清（仅 7 个文件）→ ② origin/main fetch 后核对同样缺失（排除本地落后）→ ③ `git log --all` 该路径从未存在 → ④ 全仓库 find 仅命中 `.myrd-platform/.claude/skills/`（平台注入阅读副本，被 .gitignore 排除不入库，按硬约束不得作判定来源）→ ⑤ 前序 deploy 产物旁证。
+- **根因**：平台注入技能包（新版，含机器人试玩门禁：协议 `GODOT_PLAYTEST: PASS/FAIL` 退出码 0/1、2=环境不可用；`GODOT_PLAYTEST_METRICS: <JSON>`；bot 多局输出节奏代理指标——首次奖励/无反馈窗口/反馈密度/局间方差；阈值由工程内 `tests/playtest.json` 覆盖）**领先于模板仓库预置基线**（v1 仅四脚本，godot-smoke routine 也只有四步）。属模板仓库技能资产滞后，需运维补模板仓库，非 agent 现场可修。
+- **没做的事同样重要**：不交付试玩验收包、不拷贝注入副本、不自造判定器；四问量表标「待用户试玩」；spec 数值回写跳过（未收到用户结论，严禁编造）。
+- **影响面切割**：deploy 产物不受影响（游戏仍可访问），godot-smoke 四步门禁此前已全过——blocked 只挡 playtest 这一段。
+- **修复路径**：运维补模板仓库 `playtest.sh` + `playtest_driver.gd`（连同 SKILL.md 章节与 godot-smoke-routine.md 模板同步，脚本/文档/routine 三者一致）→ 经模板预置链路同步进项目仓库（不得手抄注入副本）→ 重跑 playtest 节点交付 `op=playtest_kit`（含 `<liveUrl>?tuning=1` 调参工作台入口）。取证报告在仓库 `docs/game-9-playtest-blocked-report.md`。
+
+## 六、下一个游戏直接抄的清单
+
+```bash
+# 1. 门禁入口（四步；退出码 0/1/2/3 见 §3.6）
+bash games/<game>/verify.sh
+
+# 2. 关卡可解性证据（--paths 生成见证解 → 落盘 solution 字段 → 冒烟回放）
+python3 games/<game>/tools/level_solver.py games/<game> --paths
+```
+
+Web 导出预设必查四项：
+
+| 项 | 值 | 不守的后果 |
+| --- | --- | --- |
+| `variant/thread_support` | `false`（单线程） | M1 网关无 COOP/COEP，SharedArrayBuffer 不可用 → 线程版上线白屏 |
+| `[gui] theme/custom_font` | 子集化中文字体 | 浏览器无系统字体 → 中文全部缺字方块（preflight P13 拦） |
+| `renderer/rendering_method` | `gl_compatibility`（desktop+mobile 双写） | Forward+ 在 Web 不可用 |
+| `.gitignore` | 加 `!/export/web/` 豁免 | assets_dir 构建输入缺资产，bundle 打包失败 |
+
+复用分工：门禁三层总论 / E-16 带病绿灯 / AppHost 部署总论 → id=27407691-bcf8-4e73-b686-1bb8df684e5c；移动端触屏摇杆 / 音频解锁规范 → id=82e419bb-b641-4b5e-bb58-d8b9633169ca；本文 = game-9 增量（导出预设从零补齐、见证解回放机判 AC4、通关判据口径、死锁反馈机判、AC5 帧预算断言、E-08 分相位注入、求解器演进、playtest blocked 纪律、双分支审计口径）。
+
+
+## 沉淀《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+# 《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+> 来源：需求《《hello》休闲收集小游戏》（id=cmuqk7luz002am9bfmmkouw9v，goal=cmuqk3j2o001mm9bfptrztaj1）走完「scaffold → implement → deploy → playtest」工坊主通道后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/hello`（std-skills minimal-2d 模板起步，Godot 4.3.stable，gl_compatibility）。线上终态：liveUrl `https://leomac-studio.tail49399e.ts.net/apps/hello`（HostedApp id=cmuqk3huq001km9bf5ejp7tdg，deployment v2=cmuqlxz2v001km9bxc0w5pspp，gitRef=`myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1@dfd20d1`，/health 200、线上标题《hello》 · 休闲收集）。**playtest 节点 status=blocked**（模板仓库未预置 playtest.sh），线上版经独立 assign_agent 复核确认可玩。本文只写 hello 的增量事实与新坑；门禁三层体系总论与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key），单游戏部署先例见 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9），触屏摇杆与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca。四篇互为补充、不重复。
+
+## 一、事实基线：提交链与四棒产出（审计入口）
+
+`origin/myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1` 提交链（逐字核实）：
+
+| commit | 内容 | 结果 |
+| --- | --- | --- |
+| f9bc9d65 | 模板起步：std-skills minimal-2d 脚手架建 `games/hello` | ✅ |
+| 1bc8fa24 | 收集玩法与胜利/重开闭环 + README 玩法说明 | ✅ |
+| a8b5fd09 | Web 导出可托管形态：export_presets.cfg + `.gitignore` 豁免 + 导出产物入库 | ✅ |
+| 16249412 | 关卡梯度 + 限时失败反馈 + 冒烟断言同步升级 | ✅ |
+| dfd20d1b | 根壳与 apphost.toml 切到 hello + 接通调参桥（=部署 commit） | ✅ 已部署 |
+
+- `myrd/hello-game-goal-cmuqk3j2o001mm9bfptrztaj1` 分支另含 508dcc6b（assign_agent 线上复核取证），与 games-goal 分支**不同步**——复核/审计一律认 goal artifacts 里的 `gitRef`（games-goal@dfd20d1），别按「目标 id 搜分支」。
+- 门禁终态：preflight 13 类 PASS / `GODOT_SMOKE: PASS`（240 帧）/ `GODOT_FUZZ: PASS`（seed=20260913，6 批次无崩溃无脚本错误）；`bash games/hello/verify.sh` 全链路 PASS。
+- 导出 11 文件落 `games/hello/export/web/`：index.wasm 35,376,909B / index.pck 2,497,520B / index.js 331,495B / index.html 4,848B / index.audio.worklet.js 7,298B。
+
+## 二、Godot4 工程结构：hello 的最小可玩模板契约（可复制起点）
+
+```
+games/hello/
+├── project.godot          # 三类必接线：run/main_scene、[autoload] GameState、[input]
+├── autoload/game_state.gd # 单例 + TUNING_META 白名单（调参唯一入口清单）
+├── scenes/{main,player,collectible}.tscn
+├── scripts/{main,player,collectible,virtual_joystick,touch_confirm_button}.gd
+├── assets/fonts/NotoSansSC-Regular.otf + OFL.txt   # Web 中文底线
+├── tests/{smoke.gd,smoke.tscn}                     # 相位状态机冒烟场景
+├── verify.sh               # 工程门禁入口（退出码 0/1/2/3）
+└── export_presets.cfg      # Web 导出预设（thread_support=false）
+```
+
+- **三类必接线是 preflight 静态机判对象**：主场景、autoload、input 映射缺任何一项就是「黑屏/无响应」。hello 实测：`config/name="hello"`、`run/main_scene="res://scenes/main.tscn"`、`GameState="*res://autoload/game_state.gd"`。
+- **渲染器钉死 gl_compatibility 且 `.mobile` 双写**；viewport 640×360；`[gui] theme/custom_font` 指向 NotoSansSC（OFL 1.1）——删了中文全变缺字方块（preflight P13 拦）。
+- **UI 挂独立 CanvasLayer（UI/TouchUI）**，与游戏世界分离；触屏端用 `virtual_joystick.gd` + `touch_confirm_button.gd` 承载移动与确认，桌面/触屏同一工程不加分叉构建。
+- **收集玩法碰撞口径写进代码注释**：Player 矩形 24×24（半宽 12）、Collectible 圆 r=22，可达判定=玩家中心进入收集物中心 34px 内；摆点相对 clamp 边界 (12..628, 12..348) 全可达不卡死角——**碰撞余量要在摆新点时先算再摆**，否则冒烟传送收集断言假失败。
+
+## 三、门禁增量：帧预算推导注释 + 键位契约断言
+
+- **帧推导写进 verify.sh 注释**：「噪声 30 帧 → 移动 10 帧 → 4 次传送收集（各 4 帧）→ 过关断言 → confirm 进第 2 关断言（梯度）→ 时限压 0 触发失败断言 → confirm 重来断言」约 94 物理帧，预算取 240 对齐 `.myrd/routines.yaml` 的 smokeFrames 默认值（两边同值不各说各话）。**推导过程留在门禁入口文件里**，后续调速度的人不必重推。
+- 冒烟 9 项玩法断言：噪声输入后仍能移动、收集计数累加、过关判定、难度梯度（4→5 目标、30→26s 时限）、超时失败反馈、失败重来复位，外加键位契约 `_check_key_bindings`（逐键 AND 判定）。
+- verify.sh 退出码语义与 oak-key 同源：0 通过 / 1 冒烟失败 / 2 环境不可用（**存在性守卫先行**：preflight.py、smoke.sh、resolve-godot.sh 缺一即 2，防「脚本缺失」被误判成 3 诱导改游戏代码）/ 3 静态不一致。
+- **复发坑（连续两作）**：`.myrd/routines.yaml` 默认 `gamePath: games/godot-coin-rush` 至今未修。oak-key 轮已记录，hello 轮依旧要靠 preHookParams 显式覆盖成 `games/hello` 才测对工程。**建议运维直接改模板默认值或置空强制必填**，别再指望每作自觉覆盖。
+
+## 四、playtest blocked 实录：模板仓库技能资产落后于平台注入副本（本轮最大增量）
+
+- **触发**：判定脚本五清单 `{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 要求全部由项目仓库预置，hello 实测唯独 `std-skills/godot-game-dev/scripts/playtest.sh` MISSING → 节点按硬约束立即 blocked（不产试玩验收包、不回填量表、不调参回写）。
+- **根因（版本分裂）**：仓库内 `std-skills/godot-game-dev/` 是**旧版**（SKILL.md 无 playtest，routines.yaml 4 步）；平台注入阅读副本 `.myrd-platform/.claude/skills/godot-game-dev/` 是**新版**（SKILL.md §4.5 机器人试玩门禁 + `playtest_driver.gd` + 5 步 routine，新增 `playtestFrames: "900"`）。即：**模板仓库落后于平台注入副本**。
+- **纪律（为什么 blocked 而不是补一个）**：判定器唯一来源是模板仓库预置；被检方自写判定脚本，门禁不再独立，PASS 一文不值；注入副本是阅读用，不得复制/改写/等价替代。
+- **运维待办（精确到文件）**：把 `WORKSHOP_GAME_TEMPLATE_REPO` 的 godot-game-dev 技能资产同步到含 `scripts/playtest.sh` + `scripts/playtest_driver.gd` 的版本，并让仓库 `.myrd/routines.yaml` 的 godot-smoke 升到 5 步。报告已落盘 `docs/playtest/hello-playtest-blocked.md`（commit 283773e）。
+- **教训泛化**：工坊每接入新模板资产前，先 diff「模板仓库 vs `.myrd-platform/` 注入副本」的技能版本，发现落后先报运维，别等跑到最后一棒才 blocked。
+
+## 五、Web 导出与部署：hello 的三个增量打法
+
+1. **导出配置前置到 scaffold 棒**（前两作是 deploy 棒现场补 preset）：scaffold 按 `games/game` 既有先例补齐 `export_presets.cfg`（`platform="Web"`、`export_path="export/web/index.html"`、`variant/thread_support=false`、`html/canvas_resize_policy=2`）+ `.gitignore` 加 `!/export/web/` 豁免 + 导出产物入库（a8b5fd09）。deploy 棒零决策复用重导出——**「可托管形态」应该在脚手架棒就建成，别留到部署棒现场发明**。
+2. **根壳单游戏位切换要核对三处**：`apphost.toml`（name=hello / assets_dir=games/hello/export/web / health=/health / runtime=node20）、server 壳的资产路由、调参桥全局注入。hello 轮根壳原指向 candy-crush-legend（games/game/export/web），已整体切到 hello。**每次上新游戏，部署前 grep 根壳里旧游戏名清残留**。
+3. **部署重发坑：v1 因 504 重发被 superseded，v2 才是终态**（两笔同 gitRef）。判断游戏死活以 `/health` + app status + liveUrl 实测为准，**别拿 deployment 列表第一笔当真**。另：`/` 会 308 重定向到 `/apps/hello`（尾斜杠归一化），curl 复核记得 `-L` 跟随。
+
+线上复核（assign_agent 独立完成，不复用 deploy 自测结论）：部署 gitRef 远端 HEAD 与 dfd20d1 逐字一致；资产通道全文本（wasm/pck 走 `*.gz.b64`），本地解码还原 wasm 35,376,909 字节与本地导出逐字一致、magic `\0asm` v1 有效，pck magic `GDPC`；壳契约四件（相对路径拉资产、移动端音频手势解锁器、`__audioDebug` 取证口、tuning 调参桥）逐项在位。
+
+## 六、调参桥 hello 实例：spec 数值与实现默认值的口径漂移（真实发生，值得记录）
+
+- `game_state.gd` 的 `TUNING_META` 白名单四键：`base_target` 1–6、`base_time` 10–90、`time_step` 0–10、`min_time` 5–90；键不在名单=拒绝（防 URL 乱注入）；缺壳层时全局 undefined 属预期，门禁行为不受影响。
+- **口径漂移**：GameDesignSpec v1（id=cmuqkaypy002hm9bf3wnk1k26，approved）写的是 3 关 10/15/25 件、30/45/60s、连击窗口 1.5s；实现默认值是 `BASE_TARGET=4 / BASE_TIME=30 / MIN_TIME=18 / TIME_STEP=4`（每关目标 4→5、时限 30→26s）。spec 数值**没有**作为默认值落地，而是寄望试玩期经调参桥回填——playtest blocked 后未回填，两者至今不一致。
+- **结论**：工坊「spec → 实现」的数值对齐不能靠默认值拍脑袋。两条路二选一：① 实现前把 spec 数值直接落成常量默认值；② spec 数值作为 TUNING_META 默认初值，并在工程 README 记「spec 口径 = 默认值」。否则验收对不上、复盘对不齐。
+
+## 七、坑位速查表（hello 新增/复发，出问题先对号）
+
+| # | 坑 | 一句话修法 |
+| --- | --- | --- |
+| 1 | 双分支并存：工作区实际建 `hello-game-goal-*`，任务指定 `games-goal-*` | scaffold 棒把同一 commit 推两条分支保证 gitRef 存在；审计认 goal artifacts 的 gitRef |
+| 2 | routines.yaml 默认 gamePath=games/godot-coin-rush（复发） | preHookParams 显式覆盖；运维改模板默认值根治 |
+| 3 | 模板仓库技能资产落后于平台注入副本 → playtest blocked | 接入前先 diff 两份技能版本；落后先报运维 |
+| 4 | 部署 504 重发 → v1 superseded / v2 running | 判终态看 /health + app status + liveUrl 实测 |
+| 5 | `/` 308 到 `/apps/hello` 尾斜杠归一化 | curl 复核加 `-L` |
+| 6 | github.com:443 从工作区不可达（3 次重试 75s 超时） | commit 留本地分支不丢；先走平台 API（localhost）回写再补推 |
+| 7 | 碰撞余量不算就摆点 → 传送收集断言假失败 | 半宽+半径先算可达包络，摆点落在 clamp 边界内 |
+| 8 | spec 数值与实现默认值漂移 | spec 数值落成默认值或 TUNING 初值，README 记口径 |
+| 9 | 导出配置留到部署棒现场发明 | scaffold 棒按上一作先例补 preset + .gitignore 豁免 + 产物入库 |
+| 10 | 根壳残留上一游戏（单游戏位惯例） | 部署前 grep 旧游戏名清残留，apphost.toml 三键核对 |
+
+## 八、关联知识与权威来源
+
+- Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路总论（oak-key）：27407691-bcf8-4e73-b686-1bb8df684e5c
+- game-9 单游戏部署先例与调参桥 §3C：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 移动端触屏虚拟摇杆与 AudioContext 解锁规范：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- MyRD 平台真实仓库结构地图：b07a928a-414b-4d48-9535-5b6d6cc859ae
+- 仓库内权威文件（本仓可直接复用）：`games/hello/{verify.sh,export_presets.cfg,tests/smoke.gd,autoload/game_state.gd}`、`docs/playtest/hello-playtest-blocked.md`、`std-skills/godot-game-dev/scripts/`、`.myrd/routines.yaml`
+- 平台产物链：requirement=cmuqk7luz002am9bfmmkouw9v → design_spec=cmuqkaypy002hm9bf3wnk1k26 → hosted_app=cmuqk3huq001km9bf5ejp7tdg → workflow run=cmuqkb8xl002nm9bf9pz8hw61（/workflows/cmuqk3j35001qm9bfsdw4xn8d/runs/cmuqkb8xl002nm9bf9pz8hw61）→ 线上复核 assign_agent=cmto42pg60004m9aq7jczszhy
+
+## 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+# 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+> **文档定位**：固化 game-8 v2 轮手感调优的**具体数值（前后对照）**、godot-smoke 门禁表现、线上链路诊断结论与**可照抄的复测方法**，形成「手感类反馈（再大一点 / 再慢一点）」的**可复用增量调参基线**——后续同类反馈直接对照本文 §五 playbook 执行，不必重新勘探。
+> **权威基准**：需求《牛牛打游戏 game-8 · v2 手感调优：牛牛体型放大、移动速度下调》（`cmuqmej89000ym9gg6mom93o0`）；策划案 v1 设计唯一来源（doc `80b9c193-6807-43e4-b2b0-5789f2d9e35b`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）；收口依赖清单（doc `943eb5eb-0949-43fe-b939-83cf171af2a3`）。
+> **实现基线**：部署分支 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`；数值提交 `3a396355`（feat v2 手感调优）→ 产物重导出 `1089e4b` → 诊断报告 `1afec443`（`games/game-8/docs/v2-liveurl-diagnosis.md`，docs-only）；线上部署 = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`。
+> **本文数字全部为一手实测值**（git diff 实录 / curl 取证 / 线上 pck 自跑门禁），非估算。
+
+## 一、v2 数值基线（前后对照，唯一落账）
+
+| 声明键 | v1 默认 | v2 落账 | 需求量化区间 | 实际占比 | TUNING_META 钳制 |
+|---|---|---|---|---|---|
+| `PLAYER_SCALE` | 1.0 | **1.4** | 1.3~1.5× 整体放大 | 1.4× | min 0.5 / max 2.0 / step 0.05 |
+| `PLAYER_SPEED` | 220.0 px/s | **145.0 px/s** | v1 的 60~70% | **65.9%** | min 60 / max 300 / step 5 |
+
+- **唯一落账位置**：`games/game-8/autoload/game_state.gd` 数值区（v2 HEAD 实测：`var PLAYER_SCALE: float = 1.4` / `var PLAYER_SPEED: float = 145.0`）。⚠️ 策划案 v1 写的路径是 `scripts/game_state.gd`，**实际权威路径是 `autoload/game_state.gd`**（scripts/ 下并无此文件），后续引用以本文为准。
+- **接线方式**（`scripts/player.gd`）：`_apply_tuned_scale()` 把 `PLAYER_SCALE` 以**根节点 uniform scale** 应用（`is_equal_approx` 脏检查，滑杆改动下一物理帧生效），同步作用于视觉精灵、`CollisionShape2D` 碰撞体与 `PickupArea/PickupShape` 判定体；`velocity = direction * GameState.PLAYER_SPEED` 每物理帧读声明键。
+- **判定几何联动（容易算错的口径，钉死）**：`player.tscn` PickupShape 本体半径 22px → v2 缩放后 **30.8px**；收集物本体半径 14px（`collectible.tscn`）；**触发距离（圆心距）= 30.8 + 14 = 44.8px**（v1 为 22+14=36px）。刷点安全间距常量 96px 未动 → 余量从 96/36 ≈ **2.67×** 收窄到 96/44.8 ≈ **2.14×**，仍满足「重开不贴脸白捡」。commit `3a396355` 提交信息里的「判定半径 44.8px」即此**触发距离**口径，不是 PickupShape 本体半径，别混淆。
+
+## 二、godot-smoke 门禁表现（v2 断言三件套 + 全链路复跑）
+
+### 2.1 门禁复跑结果（本地与 preHook 同源，全绿）
+| 门禁步 | 结果 |
+|---|---|
+| resolve-godot.sh | exit 0，Godot **4.3.stable.official.77dcf97d8** |
+| preflight.py | **PREFLIGHT: PASS**（13 类前置一致性检查、40 个工程文件，exit 0） |
+| smoke.sh（240 帧预算） | **GODOT_SMOKE: PASS**（exit 0、零 SCRIPT ERROR） |
+| input-fuzz.sh | **GODOT_FUZZ: PASS**（seed=20260913，6 批次 239 帧，exit 0） |
+| playtest.sh | **脚本缺失**（模板仓库未预置，D2 依赖 / bug `cmuktchmy000km97z6kj3r2ro` Bug1），维持 blocked、不代写不伪造 |
+
+### 2.2 smoke.gd 新增 v2 手感断言三件套（真实机判，含 FAIL 路径，约 L423-435 `_assert_v2_tuning`）
+1. **倍率区间**：`PLAYER_SCALE ∈ [V2_SCALE_MIN=1.3, V2_SCALE_MAX=1.5]`，违例 FAIL 签名「v2 手感断言 FAIL：体型倍率 %.2f 不在 %.1f~%.1f 区间」；
+2. **移速区间**：`PLAYER_SPEED ∈ [V2_SPEED_MIN=V1_SPEED×0.6=132.0, V2_SPEED_MAX=V1_SPEED×0.7=154.0]`，FAIL 签名「移速 %.1fpx/s 不在 v1 默认 %.0f 的 60%%~70%% 区间」；
+3. **接线集成断言** `_assert_node_scaled`：Player 根节点、`CollisionShape2D`、`PickupArea/PickupShape` 三节点的全局缩放必须都等于数值区 `PLAYER_SCALE`（与难度梯度 SpawnTimer 断言同口径，防「数值键写了但没接上」）。
+
+方向符号断言（A/← 后 position.x 减小、D/→ 后增大）与 50 连击判定一致性、难度梯度、过期回收、胜负四分支、一键重开、持久化等既有契约**全部保留不动且继续通过**——玩法零回退。
+
+### 2.3 可复用结论：断言区间与需求区间硬耦合
+smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的。后续若要把数值调**跨出**这个区间，必须**三处同步**：smoke.gd 常量、需求区间条款、策划案 revisions 数值区——否则门禁会以清晰签名 FAIL（这是门禁在强制「数值变更须先改需求基线」的设计行为，**不是误报，不许放松断言来绕**）。
+
+## 三、线上链路诊断结论（liveUrl 端到端实测，2026-10-02）
+
+**结论先行**：✅ v2 已在线上生效且量化达标——部署产物自跑门禁全绿（含 v2 手感基线机判），线上资产与仓库导出逐字节一致，**无需修复、无需回滚**。
+
+1. **部署元数据**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`）；当前部署 **version 5 `cmuqny37h001ficf0mpmr71mv` status=running**；gitRef=`myrd/games-goal-cmujpml1e006rm99i9hc33huu`（未落 main ✓）；commit `1089e4b`（其上仅 1 个 docs 提交，代码零差异）；v4=`cmuqnx9v6001dicf0fmfryxcz` superseded（重试冗余但无害）。
+2. **公网链路**：`GET /apps/game-8/health` → 200 `{"ok":true,"app":"game-8","game":"牛牛打游戏","assets":"lazy/object-storage"}`；`/apps/game-8/` → 308 规范化跳转 → 200；`/gw/health` → 200（网关透传正常）；壳页 11,626B，`__GAME_TUNING__` 调参桥 ×2、`__audioDebug` 音频手势解锁器、资产全走相对路径 `fetch(BASE_PATH + 'api/public/assets/' + name)` 三契约在位。
+3. **资产文本通道**：`index.pck` base64 3,333,340B → 解码 gzip 2,513,040B；`index.wasm` base64 **10,696,408B** → 解码 35,376,909B（与门禁经验 v6 一手实测值一致）。
+4. **逐字节一致（无版本漂移）**：本地导出（部署 commit 工作树）与线上对象存储拉回解码产物 sha256 完全一致——pck `5f556ad9adf47579cb38a1fd8f7549e33b478b56cd4b3b5f112346281d699e25`；wasm `fe5cebc590758c10bc4469be5a591e28edbde5ec8f458f21baeb83db50d028b9`。
+5. **最高等级证据——部署产物自跑门禁**：`godot --headless --main-pack <线上pck> --quit-after 240 res://tests/smoke.tscn` → exit 0、零 SCRIPT ERROR、`GODOT_SMOKE: PASS`，v2 手感基线机判全过（1.4∈[1.3,1.5]，145∈[132,154]）——「牛牛变大变慢」是**产物运行期实测**，不是代码推断。
+
+## 四、复测方法（照抄即用）
+
+1. **公网探测**：`curl -s <liveUrl>/apps/game-8/health`（期望 200 + ok:true）；`curl -sI <liveUrl>/apps/game-8/`（期望 308→200）；壳页 HTML grep `__GAME_TUNING__` / `__audioDebug`。
+2. **资产一致性**：`GET /api/public/assets/index.pck`（和 index.wasm）→ base64 解码 → gunzip → `shasum -a 256`，对照 §三.4 的两个哈希；不一致即版本漂移，先查部署 commit 再谈手感。
+3. **手感数值机判**：`godot --headless --main-pack <线上或本地 index.pck> --quit-after 240 res://tests/smoke.tscn`，判定三条件（`GODOT_SMOKE: PASS` + exit 0 + 零 SCRIPT ERROR），签名中应含「v2手感基线(体型1.3~1.5x·移速60~70%)」字样。
+4. **数值速查**：游戏内调参面板或壳页 `?tuning=1` URL 直接查看当前声明键值；或读 `games/game-8/autoload/game_state.gd` 数值区。
+5. **环境备注**：诊断沙箱对 github.com:443 直连超时（`Recv failure`），推送改走 `ssh.github.com:443` 通道——后续同环境取证直接用此通道，别反复试直连。
+
+## 五、「再大一点 / 再慢一点」类反馈的增量调参 playbook（可复用基线）
+
+**标准链路（全七步，禁止散点改代码对数值）**：
+调参入口（游戏内面板滑杆即时生效 / 壳页 `?tuning=` URL）→ 确定目标声明键与新值 → **经策划案 revisions 回写 `spec.numeric`**（doc `80b9c193-…`，spec 载体即该知识文档）→ 改 `autoload/game_state.gd` 数值区 → 复跑 godot-smoke 门禁 → 重导出 Web 产物并部署（gitRef 必须是 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`）→ 按本文 §四产物自跑门禁复测。
+
+**建议步长与边界**：
+| 反馈 | 动作 | 步长建议 | 边界 |
+|---|---|---|---|
+| 再大一点 | `PLAYER_SCALE` ↑ | +0.05~0.1 / 档 | 钳制 [0.5, 2.0]；跨出 [1.3,1.5] 须按 §2.3 三处同步 |
+| 再小一点 | `PLAYER_SCALE` ↓ | −0.05~0.1 / 档 | 同上；低于 1.3 同样触发门禁 FAIL |
+| 再慢一点 | `PLAYER_SPEED` ↓ | −5~15 / 档 | 钳制 [60, 300]；跨出 [132,154] 须三处同步 |
+| 再快一点 | `PLAYER_SPEED` ↑ | +5~15 / 档 | 同上 |
+
+**每次调整必做的三项联动复核**：
+1. **断言区间一致性**（§2.3）：数值是否跨出 smoke 常量带；
+2. **判定几何余量**：体型↑ → 触发距离 = 22×scale + 14 线性放大 → 96px 刷点间距余量 = 96/触发距离 收窄；低于 2× 时须复核刷点安全间距常量是否要同步上调（公平性属门禁议题，不许靠放松断言解决）；
+3. **达成余量**：移速↓ → 单位时间可达刷点数↓ → 60s/20 目标的通关可达性须复核（跑 50 连击一致性 + 全链路一条龙断言兜底；v2 @145px/s 已实测可通关）。
+
+**回滚口径**：v1 = `PLAYER_SCALE 1.0` / `PLAYER_SPEED 220.0`，两键均可在调参面板或 `?tuning=` URL 直接调回，代码零改动。
+
+**主观手感的最终裁决**：数值区间内「像不像用户要的手感」机器判不了，仍以 D3 用户试玩结论为准（入口 `…/apps/game-8?tuning=1` 已可用）；未决依赖 D1（iOS Safari 真机）/ D2（playtest.sh 模板资产）见收口清单 doc `943eb5eb-…`。
+
+**来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
+
+
+## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+# game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+> 来源：需求《测试连点防重的极简计数页（game-12）》（id=cmur8x93r0016icbsd90s6e60，goal=cmur8pnhn000kicbsvl0eoqx6）走完「录入需求 → 判定规则调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-12`（Godot 4.3.stable），分支 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`（scaffold e055e4f → implement ff779d0 → deploy c54fcc9/078f761/e5b292e → playtest 1f7a4a3）。线上：https://leomac-studio.tail49399e.ts.net/apps/game-12/（/health 200 `{"ok":true,"app":"game-12"}`，deploymentId=cmurba8yd001vicbsfdl79x8l，部署 commit c54fcc9）。门禁终态：**godot-smoke 全绿 + mobile-web-smoke PASS 10/10（实测 FPS 39）**，playtest 棒复跑双门禁结论一致。
+>
+> 本文只写 game-12 的增量结论：防重语义选型与实现契约、双门禁通过路径、踩坑清单与复用清单。门禁三层体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-9 增量见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be；移动端触屏摇杆与 AudioContext 解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；防重判定规则 R1–R6 / 事件契约 C1–C4 调研全文见项目文档库 id=8345388c-cf30-4d7c-8413-39ccd7e65887。互为补充、不重复。
+
+## 一、防重语义选型：只有「固定节流（采纳即锚定、拦截不延窗）」能同时过验收 2 和 3
+
+| 方案 | 机制 | 300ms 内连点 5 次 | 窗口后恢复累加 | 结论 |
+| --- | --- | --- | --- | --- |
+| **固定节流（首击入窗）** | 首击计数并锚定窗口；窗口内后续点击全拦且**不更新锚点** | 仅 +1 | 正常 | 采用 |
+| 防抖（末击重启窗口） | 每次点击都重置窗口，静默期满才计 | 0 次 | — | 违背验收 2 |
+| 首尾折叠 | 窗口首末各计一次 | +2 | — | 违背验收 2 |
+
+**最易写错的一行**：被拦截的点击不得触碰窗口锚点 `_last_count_ms`。一旦拦截分支也更新它，节流就退化成防抖——持续点击下计数永远不涨，验收 3 永远不过。
+
+实现（`games/game-12/autoload/game_state.gd`，时间注入纯函数，核心约 15 行）：
+
+```gdscript
+const TARGET_COUNT: int = 10
+const DEBOUNCE_MS: int = 300
+var _last_count_ms: int = -DEBOUNCE_MS   # 初值 = -窗口 → 开局首击立即有效
+
+func try_count(now_ms: int) -> bool:
+    if state != State.PLAYING:
+        return false                      # 已胜：忽略，不报错
+    if now_ms - _last_count_ms < DEBOUNCE_MS:
+        click_rejected.emit(DEBOUNCE_MS - (now_ms - _last_count_ms))
+        return false                      # 拦截：只发反馈信号，不动锚点
+    _last_count_ms = now_ms
+    count += 1
+    count_changed.emit(count)
+    if count >= TARGET_COUNT:
+        state = State.WON
+        state_changed.emit(state)
+    return true
+
+func reset() -> void:
+    count = 0
+    state = State.PLAYING
+    _last_count_ms = -DEBOUNCE_MS         # 重开同步清防重锚点 → 首击立即有效
+```
+
+三个不能省的细节：
+1. `_last_count_ms` 初值取 `-DEBOUNCE_MS`，否则开局第一击被吞（验收 1 首点即错）。
+2. `reset()` 必须同时清防重锚点——「刷新/重开无残留」包含防重状态本身。
+3. 拦截不静默：`click_rejected(remaining_ms)` 把「被吞的点击」变成可感知反馈（按钮闪红 + 状态栏「连点已拦截，还需 Nms」）。且关键反馈不能被高频更新覆盖——状态栏曾把指针坐标与拦截提示混在一行，坐标每物理帧刷新把「还需 Nms」冲掉，拆成反馈线/指针线两行才保住。
+
+时间注入是机判前提：`try_count(now_ms)` 不读时钟 → 无头冒烟可用合成时间戳逐毫秒断言（完全确定、与帧率零耦合）；只有真实点击路径才走 `Time.get_ticks_msec()`。
+
+## 二、单源单相：三个入口汇一个判定点，防「一次触碰计两次」
+
+Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`（调研已核实）→ 移动端一次触碰可能产生 touch/mouse 双事件，再加键盘空格/回车，同一「点击」有四个来源。game-12 的收敛方式：
+- `CountButton.pressed`（鼠标/触摸）与 `_unhandled_input("confirm")`（键盘/动作）都只调唯一入口 `_attempt_count()` → `GameState.try_count(...)`。防重判定只在 GameState 一处，不可能被绕过。
+- `TouchConfirmButton`（TouchScreenButton）**不直接调游戏逻辑**，而是 `Input.parse_input_event(InputEventAction("confirm"))` 注入动作 → 触摸与键盘走完全相同路径（顺带获得桌面端自动不响应的免费屏蔽）。热区用 shape 圆（半径 44）而非位图。
+
+## 三、把「防重」机判成确定性断言（附负例验证纪律）
+
+冒烟相位设计（`games/game-12/tests/smoke.gd`）：
+- **合成时间戳断言防重**：t0 有效；t0+100/200/299ms 连点全拦、只发 click_rejected、count 不变；跨窗后再点正常 +1。
+- **真实路径另测**：真实点击受真窗口约束 → 相位间显式等真实时间跨窗，并设帧数上限守卫（60fps 约 2s，超限报 `Engine.max_fps` 异常而非挂死）。
+- **噪声后复位**：乱键相位可能真触发计数/拦截，且末次乱键可能贴着 confirm 注入点不足 300ms → 进断言前 `GameState.reset()` 清锚点，消灭偶发失败。
+- **每条断言做负例验证**（证明会真 FAIL，不是永真）：热区 44→10、宽高比 keep→expand、脉冲阈值抬到 1.0，三次均如预期 FAIL。
+
+两个「静默漏判」陷阱（负例不触发才发现）：
+1. 静态几何断言放 `_ready()`：此时 `Control.size` 恒为 0，整段断言被静默跳过 → 移到第一物理帧再读。
+2. Button 有主题最小尺寸保护：`offset_right=110` 实际 size 被钳到 115，44px 负例测不出来 → 换 TouchScreenButton 圆形热区做负例。
+
+极简静止页的门禁特异问题：mobile 门禁「画面在动」检查会把完全静止的页面误判为渲染冻结。解法：+1 按钮加待机呼吸脉冲（scale 1.00→1.06 / 0.9s，实测极差 0.060 ≥ 阈值 0.02），一举两得——既是移动端可点示能，又是确定性的非零帧差证据。缩放绕 `pivot_offset`（控件中心），否则动画往右下飘。
+
+画布口径：调研建议设计宽 375 + Adaptive；实现落成 720×1280 竖屏 + `canvas_items`+`keep`（+1 按钮 560×240，375 宽实机约 291px），同样满足无横滚与 ≥44px。机判锚点是**宽高比策略必须 keep**（expand 会被冒烟断言拦，负例已验证）。
+
+## 四、Godot Web 双门禁：分工、顺序与标记辨析
+
+| 门禁 | 判定链 | 拦什么 | game-12 实测 |
+| --- | --- | --- | --- |
+| **godot-smoke** | resolve-godot → preflight.py（13 类静态一致性）→ headless smoke（`GODOT_SMOKE_FRAMES=240`，断言退出码 0 + `GODOT_SMOKE: PASS` 标记 + 日志无 SCRIPT ERROR）→ input-fuzz（seed=20260913，6 批/239 帧） | 游戏本体「跑得动且玩得动」（含防重/恢复/胜负/重开/触控目标/拉伸契约断言） | 四步全 exit 0 |
+| **mobile-web-smoke** | mobile-web-smoke.mjs --url <liveUrl>（headless Chrome 390×844 iPhone 仿真）10 项：网络全通/console 零错/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约（__audioDebug）/无横溢（scrollWidth=390）/FPS≥8（实测 39） | 部署后真实链路上的移动端可玩性 | PASS 10/10 |
+
+三条纪律：
+1. **mobile-web-smoke 必须打部署后的 liveUrl**——本地静态伺服 export/web 只能当预检（implement 棒做过 10 项预检），不能替代正式门禁：M1 网关、对象存储资产通道、壳契约只在真实链路暴露。所以它位于 deploy 之后，是产物验证而非 implement 棒门禁。
+2. **标记辨析**：判定脚本 stdout 是小写 `godot-smoke: PASS`，引擎日志里才是大写 `GODOT_SMOKE: PASS`（smoke.sh 内部 grep 大写标记后才自产小写行）。只 tail 游戏日志看不到大写标记不等于失败——先分清两层标记再下结论。
+3. **证据随仓库归档**：`games/game-12/qa/mobile/report.json` + phase-load/tap/joystick 三张截图入库，供复跑比对。
+
+## 五、部署链五个真实踩坑（每个都在本目标发生过）
+
+1. **`.gitignore` 里 `/export/` 不删 = 部署后全 404**：apphost.toml 的 `assets_dir` 指向 `games/game-12/export/web`，导出产物不入库则 wasm/pck 上线即丢。导出产物必须入库（37MB wasm 走底座 A「资产出 bundle」+ 对象存储懒加载 + `/api/public/assets/` b64 文本通道，总论见 27407691）。
+2. **apphost.toml 沿用上一游戏**：原值指向 candy-crush 的 `games/game/export/web`；构建管线按 gitRef 读它，不改会打包错应用 → `name`/`assets_dir` 随游戏改是 deploy 棒第一查。
+3. **gitRef 必须是目标分支不是 main**：本次 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`。注意本地工作区克隆出的分支名可能与远端目标分支不同名同指针（`myrd/game-12-goal-…` vs `myrd/games-goal-…`）→ 部署前 fetch + 显式切到目标分支再读 apphost/导出。
+4. **壳页三件套缺一不可**（`server/src/game-page.ts` / `games/game-12/export/web-shell.html`）：品牌文案适配（曾残留糖果粉碎传奇文案）；§3C 调参桥（引擎加载前解析 `?tuning=` → `window.__GAME_TUNING__`，只认对象形态、非法 JSON 静默忽略——game-12 缺，补约 8 行）；音频手势解锁器 + `window.__audioDebug`（即 mobile 门禁「音频解锁契约」的机判对象）。壳页另配 `overflow:hidden + touch-action:none` + `user-scalable=no`：彻底禁双击缩放/滚动，快速二连点不被浏览器手势吞掉造成防重误判（比调研建议的 `touch-action: manipulation` 更强）。
+5. **PATCH 目标 artifacts 是整体替换数组**：回写产物必须 get→append→写回（playtest 棒 3→4 条、既有条目原样保留 + 回读校验），直接 put 会抹掉前序产物。
+
+调参语义澄清：`TUNING_META` 未声明时 `?tuning=1` 是**安全 no-op**（正常进游戏、忽略键）。game-12 有意不把 `DEBOUNCE_MS=300` 做成可调——它是需求验收项本身，spec 是唯一事实源。要开放浏览器内调参需下一轮：spec.numeric 声明键 → TUNING_META + tuning_panel.gd + 冒烟断言 → 重导出重部署重跑 mobile 门禁。
+
+## 六、macOS 自带 bash 3.2 的全角括号坑
+
+`verify.sh` 里 `$FRAMES）`（全角右括号紧贴变量名）在 macOS bash 3.2 某些 locale 下把多字节字符并入变量名 → `FRAMES: unbound variable`，而上一行 echo 还能正常展开，极难定位。写法统一 `${FRAMES}`，用 `bash -x` 抓现行。game-12 修复后 verify.sh 端到端全绿（preflight/smoke/fuzz 全 exit 0）。
+
+## 七、如实上报的缺口（未绕过、未伪造）
+
+1. **playtest.sh 不在模板仓库**（`std-skills/godot-game-dev/scripts/` 同目录 9 个判定/驱动脚本中独缺它）：各节点均未自造等价判定器、未伪造 `GODOT_PLAYTEST: PASS`；`.myrd/routines.yaml` 两条 routine（godot-smoke / mobile-web-smoke）均不引用它 → 不阻塞双门禁，缺口随产物 detail 上报运维补资产。
+2. **真机抽查未做**（本环境建不了 iOS 会话）：mobile-web-smoke 是 headless Chrome 仿真，触摸结论的边界是仿真环境；真机验证留待用户试玩回填。
+3. **试玩结论只能来自用户**：playtest_kit 已交付（`games/game-12/qa/playtest-kit.md`，试玩指引 + 反馈对照表 + 四问量表），量表待回填，未代填任何「好玩/通过」结论；未收到用户调参 URL 前，无 spec revisions/approve 调用。
+
+## 八、复用清单（后续点击类小游戏直接抄）
+
+1. 防重抄 `try_count(now_ms)` 签名：时间注入纯函数 + 初值 `-DEBOUNCE_MS` + 拦截不动锚点 + reset 清锚点 + 拦截发 remaining_ms。
+2. 输入抄「单源单相」：所有入口 → 唯一 `_attempt_count()`；TouchScreenButton 注入 InputEventAction 而非直调逻辑。
+3. 断言抄四件套：合成时间断言 + 真实路径跨窗等待 + 噪声后 reset + 每条断言负例验证；几何断言放第一物理帧，44px 负例用 TouchScreenButton 热区。
+4. 静止页记得待机脉冲（≥0.02 极差同时换「画面在动」绿与可点示能）。
+5. 部署抄「五查」：gitignore 的 /export/、apphost.toml 指向、gitRef=目标分支、壳三件套（文案/调参桥/音频解锁）、artifacts 回写 get→append→写回。
+
+关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
+
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
 
 # 知识：僵尸/孤儿运行轨迹的识别与处置
@@ -3509,6 +4283,780 @@ Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`�
 
 关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
 
+## 沉淀 game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战经验（推箱子点亮方块解谜 · 全四棒工作流）
+
+# game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战沉淀（推箱子点亮方块解谜 · 全四棒工作流）
+
+> 来源：需求《推箱子点亮方块解谜（game-9）》（id=cmupsx443003om9dh5dwd5w9u，goal=cmupsrc19002sm9dhp5su0zaj）走完「前置体检 → scaffold → implement → deploy → playtest」全流程后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-9`（Godot 4.3.stable.official）。线上：liveUrl https://leomac-studio.tail49399e.ts.net/apps/game-9/（deploymentId=cmupxibnn0087m9dhz3cfhap4，commit 19a6d59，838ms 上线，app.status=ready）。工作流运行 /workflows/cmupsrc1v002wm9dh68sljxoq/runs/cmuputtey006dm9dht78nbbtm。
+>
+> 本文只写 game-9 新踩的坑与增量打法。门禁三层体系总论（preflight/smoke/fuzz 分工、E-16 带病绿灯）与 AppHost 部署总论见《沉淀 Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路实战经验》（id=27407691-bcf8-4e73-b686-1bb8df684e5c，oak-key 实测）；移动端触屏摇杆与音频解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca。三篇互为补充、不重复。
+
+## 一、事实基线：四棒各留下什么（审计入口）
+
+| 棒 | 提交 | 内容 | 结果 |
+| --- | --- | --- | --- |
+| scaffold | d297996 | 以 templates/minimal-2d 初始化 games/game-9：推箱骨架（推动/点亮/Undo/Restart/换关）+ 5 关关卡册 + tools/level_solver.py + tests/smoke.gd + verify.sh | ✅ |
+| implement | 4bfdb00 | 见证解回放 / 死锁反馈 / touch_swipe / AC5 响应断言；is_solved 口径修复；.myrd/spec/design-spec.json 落盘 | ✅ |
+| deploy | 19a6d59 | export_presets.cfg + 导出产物入库 + apphost 壳切 game-9 + §3C 调参桥 + 移除 candy-crush 残留 | ✅ 已部署 |
+| playtest | 0103b33 | docs：playtest blocked 报告（缺 playtest.sh） | ⛔ blocked |
+
+- **部署形态**：底座 A「资产出 bundle」——`apphost.toml` 里 `assets_dir="games/game-9/export/web"`，37MB 导出经对象存储懒加载，bundle 本体不含游戏资源（25MB bundle 上限不再约束资产体积）。
+- **导出产物形态**：index.wasm 33.7MB / index.pck 2.4MB / index.js 331KB / index.html 4.9KB / index.audio.worklet.js 7.3KB。线上资产通道 `/api/public/assets/`：index.js 原文直出，wasm/pck 走 `*.gz.b64` 文本（10.7MB / 3.3MB），端到端解码验证过（b64→gzip→`WebAssembly.validate()=true`、pck 魔数 `GDPC`）。
+- **部署记录层 status=running 与应用已 ready 并存**：判断游戏死活以 /health 与实际可达为准，别拿 deployment.status 当真。
+
+### 分支审计坑：同一目标两条远端分支并存
+
+- `myrd/game-9-goal-<goalId>`：前置体检节点首次推送建立，停在 implement 棒（4bfdb00）。
+- `myrd/games-goal-<goalId>`：工作流四棒实际跑的分支，tip=0103b33（多出 deploy/playtest 两棒）。
+- 结论：**复现/审计认 goal artifacts 里的 `gitRef` 与 `app_deployments.commit_hash`（本次 = 19a6d59）**，别按「目标 id 搜分支」想当然——两条分支都能搜到且不同步。另：线上部署的是 19a6d59，其后 playtest 棒只追加 docs（0103b33）未重新部署，属 docs-only 差异，游戏本体无差。
+
+## 二、Godot Web 导出：模板不含预设，从零补齐的六个决策
+
+1. **模板仓库不含 `export_presets.cfg`**。games/game-9 的 README 在 scaffold 棒就记了：「export_presets.cfg 尚未配置（模板不含），部署节点需按 games/game/ 的 web 导出先例补齐」。每个新游戏都要从上一个游戏的先例抄一份再改，别等部署节点现场发明。
+2. **必须用单线程变体：`variant/thread_support=false`**。M1 网关不发 COOP/COEP 头，SharedArrayBuffer 不可用，线程版直接白屏。这是 Web 导出第一坑：配错不报错、上线才白屏。
+3. **导出产物必须入库，`.gitignore` 加 `!/export/web/` 豁免**。`assets_dir` 是平台构建输入，产物不在仓库里平台打包 bundle 就缺资产。Godot 工程 .gitignore 默认把 export/ 排掉，这里要反着来。
+4. **全局中文字体是 Web 导出的底线**（preflight P13 机判）。浏览器沙箱拿不到系统字体，引擎内置字体只有拉丁字形；`[gui] theme/custom_font` 必须指向子集化中文字体（本工程用 Noto Sans CJK SC：GB2312 全集 + ASCII + 常用符号，OFL 1.1），删了所有中文变缺字方块。字体约 2.9MB，是 pck 体积大头，但属中文游戏必要成本。
+5. **渲染器钉死 `gl_compatibility`**（`renderer/rendering_method` 与 `.mobile` 双写）。Forward+ 在 Web 上不可用。
+6. **接手模板仓库先清上一个游戏的残留**。deploy 棒移除了基线残留的 candy-crush 工程 `games/game/`（39MB 导出）——模板仓库是「单游戏位」惯例，根壳一次只服务一个游戏；残留工程还会污染门禁参照（前置体检时 gate-selftest 拿 games/game 当参照，因 player.gd 缺 `moved.emit`/`const SPEED` 模板契约锚点，D4/D5 注入失败，换官方参照 `templates/minimal-2d` 后 D1–D5 全拦）。
+
+**壳侧三件套 + 调参桥**（沿用 oak-key 先例并加一层）：相对路径资产路由；移动端音频手势解锁器（AudioContext 包装 / 手势 resume / `__audioDebug` 取证口）；worklet 防御；新增 **§3C 调参桥**：
+
+- 壳把 URL `?tuning=<json>` 解析成 `window.__GAME_TUNING__`；
+- 游戏侧 `GameState._apply_tuning_overrides()` 仅 `OS.has_feature("web")` 时经 `JavaScriptBridge.eval("JSON.stringify(window.__GAME_TUNING__ || null)")` 读取；
+- `TUNING_META` 白名单四键 + min/max 钳制 + round 取整：`move_anim_ms` 0–400、`push_anim_ms` 0–400、`key_repeat_interval_ms` 50–600、`win_overlay_delay_ms` 0–1000。
+- 价值：试玩期调手感不用改代码重导出——「试玩调好的参数用 URL 复现」，试玩入口直接发 `?tuning=1` 工作台链接。无头冒烟/桌面自动跳过，门禁行为不受影响。
+
+## 三、冒烟门禁：game-9 的四个增量打法
+
+四步 routine 不变（`.myrd/routines.yaml` id=godot-smoke：resolve-godot → preflight 13 类 → `GODOT_SMOKE_FRAMES=240` headless-smoke → input-fuzz，seed=20260913），`games/game-9/verify.sh` 只调用 std-skills 判定脚本、不重实现。本次实测：preflight PASS / `GODOT_SMOKE: PASS`（240 帧，exit 0）/ `GODOT_FUZZ: PASS`。增量全在冒烟断言本身（tests/smoke.gd，628 行，11 项断言清单）：
+
+### 3.1 见证解回放：把 AC4「关卡可解」变成引擎内机判
+
+离线求解器说「可解」只是一句话结论；game-9 把它做成冒烟断言：
+
+- `tools/level_solver.py --paths` 生成每关见证解（U/D/L/R 移动串，长度 == par），Python 侧重放自证后落盘进 `sokoban_levels.gd` 的 `solution` 字段（与 layout 同处，单一事实源，防两处数据漂移）；
+- 冒烟逐关回放见证解，断言三条：**必须通关、步数 == par、回放全程不得误报死锁**；
+- solver 直接解析 `sokoban_levels.gd`（不复制关卡数据），「策划案 → 关卡册 → 求解器 → 冒烟」四层数据同源，par 漂移会在冒烟里直接爆。
+
+### 3.2 通关判据口径：常亮 ≠ 通关（冒烟实测拦下的真 bug）
+
+点亮目标格是 `onceLitStaysLit`（入场常亮、永不熄灭），但 `is_solved` 不能跟着用「全部点亮」口径——**常亮口径会把 level-05 最优路径第 35 步误判通关、提前停走**（冒烟回放见证解时实测拦下）。修复：`is_solved` = 「全部接线槽有方块驻留」，与求解器 / spec parMoves 同口径；点亮只作视觉态。
+
+教训：**「视觉状态」与「胜负判据」是两个变量。凡有常亮/累计态的玩法，胜负判据必须与求解器同口径，并让冒烟回放最优解来兜底。**
+
+### 3.3 死锁反馈机判：报与不报都要有断言
+
+角死锁检测 + `deadlock_changed` 信号 + HUD 卡死警示 + 死锁方块变红。冒烟断言四条：角死锁必报、在槽角不报（在槽角是合法终态）、开阔局面不报（防假阳性）、真实关卡把方块顶进角后信号通知 UI 且 **Undo 可脱离死锁态**。「无假阳性」的论证写在检测函数注释里供复核。
+
+### 3.4 AC5 量化成帧预算断言
+
+- 响应延迟：spec 200ms ≈ 60FPS 下 12 帧 → 断言「注入输入 → 首次步进 + HUD 同步刷新」≤ `RESPONSE_BUDGET_FRAMES=12` 帧，验收口径直接写进门禁；
+- 触屏滑动：越过 24px 阈值（`spec.numeric.input.touchSwipeThresholdPx`）的一次滑动**恰好步进 1 格**；冒烟注入 48px 拖拽验证（`SWIPE_DRAG_PX=48`）。
+
+### 3.5 headless 输入注入的坑（error-signatures E-08 的 game-9 变体）
+
+- headless 下 `Input.parse_input_event()` 的缓冲冲刷会清掉 `Input.action_press()` 的按下状态，**同帧混用两种注入方式会让「移动断言」假失败** → 冒烟分 7 相位（噪声/移动/滑动/逻辑/等弹层/下一关/收尾）互不重叠；
+- 触点下标隔离：噪声相位用触点 0/1，滑动断言用触点 7，防互相回收；
+- 滑动起点 (500,280) 刻意避开左下摇杆热区（24..160 × 400..536）与右下按钮排，否则手势被控件吃掉；
+- 噪声相位（30 帧悬挂手势/孤儿释放/乱键）放在一切正式断言之前——上一游戏（糖果三消，commit bbb872f4「致胜滑动后指针脏状态吞掉下一关第一次手势」）就是靠这类对抗注入防回归的。
+
+### 3.6 verify.sh 退出码四态（给修复方向做机器路由）
+
+0=通过；1=smoke/fuzz 运行期未过（改游戏代码）；2=环境不可用（缺 Godot/技能脚本/python3，装环境而非改代码）；3=preflight 静态未过（先修静态，不必跑冒烟）。关键设计：技能脚本存在性守卫放在一切判定之前，缺脚本必须报 2——否则会掉进下游非零退出码被误判成 3，诱导修复节点去改游戏代码。
+
+## 四、关卡求解器：三段演进与两个真 bug（策划案阶段就要做）
+
+固化策划案（create_design_spec）时就要求每关机器可解、par 机器可算——这步做了，实现、冒烟、验收全链路都有基准。求解器三段演进：
+
+1. **BFS**：前三关（状态空间小）够用；
+2. **A* + 拉拽距离启发 + 死格剪枝**：大关用（启发值 = 每方块到最近接线槽的拉拽距离下界，可采纳；死格 = 角死锁 / 墙边不可拉出格）；
+3. **精确状态 A\***：修掉「区域归一化」bug 后的最终形态。
+
+两个真 bug（都在求解器侧，不在游戏侧）：
+
+- **区域归一化把玩家站位合并掉**：对「推动数」精确，对「玩家步数」只是松弛下界——level-02 手推最少 10 步，求解器报 5。修复：玩家坐标显式入状态；修复后 A* 与纯 BFS 交叉验证一致（2/10/18）。
+- **开阔房间 + 5 方块状态空间爆炸**：单关搜索超时。解法不是更强的剪枝，而是**改关卡布局**——level-05 换成更紧凑、隔断更多的「总控机房」，对人更难、对求解器更小，验证 3.8s，par=58 > level-04 的 40，难度曲线反而更成立。
+
+工程参数：`EXPANSION_CAP=4_000_000`、`MAX_DEPTH=200`；par 不一致只告警（布局或 par 漂移），可解性才是硬判据（exit 0/1）。最终 par 曲线 2/10/18/40/58，方块数 1→5 严格递增（AC4），策划案 `numeric.difficulty.parMoves`、关卡册、冒烟断言三方一致。
+
+## 五、playtest blocked：判定器独立性纪律的一次实战
+
+playtest 节点硬约束：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 五个判定脚本**全部由模板仓库预置**，缺任何一个 → 立即 blocked，**严禁现场自造、拷贝注入副本、或用等价命令替代**——它们是判定器，被检方自己写门禁即失去独立性。
+
+本次实测缺 `playtest.sh`（及 `playtest_driver.gd`），按纪律停止：
+
+- **证据链五步**：① 工作区分支 scripts 目录实清（仅 7 个文件）→ ② origin/main fetch 后核对同样缺失（排除本地落后）→ ③ `git log --all` 该路径从未存在 → ④ 全仓库 find 仅命中 `.myrd-platform/.claude/skills/`（平台注入阅读副本，被 .gitignore 排除不入库，按硬约束不得作判定来源）→ ⑤ 前序 deploy 产物旁证。
+- **根因**：平台注入技能包（新版，含机器人试玩门禁：协议 `GODOT_PLAYTEST: PASS/FAIL` 退出码 0/1、2=环境不可用；`GODOT_PLAYTEST_METRICS: <JSON>`；bot 多局输出节奏代理指标——首次奖励/无反馈窗口/反馈密度/局间方差；阈值由工程内 `tests/playtest.json` 覆盖）**领先于模板仓库预置基线**（v1 仅四脚本，godot-smoke routine 也只有四步）。属模板仓库技能资产滞后，需运维补模板仓库，非 agent 现场可修。
+- **没做的事同样重要**：不交付试玩验收包、不拷贝注入副本、不自造判定器；四问量表标「待用户试玩」；spec 数值回写跳过（未收到用户结论，严禁编造）。
+- **影响面切割**：deploy 产物不受影响（游戏仍可访问），godot-smoke 四步门禁此前已全过——blocked 只挡 playtest 这一段。
+- **修复路径**：运维补模板仓库 `playtest.sh` + `playtest_driver.gd`（连同 SKILL.md 章节与 godot-smoke-routine.md 模板同步，脚本/文档/routine 三者一致）→ 经模板预置链路同步进项目仓库（不得手抄注入副本）→ 重跑 playtest 节点交付 `op=playtest_kit`（含 `<liveUrl>?tuning=1` 调参工作台入口）。取证报告在仓库 `docs/game-9-playtest-blocked-report.md`。
+
+## 六、下一个游戏直接抄的清单
+
+```bash
+# 1. 门禁入口（四步；退出码 0/1/2/3 见 §3.6）
+bash games/<game>/verify.sh
+
+# 2. 关卡可解性证据（--paths 生成见证解 → 落盘 solution 字段 → 冒烟回放）
+python3 games/<game>/tools/level_solver.py games/<game> --paths
+```
+
+Web 导出预设必查四项：
+
+| 项 | 值 | 不守的后果 |
+| --- | --- | --- |
+| `variant/thread_support` | `false`（单线程） | M1 网关无 COOP/COEP，SharedArrayBuffer 不可用 → 线程版上线白屏 |
+| `[gui] theme/custom_font` | 子集化中文字体 | 浏览器无系统字体 → 中文全部缺字方块（preflight P13 拦） |
+| `renderer/rendering_method` | `gl_compatibility`（desktop+mobile 双写） | Forward+ 在 Web 不可用 |
+| `.gitignore` | 加 `!/export/web/` 豁免 | assets_dir 构建输入缺资产，bundle 打包失败 |
+
+复用分工：门禁三层总论 / E-16 带病绿灯 / AppHost 部署总论 → id=27407691-bcf8-4e73-b686-1bb8df684e5c；移动端触屏摇杆 / 音频解锁规范 → id=82e419bb-b641-4b5e-bb58-d8b9633169ca；本文 = game-9 增量（导出预设从零补齐、见证解回放机判 AC4、通关判据口径、死锁反馈机判、AC5 帧预算断言、E-08 分相位注入、求解器演进、playtest blocked 纪律、双分支审计口径）。
+
+
+## 沉淀《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+# 《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+> 来源：需求《《hello》休闲收集小游戏》（id=cmuqk7luz002am9bfmmkouw9v，goal=cmuqk3j2o001mm9bfptrztaj1）走完「scaffold → implement → deploy → playtest」工坊主通道后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/hello`（std-skills minimal-2d 模板起步，Godot 4.3.stable，gl_compatibility）。线上终态：liveUrl `https://leomac-studio.tail49399e.ts.net/apps/hello`（HostedApp id=cmuqk3huq001km9bf5ejp7tdg，deployment v2=cmuqlxz2v001km9bxc0w5pspp，gitRef=`myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1@dfd20d1`，/health 200、线上标题《hello》 · 休闲收集）。**playtest 节点 status=blocked**（模板仓库未预置 playtest.sh），线上版经独立 assign_agent 复核确认可玩。本文只写 hello 的增量事实与新坑；门禁三层体系总论与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key），单游戏部署先例见 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9），触屏摇杆与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca。四篇互为补充、不重复。
+
+## 一、事实基线：提交链与四棒产出（审计入口）
+
+`origin/myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1` 提交链（逐字核实）：
+
+| commit | 内容 | 结果 |
+| --- | --- | --- |
+| f9bc9d65 | 模板起步：std-skills minimal-2d 脚手架建 `games/hello` | ✅ |
+| 1bc8fa24 | 收集玩法与胜利/重开闭环 + README 玩法说明 | ✅ |
+| a8b5fd09 | Web 导出可托管形态：export_presets.cfg + `.gitignore` 豁免 + 导出产物入库 | ✅ |
+| 16249412 | 关卡梯度 + 限时失败反馈 + 冒烟断言同步升级 | ✅ |
+| dfd20d1b | 根壳与 apphost.toml 切到 hello + 接通调参桥（=部署 commit） | ✅ 已部署 |
+
+- `myrd/hello-game-goal-cmuqk3j2o001mm9bfptrztaj1` 分支另含 508dcc6b（assign_agent 线上复核取证），与 games-goal 分支**不同步**——复核/审计一律认 goal artifacts 里的 `gitRef`（games-goal@dfd20d1），别按「目标 id 搜分支」。
+- 门禁终态：preflight 13 类 PASS / `GODOT_SMOKE: PASS`（240 帧）/ `GODOT_FUZZ: PASS`（seed=20260913，6 批次无崩溃无脚本错误）；`bash games/hello/verify.sh` 全链路 PASS。
+- 导出 11 文件落 `games/hello/export/web/`：index.wasm 35,376,909B / index.pck 2,497,520B / index.js 331,495B / index.html 4,848B / index.audio.worklet.js 7,298B。
+
+## 二、Godot4 工程结构：hello 的最小可玩模板契约（可复制起点）
+
+```
+games/hello/
+├── project.godot          # 三类必接线：run/main_scene、[autoload] GameState、[input]
+├── autoload/game_state.gd # 单例 + TUNING_META 白名单（调参唯一入口清单）
+├── scenes/{main,player,collectible}.tscn
+├── scripts/{main,player,collectible,virtual_joystick,touch_confirm_button}.gd
+├── assets/fonts/NotoSansSC-Regular.otf + OFL.txt   # Web 中文底线
+├── tests/{smoke.gd,smoke.tscn}                     # 相位状态机冒烟场景
+├── verify.sh               # 工程门禁入口（退出码 0/1/2/3）
+└── export_presets.cfg      # Web 导出预设（thread_support=false）
+```
+
+- **三类必接线是 preflight 静态机判对象**：主场景、autoload、input 映射缺任何一项就是「黑屏/无响应」。hello 实测：`config/name="hello"`、`run/main_scene="res://scenes/main.tscn"`、`GameState="*res://autoload/game_state.gd"`。
+- **渲染器钉死 gl_compatibility 且 `.mobile` 双写**；viewport 640×360；`[gui] theme/custom_font` 指向 NotoSansSC（OFL 1.1）——删了中文全变缺字方块（preflight P13 拦）。
+- **UI 挂独立 CanvasLayer（UI/TouchUI）**，与游戏世界分离；触屏端用 `virtual_joystick.gd` + `touch_confirm_button.gd` 承载移动与确认，桌面/触屏同一工程不加分叉构建。
+- **收集玩法碰撞口径写进代码注释**：Player 矩形 24×24（半宽 12）、Collectible 圆 r=22，可达判定=玩家中心进入收集物中心 34px 内；摆点相对 clamp 边界 (12..628, 12..348) 全可达不卡死角——**碰撞余量要在摆新点时先算再摆**，否则冒烟传送收集断言假失败。
+
+## 三、门禁增量：帧预算推导注释 + 键位契约断言
+
+- **帧推导写进 verify.sh 注释**：「噪声 30 帧 → 移动 10 帧 → 4 次传送收集（各 4 帧）→ 过关断言 → confirm 进第 2 关断言（梯度）→ 时限压 0 触发失败断言 → confirm 重来断言」约 94 物理帧，预算取 240 对齐 `.myrd/routines.yaml` 的 smokeFrames 默认值（两边同值不各说各话）。**推导过程留在门禁入口文件里**，后续调速度的人不必重推。
+- 冒烟 9 项玩法断言：噪声输入后仍能移动、收集计数累加、过关判定、难度梯度（4→5 目标、30→26s 时限）、超时失败反馈、失败重来复位，外加键位契约 `_check_key_bindings`（逐键 AND 判定）。
+- verify.sh 退出码语义与 oak-key 同源：0 通过 / 1 冒烟失败 / 2 环境不可用（**存在性守卫先行**：preflight.py、smoke.sh、resolve-godot.sh 缺一即 2，防「脚本缺失」被误判成 3 诱导改游戏代码）/ 3 静态不一致。
+- **复发坑（连续两作）**：`.myrd/routines.yaml` 默认 `gamePath: games/godot-coin-rush` 至今未修。oak-key 轮已记录，hello 轮依旧要靠 preHookParams 显式覆盖成 `games/hello` 才测对工程。**建议运维直接改模板默认值或置空强制必填**，别再指望每作自觉覆盖。
+
+## 四、playtest blocked 实录：模板仓库技能资产落后于平台注入副本（本轮最大增量）
+
+- **触发**：判定脚本五清单 `{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 要求全部由项目仓库预置，hello 实测唯独 `std-skills/godot-game-dev/scripts/playtest.sh` MISSING → 节点按硬约束立即 blocked（不产试玩验收包、不回填量表、不调参回写）。
+- **根因（版本分裂）**：仓库内 `std-skills/godot-game-dev/` 是**旧版**（SKILL.md 无 playtest，routines.yaml 4 步）；平台注入阅读副本 `.myrd-platform/.claude/skills/godot-game-dev/` 是**新版**（SKILL.md §4.5 机器人试玩门禁 + `playtest_driver.gd` + 5 步 routine，新增 `playtestFrames: "900"`）。即：**模板仓库落后于平台注入副本**。
+- **纪律（为什么 blocked 而不是补一个）**：判定器唯一来源是模板仓库预置；被检方自写判定脚本，门禁不再独立，PASS 一文不值；注入副本是阅读用，不得复制/改写/等价替代。
+- **运维待办（精确到文件）**：把 `WORKSHOP_GAME_TEMPLATE_REPO` 的 godot-game-dev 技能资产同步到含 `scripts/playtest.sh` + `scripts/playtest_driver.gd` 的版本，并让仓库 `.myrd/routines.yaml` 的 godot-smoke 升到 5 步。报告已落盘 `docs/playtest/hello-playtest-blocked.md`（commit 283773e）。
+- **教训泛化**：工坊每接入新模板资产前，先 diff「模板仓库 vs `.myrd-platform/` 注入副本」的技能版本，发现落后先报运维，别等跑到最后一棒才 blocked。
+
+## 五、Web 导出与部署：hello 的三个增量打法
+
+1. **导出配置前置到 scaffold 棒**（前两作是 deploy 棒现场补 preset）：scaffold 按 `games/game` 既有先例补齐 `export_presets.cfg`（`platform="Web"`、`export_path="export/web/index.html"`、`variant/thread_support=false`、`html/canvas_resize_policy=2`）+ `.gitignore` 加 `!/export/web/` 豁免 + 导出产物入库（a8b5fd09）。deploy 棒零决策复用重导出——**「可托管形态」应该在脚手架棒就建成，别留到部署棒现场发明**。
+2. **根壳单游戏位切换要核对三处**：`apphost.toml`（name=hello / assets_dir=games/hello/export/web / health=/health / runtime=node20）、server 壳的资产路由、调参桥全局注入。hello 轮根壳原指向 candy-crush-legend（games/game/export/web），已整体切到 hello。**每次上新游戏，部署前 grep 根壳里旧游戏名清残留**。
+3. **部署重发坑：v1 因 504 重发被 superseded，v2 才是终态**（两笔同 gitRef）。判断游戏死活以 `/health` + app status + liveUrl 实测为准，**别拿 deployment 列表第一笔当真**。另：`/` 会 308 重定向到 `/apps/hello`（尾斜杠归一化），curl 复核记得 `-L` 跟随。
+
+线上复核（assign_agent 独立完成，不复用 deploy 自测结论）：部署 gitRef 远端 HEAD 与 dfd20d1 逐字一致；资产通道全文本（wasm/pck 走 `*.gz.b64`），本地解码还原 wasm 35,376,909 字节与本地导出逐字一致、magic `\0asm` v1 有效，pck magic `GDPC`；壳契约四件（相对路径拉资产、移动端音频手势解锁器、`__audioDebug` 取证口、tuning 调参桥）逐项在位。
+
+## 六、调参桥 hello 实例：spec 数值与实现默认值的口径漂移（真实发生，值得记录）
+
+- `game_state.gd` 的 `TUNING_META` 白名单四键：`base_target` 1–6、`base_time` 10–90、`time_step` 0–10、`min_time` 5–90；键不在名单=拒绝（防 URL 乱注入）；缺壳层时全局 undefined 属预期，门禁行为不受影响。
+- **口径漂移**：GameDesignSpec v1（id=cmuqkaypy002hm9bf3wnk1k26，approved）写的是 3 关 10/15/25 件、30/45/60s、连击窗口 1.5s；实现默认值是 `BASE_TARGET=4 / BASE_TIME=30 / MIN_TIME=18 / TIME_STEP=4`（每关目标 4→5、时限 30→26s）。spec 数值**没有**作为默认值落地，而是寄望试玩期经调参桥回填——playtest blocked 后未回填，两者至今不一致。
+- **结论**：工坊「spec → 实现」的数值对齐不能靠默认值拍脑袋。两条路二选一：① 实现前把 spec 数值直接落成常量默认值；② spec 数值作为 TUNING_META 默认初值，并在工程 README 记「spec 口径 = 默认值」。否则验收对不上、复盘对不齐。
+
+## 七、坑位速查表（hello 新增/复发，出问题先对号）
+
+| # | 坑 | 一句话修法 |
+| --- | --- | --- |
+| 1 | 双分支并存：工作区实际建 `hello-game-goal-*`，任务指定 `games-goal-*` | scaffold 棒把同一 commit 推两条分支保证 gitRef 存在；审计认 goal artifacts 的 gitRef |
+| 2 | routines.yaml 默认 gamePath=games/godot-coin-rush（复发） | preHookParams 显式覆盖；运维改模板默认值根治 |
+| 3 | 模板仓库技能资产落后于平台注入副本 → playtest blocked | 接入前先 diff 两份技能版本；落后先报运维 |
+| 4 | 部署 504 重发 → v1 superseded / v2 running | 判终态看 /health + app status + liveUrl 实测 |
+| 5 | `/` 308 到 `/apps/hello` 尾斜杠归一化 | curl 复核加 `-L` |
+| 6 | github.com:443 从工作区不可达（3 次重试 75s 超时） | commit 留本地分支不丢；先走平台 API（localhost）回写再补推 |
+| 7 | 碰撞余量不算就摆点 → 传送收集断言假失败 | 半宽+半径先算可达包络，摆点落在 clamp 边界内 |
+| 8 | spec 数值与实现默认值漂移 | spec 数值落成默认值或 TUNING 初值，README 记口径 |
+| 9 | 导出配置留到部署棒现场发明 | scaffold 棒按上一作先例补 preset + .gitignore 豁免 + 产物入库 |
+| 10 | 根壳残留上一游戏（单游戏位惯例） | 部署前 grep 旧游戏名清残留，apphost.toml 三键核对 |
+
+## 八、关联知识与权威来源
+
+- Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路总论（oak-key）：27407691-bcf8-4e73-b686-1bb8df684e5c
+- game-9 单游戏部署先例与调参桥 §3C：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 移动端触屏虚拟摇杆与 AudioContext 解锁规范：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- MyRD 平台真实仓库结构地图：b07a928a-414b-4d48-9535-5b6d6cc859ae
+- 仓库内权威文件（本仓可直接复用）：`games/hello/{verify.sh,export_presets.cfg,tests/smoke.gd,autoload/game_state.gd}`、`docs/playtest/hello-playtest-blocked.md`、`std-skills/godot-game-dev/scripts/`、`.myrd/routines.yaml`
+- 平台产物链：requirement=cmuqk7luz002am9bfmmkouw9v → design_spec=cmuqkaypy002hm9bf3wnk1k26 → hosted_app=cmuqk3huq001km9bf5ejp7tdg → workflow run=cmuqkb8xl002nm9bf9pz8hw61（/workflows/cmuqk3j35001qm9bfsdw4xn8d/runs/cmuqkb8xl002nm9bf9pz8hw61）→ 线上复核 assign_agent=cmto42pg60004m9aq7jczszhy
+
+## 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+# 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+> **文档定位**：固化 game-8 v2 轮手感调优的**具体数值（前后对照）**、godot-smoke 门禁表现、线上链路诊断结论与**可照抄的复测方法**，形成「手感类反馈（再大一点 / 再慢一点）」的**可复用增量调参基线**——后续同类反馈直接对照本文 §五 playbook 执行，不必重新勘探。
+> **权威基准**：需求《牛牛打游戏 game-8 · v2 手感调优：牛牛体型放大、移动速度下调》（`cmuqmej89000ym9gg6mom93o0`）；策划案 v1 设计唯一来源（doc `80b9c193-6807-43e4-b2b0-5789f2d9e35b`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）；收口依赖清单（doc `943eb5eb-0949-43fe-b939-83cf171af2a3`）。
+> **实现基线**：部署分支 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`；数值提交 `3a396355`（feat v2 手感调优）→ 产物重导出 `1089e4b` → 诊断报告 `1afec443`（`games/game-8/docs/v2-liveurl-diagnosis.md`，docs-only）；线上部署 = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`。
+> **本文数字全部为一手实测值**（git diff 实录 / curl 取证 / 线上 pck 自跑门禁），非估算。
+
+## 一、v2 数值基线（前后对照，唯一落账）
+
+| 声明键 | v1 默认 | v2 落账 | 需求量化区间 | 实际占比 | TUNING_META 钳制 |
+|---|---|---|---|---|---|
+| `PLAYER_SCALE` | 1.0 | **1.4** | 1.3~1.5× 整体放大 | 1.4× | min 0.5 / max 2.0 / step 0.05 |
+| `PLAYER_SPEED` | 220.0 px/s | **145.0 px/s** | v1 的 60~70% | **65.9%** | min 60 / max 300 / step 5 |
+
+- **唯一落账位置**：`games/game-8/autoload/game_state.gd` 数值区（v2 HEAD 实测：`var PLAYER_SCALE: float = 1.4` / `var PLAYER_SPEED: float = 145.0`）。⚠️ 策划案 v1 写的路径是 `scripts/game_state.gd`，**实际权威路径是 `autoload/game_state.gd`**（scripts/ 下并无此文件），后续引用以本文为准。
+- **接线方式**（`scripts/player.gd`）：`_apply_tuned_scale()` 把 `PLAYER_SCALE` 以**根节点 uniform scale** 应用（`is_equal_approx` 脏检查，滑杆改动下一物理帧生效），同步作用于视觉精灵、`CollisionShape2D` 碰撞体与 `PickupArea/PickupShape` 判定体；`velocity = direction * GameState.PLAYER_SPEED` 每物理帧读声明键。
+- **判定几何联动（容易算错的口径，钉死）**：`player.tscn` PickupShape 本体半径 22px → v2 缩放后 **30.8px**；收集物本体半径 14px（`collectible.tscn`）；**触发距离（圆心距）= 30.8 + 14 = 44.8px**（v1 为 22+14=36px）。刷点安全间距常量 96px 未动 → 余量从 96/36 ≈ **2.67×** 收窄到 96/44.8 ≈ **2.14×**，仍满足「重开不贴脸白捡」。commit `3a396355` 提交信息里的「判定半径 44.8px」即此**触发距离**口径，不是 PickupShape 本体半径，别混淆。
+
+## 二、godot-smoke 门禁表现（v2 断言三件套 + 全链路复跑）
+
+### 2.1 门禁复跑结果（本地与 preHook 同源，全绿）
+| 门禁步 | 结果 |
+|---|---|
+| resolve-godot.sh | exit 0，Godot **4.3.stable.official.77dcf97d8** |
+| preflight.py | **PREFLIGHT: PASS**（13 类前置一致性检查、40 个工程文件，exit 0） |
+| smoke.sh（240 帧预算） | **GODOT_SMOKE: PASS**（exit 0、零 SCRIPT ERROR） |
+| input-fuzz.sh | **GODOT_FUZZ: PASS**（seed=20260913，6 批次 239 帧，exit 0） |
+| playtest.sh | **脚本缺失**（模板仓库未预置，D2 依赖 / bug `cmuktchmy000km97z6kj3r2ro` Bug1），维持 blocked、不代写不伪造 |
+
+### 2.2 smoke.gd 新增 v2 手感断言三件套（真实机判，含 FAIL 路径，约 L423-435 `_assert_v2_tuning`）
+1. **倍率区间**：`PLAYER_SCALE ∈ [V2_SCALE_MIN=1.3, V2_SCALE_MAX=1.5]`，违例 FAIL 签名「v2 手感断言 FAIL：体型倍率 %.2f 不在 %.1f~%.1f 区间」；
+2. **移速区间**：`PLAYER_SPEED ∈ [V2_SPEED_MIN=V1_SPEED×0.6=132.0, V2_SPEED_MAX=V1_SPEED×0.7=154.0]`，FAIL 签名「移速 %.1fpx/s 不在 v1 默认 %.0f 的 60%%~70%% 区间」；
+3. **接线集成断言** `_assert_node_scaled`：Player 根节点、`CollisionShape2D`、`PickupArea/PickupShape` 三节点的全局缩放必须都等于数值区 `PLAYER_SCALE`（与难度梯度 SpawnTimer 断言同口径，防「数值键写了但没接上」）。
+
+方向符号断言（A/← 后 position.x 减小、D/→ 后增大）与 50 连击判定一致性、难度梯度、过期回收、胜负四分支、一键重开、持久化等既有契约**全部保留不动且继续通过**——玩法零回退。
+
+### 2.3 可复用结论：断言区间与需求区间硬耦合
+smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的。后续若要把数值调**跨出**这个区间，必须**三处同步**：smoke.gd 常量、需求区间条款、策划案 revisions 数值区——否则门禁会以清晰签名 FAIL（这是门禁在强制「数值变更须先改需求基线」的设计行为，**不是误报，不许放松断言来绕**）。
+
+## 三、线上链路诊断结论（liveUrl 端到端实测，2026-10-02）
+
+**结论先行**：✅ v2 已在线上生效且量化达标——部署产物自跑门禁全绿（含 v2 手感基线机判），线上资产与仓库导出逐字节一致，**无需修复、无需回滚**。
+
+1. **部署元数据**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`）；当前部署 **version 5 `cmuqny37h001ficf0mpmr71mv` status=running**；gitRef=`myrd/games-goal-cmujpml1e006rm99i9hc33huu`（未落 main ✓）；commit `1089e4b`（其上仅 1 个 docs 提交，代码零差异）；v4=`cmuqnx9v6001dicf0fmfryxcz` superseded（重试冗余但无害）。
+2. **公网链路**：`GET /apps/game-8/health` → 200 `{"ok":true,"app":"game-8","game":"牛牛打游戏","assets":"lazy/object-storage"}`；`/apps/game-8/` → 308 规范化跳转 → 200；`/gw/health` → 200（网关透传正常）；壳页 11,626B，`__GAME_TUNING__` 调参桥 ×2、`__audioDebug` 音频手势解锁器、资产全走相对路径 `fetch(BASE_PATH + 'api/public/assets/' + name)` 三契约在位。
+3. **资产文本通道**：`index.pck` base64 3,333,340B → 解码 gzip 2,513,040B；`index.wasm` base64 **10,696,408B** → 解码 35,376,909B（与门禁经验 v6 一手实测值一致）。
+4. **逐字节一致（无版本漂移）**：本地导出（部署 commit 工作树）与线上对象存储拉回解码产物 sha256 完全一致——pck `5f556ad9adf47579cb38a1fd8f7549e33b478b56cd4b3b5f112346281d699e25`；wasm `fe5cebc590758c10bc4469be5a591e28edbde5ec8f458f21baeb83db50d028b9`。
+5. **最高等级证据——部署产物自跑门禁**：`godot --headless --main-pack <线上pck> --quit-after 240 res://tests/smoke.tscn` → exit 0、零 SCRIPT ERROR、`GODOT_SMOKE: PASS`，v2 手感基线机判全过（1.4∈[1.3,1.5]，145∈[132,154]）——「牛牛变大变慢」是**产物运行期实测**，不是代码推断。
+
+## 四、复测方法（照抄即用）
+
+1. **公网探测**：`curl -s <liveUrl>/apps/game-8/health`（期望 200 + ok:true）；`curl -sI <liveUrl>/apps/game-8/`（期望 308→200）；壳页 HTML grep `__GAME_TUNING__` / `__audioDebug`。
+2. **资产一致性**：`GET /api/public/assets/index.pck`（和 index.wasm）→ base64 解码 → gunzip → `shasum -a 256`，对照 §三.4 的两个哈希；不一致即版本漂移，先查部署 commit 再谈手感。
+3. **手感数值机判**：`godot --headless --main-pack <线上或本地 index.pck> --quit-after 240 res://tests/smoke.tscn`，判定三条件（`GODOT_SMOKE: PASS` + exit 0 + 零 SCRIPT ERROR），签名中应含「v2手感基线(体型1.3~1.5x·移速60~70%)」字样。
+4. **数值速查**：游戏内调参面板或壳页 `?tuning=1` URL 直接查看当前声明键值；或读 `games/game-8/autoload/game_state.gd` 数值区。
+5. **环境备注**：诊断沙箱对 github.com:443 直连超时（`Recv failure`），推送改走 `ssh.github.com:443` 通道——后续同环境取证直接用此通道，别反复试直连。
+
+## 五、「再大一点 / 再慢一点」类反馈的增量调参 playbook（可复用基线）
+
+**标准链路（全七步，禁止散点改代码对数值）**：
+调参入口（游戏内面板滑杆即时生效 / 壳页 `?tuning=` URL）→ 确定目标声明键与新值 → **经策划案 revisions 回写 `spec.numeric`**（doc `80b9c193-…`，spec 载体即该知识文档）→ 改 `autoload/game_state.gd` 数值区 → 复跑 godot-smoke 门禁 → 重导出 Web 产物并部署（gitRef 必须是 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`）→ 按本文 §四产物自跑门禁复测。
+
+**建议步长与边界**：
+| 反馈 | 动作 | 步长建议 | 边界 |
+|---|---|---|---|
+| 再大一点 | `PLAYER_SCALE` ↑ | +0.05~0.1 / 档 | 钳制 [0.5, 2.0]；跨出 [1.3,1.5] 须按 §2.3 三处同步 |
+| 再小一点 | `PLAYER_SCALE` ↓ | −0.05~0.1 / 档 | 同上；低于 1.3 同样触发门禁 FAIL |
+| 再慢一点 | `PLAYER_SPEED` ↓ | −5~15 / 档 | 钳制 [60, 300]；跨出 [132,154] 须三处同步 |
+| 再快一点 | `PLAYER_SPEED` ↑ | +5~15 / 档 | 同上 |
+
+**每次调整必做的三项联动复核**：
+1. **断言区间一致性**（§2.3）：数值是否跨出 smoke 常量带；
+2. **判定几何余量**：体型↑ → 触发距离 = 22×scale + 14 线性放大 → 96px 刷点间距余量 = 96/触发距离 收窄；低于 2× 时须复核刷点安全间距常量是否要同步上调（公平性属门禁议题，不许靠放松断言解决）；
+3. **达成余量**：移速↓ → 单位时间可达刷点数↓ → 60s/20 目标的通关可达性须复核（跑 50 连击一致性 + 全链路一条龙断言兜底；v2 @145px/s 已实测可通关）。
+
+**回滚口径**：v1 = `PLAYER_SCALE 1.0` / `PLAYER_SPEED 220.0`，两键均可在调参面板或 `?tuning=` URL 直接调回，代码零改动。
+
+**主观手感的最终裁决**：数值区间内「像不像用户要的手感」机器判不了，仍以 D3 用户试玩结论为准（入口 `…/apps/game-8?tuning=1` 已可用）；未决依赖 D1（iOS Safari 真机）/ D2（playtest.sh 模板资产）见收口清单 doc `943eb5eb-…`。
+
+**来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
+
+
+## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+# game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+> 来源：需求《测试连点防重的极简计数页（game-12）》（id=cmur8x93r0016icbsd90s6e60，goal=cmur8pnhn000kicbsvl0eoqx6）走完「录入需求 → 判定规则调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-12`（Godot 4.3.stable），分支 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`（scaffold e055e4f → implement ff779d0 → deploy c54fcc9/078f761/e5b292e → playtest 1f7a4a3）。线上：https://leomac-studio.tail49399e.ts.net/apps/game-12/（/health 200 `{"ok":true,"app":"game-12"}`，deploymentId=cmurba8yd001vicbsfdl79x8l，部署 commit c54fcc9）。门禁终态：**godot-smoke 全绿 + mobile-web-smoke PASS 10/10（实测 FPS 39）**，playtest 棒复跑双门禁结论一致。
+>
+> 本文只写 game-12 的增量结论：防重语义选型与实现契约、双门禁通过路径、踩坑清单与复用清单。门禁三层体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-9 增量见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be；移动端触屏摇杆与 AudioContext 解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；防重判定规则 R1–R6 / 事件契约 C1–C4 调研全文见项目文档库 id=8345388c-cf30-4d7c-8413-39ccd7e65887。互为补充、不重复。
+
+## 一、防重语义选型：只有「固定节流（采纳即锚定、拦截不延窗）」能同时过验收 2 和 3
+
+| 方案 | 机制 | 300ms 内连点 5 次 | 窗口后恢复累加 | 结论 |
+| --- | --- | --- | --- | --- |
+| **固定节流（首击入窗）** | 首击计数并锚定窗口；窗口内后续点击全拦且**不更新锚点** | 仅 +1 | 正常 | 采用 |
+| 防抖（末击重启窗口） | 每次点击都重置窗口，静默期满才计 | 0 次 | — | 违背验收 2 |
+| 首尾折叠 | 窗口首末各计一次 | +2 | — | 违背验收 2 |
+
+**最易写错的一行**：被拦截的点击不得触碰窗口锚点 `_last_count_ms`。一旦拦截分支也更新它，节流就退化成防抖——持续点击下计数永远不涨，验收 3 永远不过。
+
+实现（`games/game-12/autoload/game_state.gd`，时间注入纯函数，核心约 15 行）：
+
+```gdscript
+const TARGET_COUNT: int = 10
+const DEBOUNCE_MS: int = 300
+var _last_count_ms: int = -DEBOUNCE_MS   # 初值 = -窗口 → 开局首击立即有效
+
+func try_count(now_ms: int) -> bool:
+    if state != State.PLAYING:
+        return false                      # 已胜：忽略，不报错
+    if now_ms - _last_count_ms < DEBOUNCE_MS:
+        click_rejected.emit(DEBOUNCE_MS - (now_ms - _last_count_ms))
+        return false                      # 拦截：只发反馈信号，不动锚点
+    _last_count_ms = now_ms
+    count += 1
+    count_changed.emit(count)
+    if count >= TARGET_COUNT:
+        state = State.WON
+        state_changed.emit(state)
+    return true
+
+func reset() -> void:
+    count = 0
+    state = State.PLAYING
+    _last_count_ms = -DEBOUNCE_MS         # 重开同步清防重锚点 → 首击立即有效
+```
+
+三个不能省的细节：
+1. `_last_count_ms` 初值取 `-DEBOUNCE_MS`，否则开局第一击被吞（验收 1 首点即错）。
+2. `reset()` 必须同时清防重锚点——「刷新/重开无残留」包含防重状态本身。
+3. 拦截不静默：`click_rejected(remaining_ms)` 把「被吞的点击」变成可感知反馈（按钮闪红 + 状态栏「连点已拦截，还需 Nms」）。且关键反馈不能被高频更新覆盖——状态栏曾把指针坐标与拦截提示混在一行，坐标每物理帧刷新把「还需 Nms」冲掉，拆成反馈线/指针线两行才保住。
+
+时间注入是机判前提：`try_count(now_ms)` 不读时钟 → 无头冒烟可用合成时间戳逐毫秒断言（完全确定、与帧率零耦合）；只有真实点击路径才走 `Time.get_ticks_msec()`。
+
+## 二、单源单相：三个入口汇一个判定点，防「一次触碰计两次」
+
+Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`（调研已核实）→ 移动端一次触碰可能产生 touch/mouse 双事件，再加键盘空格/回车，同一「点击」有四个来源。game-12 的收敛方式：
+- `CountButton.pressed`（鼠标/触摸）与 `_unhandled_input("confirm")`（键盘/动作）都只调唯一入口 `_attempt_count()` → `GameState.try_count(...)`。防重判定只在 GameState 一处，不可能被绕过。
+- `TouchConfirmButton`（TouchScreenButton）**不直接调游戏逻辑**，而是 `Input.parse_input_event(InputEventAction("confirm"))` 注入动作 → 触摸与键盘走完全相同路径（顺带获得桌面端自动不响应的免费屏蔽）。热区用 shape 圆（半径 44）而非位图。
+
+## 三、把「防重」机判成确定性断言（附负例验证纪律）
+
+冒烟相位设计（`games/game-12/tests/smoke.gd`）：
+- **合成时间戳断言防重**：t0 有效；t0+100/200/299ms 连点全拦、只发 click_rejected、count 不变；跨窗后再点正常 +1。
+- **真实路径另测**：真实点击受真窗口约束 → 相位间显式等真实时间跨窗，并设帧数上限守卫（60fps 约 2s，超限报 `Engine.max_fps` 异常而非挂死）。
+- **噪声后复位**：乱键相位可能真触发计数/拦截，且末次乱键可能贴着 confirm 注入点不足 300ms → 进断言前 `GameState.reset()` 清锚点，消灭偶发失败。
+- **每条断言做负例验证**（证明会真 FAIL，不是永真）：热区 44→10、宽高比 keep→expand、脉冲阈值抬到 1.0，三次均如预期 FAIL。
+
+两个「静默漏判」陷阱（负例不触发才发现）：
+1. 静态几何断言放 `_ready()`：此时 `Control.size` 恒为 0，整段断言被静默跳过 → 移到第一物理帧再读。
+2. Button 有主题最小尺寸保护：`offset_right=110` 实际 size 被钳到 115，44px 负例测不出来 → 换 TouchScreenButton 圆形热区做负例。
+
+极简静止页的门禁特异问题：mobile 门禁「画面在动」检查会把完全静止的页面误判为渲染冻结。解法：+1 按钮加待机呼吸脉冲（scale 1.00→1.06 / 0.9s，实测极差 0.060 ≥ 阈值 0.02），一举两得——既是移动端可点示能，又是确定性的非零帧差证据。缩放绕 `pivot_offset`（控件中心），否则动画往右下飘。
+
+画布口径：调研建议设计宽 375 + Adaptive；实现落成 720×1280 竖屏 + `canvas_items`+`keep`（+1 按钮 560×240，375 宽实机约 291px），同样满足无横滚与 ≥44px。机判锚点是**宽高比策略必须 keep**（expand 会被冒烟断言拦，负例已验证）。
+
+## 四、Godot Web 双门禁：分工、顺序与标记辨析
+
+| 门禁 | 判定链 | 拦什么 | game-12 实测 |
+| --- | --- | --- | --- |
+| **godot-smoke** | resolve-godot → preflight.py（13 类静态一致性）→ headless smoke（`GODOT_SMOKE_FRAMES=240`，断言退出码 0 + `GODOT_SMOKE: PASS` 标记 + 日志无 SCRIPT ERROR）→ input-fuzz（seed=20260913，6 批/239 帧） | 游戏本体「跑得动且玩得动」（含防重/恢复/胜负/重开/触控目标/拉伸契约断言） | 四步全 exit 0 |
+| **mobile-web-smoke** | mobile-web-smoke.mjs --url <liveUrl>（headless Chrome 390×844 iPhone 仿真）10 项：网络全通/console 零错/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约（__audioDebug）/无横溢（scrollWidth=390）/FPS≥8（实测 39） | 部署后真实链路上的移动端可玩性 | PASS 10/10 |
+
+三条纪律：
+1. **mobile-web-smoke 必须打部署后的 liveUrl**——本地静态伺服 export/web 只能当预检（implement 棒做过 10 项预检），不能替代正式门禁：M1 网关、对象存储资产通道、壳契约只在真实链路暴露。所以它位于 deploy 之后，是产物验证而非 implement 棒门禁。
+2. **标记辨析**：判定脚本 stdout 是小写 `godot-smoke: PASS`，引擎日志里才是大写 `GODOT_SMOKE: PASS`（smoke.sh 内部 grep 大写标记后才自产小写行）。只 tail 游戏日志看不到大写标记不等于失败——先分清两层标记再下结论。
+3. **证据随仓库归档**：`games/game-12/qa/mobile/report.json` + phase-load/tap/joystick 三张截图入库，供复跑比对。
+
+## 五、部署链五个真实踩坑（每个都在本目标发生过）
+
+1. **`.gitignore` 里 `/export/` 不删 = 部署后全 404**：apphost.toml 的 `assets_dir` 指向 `games/game-12/export/web`，导出产物不入库则 wasm/pck 上线即丢。导出产物必须入库（37MB wasm 走底座 A「资产出 bundle」+ 对象存储懒加载 + `/api/public/assets/` b64 文本通道，总论见 27407691）。
+2. **apphost.toml 沿用上一游戏**：原值指向 candy-crush 的 `games/game/export/web`；构建管线按 gitRef 读它，不改会打包错应用 → `name`/`assets_dir` 随游戏改是 deploy 棒第一查。
+3. **gitRef 必须是目标分支不是 main**：本次 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`。注意本地工作区克隆出的分支名可能与远端目标分支不同名同指针（`myrd/game-12-goal-…` vs `myrd/games-goal-…`）→ 部署前 fetch + 显式切到目标分支再读 apphost/导出。
+4. **壳页三件套缺一不可**（`server/src/game-page.ts` / `games/game-12/export/web-shell.html`）：品牌文案适配（曾残留糖果粉碎传奇文案）；§3C 调参桥（引擎加载前解析 `?tuning=` → `window.__GAME_TUNING__`，只认对象形态、非法 JSON 静默忽略——game-12 缺，补约 8 行）；音频手势解锁器 + `window.__audioDebug`（即 mobile 门禁「音频解锁契约」的机判对象）。壳页另配 `overflow:hidden + touch-action:none` + `user-scalable=no`：彻底禁双击缩放/滚动，快速二连点不被浏览器手势吞掉造成防重误判（比调研建议的 `touch-action: manipulation` 更强）。
+5. **PATCH 目标 artifacts 是整体替换数组**：回写产物必须 get→append→写回（playtest 棒 3→4 条、既有条目原样保留 + 回读校验），直接 put 会抹掉前序产物。
+
+调参语义澄清：`TUNING_META` 未声明时 `?tuning=1` 是**安全 no-op**（正常进游戏、忽略键）。game-12 有意不把 `DEBOUNCE_MS=300` 做成可调——它是需求验收项本身，spec 是唯一事实源。要开放浏览器内调参需下一轮：spec.numeric 声明键 → TUNING_META + tuning_panel.gd + 冒烟断言 → 重导出重部署重跑 mobile 门禁。
+
+## 六、macOS 自带 bash 3.2 的全角括号坑
+
+`verify.sh` 里 `$FRAMES）`（全角右括号紧贴变量名）在 macOS bash 3.2 某些 locale 下把多字节字符并入变量名 → `FRAMES: unbound variable`，而上一行 echo 还能正常展开，极难定位。写法统一 `${FRAMES}`，用 `bash -x` 抓现行。game-12 修复后 verify.sh 端到端全绿（preflight/smoke/fuzz 全 exit 0）。
+
+## 七、如实上报的缺口（未绕过、未伪造）
+
+1. **playtest.sh 不在模板仓库**（`std-skills/godot-game-dev/scripts/` 同目录 9 个判定/驱动脚本中独缺它）：各节点均未自造等价判定器、未伪造 `GODOT_PLAYTEST: PASS`；`.myrd/routines.yaml` 两条 routine（godot-smoke / mobile-web-smoke）均不引用它 → 不阻塞双门禁，缺口随产物 detail 上报运维补资产。
+2. **真机抽查未做**（本环境建不了 iOS 会话）：mobile-web-smoke 是 headless Chrome 仿真，触摸结论的边界是仿真环境；真机验证留待用户试玩回填。
+3. **试玩结论只能来自用户**：playtest_kit 已交付（`games/game-12/qa/playtest-kit.md`，试玩指引 + 反馈对照表 + 四问量表），量表待回填，未代填任何「好玩/通过」结论；未收到用户调参 URL 前，无 spec revisions/approve 调用。
+
+## 八、复用清单（后续点击类小游戏直接抄）
+
+1. 防重抄 `try_count(now_ms)` 签名：时间注入纯函数 + 初值 `-DEBOUNCE_MS` + 拦截不动锚点 + reset 清锚点 + 拦截发 remaining_ms。
+2. 输入抄「单源单相」：所有入口 → 唯一 `_attempt_count()`；TouchScreenButton 注入 InputEventAction 而非直调逻辑。
+3. 断言抄四件套：合成时间断言 + 真实路径跨窗等待 + 噪声后 reset + 每条断言负例验证；几何断言放第一物理帧，44px 负例用 TouchScreenButton 热区。
+4. 静止页记得待机脉冲（≥0.02 极差同时换「画面在动」绿与可点示能）。
+5. 部署抄「五查」：gitignore 的 /export/、apphost.toml 指向、gitRef=目标分支、壳三件套（文案/调参桥/音频解锁）、artifacts 回写 get→append→写回。
+
+关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
+
+## 沉淀 game-14 Godot Web 导出与移动端门禁经验
+
+> 来源：goal cmusp1rab0028ic7q9shcdzyl（项目 cmusp1ra00022ic7qnk18nofm）「小游戏工坊 · game-14」工作流执行沉淀。上游输入：需求《game-14 太空飞船躲陨石捡金币》（cmusphfbp0062ic7qrxlt2nk4）、GameDesignSpec v1（cmuspm7sm006uic7qzrbqyilp，approved）。工作流 run cmuspmlex0072ic7qnjiqxmpc **真实结局 = failed，且失败于工作区准备阶段，四个节点全部 pending**。本卡如实记录本轮真实结论（失败模式与补救路径），并把 game-14 真正进入开发后要带上的导出/门禁契约收拢成清单（引用既有基线、不重复）。**本轮没有产生任何 game-14 代码、导出产物、门禁判定或部署事实——请勿把本卡第 4~6 节的复用清单误读为 game-14 实测数据。**
+
+## 一、本轮真实结局：准备阶段 git clone 失败，门禁与导出根本未执行
+
+- 时间线：run 创建 2026-10-03T18:12:57Z → failed 2026-10-03T18:15:25Z（存活 2 分 28 秒）；prepSteps 仅「解析模型配置 3ms」；失败点 = preparationPhase「正在准备代码工作区（克隆仓库、拉取最新代码）」。
+- run.result.error 逐字：`git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmusp1ra00022ic7qnk18nofm/run-cmuspmlex0072ic7qnjiqxmpc'... fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75009 ms: Couldn't connect to server`。
+- 节点状态：脚手架 / 实现玩法 / 导出并部署 / 试玩验收 全部 pending；implement 与 deploy 的 godot-smoke preHook、playtest 的 mobile-web-smoke preHook 也均 pending——**门禁一次都没跑过，不存在「门禁打回」**。
+- 复盘纪律：「已启动 ≠ 已成功」在本轮的具体形态就是「run 状态 failed + 节点全 pending」；判定真实结局唯一依据 run 状态与 run.result.error，禁止凭预期脑补「门禁打到第几轮」。
+
+## 二、根因分类与补救：环境不可用 ≠ 代码缺陷，正确动作是重跑而非改代码
+
+- 根因：github.com:443 连接 75 秒超时（connect 阶段即失败，非认证/仓库问题），属瞬时网络故障——与 godot-smoke 退出码 2「环境不可用」同层语义：**禁止为它改游戏代码，更不允许宣称门禁失败**。
+- 恢复复核（2026-10-04）：`curl https://github.com` → 200（0.59s）；`git ls-remote https://github.com/hl3w22bupt/myrd-playground.git` 正常返回分支列表 → 复跑条件已具备。
+- 补救动作：`POST /api/v1/workflows/runs/cmuspmlex0072ic7qnjiqxmpc/rerun`（平台手册 rerun 入口）。DAG 输入不变：需求 cmusphfbp0062ic7qrxlt2nk4 + spec cmuspm7sm006uic7qzrbqyilp（v1 approved）仍是唯一权威。
+- 若同签名（clone exit 128 / 443 connect timeout）复现：先做宿主机连通性探针（curl github.com + git ls-remote），如实按「环境不可用」上报等待恢复；不得降级为纸面交付，也不得空转烧修复预算。
+
+## 三、game-14 工坊流水线契约（经本轮 run 定义实测核实）
+
+- 四棒 DAG：脚手架 scaffold → 实现玩法 implement → 导出并部署 deploy → 试玩验收 playtest；仓库 github.com/hl3w22bupt/myrd-playground（game-14 预期落位 `games/game-14`，以 scaffold 实际产物为准）。
+- 门禁挂点：**implement、deploy 两棒都挂 godot-smoke；playtest 挂 mobile-web-smoke**。routine 均 gate:false、由 preHook 显式引用；`{{liveUrl}}` 无默认值 = fail-closed（不传就报错，不会静默跳过门禁）；`{{gamePath}}` 必须经 preHookParams 显式传参（默认值指向不存在工程的坑见 27407691 §1.3）。
+- 判定资产唯一来源：仓库 `std-skills/godot-game-dev/scripts/`（mobile-web-smoke 判定脚本 mobile-web-smoke.mjs + 负例自测 mobile_smoke_selftest.mjs + routine 片段模板已随 commit 4a8e4b76 落地）；被检工程不得自造判定器，scaffold 只校验不自造。
+
+## 四、game-14 验收标准 → 门禁断言映射（approved spec v1 的可机判数值）
+
+| 验收项 | spec v1 锚点 | 机判断言落法 |
+| --- | --- | --- |
+| 难度阶梯 | 陨石生成间隔 950ms 逐档递减至封顶 430ms、下落速度 130px/s 逐档递增至封顶 270px/s，共 5 档（每 100 分一档） | 冒烟分相位读各档生成间隔/单位位移帧数，断言逐档单调变化且封顶后不再变化；档位边界按得分 100/200/300/400 推导写进断言注释 |
+| 状态机与持久化 | 开始（含操作说明）/进行中/暂停恢复/游戏结束/一键重开五状态；最高分 localStorage 键 `game14.highScore` | 状态标志断言；重开后断言分数清零而最高分保留；localStorage 属线上行为，由 mobile-web-smoke 打 liveUrl 验证 |
+| 操控与边界 | 键盘 ←→/A/D（含上下）+ 触摸拖动，飞船不可越出画布 | E-08 纪律：按住方向键测位移与动作注入分帧做；越界 clamp 断言；触摸拖动必须真实改变飞船目标位置（mobile 门禁 touch-response 预修，见 §六） |
+| 计分与生命 | 拾金币 +10 实时显示；撞陨石 −1 命（共 3 命），命尽进游戏结束页并展示本局得分 + 历史最高分 | 拾取/碰撞事件计数断言；连续碰撞或生命归零路径必须可达并断言 GAME_OVER |
+| 视听契约 | 三层星空视差滚动；碰撞爆炸闪烁 + 300ms 震屏 + 1.2s 无敌闪烁；+10 飘分 | 事件标志/帧差断言；无敌期 = 「碰撞不再扣命」的断言窗口 |
+| 音频契约 | coin-pickup / meteor-explosion / game-over 三 SFX 可编程触发；M 键静音且不影响逻辑 | headless 侧编程触发断言；AudioContext 解锁契约（__audioDebug）归 mobile-web-smoke 第 8 项 |
+| 性能 | 连续游玩 60s 帧率 ≥ 30fps；页面无控制台报错 | **阈值辨析：mobile-web-smoke 的 FPS≥8 是底线门禁，≥30fps 是需求验收线——门禁全绿 ≠ 验收达标，验收仍按 spec 执行** |
+
+## 五、复用基线指针（执行时直接带上，本卡不重复其内容）
+
+- **27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 总论）**：Godot 4.3 Web 导出参数基线（`variant/thread_support=false` 免 COOP/COEP、`canvas_resize_policy=2`、中文必须 theme/custom_font=P13、导出 7 件套与 wasm≈35MB 量级）；AppHost 部署契约（**一游戏一清单**——game-14 必须 `name="game-14"`、`assets_dir="games/game-14/export/web"`，绝不沿用他游戏 apphost.toml；部署 gitRef 必须是部署分支 `myrd/games-goal-<goalId>` 不是 main；`/export/` 产物必须入库否则上线全 404；M1 网关拦二进制 → gzip+b64 文本回传；壳内资源全走相对路径）；godot-smoke 三层门禁与退出码语义 0/1/2/3；error-signatures 修复循环纪律；部署终态独立复核四步。
+- **00314649-c4d2-407c-871b-62f7de91b07d（game-12）**：mobile-web-smoke 10 项明细（网络/console/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约/无横溢/FPS≥8）与「必须打部署后 liveUrl」纪律（本地静态伺服只能当预检）；标记辨析（判定脚本 stdout 小写 `godot-smoke: PASS` vs 引擎日志大写 `GODOT_SMOKE: PASS`）；证据随仓归档（`games/<game>/qa/mobile/report.json` + phase 截图）。
+- **82e419bb-b641-4b5e-bb58-d8b9633169ca**：移动端触屏虚拟摇杆与 AudioContext 解锁三件套（首手势解锁 + 解锁前记账 + 退后台回来再解锁），壳页与游戏侧都要进。
+- **36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）/ 78180e88-6486-404e-9265-e315e0da3c66（hello）**：同系列工程结构、模板与门禁增量结论。
+
+## 六、mobile-web-smoke 已知失败图谱（5 款游戏实测 → game-14 预修清单）
+
+仓库 mobile-gate 系列实测 verdict（commits 11957bd3~585db60c）：game-3 疾风忍者跑 **PASS**（十项全绿，tap 触发跳跃实证触摸驱动玩法）；game-2 星尘收集者 FAIL（console Godot 缺 cfg 告警 + tap 后零帧差）；game-4 光路谜阵 FAIL（tap 落空格零帧差，探针坐标与 letterbox 棋盘错位）；game-9 推箱子 FAIL（探针落点错位，摇杆实际 CSS(44,502)）；game-10 天天酷跑 FAIL（tap 落横带无响应，尚需探针区分「点按开始未实现」与「落点错位」）。
+
+- 主失败源集中在 **touch-response**，两类根因：①游戏触摸未真正接入玩法状态（UI 自称支持触摸但点按无效）；②探针坐标与画布 letterbox/控件 CSS 实际位置错位（屏幕坐标 ≠ 游戏坐标）。
+- game-14 预修清单：触摸拖动直接改飞船目标位置并与键盘同路径（game-12「单源单相」范式：多输入源汇一个判定入口）；可交互热区 ≥44px，避免依赖 letterbox 偏移的绝对坐标；开始页不要做成纯静止层（会触发「画面在动」误判，game-12 用待机呼吸脉冲拿到确定性非零帧差）；音频解锁契约随壳页一并实现。
+- 证据纪律：verdict 逐字进 commit message + report.json + phase-load/tap/joystick 三截图入库，供复跑比对。
+
+## 七、关联知识与权威来源
+
+- 知识卡：27407691-bcf8-4e73-b686-1bb8df684e5c（导出+门禁+AppHost 总论）、00314649-c4d2-407c-871b-62f7de91b07d（双门禁与 mobile-web-smoke 10 项）、82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏/音频解锁）、36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）、78180e88-6486-404e-9265-e315e0da3c66（hello 工坊）、b07a928a-414b-4d48-9535-5b6d6cc859ae（平台仓库结构与路径陷阱）。
+- 仓库权威文件：`std-skills/godot-game-dev/scripts/{smoke.sh,preflight.py,input-fuzz.sh,resolve-godot.sh,mobile-web-smoke.mjs,mobile_smoke_selftest.mjs}`、`std-skills/godot-game-dev/references/{godot-smoke-routine.md,mobile-smoke-routine.md,error-signatures.md}`、`.myrd/routines.yaml`。
+- 平台事实源：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`（rerun 入口、「已启动 ≠ 已成功」纪律）；工作流 spec 与需求以平台登记产物为准。
+
+
+## 沉淀知识：Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+# Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+> 来源：目标「森林收集水果限时赛」（goal=cmuspb558003tic7qwgyd02c2）的小游戏工坊流水线（workflow=cmuspb55m003xic7q9o18vjk2 v1，scaffold→implement→deploy→playtest）首轮执行（run=cmuspld10006ric7qup55soew，2026-10-03T18:12:00Z 起、18:14:30Z 判 failed）。固定参数：工程 games/60-2，功能分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2，AppHost cmuspb3xg003ric7q1ksya6c3（slug 60-2），liveUrl https://leomac-studio.tail49399e.ts.net/apps/60-2/（部署前即确定）。本文只写本轮实测增量：①双门禁在 60-2 的挂点与分工；②本次 run 的真实卡点——双门禁之前的第一堵墙；③一次「参数漂移」疑云的证伪过程；④知识沉淀节点自身的 API 事实。godot-smoke 三层门禁体系、打回修复签名表、AppHost 部署总论见关联知识（§八），不重复。
+
+## 一、结论速览
+
+| # | 要点 | 结论 | 依据 |
+| --- | --- | --- | --- |
+| 1 | 双门禁分工 | 工程门（godot-smoke，挂 implement 与 deploy 之前，判工程本体）×线上门（mobile-web-smoke，只挂 playtest 之前，判公网 liveUrl）——判定对象、执行环境、证据落点都不同，不可合并为一道 | 工作流定义逐节点核对 |
+| 2 | 本次失败层级 | run 级失败发生在**门禁之前**：工作区 git clone 连不上 github.com（443 端口 75s 连接超时），四个节点全部 pending，双门禁一次都没执行 | run.result.error 原文 |
+| 3 | 根因定性 | 环境阻塞，非代码/配置缺陷：github.com 从执行机**持续性**不可达（2026-10-03 run 失败 + 2026-10-04 复测 `curl -m 10 https://github.com` 仍超时，连接建立不了） | run 错误 + 本机复测 |
+| 4 | 重跑纪律 | 网络不通时重跑 run = 空烧：先 `curl -m 10 https://github.com` 验连通（10 秒成本），通了自己重跑（工作流定义无需改动），持续不通按「blocked 比空烧有用」上报运维（代理/镜像），禁止为绕过网络改仓库来源 | 本轮 2.5 分钟烧掉一次 run 的直接教训 |
+| 5 | 工作流定义健康度 | 60-2 四节点参数已逐一核对**全部正确**指向 games/60-2 / 60-2 分支 / 60-2 AppHost / 60-2 liveUrl，不存在「模板实例化只替换了首个节点」的漂移 | 8 个关键词 × 4 节点计数复核 |
+| 6 | 沉淀 API 事实 | 本部署**没有** `/api/v1/knowledge/search`（404）；等效做法与写入契约见 §七 | 本次实测 + 平台源码 src/routes/knowledge.ts |
+
+## 二、60-2 双门禁挂点与分工（逐节点实例核对）
+
+| 节点 | preHook | preHookParams | 判定对象 | 证据落点 |
+| --- | --- | --- | --- | --- |
+| scaffold | 无 | — | 资产存在性自检（门禁脚本/routines.yaml/模板，缺失→blocked） | 节点 detail |
+| implement | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（静态一致性 + 无头运行） | 门禁日志 |
+| deploy | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（部署前再拦一次，防止部署带病产物） | 门禁日志 |
+| playtest | mobile-web-smoke | gamePath=games/60-2, liveUrl=https://leomac-studio.tail49399e.ts.net/apps/60-2/ | **线上公网 liveUrl**（headless Chrome 移动仿真） | games/60-2/qa/mobile/（report.json + 分阶段截图） |
+
+要点展开：
+
+1. **工程门挂两道、线上门只挂一道，是有意设计**：godot-smoke 的判定对象是仓库内工程（preflight 静态 + headless 运行），所以在写代码（implement）和出产物（deploy）两处都要拦；mobile-web-smoke 的判定对象是已部署的线上地址，只有 playtest（试玩验收）消费它，且 liveUrl 在部署前就已锁定，preHook 可以在节点启动前先跑门禁、节点启动后直接读证据。
+2. **判定协议（与门禁同源，agent 本地自检命令完全一致）**：退出码 `0` 且日志含标记才算通过——`GODOT_SMOKE: PASS`（冒烟）/ `GODOT_FUZZ: PASS`（fuzz）/ `GODOT_PLAYTEST: PASS`（机器人试玩）；退出码 `2` = 环境不可用（装环境/上报，**禁止为过门禁改判定脚本或改松断言**）。
+3. **判定器独立性**：`preflight.py / smoke.sh / input-fuzz.sh / playtest.sh / resolve-godot.sh / mobile-web-smoke.mjs` 唯一合法来源是仓库 `std-skills/godot-game-dev/scripts/`（模板仓库预置）；平台注入的 `.myrd-platform/.claude/skills/godot-game-dev/` 只是阅读副本，不得当判定来源、不得现场改写、不得自造等价脚本——被检方自己写判定器，PASS 一文不值。缺任何一个 → status=blocked 上报（「模板仓库未预置门禁脚本：<文件名>；请运维补模板仓库」），**不要现场补**。
+4. **参数化必须显式传**：`.myrd/routines.yaml` 中 `godot-smoke` 与 `mobile-web-smoke` 的 `{{gamePath}}`/`{{liveUrl}}` 由工作流节点 preHookParams 按工程覆盖。仓库默认值指向别的工程——不传参要么报错、要么（更糟）静默测错工程给出假 PASS（坑实录见关联知识 27407691 §1.3）。
+5. **中文字体是 preflight P13 的拦截项**：Web 导出跑在浏览器沙箱里拿不到系统字体，模板自带 `assets/fonts/` 全局中文字体与 `project.godot` 的 `[gui] theme/custom_font` 配置必须原样保留；「有中文文案但无字体」直接被 P13 拦下。禁止为躲缺字把文案英化——那是字体缺失的症状，不是修复。
+
+## 三、本次 run 的真实卡点：双门禁之前的第一堵墙
+
+**时间线**：18:12:00 run 启动 → 引导阶段执行工作区 `git clone https://github.com/hl3w22bupt/myrd-playground.git` → 75 秒连接超时 → 18:14:30 run 判 failed。错误原文：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspb3xd003nic7qm25pu8si/run-cmuspld10006ric7qup55soew'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75003 ms: Couldn't connect to server
+```
+
+**为什么门禁体系没接住**：门禁全部挂在**节点**上（preHook），而 clone 是 run 引导步骤，发生在第一个节点之前。clone 失败的后果是：①直接置 run=failed（result.error），②四个节点永远 pending，③没有 reject 打回循环、没有 blocked 语义、没有证据落点——门禁体系（preflight/smoke/fuzz/playtest/mobile-web-smoke 六个判定器）覆盖的是「工程与线上」，不覆盖「工作区引导」这第 0 步。
+
+**连锁依赖链**（为什么这一断全断）：clone 可用 → 功能分支可推送 → AppHost 按 gitRef 拉取构建 → liveUrl 可访问 → mobile-web-smoke 有东西可测 → 试玩验收有地方可玩。第 0 依赖断了，双门禁与验收全部空转。
+
+**恢复路径（给下一轮执行，按序）**：
+
+1. 先验连通（成本 10 秒，避免空烧一次 2.5 分钟的 run）：`curl -s -o /dev/null -m 10 -w "%{http_code}" https://github.com`；
+2. 通了 → 直接重跑工作流，**定义无需任何改动**（四节点参数已核对全部正确，见 §四）；
+3. 持续不通 → 不要重跑，回写 status=blocked 上报运维（网络代理 / GitHub 镜像 / 出网白名单），写清「clone github.com:443 连接超时，全链被第 0 依赖阻塞」——与门禁「退出码 2 = 环境不可用，禁止为过门禁改代码」是同一条纪律的 run 级推广：**环境不通时，重跑是空烧，先修环境或如实上报**；
+4. 禁止为绕过网络私自换镜像仓库/改 remote——仓库来源是部署与门禁的信任锚，变更必须走运维。
+
+## 四、诊断方法论：一次「模板参数漂移」疑云的证伪
+
+**现象**：核对工作流定义时，scaffold 节点参数正确指向 games/60-2，而读到的 implement/deploy/playtest 节点 prompt 里满是上一个游戏 app-2 的固定参数（gamePath=games/app-2、分支 cmuspfeyw…、AppHost cmuspfdr…、liveUrl /apps/app-2/）→ 一度形成高价值假设：「工作流模板实例化只替换了首个节点的参数」。
+
+**证伪过程**：换独立文件名重新拉取同一工作流，对 8 个关键词（games/60-2、games/app-2、两个 goal id、两个 liveUrl、两个 AppHost id）× 4 节点逐一计数——**四节点全部正确指向 60-2**。真因：诊断用的 `/tmp` 共享临时文件被本机并发进程覆盖，中间那几步读到的其实是另一个工作流（app-2）的同名缓存文件。
+
+**沉淀三条**：
+
+1. 结论必须落在「重新独立取证」上，不落在「上一次读到的内容」上——尤其对「上游模板缺陷」这类会被写进知识、触发他人返工的高价值指控，先证伪再落笔；
+2. 诊断脚本对临时文件用唯一文件名（本次 `/tmp/wf.json` 与并发工作流进程撞名），或直接管道内消费不落盘；
+3. 证伪本身也是产出：本文档差点把一个不存在的平台缺陷写成结论，§一第 5 条的「定义健康度」结论就是证伪的成果，它让下一轮可以放心直接重跑。
+
+## 五、Web 导出与 AppHost 部署：60-2 落位值与硬约束清单
+
+机制细节与打回修复总论见关联知识 27407691（oak-key 全链路）与 82e419bb（触屏/音频），本节只列 60-2 的具体落位值和逐项易错点：
+
+| 项 | 60-2 落位值 | 易错点（违反后果） |
+| --- | --- | --- |
+| 部署来源分支 | myrd/games-goal-cmuspb558003tic7qwgyd02c2 | gitRef 传 main → main 上没有本游戏的 apphost.toml/导出产物，构建失败或把别的壳部署出去 |
+| 部署 API | POST /api/v1/apphost/apps/cmuspb3xg003ric7q1ksya6c3/deployments，mode=bundle | sourceId 必须是 goal id cmuspb558003tic7qwgyd02c2；带别的应用 id → 403 APP_BOUND_TO_OTHER_SOURCE（选错坑，回来核对 hostedAppId，不要换坑硬试） |
+| 导出预设 | games/60-2/export_presets.cfg 配 Web(HTML5)，产物落 games/60-2/export/web/（必须含 index.html） | 缺 index.html → 壳无入口页 |
+| 资产出 bundle | apphost.toml 声明 `assets_dir = "games/60-2/export/web"`，平台把该目录上传对象存储，25MB 上限不再约束资产体积 | 不声明 assets_dir → 产物挤进 bundle，体积立刻顶 25MB 上限 |
+| 壳资产路由 | asset-store `getAsset` 懒加载，路由 `/api/public/assets/:name`；`gzip+b64` → 回 text/plain 的 base64（壳端 DecompressionStream 解压）；`raw` → 按 contentType 回原文 | M1 网关**只透传文本响应**：octet-stream/gzip/图片/音视频 → 502 UNSUPPORTED_BINARY；资产一律 base64 文本回传 |
+| 路径口径 | 壳页面拉资源**一律相对路径**（`api/public/assets/index.wasm`）；`?p=` 是网关保留 query | 绝对路径 `/assets/...` 或 `?p=` 手拼 → 404/被登录墙拦 → 黑屏 |
+| wasm 初始化 | `WebAssembly.instantiate(bytes)`（base64 → Uint8Array → 解压） | instantiateStreaming 要求 application/wasm MIME，本链路不满足 |
+| b64 内联降级 | 仅当 asset-store 不可用；原始产物 ≤ 18MB（b64 膨胀 1.33×，bundle 上限 25MB） | 超限 → 降级「说明页 + 下载指引」，不得声称可玩 |
+| 音频手势解锁 | 壳页面在引擎加载**之前**：①包 AudioContext 构造器捕获引擎实例；②document 级 `touchstart/touchend/pointerdown/keydown/click`（capture+passive，不消费事件）同步 `ctx.resume()`；③暴露 `window.__audioDebug()` | 缺任一 → 移动端全部音效静默且控制台零报错（WebKit 创建即 suspended、切后台变 interrupted、引擎只在输入回调 resume）；有音效的游戏壳缺解锁器 = 验收不通过 |
+| 调参桥 | 壳页面引擎加载前解析 `?tuning=<JSON>` 进 `window.__GAME_TUNING__`，游戏侧 GameState 启动按 TUNING_META 声明的键钳制覆盖 | 缺 → 试玩调好的参数无法用 URL 复现，调参回写流程断裂 |
+| 部署后自测 | /health 与 / 都 200 只是起点，**必须**跑 mobile-web-smoke | 只 curl 200 就宣称部署成功 = 跳过移动端硬门槛 |
+
+## 六、mobile-web-smoke 移动端模拟门禁要点
+
+- **机判方式与维度**：headless Chrome 移动仿真打开线上 liveUrl，机判六项——网络（资源可达）、console（无报错）、渲染（画面在动）、触摸（可交互）、音频契约（解锁层在位）、视口（移动端尺寸正确）。
+- **证据落点**：`games/60-2/qa/mobile/`（report.json + 分阶段截图）。试玩节点（playtest）据此写试玩指引；若发现证据缺失或与 preHook 结论矛盾，如实回写 detail，不替门禁背书。
+- **已知边界一：静止页会被误判渲染冻结**。完全静止的页面「画面在动」检查会 FAIL——解法是给核心按钮加待机呼吸脉冲（game-12 实测：scale 1.00→1.06 / 0.9s，极差 0.060 ≥ 阈值 0.02），既是门禁过检又是移动端可点示能（关联知识 00314649）。
+- **已知边界二：门禁全绿 ≠ 真机可用**。触摸事件分发顺序（E-18：`mouse_filter=STOP` 的 Control 在 GUI 命中阶段吃掉触摸，永远到不了 `_unhandled_input`）与 InputEventAction 互踩（E-19）都属于「headless 门禁全绿、真机必挂」型，机判之后仍需真人真机过一次「开局可动、摇杆不误触」（关联知识 82e419bb）。
+- **与试玩验收的衔接**：mobile-web-smoke 全绿只是准入，试玩节点产出「试玩验收包」（试玩指引 + 四问量表 + 调参工作台入口 `<liveUrl>?tuning=1`）；试玩结论只能来自用户，量表未回填就如实标「待回填」，detail 里不得出现没有出处的「试玩通过」。
+
+## 七、知识沉淀节点自身的 API 事实（本次实测，供后续沉淀节点直接复用）
+
+- **本部署不存在 `GET /api/v1/knowledge/search`**（返回 404）。等效「先搜后写」：`GET /api/v1/knowledge?scope=global&limit=200` 拉全量后客户端按 title/内容过滤（服务端源码 src/routes/knowledge.ts 的 GET 只支持 scope/category/projectId 过滤，无全文检索；列表默认只返回 parentId=null 且 isPublished=true 的文档）。
+- **新增**：`POST /api/v1/knowledge`，必填 `title` + `scope`（'global'|'project'）；`title+scope` 重复 → 409 CONFLICT（先搜后写可顺便避开）；`tags` 必须是字符串数组；`category` 建议对齐既有口径（本文用「技术方案」，与同类游戏知识一致）；创建即 isPublished=true 并自动生成 v1 版本快照。
+- **更新**：`PATCH /api/v1/knowledge/doc?id=<docId>`，支持部分更新 title/content/category/tags/icon/scope/projectIds；平台自动做版本化（更新前快照旧版 → version+1 → parentVersion=`id@vN`），不需要调用方自己处理版本。
+- **单篇读取**：`GET /api/v1/knowledge/doc?id=<docId>`（返回 doc + associatedProjectIds；已删除文档也能读到，便于历史链接）。
+- **写入姿势**：JSON body 直接 PUT 不便时，用 python3 `json.dumps` 构造 payload 再交 curl 发送，避免 shell 转义事故。
+
+## 八、关联知识（互为补充，不重复）
+
+- `27407691-bcf8-4e73-b686-1bb8df684e5c`：Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路实战（oak-key）——三层门禁体系、退出码语义、routine 参数化、GODOT_BIN 单一实现、error-signatures 打回修复表。
+- `00314649-c4d2-407c-871b-62f7de91b07d`：game-12 双门禁通过路径——mobile-web-smoke PASS 10/10 实测、静止页呼吸脉冲、负例验证纪律。
+- `82e419bb-b641-4b5e-bb58-d8b9633169ca`：game-5 触屏虚拟摇杆与 AudioContext 解锁规范——E-18/E-19 机制、统一移动向量出口、音频门控三件套。
+- `6e91a11d-3632-4721-a3ea-d433e9622f9b`：game-5 玩法设计要点——与 60-2 同属「森林收集水果限时赛」玩法族（60 秒限时收集），数值基准可对照。
+- 设计 spec（platform）：`cmuspl1bw006lic7qkcplv73e`——60-2 的水果分值表（+1/+3/+10）、生成节奏与 60 秒结算契约及契约测试清单，实现与验收以此为准。
+
+## 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+# 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+> 来源：需求《《森林收集水果限时赛》游戏需求》（id=cmusp9cd00035ic7qxi8c4il3，验收节点 completed）→ GameDesignSpec《水果分值表与收集循环》（id=cmuspeqza004uic7qusqyn7gr）→ 小游戏工坊两次工作流运行皆 failed → 主策划验收指派（id=cmtn5fhk8000hjqckrib9i3bb，completed）。全部平台终态于 2026-10-04 经 API 与线上 URL 实测取证（见 §一）。
+>
+> 本文写三件事：① 可复用的「分值分档点按收集」玩法模板（+1/+2/+5 三档）；② Web 导出 + 双门禁的复用要点；③ 本 goal 双跑皆败的流程复盘教训。**不重复**总论：门禁三层体系与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key）；工程结构最小契约与帧预算推导见 78180e88-6486-404e-9265-e315e0da3c66（hello）；时间注入机判与单源单相见 00314649-c4d2-407c-871b-62f7de91b07d（game-12）；触屏适配与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca；**同名 IP 的另一机制变体**（松鼠移动+原木躲避+连击）见 6e91a11d-3632-4721-a3ea-d433e9622f9b（game-5 老版）。
+
+## 一、事实基线（本 goal 真实终态，先看这个再谈复用）
+
+| 对象 | 标识 | 终态 | 取证方式 |
+| --- | --- | --- | --- |
+| 需求 | cmusp9cd00035ic7qxi8c4il3 | completed | goal DAG 记录 |
+| GameDesignSpec（分值表与收集循环） | cmuspeqza004uic7qusqyn7gr | completed | goal DAG 记录 |
+| 工坊运行 #1 | workflow=cmusp1yao002pic7q384xxfse，run=cmuspf4oo0050ic7qfjj0azwh（工程 games/60，分支 myrd/games-goal-cmusp1ya8002lic7qk39zog9o） | **failed** | GET /api/v1/workflows/{id} 的 runs 字段 |
+| 工坊运行 #2（换 slug 重试） | workflow=cmuspb55m003xic7q9o18vjk2，run=cmuspld10006ric7qup55soew（工程 games/60-2，分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2） | **failed** | 同上 |
+| AppHost 记录 | 60=cmusp1ya6002jic7qz3dhps7r；60-2=cmuspb3xg003ric7q1ksya6c3 | 均卡在 status=creating，publicUrl=null，publishedAt=null | GET /api/v1/apps |
+| 线上地址 | https://leomac-studio.tail49399e.ts.net/apps/60 与 /apps/60-2（含 /gw 变体） | **404「应用不存在」** | curl -L 实测 2026-10-04 |
+| 主策划验收指派 | cmtn5fhk8000hjqckrib9i3bb（标题「验收复核线上版并回写产物标识」） | completed（节点完成；其结论正文经多个 API 路由探测不可回读） | goal DAG 记录 |
+| 同名老变体 game-5 | AppHost=cmuipis4f0063m9l6hagvvvd4，goal=cmuipis4g0065m9l69hew4nng，需求=cmuipol63006rm9l6cp2ww5r5 | ready，publicUrl=/apps/game-5，3 次工坊 run 全 completed | GET /api/v1/apps、/api/v1/workflows |
+
+结论一句话：**本 goal 的「点按分档版」截至 2026-10-04 没有可玩的线上版**；平台里唯一在线的「森林收集水果限时赛」是老变体 game-5（玩法口径完全不同）。后续任何验收、试玩、传播链接都必须先对照本表，别拿老 game-5 顶数。
+
+## 二、分值驱动收集玩法模板（+1/+2/+5 三档 · 点按拾取）
+
+### 2.1 分值表与频率反相关（需求硬性口径 + 建议校准值）
+
+| 档位 | 分值（需求硬性） | 出现权重（建议起点） | 期望得分贡献占比（建议） | 视觉要求 |
+| --- | --- | --- | --- | --- |
+| 低（苹果） | +1 | ~70% | ~45% | 常规色调 |
+| 中（橙子） | +2 | ~25% | ~35% | 提亮一档 |
+| 高（稀有水果） | +5 | ~5% | ~20% | 高对比 + 特效标识 |
+
+- **分值与频率必须反相关**且两者解耦配置（权重表与分值表分开两张常量表）——需求只锁「高分水果出现频率更低」，斜率是实现自由度；但三档贡献占比是手感核心，建议按上表起步、用冒烟统计实测校准（240 帧冒烟里统计三类生成次数的比例，替代人工目测）。
+- **期望值校准法**：单局期望总分 = 60s × 刷新速率 × Σ(权重ᵢ × 分值ᵢ)。先定「单局期望分」这一产品目标，再反推刷新速率，不要拍脑袋调刷新率。
+- **计分唯一入口**：所有得分变更走同一个 `add_score(points)`，分值查表发生在水果节点持有 `tier` 字段 → 入口处查表，禁止 UI 层或触摸回调里散落 `score += 1` 字面量。这是「+1/+2/+5 各自累加正确」能被机判断言的前提（同 game-12 的单源纪律）。
+
+### 2.2 60 秒计时的 ±1 秒验收实现口径
+
+- 用 `float` 剩余时间在 `_process(delta)` 里累积递减，显示层取 `ceil()`；归零判定用 `time_left <= 0.0` 触发结算，**不要**用「Timer 节点每 1 秒 tick 一次、tick 里 -1」的实现——tick 计数在暂停/掉帧/场景切换时会漂移，±1 秒容差经不起移动端浏览器节流（切后台回来一次就能漂 1~2 秒）。
+- 冒烟断言：读 UI 计时文本两次间隔 1~2 秒断言递减；用引擎时间注入（同 game-12 `try_count(now_ms)` 模式）把 `time_left` 直接压到 0，断言进入结算场景。显示值与内部值分离，断言内部值。
+
+### 2.3 点按拾取：单源单相 + 热区（移动端唯一操作）
+
+- Godot 4 默认 `emulate_mouse_from_touch=true` → 一次触摸可能产生 touch + mouse 双事件，再加 `_unhandled_input` 的动作路径，同一「点击」多来源。收敛方式与 game-12 相同：所有来源只调唯一入口 `attempt_collect(fruit)`，判定收口在 GameState 一处。
+- 触摸热区按「水果视觉半径 + 容差」配置，最小可点直径 ≥ 44~48 逻辑 px，且注意 DPR 换算（引 82e419bb）；相邻水果刷新点最小间距 ≥ 1.5 个水果直径，防误触串档（点到低档实际想点中档）。
+- 高分水果「稀有」也必须**可点**：特效动画不要吃掉点击区（动画节点 `mouse_filter=IGNORE`），否则会出现「看得见点不中」的体感灾难——美术动效是 Area2D 之外的子节点，别挂在碰撞体上。
+
+### 2.4 供给节奏与场上管理（点按版的补货口径）
+
+- 两段式供给（引 6e91a11d §二并适配）：开局铺场 8~12 个 → 场上存量低于下限（建议 6）时按 0.8~1.5 秒补 1 个。60 秒点按版的失败模式比躲避版更隐蔽：**可收目标耗尽 = 玩家空转**，补货下限是硬保障。
+- 三档各自独立掷骰，不共用计时器；高档（稀有）另加「场上同屏最多 1 个」约束，防止稀有权重 5% 在随机聚类下同屏堆 3 个、破坏「稀有」体感。
+- 场景边界内边距 ≥ 半个水果直径，保证边缘刷新可点；不做与障碍物的路径重叠问题（本变体无移动障碍），但要避免刷新点落在 UI 计时条/得分条下方。
+
+### 2.5 一键重开的完整重置清单（验收 5 的坑点）
+
+结算界面「重新开始」必须复位**全部**运行态，逐项列出防漏：倒计时回 60、得分清零、场上水果全部回收、三档刷新计时器重置、稀有水果在场标记清除、飘分/特效节点队列清空、结算面板隐藏。重开入口双通道（触摸可点 + 键盘 Enter/Space），坑源见 ed31081f-82be-4a76-a28b-476f7e18a00b（game-3 只有触摸入口导致桌面端无法重开）。冒烟断言：先打完一局（注入 time 归零）→ 点/按重开 → 断言计时==60 且得分==0 且场上水果数==铺场数。
+
+### 2.6 森林主题的可机判底线（验收 3）
+
+美术质量不进门禁，但结构可以机判：断言主场景节点树中存在 ≥ 2 类森林装饰元素组（如 Trees/Grass 两个 Node2D 组各自子节点数 > 0）；水果节点与背景装饰分属不同层级（水果层 z_index 更高且不被装饰遮罩覆盖）。preflight 不查这些，要写进工程内 `tests/smoke.gd` 的玩法断言段。
+
+### 2.7 验收 → 冒烟断言映射（写进 verify.sh 的建议）
+
+| 需求验收条目 | 冒烟断言建议 |
+| --- | --- |
+| 1. 60 秒递减、归零自动结算、偏差 ≤ ±1s | 两次读计时文本断言递减；注入 time_left=0 断言进结算 |
+| 2. ≥3 种分值（+1/+2/+5）各自累加、实时显示 | 依次对三档水果坐标注入触摸，断言得分序列 +1/+2/+5；断言 UI 总分文本同步 |
+| 3. 森林主题 ≥2 类元素、水果不遮挡 | 断言装饰节点组存在且子节点 >0；断言水果层在装饰层之上 |
+| 4. 移动端触屏可完整跑一局、无明显卡顿 | mobile-web-smoke 门禁（双门禁第二道）跑 FPS 采样，参照 game-12 实测 FPS 39 的基线口径 |
+| 5. 一键重开、倒计时与得分重置 | 跑完一局 → 触发重开 → 断言 60/0/铺场数三值（见 §2.5） |
+
+## 三、Web 导出与双门禁复用要点
+
+本 goal 两次工作流的 scaffold 节点 prompt（工坊流水线模板实文）把门禁资产判据钉死为**四件套**：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, resolve-godot.sh, mobile-web-smoke.mjs}` 全部在仓库内且不被 .gitignore 排除，缺任一 → blocked 上报，禁止从平台注入的 `.myrd-platform/.claude/skills/` 阅读副本里复制脚本充当判定器，也禁止自造等价脚本。对比老 game-5 工作流只要求三件套——**mobile-web-smoke.mjs 是后来加入的第四件**，新工程照四件套验收。
+
+- **双门禁分工**：godot-smoke（preflight 静态 + headless 冒烟 + input-fuzz）证明「能跑能玩」，mobile-web-smoke 证明「移动端模拟下可玩且不掉帧」。两道各自独立出退出码，任何一道非 0 都不该进入 deploy。
+- **退出码语义**（与总论同源）：0 通过 / 1 冒烟失败→打回修复循环 / 2 环境不可用→装环境、禁止为过门禁改代码 / 3 静态不一致（verify.sh 单独编码）。存在性守卫先行判 2，防「脚本缺失」被误判成 3 诱导修游戏代码。
+- **Web 导出配置五要点**（引 78180e88 实测，不再展开）：渲染器钉死 gl_compatibility 且 `.mobile` 双写；`thread_support=false`；中文必须内置 NotoSansSC 等字体（preflight P13 拦 Web 中文缺字）；导出产物落 `games/<工程>/export/web/` 并 .gitignore 豁免入库；UI 挂独立 CanvasLayer 与游戏世界分离。
+- **AppHost 部署口径**：部署 gitRef 必须是 goal 功能分支（`myrd/games-goal-<goalId>`），绝不能用 main；liveUrl 在部署完成前即由工坊确定（本 goal 为 /apps/60、/apps/60-2），移动端门禁与试玩都以它为准。
+
+## 四、流程复盘：为什么本 goal 没有线上版（双跑皆败实录）
+
+时间线（全部平台记录）：17:56:54 创建 AppHost「60」+ 工作流 #1 → run cmuspf4oo0050ic7qfjj0azwh **failed** → 18:04:01 换 slug 重试，创建 AppHost「60-2」+ 工作流 #2 → run cmuspld10006ric7qup55soew **再 failed** → 验收指派节点 completed 回写产物标识 → 2026-10-04 实测线上 404。
+
+- **教训 A：节点完成态 ≠ 线上可玩。** 验收指派节点 completed，但平台记录里不存在任何可访问的线上版本。「验收复核」类节点的完成前置必须是硬证据：liveUrl 返回 200 且真实浏览器跑通「开始→拾取→结算→重开」闭环，产物标识回写附上 deployment/gitRef；否则完成态与线上态脱节，下游（频道播报、试玩通知、知识沉淀）全部建立在幻觉上。
+- **教训 B：同名变体串场是本 IP 的特有陷阱。**「森林收集水果限时赛」在仓库里有两个机制完全不同的变体：老 game-5（松鼠移动+原木躲避+连击，已上线）与本版（点按拾取+分值分档，未上线）。两者需求 id、goal id、工程目录（games/game-5 vs games/60、60-2）、分支、slug 全不同。**一切定位以产物 id + 分支名 + 工程目录为准，禁止按游戏名搜索**——按名搜必然把老 game-5 的「已上线、3 run 全绿」误当成新版的现状。
+- **教训 C：换 slug 重试会留下孤儿 AppHost 空壳。** 60 失败后换 60-2 重试，AppHost 表留下两条 status=creating 的壳，publicUrl 均为 null。重试前应优先复用原 AppHost 记录；若必须换 slug，重试启动时把旧壳置为废弃态。排查「游戏上线了没」的正确顺序：先查 AppHost status（creating/ready/failed），再 curl liveUrl 实测——本 goal 的 404 就是这么确认的，不能只信工作流状态或节点状态。
+- **教训 D：复盘入口与取证边界。** 工作流 API 只回 run id + status，不回失败日志；复盘具体卡点需持 run id（cmuspf4oo0050ic7qfjj0azwh、cmuspld10006ric7qup55soew）到执行日志/workflow 详情页查。本机环境 GitHub 443 不通，`git ls-remote` 无法核实两条 goal 分支是否推上远端——分支存在性复核必须在能连 GitHub 的环境做，不要在本机下「分支不存在」的结论。
+
+## 五、给下一个同类小游戏的复用清单
+
+1. 玩法骨架直接抄 §二：三档分值表 + 反相关权重表 + `add_score` 单入口 + float 计时 + 两段式补货 + 完整重置清单，改数值不改结构。
+2. 工程起点抄 78180e88 §二的最小契约（project.godot 三类必接线、TUNING_META 白名单、tests/smoke.gd、verify.sh、export_presets.cfg）。
+3. 门禁四件套齐全性检查放在 scaffold 第一步（本 goal 工作流模板已内置该判据），双门禁全绿才允许 deploy。
+4. 验收断言按 §2.7 映射表逐条落进 smoke.gd，每条断言做负例验证（证明会真 FAIL）。
+5. 上线判定只认三件套：AppHost status=ready + liveUrl 200 + 实机操作闭环截图/录像；验收节点回写产物标识时必须附 deployment/gitRef。
+6. 涉及「森林收集水果限时赛」名字的一切操作，先对 §一事实基线表确认自己在操作哪个变体。
+
+## 六、关联知识
+
+- 门禁三层体系 + AppHost 部署总论：27407691-bcf8-4e73-b686-1bb8df684e5c
+- 工程结构最小契约 + 帧预算推导 + playtest blocked 实录：78180e88-6486-404e-9265-e315e0da3c66
+- 双门禁（godot-smoke + mobile-web-smoke）+ 时间注入机判 + 单源单相：00314649-c4d2-407c-871b-62f7de91b07d
+- 移动端触屏虚拟摇杆 + AudioContext 解锁：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- 同名 IP 老变体（松鼠+原木+连击）玩法口径：6e91a11d-3632-4721-a3ea-d433e9622f9b
+- game-9 单游戏部署先例：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 对抗性探索与机判方法论（QA 复用）：437f8129-89b5-4f46-95c0-2d475c3cead8
+
+## 沉淀 app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单（太空飞船躲陨石捡金币）
+
+# app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单
+
+> 来源：目标《创建小游戏应用：太空飞船躲陨石捡金币》（goal=cmuspfeyw0058ic7qrmh6qebm）首轮执行（2026-10-03 18:11~18:23 UTC）+ 次日（2026-10-04）知识沉淀时的时点复核。需求 id=cmuspmumf007cic7qlt6uwieo，GameDesignSpec id=cmuspqwhe007ric7qp0465dvk，工坊工作流 id=cmuspfez9005cic7q93j4fk74，失败运行 id=cmuspr5v7007xic7q5ng1aqqo。
+>
+> 本文只写本例增量：**工坊流水线在门禁一启动之前就整体失败**这一反面样本的取证、归类、复核方法论与重跑前置清单。godot-smoke 三层门禁体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-12 双门禁通过路径见 id=00314649-c4d2-407c-871b-62f7de91b07d；移动端触屏/音频规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；game-9 见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be。本文与它们互补：前面几篇讲「门禁怎么过」，本篇讲「门禁根本没来得及跑」时怎么定位、怎么复核、重跑前还要先解决什么。
+
+## 一、一手事实时间线（全部库内取证，非转述）
+
+| 时刻（UTC） | 事件 | 证据 |
+| --- | --- | --- |
+| 10-03 18:07:22 | hosted_apps 记录 app-2 创建（id=cmuspfdr20056ic7qm2ebhvwv，slug=app-2），status=creating | hosted_apps 行；updated_at 至 10-04 仍冻结在该时刻 |
+| 18:11~18:13 | 需求录入完成（含双门禁 + HostedApp 约束 + 4 条验收标准） | 需求 id=cmuspmumf007cic7qlt6uwieo |
+| 18:13~18:16 | GameDesignSpec v0 落账（八段、10 实体、数值写死） | spec id=cmuspqwhe007ric7qp0465dvk |
+| 18:16:30 → 18:17:36 | 工坊工作流运行启动后 **66 秒即 failed** | workflow_runs.status=failed |
+| 18:17:40 → 18:23:07 | express_lane 独立复核完成：app-2 未上线、验收 0/4、双门禁均未启动 | 复核结论（goal 会话） |
+| 10-04（本文写作时） | app-2 仍 status=creating、live_url 空、app_deployments **0 行**；该工作流**仅 1 次运行且为 failed，未重跑**；github.com 从 agent 环境再次 20s 超时不可达 | hosted_apps / app_deployments / workflow_runs 实查 + curl 探针 |
+
+失败报错原文（复现用）：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspfdqy0052ic7qnkimp4n5/run-cmuspr5v7007xic7q5ng1aqqo'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/':
+Failed to connect to github.com port 443 after 32655 ms: Couldn't connect to server
+```
+
+## 二、失败模式归类：不是「门禁失败」，是「门禁前基础设施失败」
+
+工坊四棒为 scaffold → implement → deploy → playtest（实现/部署两棒挂 godot-smoke preHook 240 帧，试玩棒挂 mobile-web-smoke）。本例失败的关键特征：
+
+1. **死在第 0 棒之前**：4 个节点状态全部 pending，工作流主体逻辑一行都没执行——失败发生在为运行准备 worktree 的 `git clone` 阶段。
+2. **零产物可判**：goal 分支 `myrd/games-goal-cmuspfeyw0058ic7qrmh6qebm` 在复核时不存在（`git ls-remote` 无此分支）→ 无任何代码/工程/导出物落库，不存在「半成品需要清理」的问题。
+3. **网络是间歇抖动，不是持久封锁**：复核时点（10-03 18:23）github.com HTTPS 200、`git ls-remote` 成功（HEAD=a592ea2）；次日（10-04）从 agent 环境又 20s 超时。两个时点结论相反，证明是**间歇性连接抖动**。
+4. **归类的处置含义**：门禁失败（godot-smoke 红、smoke 帧内崩溃）→ 修代码再过门禁；门禁前基础设施失败 → **不改任何代码，探针确认外网恢复后直接重跑**。两者处置路径完全不同，先归类再动手。
+
+## 三、独立复核方法论（本例实证有效，可整体复用）
+
+复核在「工作流已 failed」的背景下展开，五步证据链闭环：
+
+1. **不信状态字段，实测入口**：`status=creating` 不代表「正在部署中马上就好」——对内网 `$PLATFORM_API_URL/apps/app-2/gw` 与公网 `https://leomac-studio.tail49399e.ts.net/apps/app-2/` 双探测，均 404 `APP_NOT_FOUND`。应用记录侧 `publicUrl/publishedAt/version` 全空，项目侧 `resources=[]`、prodUrl/stagingUrl 空，app_deployments 0 行，四面证据一致。
+2. **对照实验排除平台故障**：同一 host 上其余 13 个 `status=ready` 应用（game-5/6/8/9/10/11/12、hello、app 等）全部 200 → 托管能力正常，是 app-2 自身从未部署的个案，不是平台级事故。
+3. **排他性核查防「张冠李戴」**：已上线 13 应用中无一款《太空飞船躲陨石捡金币》；题材相近的 `/apps/app/gw`「星云飞船收集」收集的是能量水晶、slug 与标题均不同，**不能冒充 app-2 交付物**。同类小游戏大量复用同套躲陨石玩法，验收时必须按 slug+标题+机制三重匹配认定交付物。
+4. **对账流程合规性**：需求 status=in-progress、close_reason 空 → 无人违规关闭需求，门禁二「未回填」是因「无入口」而非「被跳过」，流程无腐化。
+5. **失败棒位定位**：直接查 workflow_runs 的 result.error 与 nodes 状态数组，一眼定位「死在 scaffold 之前」，避免把失败误归因给某一棒的实现质量。
+
+## 四、⚠️ 规格冲突（重跑前必须拍板，否则白跑）
+
+工坊管线是 **Godot 4 → Web(HTML5) 导出**（工程 `games/app-2`、`export_presets.cfg` Web 预设、`--headless export` 构建步、godot-game-dev 技能包），而需求验收标准 4 明文要求「**纯前端 HTML/CSS/JS、无构建步骤、静态资源可直接打开运行**」。Godot 导出必然含构建步骤，两者直接冲突。
+
+- **不处理的后果**：即使部署成功、门禁一全绿，AC4 仍会判不达标——整条流水线白跑一轮。
+- **方案 A（推荐）**：把 AC4 措辞修订为「**导出产物为纯静态托管、无运行时后端、无外部 CDN 依赖**」。保留 Godot 管线，同时保住需求真正想约束的东西（免后端、免 CDN、双端可玩），且与既有门禁体系（27407691 总论）兼容。
+- **方案 B**：放弃 Godot 管线，改手写单文件 HTML/JS。仅当主人明确要求「字面意义无构建」时选它，代价是失去 godot-smoke 三层门禁与工坊流水线的既有能力。
+- **教训**：验收标准与管线能力要在**需求录入时**对齐。「无构建步骤」这类措辞对 Godot 管线应用天然不可满足，录入阶段就该识别。
+
+## 五、重跑修复路径（有序清单，供下一轮直接执行）
+
+1. **先探针再重跑**：从 runner 环境 `curl --max-time 20 https://github.com` + `git ls-remote <仓库>` 双探针确认恢复。网络是间歇抖动，盲目重跑可能再次 66 秒失败并空耗一轮。
+2. **先拍板第四节冲突**并回写需求措辞（方案 A 或 B），再触发重跑。
+3. **重跑即可，无需清理**：分支不存在、零产物，直接重跑工作流，从 scaffold 全新开始；不要试图「续跑」失败运行。
+4. **部署成功后先补门禁一**：由独立 agent 重做一轮线上可玩性复核（按第三节方法论），留证「全流程走通 + 控制台无报错」，之后才轮到 owner。
+5. **门禁二最后**：owner 桌面 + 移动各试玩一次并回填「试玩通过/不通过」，回填通过后需求方可关闭。当前门禁状态：**门禁一未启动（不可执行）、门禁二未启动（无入口）——注意是「未达」而非「失败」，回填话术要区分。**
+
+## 六、供后续 app 复用的教训清单
+
+1. **工作流失败 ≠ 游戏缺陷**：先查失败棒位。scaffold 之前死 = 基础设施层（网络/仓库可达性），与代码质量无关，处置是重跑而不是返工。
+2. **外网 git clone 是工坊流水线的第一单点**：仓库在 github.com，第一棒之前就要整仓克隆；网络抖动直接零产物。建议重跑前置「探针 + 失败自动退避重试」的习惯，并把「github 间歇不可达」记为平台环境的已知抖动源。
+3. **hosted_apps.status 不可单独作为「已上线」判据**：本例 status=creating 停滞超过 24h 且无任何部署行。判活必须「liveUrl 实测（内网+公网双探测）+ deployments 计数」双条件。
+4. **需求录入时做一次「AC × 管线」对齐检查**：把验收标准逐条对照工作流管线的既有能力（构建方式、导出形态、依赖服务），措辞冲突当场改，不要留到部署后才发现。
+5. **同题材应用排认**：平台同 slug 命名空间下有多款躲陨石/收集类小游戏，验收复核必须 slug+标题+核心机制三重匹配，防止把兄弟应用的 200 当成本应用的交付证据。
+
+---
+**一句话总结**：app-2 首轮执行是「门禁前基础设施失败」的完整样本——工坊四棒尚未启动即在 git clone 阶段遭遇 github.com 间歇性连接失败（66 秒即败、零产物、app-2 停在 creating），独立复核以五步证据链确认验收 0/4、双门禁均未达但流程未被违规绕过；修复路径 = 探针确认网络恢复 + 先拍板「Godot 构建管线 vs 无构建步骤」的规格冲突 + 直接重跑，重跑成功后再补门禁一自测与门禁二试玩回填。
+
+
 ---
 
 # 瞬时检查产品
@@ -5243,6 +6791,780 @@ Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`�
 5. 部署抄「五查」：gitignore 的 /export/、apphost.toml 指向、gitRef=目标分支、壳三件套（文案/调参桥/音频解锁）、artifacts 回写 get→append→写回。
 
 关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
+
+## 沉淀 game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战经验（推箱子点亮方块解谜 · 全四棒工作流）
+
+# game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战沉淀（推箱子点亮方块解谜 · 全四棒工作流）
+
+> 来源：需求《推箱子点亮方块解谜（game-9）》（id=cmupsx443003om9dh5dwd5w9u，goal=cmupsrc19002sm9dhp5su0zaj）走完「前置体检 → scaffold → implement → deploy → playtest」全流程后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-9`（Godot 4.3.stable.official）。线上：liveUrl https://leomac-studio.tail49399e.ts.net/apps/game-9/（deploymentId=cmupxibnn0087m9dhz3cfhap4，commit 19a6d59，838ms 上线，app.status=ready）。工作流运行 /workflows/cmupsrc1v002wm9dh68sljxoq/runs/cmuputtey006dm9dht78nbbtm。
+>
+> 本文只写 game-9 新踩的坑与增量打法。门禁三层体系总论（preflight/smoke/fuzz 分工、E-16 带病绿灯）与 AppHost 部署总论见《沉淀 Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路实战经验》（id=27407691-bcf8-4e73-b686-1bb8df684e5c，oak-key 实测）；移动端触屏摇杆与音频解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca。三篇互为补充、不重复。
+
+## 一、事实基线：四棒各留下什么（审计入口）
+
+| 棒 | 提交 | 内容 | 结果 |
+| --- | --- | --- | --- |
+| scaffold | d297996 | 以 templates/minimal-2d 初始化 games/game-9：推箱骨架（推动/点亮/Undo/Restart/换关）+ 5 关关卡册 + tools/level_solver.py + tests/smoke.gd + verify.sh | ✅ |
+| implement | 4bfdb00 | 见证解回放 / 死锁反馈 / touch_swipe / AC5 响应断言；is_solved 口径修复；.myrd/spec/design-spec.json 落盘 | ✅ |
+| deploy | 19a6d59 | export_presets.cfg + 导出产物入库 + apphost 壳切 game-9 + §3C 调参桥 + 移除 candy-crush 残留 | ✅ 已部署 |
+| playtest | 0103b33 | docs：playtest blocked 报告（缺 playtest.sh） | ⛔ blocked |
+
+- **部署形态**：底座 A「资产出 bundle」——`apphost.toml` 里 `assets_dir="games/game-9/export/web"`，37MB 导出经对象存储懒加载，bundle 本体不含游戏资源（25MB bundle 上限不再约束资产体积）。
+- **导出产物形态**：index.wasm 33.7MB / index.pck 2.4MB / index.js 331KB / index.html 4.9KB / index.audio.worklet.js 7.3KB。线上资产通道 `/api/public/assets/`：index.js 原文直出，wasm/pck 走 `*.gz.b64` 文本（10.7MB / 3.3MB），端到端解码验证过（b64→gzip→`WebAssembly.validate()=true`、pck 魔数 `GDPC`）。
+- **部署记录层 status=running 与应用已 ready 并存**：判断游戏死活以 /health 与实际可达为准，别拿 deployment.status 当真。
+
+### 分支审计坑：同一目标两条远端分支并存
+
+- `myrd/game-9-goal-<goalId>`：前置体检节点首次推送建立，停在 implement 棒（4bfdb00）。
+- `myrd/games-goal-<goalId>`：工作流四棒实际跑的分支，tip=0103b33（多出 deploy/playtest 两棒）。
+- 结论：**复现/审计认 goal artifacts 里的 `gitRef` 与 `app_deployments.commit_hash`（本次 = 19a6d59）**，别按「目标 id 搜分支」想当然——两条分支都能搜到且不同步。另：线上部署的是 19a6d59，其后 playtest 棒只追加 docs（0103b33）未重新部署，属 docs-only 差异，游戏本体无差。
+
+## 二、Godot Web 导出：模板不含预设，从零补齐的六个决策
+
+1. **模板仓库不含 `export_presets.cfg`**。games/game-9 的 README 在 scaffold 棒就记了：「export_presets.cfg 尚未配置（模板不含），部署节点需按 games/game/ 的 web 导出先例补齐」。每个新游戏都要从上一个游戏的先例抄一份再改，别等部署节点现场发明。
+2. **必须用单线程变体：`variant/thread_support=false`**。M1 网关不发 COOP/COEP 头，SharedArrayBuffer 不可用，线程版直接白屏。这是 Web 导出第一坑：配错不报错、上线才白屏。
+3. **导出产物必须入库，`.gitignore` 加 `!/export/web/` 豁免**。`assets_dir` 是平台构建输入，产物不在仓库里平台打包 bundle 就缺资产。Godot 工程 .gitignore 默认把 export/ 排掉，这里要反着来。
+4. **全局中文字体是 Web 导出的底线**（preflight P13 机判）。浏览器沙箱拿不到系统字体，引擎内置字体只有拉丁字形；`[gui] theme/custom_font` 必须指向子集化中文字体（本工程用 Noto Sans CJK SC：GB2312 全集 + ASCII + 常用符号，OFL 1.1），删了所有中文变缺字方块。字体约 2.9MB，是 pck 体积大头，但属中文游戏必要成本。
+5. **渲染器钉死 `gl_compatibility`**（`renderer/rendering_method` 与 `.mobile` 双写）。Forward+ 在 Web 上不可用。
+6. **接手模板仓库先清上一个游戏的残留**。deploy 棒移除了基线残留的 candy-crush 工程 `games/game/`（39MB 导出）——模板仓库是「单游戏位」惯例，根壳一次只服务一个游戏；残留工程还会污染门禁参照（前置体检时 gate-selftest 拿 games/game 当参照，因 player.gd 缺 `moved.emit`/`const SPEED` 模板契约锚点，D4/D5 注入失败，换官方参照 `templates/minimal-2d` 后 D1–D5 全拦）。
+
+**壳侧三件套 + 调参桥**（沿用 oak-key 先例并加一层）：相对路径资产路由；移动端音频手势解锁器（AudioContext 包装 / 手势 resume / `__audioDebug` 取证口）；worklet 防御；新增 **§3C 调参桥**：
+
+- 壳把 URL `?tuning=<json>` 解析成 `window.__GAME_TUNING__`；
+- 游戏侧 `GameState._apply_tuning_overrides()` 仅 `OS.has_feature("web")` 时经 `JavaScriptBridge.eval("JSON.stringify(window.__GAME_TUNING__ || null)")` 读取；
+- `TUNING_META` 白名单四键 + min/max 钳制 + round 取整：`move_anim_ms` 0–400、`push_anim_ms` 0–400、`key_repeat_interval_ms` 50–600、`win_overlay_delay_ms` 0–1000。
+- 价值：试玩期调手感不用改代码重导出——「试玩调好的参数用 URL 复现」，试玩入口直接发 `?tuning=1` 工作台链接。无头冒烟/桌面自动跳过，门禁行为不受影响。
+
+## 三、冒烟门禁：game-9 的四个增量打法
+
+四步 routine 不变（`.myrd/routines.yaml` id=godot-smoke：resolve-godot → preflight 13 类 → `GODOT_SMOKE_FRAMES=240` headless-smoke → input-fuzz，seed=20260913），`games/game-9/verify.sh` 只调用 std-skills 判定脚本、不重实现。本次实测：preflight PASS / `GODOT_SMOKE: PASS`（240 帧，exit 0）/ `GODOT_FUZZ: PASS`。增量全在冒烟断言本身（tests/smoke.gd，628 行，11 项断言清单）：
+
+### 3.1 见证解回放：把 AC4「关卡可解」变成引擎内机判
+
+离线求解器说「可解」只是一句话结论；game-9 把它做成冒烟断言：
+
+- `tools/level_solver.py --paths` 生成每关见证解（U/D/L/R 移动串，长度 == par），Python 侧重放自证后落盘进 `sokoban_levels.gd` 的 `solution` 字段（与 layout 同处，单一事实源，防两处数据漂移）；
+- 冒烟逐关回放见证解，断言三条：**必须通关、步数 == par、回放全程不得误报死锁**；
+- solver 直接解析 `sokoban_levels.gd`（不复制关卡数据），「策划案 → 关卡册 → 求解器 → 冒烟」四层数据同源，par 漂移会在冒烟里直接爆。
+
+### 3.2 通关判据口径：常亮 ≠ 通关（冒烟实测拦下的真 bug）
+
+点亮目标格是 `onceLitStaysLit`（入场常亮、永不熄灭），但 `is_solved` 不能跟着用「全部点亮」口径——**常亮口径会把 level-05 最优路径第 35 步误判通关、提前停走**（冒烟回放见证解时实测拦下）。修复：`is_solved` = 「全部接线槽有方块驻留」，与求解器 / spec parMoves 同口径；点亮只作视觉态。
+
+教训：**「视觉状态」与「胜负判据」是两个变量。凡有常亮/累计态的玩法，胜负判据必须与求解器同口径，并让冒烟回放最优解来兜底。**
+
+### 3.3 死锁反馈机判：报与不报都要有断言
+
+角死锁检测 + `deadlock_changed` 信号 + HUD 卡死警示 + 死锁方块变红。冒烟断言四条：角死锁必报、在槽角不报（在槽角是合法终态）、开阔局面不报（防假阳性）、真实关卡把方块顶进角后信号通知 UI 且 **Undo 可脱离死锁态**。「无假阳性」的论证写在检测函数注释里供复核。
+
+### 3.4 AC5 量化成帧预算断言
+
+- 响应延迟：spec 200ms ≈ 60FPS 下 12 帧 → 断言「注入输入 → 首次步进 + HUD 同步刷新」≤ `RESPONSE_BUDGET_FRAMES=12` 帧，验收口径直接写进门禁；
+- 触屏滑动：越过 24px 阈值（`spec.numeric.input.touchSwipeThresholdPx`）的一次滑动**恰好步进 1 格**；冒烟注入 48px 拖拽验证（`SWIPE_DRAG_PX=48`）。
+
+### 3.5 headless 输入注入的坑（error-signatures E-08 的 game-9 变体）
+
+- headless 下 `Input.parse_input_event()` 的缓冲冲刷会清掉 `Input.action_press()` 的按下状态，**同帧混用两种注入方式会让「移动断言」假失败** → 冒烟分 7 相位（噪声/移动/滑动/逻辑/等弹层/下一关/收尾）互不重叠；
+- 触点下标隔离：噪声相位用触点 0/1，滑动断言用触点 7，防互相回收；
+- 滑动起点 (500,280) 刻意避开左下摇杆热区（24..160 × 400..536）与右下按钮排，否则手势被控件吃掉；
+- 噪声相位（30 帧悬挂手势/孤儿释放/乱键）放在一切正式断言之前——上一游戏（糖果三消，commit bbb872f4「致胜滑动后指针脏状态吞掉下一关第一次手势」）就是靠这类对抗注入防回归的。
+
+### 3.6 verify.sh 退出码四态（给修复方向做机器路由）
+
+0=通过；1=smoke/fuzz 运行期未过（改游戏代码）；2=环境不可用（缺 Godot/技能脚本/python3，装环境而非改代码）；3=preflight 静态未过（先修静态，不必跑冒烟）。关键设计：技能脚本存在性守卫放在一切判定之前，缺脚本必须报 2——否则会掉进下游非零退出码被误判成 3，诱导修复节点去改游戏代码。
+
+## 四、关卡求解器：三段演进与两个真 bug（策划案阶段就要做）
+
+固化策划案（create_design_spec）时就要求每关机器可解、par 机器可算——这步做了，实现、冒烟、验收全链路都有基准。求解器三段演进：
+
+1. **BFS**：前三关（状态空间小）够用；
+2. **A* + 拉拽距离启发 + 死格剪枝**：大关用（启发值 = 每方块到最近接线槽的拉拽距离下界，可采纳；死格 = 角死锁 / 墙边不可拉出格）；
+3. **精确状态 A\***：修掉「区域归一化」bug 后的最终形态。
+
+两个真 bug（都在求解器侧，不在游戏侧）：
+
+- **区域归一化把玩家站位合并掉**：对「推动数」精确，对「玩家步数」只是松弛下界——level-02 手推最少 10 步，求解器报 5。修复：玩家坐标显式入状态；修复后 A* 与纯 BFS 交叉验证一致（2/10/18）。
+- **开阔房间 + 5 方块状态空间爆炸**：单关搜索超时。解法不是更强的剪枝，而是**改关卡布局**——level-05 换成更紧凑、隔断更多的「总控机房」，对人更难、对求解器更小，验证 3.8s，par=58 > level-04 的 40，难度曲线反而更成立。
+
+工程参数：`EXPANSION_CAP=4_000_000`、`MAX_DEPTH=200`；par 不一致只告警（布局或 par 漂移），可解性才是硬判据（exit 0/1）。最终 par 曲线 2/10/18/40/58，方块数 1→5 严格递增（AC4），策划案 `numeric.difficulty.parMoves`、关卡册、冒烟断言三方一致。
+
+## 五、playtest blocked：判定器独立性纪律的一次实战
+
+playtest 节点硬约束：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 五个判定脚本**全部由模板仓库预置**，缺任何一个 → 立即 blocked，**严禁现场自造、拷贝注入副本、或用等价命令替代**——它们是判定器，被检方自己写门禁即失去独立性。
+
+本次实测缺 `playtest.sh`（及 `playtest_driver.gd`），按纪律停止：
+
+- **证据链五步**：① 工作区分支 scripts 目录实清（仅 7 个文件）→ ② origin/main fetch 后核对同样缺失（排除本地落后）→ ③ `git log --all` 该路径从未存在 → ④ 全仓库 find 仅命中 `.myrd-platform/.claude/skills/`（平台注入阅读副本，被 .gitignore 排除不入库，按硬约束不得作判定来源）→ ⑤ 前序 deploy 产物旁证。
+- **根因**：平台注入技能包（新版，含机器人试玩门禁：协议 `GODOT_PLAYTEST: PASS/FAIL` 退出码 0/1、2=环境不可用；`GODOT_PLAYTEST_METRICS: <JSON>`；bot 多局输出节奏代理指标——首次奖励/无反馈窗口/反馈密度/局间方差；阈值由工程内 `tests/playtest.json` 覆盖）**领先于模板仓库预置基线**（v1 仅四脚本，godot-smoke routine 也只有四步）。属模板仓库技能资产滞后，需运维补模板仓库，非 agent 现场可修。
+- **没做的事同样重要**：不交付试玩验收包、不拷贝注入副本、不自造判定器；四问量表标「待用户试玩」；spec 数值回写跳过（未收到用户结论，严禁编造）。
+- **影响面切割**：deploy 产物不受影响（游戏仍可访问），godot-smoke 四步门禁此前已全过——blocked 只挡 playtest 这一段。
+- **修复路径**：运维补模板仓库 `playtest.sh` + `playtest_driver.gd`（连同 SKILL.md 章节与 godot-smoke-routine.md 模板同步，脚本/文档/routine 三者一致）→ 经模板预置链路同步进项目仓库（不得手抄注入副本）→ 重跑 playtest 节点交付 `op=playtest_kit`（含 `<liveUrl>?tuning=1` 调参工作台入口）。取证报告在仓库 `docs/game-9-playtest-blocked-report.md`。
+
+## 六、下一个游戏直接抄的清单
+
+```bash
+# 1. 门禁入口（四步；退出码 0/1/2/3 见 §3.6）
+bash games/<game>/verify.sh
+
+# 2. 关卡可解性证据（--paths 生成见证解 → 落盘 solution 字段 → 冒烟回放）
+python3 games/<game>/tools/level_solver.py games/<game> --paths
+```
+
+Web 导出预设必查四项：
+
+| 项 | 值 | 不守的后果 |
+| --- | --- | --- |
+| `variant/thread_support` | `false`（单线程） | M1 网关无 COOP/COEP，SharedArrayBuffer 不可用 → 线程版上线白屏 |
+| `[gui] theme/custom_font` | 子集化中文字体 | 浏览器无系统字体 → 中文全部缺字方块（preflight P13 拦） |
+| `renderer/rendering_method` | `gl_compatibility`（desktop+mobile 双写） | Forward+ 在 Web 不可用 |
+| `.gitignore` | 加 `!/export/web/` 豁免 | assets_dir 构建输入缺资产，bundle 打包失败 |
+
+复用分工：门禁三层总论 / E-16 带病绿灯 / AppHost 部署总论 → id=27407691-bcf8-4e73-b686-1bb8df684e5c；移动端触屏摇杆 / 音频解锁规范 → id=82e419bb-b641-4b5e-bb58-d8b9633169ca；本文 = game-9 增量（导出预设从零补齐、见证解回放机判 AC4、通关判据口径、死锁反馈机判、AC5 帧预算断言、E-08 分相位注入、求解器演进、playtest blocked 纪律、双分支审计口径）。
+
+
+## 沉淀《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+# 《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+> 来源：需求《《hello》休闲收集小游戏》（id=cmuqk7luz002am9bfmmkouw9v，goal=cmuqk3j2o001mm9bfptrztaj1）走完「scaffold → implement → deploy → playtest」工坊主通道后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/hello`（std-skills minimal-2d 模板起步，Godot 4.3.stable，gl_compatibility）。线上终态：liveUrl `https://leomac-studio.tail49399e.ts.net/apps/hello`（HostedApp id=cmuqk3huq001km9bf5ejp7tdg，deployment v2=cmuqlxz2v001km9bxc0w5pspp，gitRef=`myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1@dfd20d1`，/health 200、线上标题《hello》 · 休闲收集）。**playtest 节点 status=blocked**（模板仓库未预置 playtest.sh），线上版经独立 assign_agent 复核确认可玩。本文只写 hello 的增量事实与新坑；门禁三层体系总论与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key），单游戏部署先例见 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9），触屏摇杆与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca。四篇互为补充、不重复。
+
+## 一、事实基线：提交链与四棒产出（审计入口）
+
+`origin/myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1` 提交链（逐字核实）：
+
+| commit | 内容 | 结果 |
+| --- | --- | --- |
+| f9bc9d65 | 模板起步：std-skills minimal-2d 脚手架建 `games/hello` | ✅ |
+| 1bc8fa24 | 收集玩法与胜利/重开闭环 + README 玩法说明 | ✅ |
+| a8b5fd09 | Web 导出可托管形态：export_presets.cfg + `.gitignore` 豁免 + 导出产物入库 | ✅ |
+| 16249412 | 关卡梯度 + 限时失败反馈 + 冒烟断言同步升级 | ✅ |
+| dfd20d1b | 根壳与 apphost.toml 切到 hello + 接通调参桥（=部署 commit） | ✅ 已部署 |
+
+- `myrd/hello-game-goal-cmuqk3j2o001mm9bfptrztaj1` 分支另含 508dcc6b（assign_agent 线上复核取证），与 games-goal 分支**不同步**——复核/审计一律认 goal artifacts 里的 `gitRef`（games-goal@dfd20d1），别按「目标 id 搜分支」。
+- 门禁终态：preflight 13 类 PASS / `GODOT_SMOKE: PASS`（240 帧）/ `GODOT_FUZZ: PASS`（seed=20260913，6 批次无崩溃无脚本错误）；`bash games/hello/verify.sh` 全链路 PASS。
+- 导出 11 文件落 `games/hello/export/web/`：index.wasm 35,376,909B / index.pck 2,497,520B / index.js 331,495B / index.html 4,848B / index.audio.worklet.js 7,298B。
+
+## 二、Godot4 工程结构：hello 的最小可玩模板契约（可复制起点）
+
+```
+games/hello/
+├── project.godot          # 三类必接线：run/main_scene、[autoload] GameState、[input]
+├── autoload/game_state.gd # 单例 + TUNING_META 白名单（调参唯一入口清单）
+├── scenes/{main,player,collectible}.tscn
+├── scripts/{main,player,collectible,virtual_joystick,touch_confirm_button}.gd
+├── assets/fonts/NotoSansSC-Regular.otf + OFL.txt   # Web 中文底线
+├── tests/{smoke.gd,smoke.tscn}                     # 相位状态机冒烟场景
+├── verify.sh               # 工程门禁入口（退出码 0/1/2/3）
+└── export_presets.cfg      # Web 导出预设（thread_support=false）
+```
+
+- **三类必接线是 preflight 静态机判对象**：主场景、autoload、input 映射缺任何一项就是「黑屏/无响应」。hello 实测：`config/name="hello"`、`run/main_scene="res://scenes/main.tscn"`、`GameState="*res://autoload/game_state.gd"`。
+- **渲染器钉死 gl_compatibility 且 `.mobile` 双写**；viewport 640×360；`[gui] theme/custom_font` 指向 NotoSansSC（OFL 1.1）——删了中文全变缺字方块（preflight P13 拦）。
+- **UI 挂独立 CanvasLayer（UI/TouchUI）**，与游戏世界分离；触屏端用 `virtual_joystick.gd` + `touch_confirm_button.gd` 承载移动与确认，桌面/触屏同一工程不加分叉构建。
+- **收集玩法碰撞口径写进代码注释**：Player 矩形 24×24（半宽 12）、Collectible 圆 r=22，可达判定=玩家中心进入收集物中心 34px 内；摆点相对 clamp 边界 (12..628, 12..348) 全可达不卡死角——**碰撞余量要在摆新点时先算再摆**，否则冒烟传送收集断言假失败。
+
+## 三、门禁增量：帧预算推导注释 + 键位契约断言
+
+- **帧推导写进 verify.sh 注释**：「噪声 30 帧 → 移动 10 帧 → 4 次传送收集（各 4 帧）→ 过关断言 → confirm 进第 2 关断言（梯度）→ 时限压 0 触发失败断言 → confirm 重来断言」约 94 物理帧，预算取 240 对齐 `.myrd/routines.yaml` 的 smokeFrames 默认值（两边同值不各说各话）。**推导过程留在门禁入口文件里**，后续调速度的人不必重推。
+- 冒烟 9 项玩法断言：噪声输入后仍能移动、收集计数累加、过关判定、难度梯度（4→5 目标、30→26s 时限）、超时失败反馈、失败重来复位，外加键位契约 `_check_key_bindings`（逐键 AND 判定）。
+- verify.sh 退出码语义与 oak-key 同源：0 通过 / 1 冒烟失败 / 2 环境不可用（**存在性守卫先行**：preflight.py、smoke.sh、resolve-godot.sh 缺一即 2，防「脚本缺失」被误判成 3 诱导改游戏代码）/ 3 静态不一致。
+- **复发坑（连续两作）**：`.myrd/routines.yaml` 默认 `gamePath: games/godot-coin-rush` 至今未修。oak-key 轮已记录，hello 轮依旧要靠 preHookParams 显式覆盖成 `games/hello` 才测对工程。**建议运维直接改模板默认值或置空强制必填**，别再指望每作自觉覆盖。
+
+## 四、playtest blocked 实录：模板仓库技能资产落后于平台注入副本（本轮最大增量）
+
+- **触发**：判定脚本五清单 `{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 要求全部由项目仓库预置，hello 实测唯独 `std-skills/godot-game-dev/scripts/playtest.sh` MISSING → 节点按硬约束立即 blocked（不产试玩验收包、不回填量表、不调参回写）。
+- **根因（版本分裂）**：仓库内 `std-skills/godot-game-dev/` 是**旧版**（SKILL.md 无 playtest，routines.yaml 4 步）；平台注入阅读副本 `.myrd-platform/.claude/skills/godot-game-dev/` 是**新版**（SKILL.md §4.5 机器人试玩门禁 + `playtest_driver.gd` + 5 步 routine，新增 `playtestFrames: "900"`）。即：**模板仓库落后于平台注入副本**。
+- **纪律（为什么 blocked 而不是补一个）**：判定器唯一来源是模板仓库预置；被检方自写判定脚本，门禁不再独立，PASS 一文不值；注入副本是阅读用，不得复制/改写/等价替代。
+- **运维待办（精确到文件）**：把 `WORKSHOP_GAME_TEMPLATE_REPO` 的 godot-game-dev 技能资产同步到含 `scripts/playtest.sh` + `scripts/playtest_driver.gd` 的版本，并让仓库 `.myrd/routines.yaml` 的 godot-smoke 升到 5 步。报告已落盘 `docs/playtest/hello-playtest-blocked.md`（commit 283773e）。
+- **教训泛化**：工坊每接入新模板资产前，先 diff「模板仓库 vs `.myrd-platform/` 注入副本」的技能版本，发现落后先报运维，别等跑到最后一棒才 blocked。
+
+## 五、Web 导出与部署：hello 的三个增量打法
+
+1. **导出配置前置到 scaffold 棒**（前两作是 deploy 棒现场补 preset）：scaffold 按 `games/game` 既有先例补齐 `export_presets.cfg`（`platform="Web"`、`export_path="export/web/index.html"`、`variant/thread_support=false`、`html/canvas_resize_policy=2`）+ `.gitignore` 加 `!/export/web/` 豁免 + 导出产物入库（a8b5fd09）。deploy 棒零决策复用重导出——**「可托管形态」应该在脚手架棒就建成，别留到部署棒现场发明**。
+2. **根壳单游戏位切换要核对三处**：`apphost.toml`（name=hello / assets_dir=games/hello/export/web / health=/health / runtime=node20）、server 壳的资产路由、调参桥全局注入。hello 轮根壳原指向 candy-crush-legend（games/game/export/web），已整体切到 hello。**每次上新游戏，部署前 grep 根壳里旧游戏名清残留**。
+3. **部署重发坑：v1 因 504 重发被 superseded，v2 才是终态**（两笔同 gitRef）。判断游戏死活以 `/health` + app status + liveUrl 实测为准，**别拿 deployment 列表第一笔当真**。另：`/` 会 308 重定向到 `/apps/hello`（尾斜杠归一化），curl 复核记得 `-L` 跟随。
+
+线上复核（assign_agent 独立完成，不复用 deploy 自测结论）：部署 gitRef 远端 HEAD 与 dfd20d1 逐字一致；资产通道全文本（wasm/pck 走 `*.gz.b64`），本地解码还原 wasm 35,376,909 字节与本地导出逐字一致、magic `\0asm` v1 有效，pck magic `GDPC`；壳契约四件（相对路径拉资产、移动端音频手势解锁器、`__audioDebug` 取证口、tuning 调参桥）逐项在位。
+
+## 六、调参桥 hello 实例：spec 数值与实现默认值的口径漂移（真实发生，值得记录）
+
+- `game_state.gd` 的 `TUNING_META` 白名单四键：`base_target` 1–6、`base_time` 10–90、`time_step` 0–10、`min_time` 5–90；键不在名单=拒绝（防 URL 乱注入）；缺壳层时全局 undefined 属预期，门禁行为不受影响。
+- **口径漂移**：GameDesignSpec v1（id=cmuqkaypy002hm9bf3wnk1k26，approved）写的是 3 关 10/15/25 件、30/45/60s、连击窗口 1.5s；实现默认值是 `BASE_TARGET=4 / BASE_TIME=30 / MIN_TIME=18 / TIME_STEP=4`（每关目标 4→5、时限 30→26s）。spec 数值**没有**作为默认值落地，而是寄望试玩期经调参桥回填——playtest blocked 后未回填，两者至今不一致。
+- **结论**：工坊「spec → 实现」的数值对齐不能靠默认值拍脑袋。两条路二选一：① 实现前把 spec 数值直接落成常量默认值；② spec 数值作为 TUNING_META 默认初值，并在工程 README 记「spec 口径 = 默认值」。否则验收对不上、复盘对不齐。
+
+## 七、坑位速查表（hello 新增/复发，出问题先对号）
+
+| # | 坑 | 一句话修法 |
+| --- | --- | --- |
+| 1 | 双分支并存：工作区实际建 `hello-game-goal-*`，任务指定 `games-goal-*` | scaffold 棒把同一 commit 推两条分支保证 gitRef 存在；审计认 goal artifacts 的 gitRef |
+| 2 | routines.yaml 默认 gamePath=games/godot-coin-rush（复发） | preHookParams 显式覆盖；运维改模板默认值根治 |
+| 3 | 模板仓库技能资产落后于平台注入副本 → playtest blocked | 接入前先 diff 两份技能版本；落后先报运维 |
+| 4 | 部署 504 重发 → v1 superseded / v2 running | 判终态看 /health + app status + liveUrl 实测 |
+| 5 | `/` 308 到 `/apps/hello` 尾斜杠归一化 | curl 复核加 `-L` |
+| 6 | github.com:443 从工作区不可达（3 次重试 75s 超时） | commit 留本地分支不丢；先走平台 API（localhost）回写再补推 |
+| 7 | 碰撞余量不算就摆点 → 传送收集断言假失败 | 半宽+半径先算可达包络，摆点落在 clamp 边界内 |
+| 8 | spec 数值与实现默认值漂移 | spec 数值落成默认值或 TUNING 初值，README 记口径 |
+| 9 | 导出配置留到部署棒现场发明 | scaffold 棒按上一作先例补 preset + .gitignore 豁免 + 产物入库 |
+| 10 | 根壳残留上一游戏（单游戏位惯例） | 部署前 grep 旧游戏名清残留，apphost.toml 三键核对 |
+
+## 八、关联知识与权威来源
+
+- Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路总论（oak-key）：27407691-bcf8-4e73-b686-1bb8df684e5c
+- game-9 单游戏部署先例与调参桥 §3C：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 移动端触屏虚拟摇杆与 AudioContext 解锁规范：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- MyRD 平台真实仓库结构地图：b07a928a-414b-4d48-9535-5b6d6cc859ae
+- 仓库内权威文件（本仓可直接复用）：`games/hello/{verify.sh,export_presets.cfg,tests/smoke.gd,autoload/game_state.gd}`、`docs/playtest/hello-playtest-blocked.md`、`std-skills/godot-game-dev/scripts/`、`.myrd/routines.yaml`
+- 平台产物链：requirement=cmuqk7luz002am9bfmmkouw9v → design_spec=cmuqkaypy002hm9bf3wnk1k26 → hosted_app=cmuqk3huq001km9bf5ejp7tdg → workflow run=cmuqkb8xl002nm9bf9pz8hw61（/workflows/cmuqk3j35001qm9bfsdw4xn8d/runs/cmuqkb8xl002nm9bf9pz8hw61）→ 线上复核 assign_agent=cmto42pg60004m9aq7jczszhy
+
+## 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+# 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+> **文档定位**：固化 game-8 v2 轮手感调优的**具体数值（前后对照）**、godot-smoke 门禁表现、线上链路诊断结论与**可照抄的复测方法**，形成「手感类反馈（再大一点 / 再慢一点）」的**可复用增量调参基线**——后续同类反馈直接对照本文 §五 playbook 执行，不必重新勘探。
+> **权威基准**：需求《牛牛打游戏 game-8 · v2 手感调优：牛牛体型放大、移动速度下调》（`cmuqmej89000ym9gg6mom93o0`）；策划案 v1 设计唯一来源（doc `80b9c193-6807-43e4-b2b0-5789f2d9e35b`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）；收口依赖清单（doc `943eb5eb-0949-43fe-b939-83cf171af2a3`）。
+> **实现基线**：部署分支 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`；数值提交 `3a396355`（feat v2 手感调优）→ 产物重导出 `1089e4b` → 诊断报告 `1afec443`（`games/game-8/docs/v2-liveurl-diagnosis.md`，docs-only）；线上部署 = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`。
+> **本文数字全部为一手实测值**（git diff 实录 / curl 取证 / 线上 pck 自跑门禁），非估算。
+
+## 一、v2 数值基线（前后对照，唯一落账）
+
+| 声明键 | v1 默认 | v2 落账 | 需求量化区间 | 实际占比 | TUNING_META 钳制 |
+|---|---|---|---|---|---|
+| `PLAYER_SCALE` | 1.0 | **1.4** | 1.3~1.5× 整体放大 | 1.4× | min 0.5 / max 2.0 / step 0.05 |
+| `PLAYER_SPEED` | 220.0 px/s | **145.0 px/s** | v1 的 60~70% | **65.9%** | min 60 / max 300 / step 5 |
+
+- **唯一落账位置**：`games/game-8/autoload/game_state.gd` 数值区（v2 HEAD 实测：`var PLAYER_SCALE: float = 1.4` / `var PLAYER_SPEED: float = 145.0`）。⚠️ 策划案 v1 写的路径是 `scripts/game_state.gd`，**实际权威路径是 `autoload/game_state.gd`**（scripts/ 下并无此文件），后续引用以本文为准。
+- **接线方式**（`scripts/player.gd`）：`_apply_tuned_scale()` 把 `PLAYER_SCALE` 以**根节点 uniform scale** 应用（`is_equal_approx` 脏检查，滑杆改动下一物理帧生效），同步作用于视觉精灵、`CollisionShape2D` 碰撞体与 `PickupArea/PickupShape` 判定体；`velocity = direction * GameState.PLAYER_SPEED` 每物理帧读声明键。
+- **判定几何联动（容易算错的口径，钉死）**：`player.tscn` PickupShape 本体半径 22px → v2 缩放后 **30.8px**；收集物本体半径 14px（`collectible.tscn`）；**触发距离（圆心距）= 30.8 + 14 = 44.8px**（v1 为 22+14=36px）。刷点安全间距常量 96px 未动 → 余量从 96/36 ≈ **2.67×** 收窄到 96/44.8 ≈ **2.14×**，仍满足「重开不贴脸白捡」。commit `3a396355` 提交信息里的「判定半径 44.8px」即此**触发距离**口径，不是 PickupShape 本体半径，别混淆。
+
+## 二、godot-smoke 门禁表现（v2 断言三件套 + 全链路复跑）
+
+### 2.1 门禁复跑结果（本地与 preHook 同源，全绿）
+| 门禁步 | 结果 |
+|---|---|
+| resolve-godot.sh | exit 0，Godot **4.3.stable.official.77dcf97d8** |
+| preflight.py | **PREFLIGHT: PASS**（13 类前置一致性检查、40 个工程文件，exit 0） |
+| smoke.sh（240 帧预算） | **GODOT_SMOKE: PASS**（exit 0、零 SCRIPT ERROR） |
+| input-fuzz.sh | **GODOT_FUZZ: PASS**（seed=20260913，6 批次 239 帧，exit 0） |
+| playtest.sh | **脚本缺失**（模板仓库未预置，D2 依赖 / bug `cmuktchmy000km97z6kj3r2ro` Bug1），维持 blocked、不代写不伪造 |
+
+### 2.2 smoke.gd 新增 v2 手感断言三件套（真实机判，含 FAIL 路径，约 L423-435 `_assert_v2_tuning`）
+1. **倍率区间**：`PLAYER_SCALE ∈ [V2_SCALE_MIN=1.3, V2_SCALE_MAX=1.5]`，违例 FAIL 签名「v2 手感断言 FAIL：体型倍率 %.2f 不在 %.1f~%.1f 区间」；
+2. **移速区间**：`PLAYER_SPEED ∈ [V2_SPEED_MIN=V1_SPEED×0.6=132.0, V2_SPEED_MAX=V1_SPEED×0.7=154.0]`，FAIL 签名「移速 %.1fpx/s 不在 v1 默认 %.0f 的 60%%~70%% 区间」；
+3. **接线集成断言** `_assert_node_scaled`：Player 根节点、`CollisionShape2D`、`PickupArea/PickupShape` 三节点的全局缩放必须都等于数值区 `PLAYER_SCALE`（与难度梯度 SpawnTimer 断言同口径，防「数值键写了但没接上」）。
+
+方向符号断言（A/← 后 position.x 减小、D/→ 后增大）与 50 连击判定一致性、难度梯度、过期回收、胜负四分支、一键重开、持久化等既有契约**全部保留不动且继续通过**——玩法零回退。
+
+### 2.3 可复用结论：断言区间与需求区间硬耦合
+smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的。后续若要把数值调**跨出**这个区间，必须**三处同步**：smoke.gd 常量、需求区间条款、策划案 revisions 数值区——否则门禁会以清晰签名 FAIL（这是门禁在强制「数值变更须先改需求基线」的设计行为，**不是误报，不许放松断言来绕**）。
+
+## 三、线上链路诊断结论（liveUrl 端到端实测，2026-10-02）
+
+**结论先行**：✅ v2 已在线上生效且量化达标——部署产物自跑门禁全绿（含 v2 手感基线机判），线上资产与仓库导出逐字节一致，**无需修复、无需回滚**。
+
+1. **部署元数据**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`）；当前部署 **version 5 `cmuqny37h001ficf0mpmr71mv` status=running**；gitRef=`myrd/games-goal-cmujpml1e006rm99i9hc33huu`（未落 main ✓）；commit `1089e4b`（其上仅 1 个 docs 提交，代码零差异）；v4=`cmuqnx9v6001dicf0fmfryxcz` superseded（重试冗余但无害）。
+2. **公网链路**：`GET /apps/game-8/health` → 200 `{"ok":true,"app":"game-8","game":"牛牛打游戏","assets":"lazy/object-storage"}`；`/apps/game-8/` → 308 规范化跳转 → 200；`/gw/health` → 200（网关透传正常）；壳页 11,626B，`__GAME_TUNING__` 调参桥 ×2、`__audioDebug` 音频手势解锁器、资产全走相对路径 `fetch(BASE_PATH + 'api/public/assets/' + name)` 三契约在位。
+3. **资产文本通道**：`index.pck` base64 3,333,340B → 解码 gzip 2,513,040B；`index.wasm` base64 **10,696,408B** → 解码 35,376,909B（与门禁经验 v6 一手实测值一致）。
+4. **逐字节一致（无版本漂移）**：本地导出（部署 commit 工作树）与线上对象存储拉回解码产物 sha256 完全一致——pck `5f556ad9adf47579cb38a1fd8f7549e33b478b56cd4b3b5f112346281d699e25`；wasm `fe5cebc590758c10bc4469be5a591e28edbde5ec8f458f21baeb83db50d028b9`。
+5. **最高等级证据——部署产物自跑门禁**：`godot --headless --main-pack <线上pck> --quit-after 240 res://tests/smoke.tscn` → exit 0、零 SCRIPT ERROR、`GODOT_SMOKE: PASS`，v2 手感基线机判全过（1.4∈[1.3,1.5]，145∈[132,154]）——「牛牛变大变慢」是**产物运行期实测**，不是代码推断。
+
+## 四、复测方法（照抄即用）
+
+1. **公网探测**：`curl -s <liveUrl>/apps/game-8/health`（期望 200 + ok:true）；`curl -sI <liveUrl>/apps/game-8/`（期望 308→200）；壳页 HTML grep `__GAME_TUNING__` / `__audioDebug`。
+2. **资产一致性**：`GET /api/public/assets/index.pck`（和 index.wasm）→ base64 解码 → gunzip → `shasum -a 256`，对照 §三.4 的两个哈希；不一致即版本漂移，先查部署 commit 再谈手感。
+3. **手感数值机判**：`godot --headless --main-pack <线上或本地 index.pck> --quit-after 240 res://tests/smoke.tscn`，判定三条件（`GODOT_SMOKE: PASS` + exit 0 + 零 SCRIPT ERROR），签名中应含「v2手感基线(体型1.3~1.5x·移速60~70%)」字样。
+4. **数值速查**：游戏内调参面板或壳页 `?tuning=1` URL 直接查看当前声明键值；或读 `games/game-8/autoload/game_state.gd` 数值区。
+5. **环境备注**：诊断沙箱对 github.com:443 直连超时（`Recv failure`），推送改走 `ssh.github.com:443` 通道——后续同环境取证直接用此通道，别反复试直连。
+
+## 五、「再大一点 / 再慢一点」类反馈的增量调参 playbook（可复用基线）
+
+**标准链路（全七步，禁止散点改代码对数值）**：
+调参入口（游戏内面板滑杆即时生效 / 壳页 `?tuning=` URL）→ 确定目标声明键与新值 → **经策划案 revisions 回写 `spec.numeric`**（doc `80b9c193-…`，spec 载体即该知识文档）→ 改 `autoload/game_state.gd` 数值区 → 复跑 godot-smoke 门禁 → 重导出 Web 产物并部署（gitRef 必须是 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`）→ 按本文 §四产物自跑门禁复测。
+
+**建议步长与边界**：
+| 反馈 | 动作 | 步长建议 | 边界 |
+|---|---|---|---|
+| 再大一点 | `PLAYER_SCALE` ↑ | +0.05~0.1 / 档 | 钳制 [0.5, 2.0]；跨出 [1.3,1.5] 须按 §2.3 三处同步 |
+| 再小一点 | `PLAYER_SCALE` ↓ | −0.05~0.1 / 档 | 同上；低于 1.3 同样触发门禁 FAIL |
+| 再慢一点 | `PLAYER_SPEED` ↓ | −5~15 / 档 | 钳制 [60, 300]；跨出 [132,154] 须三处同步 |
+| 再快一点 | `PLAYER_SPEED` ↑ | +5~15 / 档 | 同上 |
+
+**每次调整必做的三项联动复核**：
+1. **断言区间一致性**（§2.3）：数值是否跨出 smoke 常量带；
+2. **判定几何余量**：体型↑ → 触发距离 = 22×scale + 14 线性放大 → 96px 刷点间距余量 = 96/触发距离 收窄；低于 2× 时须复核刷点安全间距常量是否要同步上调（公平性属门禁议题，不许靠放松断言解决）；
+3. **达成余量**：移速↓ → 单位时间可达刷点数↓ → 60s/20 目标的通关可达性须复核（跑 50 连击一致性 + 全链路一条龙断言兜底；v2 @145px/s 已实测可通关）。
+
+**回滚口径**：v1 = `PLAYER_SCALE 1.0` / `PLAYER_SPEED 220.0`，两键均可在调参面板或 `?tuning=` URL 直接调回，代码零改动。
+
+**主观手感的最终裁决**：数值区间内「像不像用户要的手感」机器判不了，仍以 D3 用户试玩结论为准（入口 `…/apps/game-8?tuning=1` 已可用）；未决依赖 D1（iOS Safari 真机）/ D2（playtest.sh 模板资产）见收口清单 doc `943eb5eb-…`。
+
+**来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
+
+
+## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+# game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+> 来源：需求《测试连点防重的极简计数页（game-12）》（id=cmur8x93r0016icbsd90s6e60，goal=cmur8pnhn000kicbsvl0eoqx6）走完「录入需求 → 判定规则调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-12`（Godot 4.3.stable），分支 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`（scaffold e055e4f → implement ff779d0 → deploy c54fcc9/078f761/e5b292e → playtest 1f7a4a3）。线上：https://leomac-studio.tail49399e.ts.net/apps/game-12/（/health 200 `{"ok":true,"app":"game-12"}`，deploymentId=cmurba8yd001vicbsfdl79x8l，部署 commit c54fcc9）。门禁终态：**godot-smoke 全绿 + mobile-web-smoke PASS 10/10（实测 FPS 39）**，playtest 棒复跑双门禁结论一致。
+>
+> 本文只写 game-12 的增量结论：防重语义选型与实现契约、双门禁通过路径、踩坑清单与复用清单。门禁三层体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-9 增量见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be；移动端触屏摇杆与 AudioContext 解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；防重判定规则 R1–R6 / 事件契约 C1–C4 调研全文见项目文档库 id=8345388c-cf30-4d7c-8413-39ccd7e65887。互为补充、不重复。
+
+## 一、防重语义选型：只有「固定节流（采纳即锚定、拦截不延窗）」能同时过验收 2 和 3
+
+| 方案 | 机制 | 300ms 内连点 5 次 | 窗口后恢复累加 | 结论 |
+| --- | --- | --- | --- | --- |
+| **固定节流（首击入窗）** | 首击计数并锚定窗口；窗口内后续点击全拦且**不更新锚点** | 仅 +1 | 正常 | 采用 |
+| 防抖（末击重启窗口） | 每次点击都重置窗口，静默期满才计 | 0 次 | — | 违背验收 2 |
+| 首尾折叠 | 窗口首末各计一次 | +2 | — | 违背验收 2 |
+
+**最易写错的一行**：被拦截的点击不得触碰窗口锚点 `_last_count_ms`。一旦拦截分支也更新它，节流就退化成防抖——持续点击下计数永远不涨，验收 3 永远不过。
+
+实现（`games/game-12/autoload/game_state.gd`，时间注入纯函数，核心约 15 行）：
+
+```gdscript
+const TARGET_COUNT: int = 10
+const DEBOUNCE_MS: int = 300
+var _last_count_ms: int = -DEBOUNCE_MS   # 初值 = -窗口 → 开局首击立即有效
+
+func try_count(now_ms: int) -> bool:
+    if state != State.PLAYING:
+        return false                      # 已胜：忽略，不报错
+    if now_ms - _last_count_ms < DEBOUNCE_MS:
+        click_rejected.emit(DEBOUNCE_MS - (now_ms - _last_count_ms))
+        return false                      # 拦截：只发反馈信号，不动锚点
+    _last_count_ms = now_ms
+    count += 1
+    count_changed.emit(count)
+    if count >= TARGET_COUNT:
+        state = State.WON
+        state_changed.emit(state)
+    return true
+
+func reset() -> void:
+    count = 0
+    state = State.PLAYING
+    _last_count_ms = -DEBOUNCE_MS         # 重开同步清防重锚点 → 首击立即有效
+```
+
+三个不能省的细节：
+1. `_last_count_ms` 初值取 `-DEBOUNCE_MS`，否则开局第一击被吞（验收 1 首点即错）。
+2. `reset()` 必须同时清防重锚点——「刷新/重开无残留」包含防重状态本身。
+3. 拦截不静默：`click_rejected(remaining_ms)` 把「被吞的点击」变成可感知反馈（按钮闪红 + 状态栏「连点已拦截，还需 Nms」）。且关键反馈不能被高频更新覆盖——状态栏曾把指针坐标与拦截提示混在一行，坐标每物理帧刷新把「还需 Nms」冲掉，拆成反馈线/指针线两行才保住。
+
+时间注入是机判前提：`try_count(now_ms)` 不读时钟 → 无头冒烟可用合成时间戳逐毫秒断言（完全确定、与帧率零耦合）；只有真实点击路径才走 `Time.get_ticks_msec()`。
+
+## 二、单源单相：三个入口汇一个判定点，防「一次触碰计两次」
+
+Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`（调研已核实）→ 移动端一次触碰可能产生 touch/mouse 双事件，再加键盘空格/回车，同一「点击」有四个来源。game-12 的收敛方式：
+- `CountButton.pressed`（鼠标/触摸）与 `_unhandled_input("confirm")`（键盘/动作）都只调唯一入口 `_attempt_count()` → `GameState.try_count(...)`。防重判定只在 GameState 一处，不可能被绕过。
+- `TouchConfirmButton`（TouchScreenButton）**不直接调游戏逻辑**，而是 `Input.parse_input_event(InputEventAction("confirm"))` 注入动作 → 触摸与键盘走完全相同路径（顺带获得桌面端自动不响应的免费屏蔽）。热区用 shape 圆（半径 44）而非位图。
+
+## 三、把「防重」机判成确定性断言（附负例验证纪律）
+
+冒烟相位设计（`games/game-12/tests/smoke.gd`）：
+- **合成时间戳断言防重**：t0 有效；t0+100/200/299ms 连点全拦、只发 click_rejected、count 不变；跨窗后再点正常 +1。
+- **真实路径另测**：真实点击受真窗口约束 → 相位间显式等真实时间跨窗，并设帧数上限守卫（60fps 约 2s，超限报 `Engine.max_fps` 异常而非挂死）。
+- **噪声后复位**：乱键相位可能真触发计数/拦截，且末次乱键可能贴着 confirm 注入点不足 300ms → 进断言前 `GameState.reset()` 清锚点，消灭偶发失败。
+- **每条断言做负例验证**（证明会真 FAIL，不是永真）：热区 44→10、宽高比 keep→expand、脉冲阈值抬到 1.0，三次均如预期 FAIL。
+
+两个「静默漏判」陷阱（负例不触发才发现）：
+1. 静态几何断言放 `_ready()`：此时 `Control.size` 恒为 0，整段断言被静默跳过 → 移到第一物理帧再读。
+2. Button 有主题最小尺寸保护：`offset_right=110` 实际 size 被钳到 115，44px 负例测不出来 → 换 TouchScreenButton 圆形热区做负例。
+
+极简静止页的门禁特异问题：mobile 门禁「画面在动」检查会把完全静止的页面误判为渲染冻结。解法：+1 按钮加待机呼吸脉冲（scale 1.00→1.06 / 0.9s，实测极差 0.060 ≥ 阈值 0.02），一举两得——既是移动端可点示能，又是确定性的非零帧差证据。缩放绕 `pivot_offset`（控件中心），否则动画往右下飘。
+
+画布口径：调研建议设计宽 375 + Adaptive；实现落成 720×1280 竖屏 + `canvas_items`+`keep`（+1 按钮 560×240，375 宽实机约 291px），同样满足无横滚与 ≥44px。机判锚点是**宽高比策略必须 keep**（expand 会被冒烟断言拦，负例已验证）。
+
+## 四、Godot Web 双门禁：分工、顺序与标记辨析
+
+| 门禁 | 判定链 | 拦什么 | game-12 实测 |
+| --- | --- | --- | --- |
+| **godot-smoke** | resolve-godot → preflight.py（13 类静态一致性）→ headless smoke（`GODOT_SMOKE_FRAMES=240`，断言退出码 0 + `GODOT_SMOKE: PASS` 标记 + 日志无 SCRIPT ERROR）→ input-fuzz（seed=20260913，6 批/239 帧） | 游戏本体「跑得动且玩得动」（含防重/恢复/胜负/重开/触控目标/拉伸契约断言） | 四步全 exit 0 |
+| **mobile-web-smoke** | mobile-web-smoke.mjs --url <liveUrl>（headless Chrome 390×844 iPhone 仿真）10 项：网络全通/console 零错/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约（__audioDebug）/无横溢（scrollWidth=390）/FPS≥8（实测 39） | 部署后真实链路上的移动端可玩性 | PASS 10/10 |
+
+三条纪律：
+1. **mobile-web-smoke 必须打部署后的 liveUrl**——本地静态伺服 export/web 只能当预检（implement 棒做过 10 项预检），不能替代正式门禁：M1 网关、对象存储资产通道、壳契约只在真实链路暴露。所以它位于 deploy 之后，是产物验证而非 implement 棒门禁。
+2. **标记辨析**：判定脚本 stdout 是小写 `godot-smoke: PASS`，引擎日志里才是大写 `GODOT_SMOKE: PASS`（smoke.sh 内部 grep 大写标记后才自产小写行）。只 tail 游戏日志看不到大写标记不等于失败——先分清两层标记再下结论。
+3. **证据随仓库归档**：`games/game-12/qa/mobile/report.json` + phase-load/tap/joystick 三张截图入库，供复跑比对。
+
+## 五、部署链五个真实踩坑（每个都在本目标发生过）
+
+1. **`.gitignore` 里 `/export/` 不删 = 部署后全 404**：apphost.toml 的 `assets_dir` 指向 `games/game-12/export/web`，导出产物不入库则 wasm/pck 上线即丢。导出产物必须入库（37MB wasm 走底座 A「资产出 bundle」+ 对象存储懒加载 + `/api/public/assets/` b64 文本通道，总论见 27407691）。
+2. **apphost.toml 沿用上一游戏**：原值指向 candy-crush 的 `games/game/export/web`；构建管线按 gitRef 读它，不改会打包错应用 → `name`/`assets_dir` 随游戏改是 deploy 棒第一查。
+3. **gitRef 必须是目标分支不是 main**：本次 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`。注意本地工作区克隆出的分支名可能与远端目标分支不同名同指针（`myrd/game-12-goal-…` vs `myrd/games-goal-…`）→ 部署前 fetch + 显式切到目标分支再读 apphost/导出。
+4. **壳页三件套缺一不可**（`server/src/game-page.ts` / `games/game-12/export/web-shell.html`）：品牌文案适配（曾残留糖果粉碎传奇文案）；§3C 调参桥（引擎加载前解析 `?tuning=` → `window.__GAME_TUNING__`，只认对象形态、非法 JSON 静默忽略——game-12 缺，补约 8 行）；音频手势解锁器 + `window.__audioDebug`（即 mobile 门禁「音频解锁契约」的机判对象）。壳页另配 `overflow:hidden + touch-action:none` + `user-scalable=no`：彻底禁双击缩放/滚动，快速二连点不被浏览器手势吞掉造成防重误判（比调研建议的 `touch-action: manipulation` 更强）。
+5. **PATCH 目标 artifacts 是整体替换数组**：回写产物必须 get→append→写回（playtest 棒 3→4 条、既有条目原样保留 + 回读校验），直接 put 会抹掉前序产物。
+
+调参语义澄清：`TUNING_META` 未声明时 `?tuning=1` 是**安全 no-op**（正常进游戏、忽略键）。game-12 有意不把 `DEBOUNCE_MS=300` 做成可调——它是需求验收项本身，spec 是唯一事实源。要开放浏览器内调参需下一轮：spec.numeric 声明键 → TUNING_META + tuning_panel.gd + 冒烟断言 → 重导出重部署重跑 mobile 门禁。
+
+## 六、macOS 自带 bash 3.2 的全角括号坑
+
+`verify.sh` 里 `$FRAMES）`（全角右括号紧贴变量名）在 macOS bash 3.2 某些 locale 下把多字节字符并入变量名 → `FRAMES: unbound variable`，而上一行 echo 还能正常展开，极难定位。写法统一 `${FRAMES}`，用 `bash -x` 抓现行。game-12 修复后 verify.sh 端到端全绿（preflight/smoke/fuzz 全 exit 0）。
+
+## 七、如实上报的缺口（未绕过、未伪造）
+
+1. **playtest.sh 不在模板仓库**（`std-skills/godot-game-dev/scripts/` 同目录 9 个判定/驱动脚本中独缺它）：各节点均未自造等价判定器、未伪造 `GODOT_PLAYTEST: PASS`；`.myrd/routines.yaml` 两条 routine（godot-smoke / mobile-web-smoke）均不引用它 → 不阻塞双门禁，缺口随产物 detail 上报运维补资产。
+2. **真机抽查未做**（本环境建不了 iOS 会话）：mobile-web-smoke 是 headless Chrome 仿真，触摸结论的边界是仿真环境；真机验证留待用户试玩回填。
+3. **试玩结论只能来自用户**：playtest_kit 已交付（`games/game-12/qa/playtest-kit.md`，试玩指引 + 反馈对照表 + 四问量表），量表待回填，未代填任何「好玩/通过」结论；未收到用户调参 URL 前，无 spec revisions/approve 调用。
+
+## 八、复用清单（后续点击类小游戏直接抄）
+
+1. 防重抄 `try_count(now_ms)` 签名：时间注入纯函数 + 初值 `-DEBOUNCE_MS` + 拦截不动锚点 + reset 清锚点 + 拦截发 remaining_ms。
+2. 输入抄「单源单相」：所有入口 → 唯一 `_attempt_count()`；TouchScreenButton 注入 InputEventAction 而非直调逻辑。
+3. 断言抄四件套：合成时间断言 + 真实路径跨窗等待 + 噪声后 reset + 每条断言负例验证；几何断言放第一物理帧，44px 负例用 TouchScreenButton 热区。
+4. 静止页记得待机脉冲（≥0.02 极差同时换「画面在动」绿与可点示能）。
+5. 部署抄「五查」：gitignore 的 /export/、apphost.toml 指向、gitRef=目标分支、壳三件套（文案/调参桥/音频解锁）、artifacts 回写 get→append→写回。
+
+关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
+
+## 沉淀 game-14 Godot Web 导出与移动端门禁经验
+
+> 来源：goal cmusp1rab0028ic7q9shcdzyl（项目 cmusp1ra00022ic7qnk18nofm）「小游戏工坊 · game-14」工作流执行沉淀。上游输入：需求《game-14 太空飞船躲陨石捡金币》（cmusphfbp0062ic7qrxlt2nk4）、GameDesignSpec v1（cmuspm7sm006uic7qzrbqyilp，approved）。工作流 run cmuspmlex0072ic7qnjiqxmpc **真实结局 = failed，且失败于工作区准备阶段，四个节点全部 pending**。本卡如实记录本轮真实结论（失败模式与补救路径），并把 game-14 真正进入开发后要带上的导出/门禁契约收拢成清单（引用既有基线、不重复）。**本轮没有产生任何 game-14 代码、导出产物、门禁判定或部署事实——请勿把本卡第 4~6 节的复用清单误读为 game-14 实测数据。**
+
+## 一、本轮真实结局：准备阶段 git clone 失败，门禁与导出根本未执行
+
+- 时间线：run 创建 2026-10-03T18:12:57Z → failed 2026-10-03T18:15:25Z（存活 2 分 28 秒）；prepSteps 仅「解析模型配置 3ms」；失败点 = preparationPhase「正在准备代码工作区（克隆仓库、拉取最新代码）」。
+- run.result.error 逐字：`git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmusp1ra00022ic7qnk18nofm/run-cmuspmlex0072ic7qnjiqxmpc'... fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75009 ms: Couldn't connect to server`。
+- 节点状态：脚手架 / 实现玩法 / 导出并部署 / 试玩验收 全部 pending；implement 与 deploy 的 godot-smoke preHook、playtest 的 mobile-web-smoke preHook 也均 pending——**门禁一次都没跑过，不存在「门禁打回」**。
+- 复盘纪律：「已启动 ≠ 已成功」在本轮的具体形态就是「run 状态 failed + 节点全 pending」；判定真实结局唯一依据 run 状态与 run.result.error，禁止凭预期脑补「门禁打到第几轮」。
+
+## 二、根因分类与补救：环境不可用 ≠ 代码缺陷，正确动作是重跑而非改代码
+
+- 根因：github.com:443 连接 75 秒超时（connect 阶段即失败，非认证/仓库问题），属瞬时网络故障——与 godot-smoke 退出码 2「环境不可用」同层语义：**禁止为它改游戏代码，更不允许宣称门禁失败**。
+- 恢复复核（2026-10-04）：`curl https://github.com` → 200（0.59s）；`git ls-remote https://github.com/hl3w22bupt/myrd-playground.git` 正常返回分支列表 → 复跑条件已具备。
+- 补救动作：`POST /api/v1/workflows/runs/cmuspmlex0072ic7qnjiqxmpc/rerun`（平台手册 rerun 入口）。DAG 输入不变：需求 cmusphfbp0062ic7qrxlt2nk4 + spec cmuspm7sm006uic7qzrbqyilp（v1 approved）仍是唯一权威。
+- 若同签名（clone exit 128 / 443 connect timeout）复现：先做宿主机连通性探针（curl github.com + git ls-remote），如实按「环境不可用」上报等待恢复；不得降级为纸面交付，也不得空转烧修复预算。
+
+## 三、game-14 工坊流水线契约（经本轮 run 定义实测核实）
+
+- 四棒 DAG：脚手架 scaffold → 实现玩法 implement → 导出并部署 deploy → 试玩验收 playtest；仓库 github.com/hl3w22bupt/myrd-playground（game-14 预期落位 `games/game-14`，以 scaffold 实际产物为准）。
+- 门禁挂点：**implement、deploy 两棒都挂 godot-smoke；playtest 挂 mobile-web-smoke**。routine 均 gate:false、由 preHook 显式引用；`{{liveUrl}}` 无默认值 = fail-closed（不传就报错，不会静默跳过门禁）；`{{gamePath}}` 必须经 preHookParams 显式传参（默认值指向不存在工程的坑见 27407691 §1.3）。
+- 判定资产唯一来源：仓库 `std-skills/godot-game-dev/scripts/`（mobile-web-smoke 判定脚本 mobile-web-smoke.mjs + 负例自测 mobile_smoke_selftest.mjs + routine 片段模板已随 commit 4a8e4b76 落地）；被检工程不得自造判定器，scaffold 只校验不自造。
+
+## 四、game-14 验收标准 → 门禁断言映射（approved spec v1 的可机判数值）
+
+| 验收项 | spec v1 锚点 | 机判断言落法 |
+| --- | --- | --- |
+| 难度阶梯 | 陨石生成间隔 950ms 逐档递减至封顶 430ms、下落速度 130px/s 逐档递增至封顶 270px/s，共 5 档（每 100 分一档） | 冒烟分相位读各档生成间隔/单位位移帧数，断言逐档单调变化且封顶后不再变化；档位边界按得分 100/200/300/400 推导写进断言注释 |
+| 状态机与持久化 | 开始（含操作说明）/进行中/暂停恢复/游戏结束/一键重开五状态；最高分 localStorage 键 `game14.highScore` | 状态标志断言；重开后断言分数清零而最高分保留；localStorage 属线上行为，由 mobile-web-smoke 打 liveUrl 验证 |
+| 操控与边界 | 键盘 ←→/A/D（含上下）+ 触摸拖动，飞船不可越出画布 | E-08 纪律：按住方向键测位移与动作注入分帧做；越界 clamp 断言；触摸拖动必须真实改变飞船目标位置（mobile 门禁 touch-response 预修，见 §六） |
+| 计分与生命 | 拾金币 +10 实时显示；撞陨石 −1 命（共 3 命），命尽进游戏结束页并展示本局得分 + 历史最高分 | 拾取/碰撞事件计数断言；连续碰撞或生命归零路径必须可达并断言 GAME_OVER |
+| 视听契约 | 三层星空视差滚动；碰撞爆炸闪烁 + 300ms 震屏 + 1.2s 无敌闪烁；+10 飘分 | 事件标志/帧差断言；无敌期 = 「碰撞不再扣命」的断言窗口 |
+| 音频契约 | coin-pickup / meteor-explosion / game-over 三 SFX 可编程触发；M 键静音且不影响逻辑 | headless 侧编程触发断言；AudioContext 解锁契约（__audioDebug）归 mobile-web-smoke 第 8 项 |
+| 性能 | 连续游玩 60s 帧率 ≥ 30fps；页面无控制台报错 | **阈值辨析：mobile-web-smoke 的 FPS≥8 是底线门禁，≥30fps 是需求验收线——门禁全绿 ≠ 验收达标，验收仍按 spec 执行** |
+
+## 五、复用基线指针（执行时直接带上，本卡不重复其内容）
+
+- **27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 总论）**：Godot 4.3 Web 导出参数基线（`variant/thread_support=false` 免 COOP/COEP、`canvas_resize_policy=2`、中文必须 theme/custom_font=P13、导出 7 件套与 wasm≈35MB 量级）；AppHost 部署契约（**一游戏一清单**——game-14 必须 `name="game-14"`、`assets_dir="games/game-14/export/web"`，绝不沿用他游戏 apphost.toml；部署 gitRef 必须是部署分支 `myrd/games-goal-<goalId>` 不是 main；`/export/` 产物必须入库否则上线全 404；M1 网关拦二进制 → gzip+b64 文本回传；壳内资源全走相对路径）；godot-smoke 三层门禁与退出码语义 0/1/2/3；error-signatures 修复循环纪律；部署终态独立复核四步。
+- **00314649-c4d2-407c-871b-62f7de91b07d（game-12）**：mobile-web-smoke 10 项明细（网络/console/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约/无横溢/FPS≥8）与「必须打部署后 liveUrl」纪律（本地静态伺服只能当预检）；标记辨析（判定脚本 stdout 小写 `godot-smoke: PASS` vs 引擎日志大写 `GODOT_SMOKE: PASS`）；证据随仓归档（`games/<game>/qa/mobile/report.json` + phase 截图）。
+- **82e419bb-b641-4b5e-bb58-d8b9633169ca**：移动端触屏虚拟摇杆与 AudioContext 解锁三件套（首手势解锁 + 解锁前记账 + 退后台回来再解锁），壳页与游戏侧都要进。
+- **36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）/ 78180e88-6486-404e-9265-e315e0da3c66（hello）**：同系列工程结构、模板与门禁增量结论。
+
+## 六、mobile-web-smoke 已知失败图谱（5 款游戏实测 → game-14 预修清单）
+
+仓库 mobile-gate 系列实测 verdict（commits 11957bd3~585db60c）：game-3 疾风忍者跑 **PASS**（十项全绿，tap 触发跳跃实证触摸驱动玩法）；game-2 星尘收集者 FAIL（console Godot 缺 cfg 告警 + tap 后零帧差）；game-4 光路谜阵 FAIL（tap 落空格零帧差，探针坐标与 letterbox 棋盘错位）；game-9 推箱子 FAIL（探针落点错位，摇杆实际 CSS(44,502)）；game-10 天天酷跑 FAIL（tap 落横带无响应，尚需探针区分「点按开始未实现」与「落点错位」）。
+
+- 主失败源集中在 **touch-response**，两类根因：①游戏触摸未真正接入玩法状态（UI 自称支持触摸但点按无效）；②探针坐标与画布 letterbox/控件 CSS 实际位置错位（屏幕坐标 ≠ 游戏坐标）。
+- game-14 预修清单：触摸拖动直接改飞船目标位置并与键盘同路径（game-12「单源单相」范式：多输入源汇一个判定入口）；可交互热区 ≥44px，避免依赖 letterbox 偏移的绝对坐标；开始页不要做成纯静止层（会触发「画面在动」误判，game-12 用待机呼吸脉冲拿到确定性非零帧差）；音频解锁契约随壳页一并实现。
+- 证据纪律：verdict 逐字进 commit message + report.json + phase-load/tap/joystick 三截图入库，供复跑比对。
+
+## 七、关联知识与权威来源
+
+- 知识卡：27407691-bcf8-4e73-b686-1bb8df684e5c（导出+门禁+AppHost 总论）、00314649-c4d2-407c-871b-62f7de91b07d（双门禁与 mobile-web-smoke 10 项）、82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏/音频解锁）、36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）、78180e88-6486-404e-9265-e315e0da3c66（hello 工坊）、b07a928a-414b-4d48-9535-5b6d6cc859ae（平台仓库结构与路径陷阱）。
+- 仓库权威文件：`std-skills/godot-game-dev/scripts/{smoke.sh,preflight.py,input-fuzz.sh,resolve-godot.sh,mobile-web-smoke.mjs,mobile_smoke_selftest.mjs}`、`std-skills/godot-game-dev/references/{godot-smoke-routine.md,mobile-smoke-routine.md,error-signatures.md}`、`.myrd/routines.yaml`。
+- 平台事实源：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`（rerun 入口、「已启动 ≠ 已成功」纪律）；工作流 spec 与需求以平台登记产物为准。
+
+
+## 沉淀知识：Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+# Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+> 来源：目标「森林收集水果限时赛」（goal=cmuspb558003tic7qwgyd02c2）的小游戏工坊流水线（workflow=cmuspb55m003xic7q9o18vjk2 v1，scaffold→implement→deploy→playtest）首轮执行（run=cmuspld10006ric7qup55soew，2026-10-03T18:12:00Z 起、18:14:30Z 判 failed）。固定参数：工程 games/60-2，功能分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2，AppHost cmuspb3xg003ric7q1ksya6c3（slug 60-2），liveUrl https://leomac-studio.tail49399e.ts.net/apps/60-2/（部署前即确定）。本文只写本轮实测增量：①双门禁在 60-2 的挂点与分工；②本次 run 的真实卡点——双门禁之前的第一堵墙；③一次「参数漂移」疑云的证伪过程；④知识沉淀节点自身的 API 事实。godot-smoke 三层门禁体系、打回修复签名表、AppHost 部署总论见关联知识（§八），不重复。
+
+## 一、结论速览
+
+| # | 要点 | 结论 | 依据 |
+| --- | --- | --- | --- |
+| 1 | 双门禁分工 | 工程门（godot-smoke，挂 implement 与 deploy 之前，判工程本体）×线上门（mobile-web-smoke，只挂 playtest 之前，判公网 liveUrl）——判定对象、执行环境、证据落点都不同，不可合并为一道 | 工作流定义逐节点核对 |
+| 2 | 本次失败层级 | run 级失败发生在**门禁之前**：工作区 git clone 连不上 github.com（443 端口 75s 连接超时），四个节点全部 pending，双门禁一次都没执行 | run.result.error 原文 |
+| 3 | 根因定性 | 环境阻塞，非代码/配置缺陷：github.com 从执行机**持续性**不可达（2026-10-03 run 失败 + 2026-10-04 复测 `curl -m 10 https://github.com` 仍超时，连接建立不了） | run 错误 + 本机复测 |
+| 4 | 重跑纪律 | 网络不通时重跑 run = 空烧：先 `curl -m 10 https://github.com` 验连通（10 秒成本），通了自己重跑（工作流定义无需改动），持续不通按「blocked 比空烧有用」上报运维（代理/镜像），禁止为绕过网络改仓库来源 | 本轮 2.5 分钟烧掉一次 run 的直接教训 |
+| 5 | 工作流定义健康度 | 60-2 四节点参数已逐一核对**全部正确**指向 games/60-2 / 60-2 分支 / 60-2 AppHost / 60-2 liveUrl，不存在「模板实例化只替换了首个节点」的漂移 | 8 个关键词 × 4 节点计数复核 |
+| 6 | 沉淀 API 事实 | 本部署**没有** `/api/v1/knowledge/search`（404）；等效做法与写入契约见 §七 | 本次实测 + 平台源码 src/routes/knowledge.ts |
+
+## 二、60-2 双门禁挂点与分工（逐节点实例核对）
+
+| 节点 | preHook | preHookParams | 判定对象 | 证据落点 |
+| --- | --- | --- | --- | --- |
+| scaffold | 无 | — | 资产存在性自检（门禁脚本/routines.yaml/模板，缺失→blocked） | 节点 detail |
+| implement | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（静态一致性 + 无头运行） | 门禁日志 |
+| deploy | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（部署前再拦一次，防止部署带病产物） | 门禁日志 |
+| playtest | mobile-web-smoke | gamePath=games/60-2, liveUrl=https://leomac-studio.tail49399e.ts.net/apps/60-2/ | **线上公网 liveUrl**（headless Chrome 移动仿真） | games/60-2/qa/mobile/（report.json + 分阶段截图） |
+
+要点展开：
+
+1. **工程门挂两道、线上门只挂一道，是有意设计**：godot-smoke 的判定对象是仓库内工程（preflight 静态 + headless 运行），所以在写代码（implement）和出产物（deploy）两处都要拦；mobile-web-smoke 的判定对象是已部署的线上地址，只有 playtest（试玩验收）消费它，且 liveUrl 在部署前就已锁定，preHook 可以在节点启动前先跑门禁、节点启动后直接读证据。
+2. **判定协议（与门禁同源，agent 本地自检命令完全一致）**：退出码 `0` 且日志含标记才算通过——`GODOT_SMOKE: PASS`（冒烟）/ `GODOT_FUZZ: PASS`（fuzz）/ `GODOT_PLAYTEST: PASS`（机器人试玩）；退出码 `2` = 环境不可用（装环境/上报，**禁止为过门禁改判定脚本或改松断言**）。
+3. **判定器独立性**：`preflight.py / smoke.sh / input-fuzz.sh / playtest.sh / resolve-godot.sh / mobile-web-smoke.mjs` 唯一合法来源是仓库 `std-skills/godot-game-dev/scripts/`（模板仓库预置）；平台注入的 `.myrd-platform/.claude/skills/godot-game-dev/` 只是阅读副本，不得当判定来源、不得现场改写、不得自造等价脚本——被检方自己写判定器，PASS 一文不值。缺任何一个 → status=blocked 上报（「模板仓库未预置门禁脚本：<文件名>；请运维补模板仓库」），**不要现场补**。
+4. **参数化必须显式传**：`.myrd/routines.yaml` 中 `godot-smoke` 与 `mobile-web-smoke` 的 `{{gamePath}}`/`{{liveUrl}}` 由工作流节点 preHookParams 按工程覆盖。仓库默认值指向别的工程——不传参要么报错、要么（更糟）静默测错工程给出假 PASS（坑实录见关联知识 27407691 §1.3）。
+5. **中文字体是 preflight P13 的拦截项**：Web 导出跑在浏览器沙箱里拿不到系统字体，模板自带 `assets/fonts/` 全局中文字体与 `project.godot` 的 `[gui] theme/custom_font` 配置必须原样保留；「有中文文案但无字体」直接被 P13 拦下。禁止为躲缺字把文案英化——那是字体缺失的症状，不是修复。
+
+## 三、本次 run 的真实卡点：双门禁之前的第一堵墙
+
+**时间线**：18:12:00 run 启动 → 引导阶段执行工作区 `git clone https://github.com/hl3w22bupt/myrd-playground.git` → 75 秒连接超时 → 18:14:30 run 判 failed。错误原文：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspb3xd003nic7qm25pu8si/run-cmuspld10006ric7qup55soew'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75003 ms: Couldn't connect to server
+```
+
+**为什么门禁体系没接住**：门禁全部挂在**节点**上（preHook），而 clone 是 run 引导步骤，发生在第一个节点之前。clone 失败的后果是：①直接置 run=failed（result.error），②四个节点永远 pending，③没有 reject 打回循环、没有 blocked 语义、没有证据落点——门禁体系（preflight/smoke/fuzz/playtest/mobile-web-smoke 六个判定器）覆盖的是「工程与线上」，不覆盖「工作区引导」这第 0 步。
+
+**连锁依赖链**（为什么这一断全断）：clone 可用 → 功能分支可推送 → AppHost 按 gitRef 拉取构建 → liveUrl 可访问 → mobile-web-smoke 有东西可测 → 试玩验收有地方可玩。第 0 依赖断了，双门禁与验收全部空转。
+
+**恢复路径（给下一轮执行，按序）**：
+
+1. 先验连通（成本 10 秒，避免空烧一次 2.5 分钟的 run）：`curl -s -o /dev/null -m 10 -w "%{http_code}" https://github.com`；
+2. 通了 → 直接重跑工作流，**定义无需任何改动**（四节点参数已核对全部正确，见 §四）；
+3. 持续不通 → 不要重跑，回写 status=blocked 上报运维（网络代理 / GitHub 镜像 / 出网白名单），写清「clone github.com:443 连接超时，全链被第 0 依赖阻塞」——与门禁「退出码 2 = 环境不可用，禁止为过门禁改代码」是同一条纪律的 run 级推广：**环境不通时，重跑是空烧，先修环境或如实上报**；
+4. 禁止为绕过网络私自换镜像仓库/改 remote——仓库来源是部署与门禁的信任锚，变更必须走运维。
+
+## 四、诊断方法论：一次「模板参数漂移」疑云的证伪
+
+**现象**：核对工作流定义时，scaffold 节点参数正确指向 games/60-2，而读到的 implement/deploy/playtest 节点 prompt 里满是上一个游戏 app-2 的固定参数（gamePath=games/app-2、分支 cmuspfeyw…、AppHost cmuspfdr…、liveUrl /apps/app-2/）→ 一度形成高价值假设：「工作流模板实例化只替换了首个节点的参数」。
+
+**证伪过程**：换独立文件名重新拉取同一工作流，对 8 个关键词（games/60-2、games/app-2、两个 goal id、两个 liveUrl、两个 AppHost id）× 4 节点逐一计数——**四节点全部正确指向 60-2**。真因：诊断用的 `/tmp` 共享临时文件被本机并发进程覆盖，中间那几步读到的其实是另一个工作流（app-2）的同名缓存文件。
+
+**沉淀三条**：
+
+1. 结论必须落在「重新独立取证」上，不落在「上一次读到的内容」上——尤其对「上游模板缺陷」这类会被写进知识、触发他人返工的高价值指控，先证伪再落笔；
+2. 诊断脚本对临时文件用唯一文件名（本次 `/tmp/wf.json` 与并发工作流进程撞名），或直接管道内消费不落盘；
+3. 证伪本身也是产出：本文档差点把一个不存在的平台缺陷写成结论，§一第 5 条的「定义健康度」结论就是证伪的成果，它让下一轮可以放心直接重跑。
+
+## 五、Web 导出与 AppHost 部署：60-2 落位值与硬约束清单
+
+机制细节与打回修复总论见关联知识 27407691（oak-key 全链路）与 82e419bb（触屏/音频），本节只列 60-2 的具体落位值和逐项易错点：
+
+| 项 | 60-2 落位值 | 易错点（违反后果） |
+| --- | --- | --- |
+| 部署来源分支 | myrd/games-goal-cmuspb558003tic7qwgyd02c2 | gitRef 传 main → main 上没有本游戏的 apphost.toml/导出产物，构建失败或把别的壳部署出去 |
+| 部署 API | POST /api/v1/apphost/apps/cmuspb3xg003ric7q1ksya6c3/deployments，mode=bundle | sourceId 必须是 goal id cmuspb558003tic7qwgyd02c2；带别的应用 id → 403 APP_BOUND_TO_OTHER_SOURCE（选错坑，回来核对 hostedAppId，不要换坑硬试） |
+| 导出预设 | games/60-2/export_presets.cfg 配 Web(HTML5)，产物落 games/60-2/export/web/（必须含 index.html） | 缺 index.html → 壳无入口页 |
+| 资产出 bundle | apphost.toml 声明 `assets_dir = "games/60-2/export/web"`，平台把该目录上传对象存储，25MB 上限不再约束资产体积 | 不声明 assets_dir → 产物挤进 bundle，体积立刻顶 25MB 上限 |
+| 壳资产路由 | asset-store `getAsset` 懒加载，路由 `/api/public/assets/:name`；`gzip+b64` → 回 text/plain 的 base64（壳端 DecompressionStream 解压）；`raw` → 按 contentType 回原文 | M1 网关**只透传文本响应**：octet-stream/gzip/图片/音视频 → 502 UNSUPPORTED_BINARY；资产一律 base64 文本回传 |
+| 路径口径 | 壳页面拉资源**一律相对路径**（`api/public/assets/index.wasm`）；`?p=` 是网关保留 query | 绝对路径 `/assets/...` 或 `?p=` 手拼 → 404/被登录墙拦 → 黑屏 |
+| wasm 初始化 | `WebAssembly.instantiate(bytes)`（base64 → Uint8Array → 解压） | instantiateStreaming 要求 application/wasm MIME，本链路不满足 |
+| b64 内联降级 | 仅当 asset-store 不可用；原始产物 ≤ 18MB（b64 膨胀 1.33×，bundle 上限 25MB） | 超限 → 降级「说明页 + 下载指引」，不得声称可玩 |
+| 音频手势解锁 | 壳页面在引擎加载**之前**：①包 AudioContext 构造器捕获引擎实例；②document 级 `touchstart/touchend/pointerdown/keydown/click`（capture+passive，不消费事件）同步 `ctx.resume()`；③暴露 `window.__audioDebug()` | 缺任一 → 移动端全部音效静默且控制台零报错（WebKit 创建即 suspended、切后台变 interrupted、引擎只在输入回调 resume）；有音效的游戏壳缺解锁器 = 验收不通过 |
+| 调参桥 | 壳页面引擎加载前解析 `?tuning=<JSON>` 进 `window.__GAME_TUNING__`，游戏侧 GameState 启动按 TUNING_META 声明的键钳制覆盖 | 缺 → 试玩调好的参数无法用 URL 复现，调参回写流程断裂 |
+| 部署后自测 | /health 与 / 都 200 只是起点，**必须**跑 mobile-web-smoke | 只 curl 200 就宣称部署成功 = 跳过移动端硬门槛 |
+
+## 六、mobile-web-smoke 移动端模拟门禁要点
+
+- **机判方式与维度**：headless Chrome 移动仿真打开线上 liveUrl，机判六项——网络（资源可达）、console（无报错）、渲染（画面在动）、触摸（可交互）、音频契约（解锁层在位）、视口（移动端尺寸正确）。
+- **证据落点**：`games/60-2/qa/mobile/`（report.json + 分阶段截图）。试玩节点（playtest）据此写试玩指引；若发现证据缺失或与 preHook 结论矛盾，如实回写 detail，不替门禁背书。
+- **已知边界一：静止页会被误判渲染冻结**。完全静止的页面「画面在动」检查会 FAIL——解法是给核心按钮加待机呼吸脉冲（game-12 实测：scale 1.00→1.06 / 0.9s，极差 0.060 ≥ 阈值 0.02），既是门禁过检又是移动端可点示能（关联知识 00314649）。
+- **已知边界二：门禁全绿 ≠ 真机可用**。触摸事件分发顺序（E-18：`mouse_filter=STOP` 的 Control 在 GUI 命中阶段吃掉触摸，永远到不了 `_unhandled_input`）与 InputEventAction 互踩（E-19）都属于「headless 门禁全绿、真机必挂」型，机判之后仍需真人真机过一次「开局可动、摇杆不误触」（关联知识 82e419bb）。
+- **与试玩验收的衔接**：mobile-web-smoke 全绿只是准入，试玩节点产出「试玩验收包」（试玩指引 + 四问量表 + 调参工作台入口 `<liveUrl>?tuning=1`）；试玩结论只能来自用户，量表未回填就如实标「待回填」，detail 里不得出现没有出处的「试玩通过」。
+
+## 七、知识沉淀节点自身的 API 事实（本次实测，供后续沉淀节点直接复用）
+
+- **本部署不存在 `GET /api/v1/knowledge/search`**（返回 404）。等效「先搜后写」：`GET /api/v1/knowledge?scope=global&limit=200` 拉全量后客户端按 title/内容过滤（服务端源码 src/routes/knowledge.ts 的 GET 只支持 scope/category/projectId 过滤，无全文检索；列表默认只返回 parentId=null 且 isPublished=true 的文档）。
+- **新增**：`POST /api/v1/knowledge`，必填 `title` + `scope`（'global'|'project'）；`title+scope` 重复 → 409 CONFLICT（先搜后写可顺便避开）；`tags` 必须是字符串数组；`category` 建议对齐既有口径（本文用「技术方案」，与同类游戏知识一致）；创建即 isPublished=true 并自动生成 v1 版本快照。
+- **更新**：`PATCH /api/v1/knowledge/doc?id=<docId>`，支持部分更新 title/content/category/tags/icon/scope/projectIds；平台自动做版本化（更新前快照旧版 → version+1 → parentVersion=`id@vN`），不需要调用方自己处理版本。
+- **单篇读取**：`GET /api/v1/knowledge/doc?id=<docId>`（返回 doc + associatedProjectIds；已删除文档也能读到，便于历史链接）。
+- **写入姿势**：JSON body 直接 PUT 不便时，用 python3 `json.dumps` 构造 payload 再交 curl 发送，避免 shell 转义事故。
+
+## 八、关联知识（互为补充，不重复）
+
+- `27407691-bcf8-4e73-b686-1bb8df684e5c`：Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路实战（oak-key）——三层门禁体系、退出码语义、routine 参数化、GODOT_BIN 单一实现、error-signatures 打回修复表。
+- `00314649-c4d2-407c-871b-62f7de91b07d`：game-12 双门禁通过路径——mobile-web-smoke PASS 10/10 实测、静止页呼吸脉冲、负例验证纪律。
+- `82e419bb-b641-4b5e-bb58-d8b9633169ca`：game-5 触屏虚拟摇杆与 AudioContext 解锁规范——E-18/E-19 机制、统一移动向量出口、音频门控三件套。
+- `6e91a11d-3632-4721-a3ea-d433e9622f9b`：game-5 玩法设计要点——与 60-2 同属「森林收集水果限时赛」玩法族（60 秒限时收集），数值基准可对照。
+- 设计 spec（platform）：`cmuspl1bw006lic7qkcplv73e`——60-2 的水果分值表（+1/+3/+10）、生成节奏与 60 秒结算契约及契约测试清单，实现与验收以此为准。
+
+## 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+# 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+> 来源：需求《《森林收集水果限时赛》游戏需求》（id=cmusp9cd00035ic7qxi8c4il3，验收节点 completed）→ GameDesignSpec《水果分值表与收集循环》（id=cmuspeqza004uic7qusqyn7gr）→ 小游戏工坊两次工作流运行皆 failed → 主策划验收指派（id=cmtn5fhk8000hjqckrib9i3bb，completed）。全部平台终态于 2026-10-04 经 API 与线上 URL 实测取证（见 §一）。
+>
+> 本文写三件事：① 可复用的「分值分档点按收集」玩法模板（+1/+2/+5 三档）；② Web 导出 + 双门禁的复用要点；③ 本 goal 双跑皆败的流程复盘教训。**不重复**总论：门禁三层体系与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key）；工程结构最小契约与帧预算推导见 78180e88-6486-404e-9265-e315e0da3c66（hello）；时间注入机判与单源单相见 00314649-c4d2-407c-871b-62f7de91b07d（game-12）；触屏适配与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca；**同名 IP 的另一机制变体**（松鼠移动+原木躲避+连击）见 6e91a11d-3632-4721-a3ea-d433e9622f9b（game-5 老版）。
+
+## 一、事实基线（本 goal 真实终态，先看这个再谈复用）
+
+| 对象 | 标识 | 终态 | 取证方式 |
+| --- | --- | --- | --- |
+| 需求 | cmusp9cd00035ic7qxi8c4il3 | completed | goal DAG 记录 |
+| GameDesignSpec（分值表与收集循环） | cmuspeqza004uic7qusqyn7gr | completed | goal DAG 记录 |
+| 工坊运行 #1 | workflow=cmusp1yao002pic7q384xxfse，run=cmuspf4oo0050ic7qfjj0azwh（工程 games/60，分支 myrd/games-goal-cmusp1ya8002lic7qk39zog9o） | **failed** | GET /api/v1/workflows/{id} 的 runs 字段 |
+| 工坊运行 #2（换 slug 重试） | workflow=cmuspb55m003xic7q9o18vjk2，run=cmuspld10006ric7qup55soew（工程 games/60-2，分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2） | **failed** | 同上 |
+| AppHost 记录 | 60=cmusp1ya6002jic7qz3dhps7r；60-2=cmuspb3xg003ric7q1ksya6c3 | 均卡在 status=creating，publicUrl=null，publishedAt=null | GET /api/v1/apps |
+| 线上地址 | https://leomac-studio.tail49399e.ts.net/apps/60 与 /apps/60-2（含 /gw 变体） | **404「应用不存在」** | curl -L 实测 2026-10-04 |
+| 主策划验收指派 | cmtn5fhk8000hjqckrib9i3bb（标题「验收复核线上版并回写产物标识」） | completed（节点完成；其结论正文经多个 API 路由探测不可回读） | goal DAG 记录 |
+| 同名老变体 game-5 | AppHost=cmuipis4f0063m9l6hagvvvd4，goal=cmuipis4g0065m9l69hew4nng，需求=cmuipol63006rm9l6cp2ww5r5 | ready，publicUrl=/apps/game-5，3 次工坊 run 全 completed | GET /api/v1/apps、/api/v1/workflows |
+
+结论一句话：**本 goal 的「点按分档版」截至 2026-10-04 没有可玩的线上版**；平台里唯一在线的「森林收集水果限时赛」是老变体 game-5（玩法口径完全不同）。后续任何验收、试玩、传播链接都必须先对照本表，别拿老 game-5 顶数。
+
+## 二、分值驱动收集玩法模板（+1/+2/+5 三档 · 点按拾取）
+
+### 2.1 分值表与频率反相关（需求硬性口径 + 建议校准值）
+
+| 档位 | 分值（需求硬性） | 出现权重（建议起点） | 期望得分贡献占比（建议） | 视觉要求 |
+| --- | --- | --- | --- | --- |
+| 低（苹果） | +1 | ~70% | ~45% | 常规色调 |
+| 中（橙子） | +2 | ~25% | ~35% | 提亮一档 |
+| 高（稀有水果） | +5 | ~5% | ~20% | 高对比 + 特效标识 |
+
+- **分值与频率必须反相关**且两者解耦配置（权重表与分值表分开两张常量表）——需求只锁「高分水果出现频率更低」，斜率是实现自由度；但三档贡献占比是手感核心，建议按上表起步、用冒烟统计实测校准（240 帧冒烟里统计三类生成次数的比例，替代人工目测）。
+- **期望值校准法**：单局期望总分 = 60s × 刷新速率 × Σ(权重ᵢ × 分值ᵢ)。先定「单局期望分」这一产品目标，再反推刷新速率，不要拍脑袋调刷新率。
+- **计分唯一入口**：所有得分变更走同一个 `add_score(points)`，分值查表发生在水果节点持有 `tier` 字段 → 入口处查表，禁止 UI 层或触摸回调里散落 `score += 1` 字面量。这是「+1/+2/+5 各自累加正确」能被机判断言的前提（同 game-12 的单源纪律）。
+
+### 2.2 60 秒计时的 ±1 秒验收实现口径
+
+- 用 `float` 剩余时间在 `_process(delta)` 里累积递减，显示层取 `ceil()`；归零判定用 `time_left <= 0.0` 触发结算，**不要**用「Timer 节点每 1 秒 tick 一次、tick 里 -1」的实现——tick 计数在暂停/掉帧/场景切换时会漂移，±1 秒容差经不起移动端浏览器节流（切后台回来一次就能漂 1~2 秒）。
+- 冒烟断言：读 UI 计时文本两次间隔 1~2 秒断言递减；用引擎时间注入（同 game-12 `try_count(now_ms)` 模式）把 `time_left` 直接压到 0，断言进入结算场景。显示值与内部值分离，断言内部值。
+
+### 2.3 点按拾取：单源单相 + 热区（移动端唯一操作）
+
+- Godot 4 默认 `emulate_mouse_from_touch=true` → 一次触摸可能产生 touch + mouse 双事件，再加 `_unhandled_input` 的动作路径，同一「点击」多来源。收敛方式与 game-12 相同：所有来源只调唯一入口 `attempt_collect(fruit)`，判定收口在 GameState 一处。
+- 触摸热区按「水果视觉半径 + 容差」配置，最小可点直径 ≥ 44~48 逻辑 px，且注意 DPR 换算（引 82e419bb）；相邻水果刷新点最小间距 ≥ 1.5 个水果直径，防误触串档（点到低档实际想点中档）。
+- 高分水果「稀有」也必须**可点**：特效动画不要吃掉点击区（动画节点 `mouse_filter=IGNORE`），否则会出现「看得见点不中」的体感灾难——美术动效是 Area2D 之外的子节点，别挂在碰撞体上。
+
+### 2.4 供给节奏与场上管理（点按版的补货口径）
+
+- 两段式供给（引 6e91a11d §二并适配）：开局铺场 8~12 个 → 场上存量低于下限（建议 6）时按 0.8~1.5 秒补 1 个。60 秒点按版的失败模式比躲避版更隐蔽：**可收目标耗尽 = 玩家空转**，补货下限是硬保障。
+- 三档各自独立掷骰，不共用计时器；高档（稀有）另加「场上同屏最多 1 个」约束，防止稀有权重 5% 在随机聚类下同屏堆 3 个、破坏「稀有」体感。
+- 场景边界内边距 ≥ 半个水果直径，保证边缘刷新可点；不做与障碍物的路径重叠问题（本变体无移动障碍），但要避免刷新点落在 UI 计时条/得分条下方。
+
+### 2.5 一键重开的完整重置清单（验收 5 的坑点）
+
+结算界面「重新开始」必须复位**全部**运行态，逐项列出防漏：倒计时回 60、得分清零、场上水果全部回收、三档刷新计时器重置、稀有水果在场标记清除、飘分/特效节点队列清空、结算面板隐藏。重开入口双通道（触摸可点 + 键盘 Enter/Space），坑源见 ed31081f-82be-4a76-a28b-476f7e18a00b（game-3 只有触摸入口导致桌面端无法重开）。冒烟断言：先打完一局（注入 time 归零）→ 点/按重开 → 断言计时==60 且得分==0 且场上水果数==铺场数。
+
+### 2.6 森林主题的可机判底线（验收 3）
+
+美术质量不进门禁，但结构可以机判：断言主场景节点树中存在 ≥ 2 类森林装饰元素组（如 Trees/Grass 两个 Node2D 组各自子节点数 > 0）；水果节点与背景装饰分属不同层级（水果层 z_index 更高且不被装饰遮罩覆盖）。preflight 不查这些，要写进工程内 `tests/smoke.gd` 的玩法断言段。
+
+### 2.7 验收 → 冒烟断言映射（写进 verify.sh 的建议）
+
+| 需求验收条目 | 冒烟断言建议 |
+| --- | --- |
+| 1. 60 秒递减、归零自动结算、偏差 ≤ ±1s | 两次读计时文本断言递减；注入 time_left=0 断言进结算 |
+| 2. ≥3 种分值（+1/+2/+5）各自累加、实时显示 | 依次对三档水果坐标注入触摸，断言得分序列 +1/+2/+5；断言 UI 总分文本同步 |
+| 3. 森林主题 ≥2 类元素、水果不遮挡 | 断言装饰节点组存在且子节点 >0；断言水果层在装饰层之上 |
+| 4. 移动端触屏可完整跑一局、无明显卡顿 | mobile-web-smoke 门禁（双门禁第二道）跑 FPS 采样，参照 game-12 实测 FPS 39 的基线口径 |
+| 5. 一键重开、倒计时与得分重置 | 跑完一局 → 触发重开 → 断言 60/0/铺场数三值（见 §2.5） |
+
+## 三、Web 导出与双门禁复用要点
+
+本 goal 两次工作流的 scaffold 节点 prompt（工坊流水线模板实文）把门禁资产判据钉死为**四件套**：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, resolve-godot.sh, mobile-web-smoke.mjs}` 全部在仓库内且不被 .gitignore 排除，缺任一 → blocked 上报，禁止从平台注入的 `.myrd-platform/.claude/skills/` 阅读副本里复制脚本充当判定器，也禁止自造等价脚本。对比老 game-5 工作流只要求三件套——**mobile-web-smoke.mjs 是后来加入的第四件**，新工程照四件套验收。
+
+- **双门禁分工**：godot-smoke（preflight 静态 + headless 冒烟 + input-fuzz）证明「能跑能玩」，mobile-web-smoke 证明「移动端模拟下可玩且不掉帧」。两道各自独立出退出码，任何一道非 0 都不该进入 deploy。
+- **退出码语义**（与总论同源）：0 通过 / 1 冒烟失败→打回修复循环 / 2 环境不可用→装环境、禁止为过门禁改代码 / 3 静态不一致（verify.sh 单独编码）。存在性守卫先行判 2，防「脚本缺失」被误判成 3 诱导修游戏代码。
+- **Web 导出配置五要点**（引 78180e88 实测，不再展开）：渲染器钉死 gl_compatibility 且 `.mobile` 双写；`thread_support=false`；中文必须内置 NotoSansSC 等字体（preflight P13 拦 Web 中文缺字）；导出产物落 `games/<工程>/export/web/` 并 .gitignore 豁免入库；UI 挂独立 CanvasLayer 与游戏世界分离。
+- **AppHost 部署口径**：部署 gitRef 必须是 goal 功能分支（`myrd/games-goal-<goalId>`），绝不能用 main；liveUrl 在部署完成前即由工坊确定（本 goal 为 /apps/60、/apps/60-2），移动端门禁与试玩都以它为准。
+
+## 四、流程复盘：为什么本 goal 没有线上版（双跑皆败实录）
+
+时间线（全部平台记录）：17:56:54 创建 AppHost「60」+ 工作流 #1 → run cmuspf4oo0050ic7qfjj0azwh **failed** → 18:04:01 换 slug 重试，创建 AppHost「60-2」+ 工作流 #2 → run cmuspld10006ric7qup55soew **再 failed** → 验收指派节点 completed 回写产物标识 → 2026-10-04 实测线上 404。
+
+- **教训 A：节点完成态 ≠ 线上可玩。** 验收指派节点 completed，但平台记录里不存在任何可访问的线上版本。「验收复核」类节点的完成前置必须是硬证据：liveUrl 返回 200 且真实浏览器跑通「开始→拾取→结算→重开」闭环，产物标识回写附上 deployment/gitRef；否则完成态与线上态脱节，下游（频道播报、试玩通知、知识沉淀）全部建立在幻觉上。
+- **教训 B：同名变体串场是本 IP 的特有陷阱。**「森林收集水果限时赛」在仓库里有两个机制完全不同的变体：老 game-5（松鼠移动+原木躲避+连击，已上线）与本版（点按拾取+分值分档，未上线）。两者需求 id、goal id、工程目录（games/game-5 vs games/60、60-2）、分支、slug 全不同。**一切定位以产物 id + 分支名 + 工程目录为准，禁止按游戏名搜索**——按名搜必然把老 game-5 的「已上线、3 run 全绿」误当成新版的现状。
+- **教训 C：换 slug 重试会留下孤儿 AppHost 空壳。** 60 失败后换 60-2 重试，AppHost 表留下两条 status=creating 的壳，publicUrl 均为 null。重试前应优先复用原 AppHost 记录；若必须换 slug，重试启动时把旧壳置为废弃态。排查「游戏上线了没」的正确顺序：先查 AppHost status（creating/ready/failed），再 curl liveUrl 实测——本 goal 的 404 就是这么确认的，不能只信工作流状态或节点状态。
+- **教训 D：复盘入口与取证边界。** 工作流 API 只回 run id + status，不回失败日志；复盘具体卡点需持 run id（cmuspf4oo0050ic7qfjj0azwh、cmuspld10006ric7qup55soew）到执行日志/workflow 详情页查。本机环境 GitHub 443 不通，`git ls-remote` 无法核实两条 goal 分支是否推上远端——分支存在性复核必须在能连 GitHub 的环境做，不要在本机下「分支不存在」的结论。
+
+## 五、给下一个同类小游戏的复用清单
+
+1. 玩法骨架直接抄 §二：三档分值表 + 反相关权重表 + `add_score` 单入口 + float 计时 + 两段式补货 + 完整重置清单，改数值不改结构。
+2. 工程起点抄 78180e88 §二的最小契约（project.godot 三类必接线、TUNING_META 白名单、tests/smoke.gd、verify.sh、export_presets.cfg）。
+3. 门禁四件套齐全性检查放在 scaffold 第一步（本 goal 工作流模板已内置该判据），双门禁全绿才允许 deploy。
+4. 验收断言按 §2.7 映射表逐条落进 smoke.gd，每条断言做负例验证（证明会真 FAIL）。
+5. 上线判定只认三件套：AppHost status=ready + liveUrl 200 + 实机操作闭环截图/录像；验收节点回写产物标识时必须附 deployment/gitRef。
+6. 涉及「森林收集水果限时赛」名字的一切操作，先对 §一事实基线表确认自己在操作哪个变体。
+
+## 六、关联知识
+
+- 门禁三层体系 + AppHost 部署总论：27407691-bcf8-4e73-b686-1bb8df684e5c
+- 工程结构最小契约 + 帧预算推导 + playtest blocked 实录：78180e88-6486-404e-9265-e315e0da3c66
+- 双门禁（godot-smoke + mobile-web-smoke）+ 时间注入机判 + 单源单相：00314649-c4d2-407c-871b-62f7de91b07d
+- 移动端触屏虚拟摇杆 + AudioContext 解锁：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- 同名 IP 老变体（松鼠+原木+连击）玩法口径：6e91a11d-3632-4721-a3ea-d433e9622f9b
+- game-9 单游戏部署先例：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 对抗性探索与机判方法论（QA 复用）：437f8129-89b5-4f46-95c0-2d475c3cead8
+
+## 沉淀 app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单（太空飞船躲陨石捡金币）
+
+# app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单
+
+> 来源：目标《创建小游戏应用：太空飞船躲陨石捡金币》（goal=cmuspfeyw0058ic7qrmh6qebm）首轮执行（2026-10-03 18:11~18:23 UTC）+ 次日（2026-10-04）知识沉淀时的时点复核。需求 id=cmuspmumf007cic7qlt6uwieo，GameDesignSpec id=cmuspqwhe007ric7qp0465dvk，工坊工作流 id=cmuspfez9005cic7q93j4fk74，失败运行 id=cmuspr5v7007xic7q5ng1aqqo。
+>
+> 本文只写本例增量：**工坊流水线在门禁一启动之前就整体失败**这一反面样本的取证、归类、复核方法论与重跑前置清单。godot-smoke 三层门禁体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-12 双门禁通过路径见 id=00314649-c4d2-407c-871b-62f7de91b07d；移动端触屏/音频规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；game-9 见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be。本文与它们互补：前面几篇讲「门禁怎么过」，本篇讲「门禁根本没来得及跑」时怎么定位、怎么复核、重跑前还要先解决什么。
+
+## 一、一手事实时间线（全部库内取证，非转述）
+
+| 时刻（UTC） | 事件 | 证据 |
+| --- | --- | --- |
+| 10-03 18:07:22 | hosted_apps 记录 app-2 创建（id=cmuspfdr20056ic7qm2ebhvwv，slug=app-2），status=creating | hosted_apps 行；updated_at 至 10-04 仍冻结在该时刻 |
+| 18:11~18:13 | 需求录入完成（含双门禁 + HostedApp 约束 + 4 条验收标准） | 需求 id=cmuspmumf007cic7qlt6uwieo |
+| 18:13~18:16 | GameDesignSpec v0 落账（八段、10 实体、数值写死） | spec id=cmuspqwhe007ric7qp0465dvk |
+| 18:16:30 → 18:17:36 | 工坊工作流运行启动后 **66 秒即 failed** | workflow_runs.status=failed |
+| 18:17:40 → 18:23:07 | express_lane 独立复核完成：app-2 未上线、验收 0/4、双门禁均未启动 | 复核结论（goal 会话） |
+| 10-04（本文写作时） | app-2 仍 status=creating、live_url 空、app_deployments **0 行**；该工作流**仅 1 次运行且为 failed，未重跑**；github.com 从 agent 环境再次 20s 超时不可达 | hosted_apps / app_deployments / workflow_runs 实查 + curl 探针 |
+
+失败报错原文（复现用）：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspfdqy0052ic7qnkimp4n5/run-cmuspr5v7007xic7q5ng1aqqo'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/':
+Failed to connect to github.com port 443 after 32655 ms: Couldn't connect to server
+```
+
+## 二、失败模式归类：不是「门禁失败」，是「门禁前基础设施失败」
+
+工坊四棒为 scaffold → implement → deploy → playtest（实现/部署两棒挂 godot-smoke preHook 240 帧，试玩棒挂 mobile-web-smoke）。本例失败的关键特征：
+
+1. **死在第 0 棒之前**：4 个节点状态全部 pending，工作流主体逻辑一行都没执行——失败发生在为运行准备 worktree 的 `git clone` 阶段。
+2. **零产物可判**：goal 分支 `myrd/games-goal-cmuspfeyw0058ic7qrmh6qebm` 在复核时不存在（`git ls-remote` 无此分支）→ 无任何代码/工程/导出物落库，不存在「半成品需要清理」的问题。
+3. **网络是间歇抖动，不是持久封锁**：复核时点（10-03 18:23）github.com HTTPS 200、`git ls-remote` 成功（HEAD=a592ea2）；次日（10-04）从 agent 环境又 20s 超时。两个时点结论相反，证明是**间歇性连接抖动**。
+4. **归类的处置含义**：门禁失败（godot-smoke 红、smoke 帧内崩溃）→ 修代码再过门禁；门禁前基础设施失败 → **不改任何代码，探针确认外网恢复后直接重跑**。两者处置路径完全不同，先归类再动手。
+
+## 三、独立复核方法论（本例实证有效，可整体复用）
+
+复核在「工作流已 failed」的背景下展开，五步证据链闭环：
+
+1. **不信状态字段，实测入口**：`status=creating` 不代表「正在部署中马上就好」——对内网 `$PLATFORM_API_URL/apps/app-2/gw` 与公网 `https://leomac-studio.tail49399e.ts.net/apps/app-2/` 双探测，均 404 `APP_NOT_FOUND`。应用记录侧 `publicUrl/publishedAt/version` 全空，项目侧 `resources=[]`、prodUrl/stagingUrl 空，app_deployments 0 行，四面证据一致。
+2. **对照实验排除平台故障**：同一 host 上其余 13 个 `status=ready` 应用（game-5/6/8/9/10/11/12、hello、app 等）全部 200 → 托管能力正常，是 app-2 自身从未部署的个案，不是平台级事故。
+3. **排他性核查防「张冠李戴」**：已上线 13 应用中无一款《太空飞船躲陨石捡金币》；题材相近的 `/apps/app/gw`「星云飞船收集」收集的是能量水晶、slug 与标题均不同，**不能冒充 app-2 交付物**。同类小游戏大量复用同套躲陨石玩法，验收时必须按 slug+标题+机制三重匹配认定交付物。
+4. **对账流程合规性**：需求 status=in-progress、close_reason 空 → 无人违规关闭需求，门禁二「未回填」是因「无入口」而非「被跳过」，流程无腐化。
+5. **失败棒位定位**：直接查 workflow_runs 的 result.error 与 nodes 状态数组，一眼定位「死在 scaffold 之前」，避免把失败误归因给某一棒的实现质量。
+
+## 四、⚠️ 规格冲突（重跑前必须拍板，否则白跑）
+
+工坊管线是 **Godot 4 → Web(HTML5) 导出**（工程 `games/app-2`、`export_presets.cfg` Web 预设、`--headless export` 构建步、godot-game-dev 技能包），而需求验收标准 4 明文要求「**纯前端 HTML/CSS/JS、无构建步骤、静态资源可直接打开运行**」。Godot 导出必然含构建步骤，两者直接冲突。
+
+- **不处理的后果**：即使部署成功、门禁一全绿，AC4 仍会判不达标——整条流水线白跑一轮。
+- **方案 A（推荐）**：把 AC4 措辞修订为「**导出产物为纯静态托管、无运行时后端、无外部 CDN 依赖**」。保留 Godot 管线，同时保住需求真正想约束的东西（免后端、免 CDN、双端可玩），且与既有门禁体系（27407691 总论）兼容。
+- **方案 B**：放弃 Godot 管线，改手写单文件 HTML/JS。仅当主人明确要求「字面意义无构建」时选它，代价是失去 godot-smoke 三层门禁与工坊流水线的既有能力。
+- **教训**：验收标准与管线能力要在**需求录入时**对齐。「无构建步骤」这类措辞对 Godot 管线应用天然不可满足，录入阶段就该识别。
+
+## 五、重跑修复路径（有序清单，供下一轮直接执行）
+
+1. **先探针再重跑**：从 runner 环境 `curl --max-time 20 https://github.com` + `git ls-remote <仓库>` 双探针确认恢复。网络是间歇抖动，盲目重跑可能再次 66 秒失败并空耗一轮。
+2. **先拍板第四节冲突**并回写需求措辞（方案 A 或 B），再触发重跑。
+3. **重跑即可，无需清理**：分支不存在、零产物，直接重跑工作流，从 scaffold 全新开始；不要试图「续跑」失败运行。
+4. **部署成功后先补门禁一**：由独立 agent 重做一轮线上可玩性复核（按第三节方法论），留证「全流程走通 + 控制台无报错」，之后才轮到 owner。
+5. **门禁二最后**：owner 桌面 + 移动各试玩一次并回填「试玩通过/不通过」，回填通过后需求方可关闭。当前门禁状态：**门禁一未启动（不可执行）、门禁二未启动（无入口）——注意是「未达」而非「失败」，回填话术要区分。**
+
+## 六、供后续 app 复用的教训清单
+
+1. **工作流失败 ≠ 游戏缺陷**：先查失败棒位。scaffold 之前死 = 基础设施层（网络/仓库可达性），与代码质量无关，处置是重跑而不是返工。
+2. **外网 git clone 是工坊流水线的第一单点**：仓库在 github.com，第一棒之前就要整仓克隆；网络抖动直接零产物。建议重跑前置「探针 + 失败自动退避重试」的习惯，并把「github 间歇不可达」记为平台环境的已知抖动源。
+3. **hosted_apps.status 不可单独作为「已上线」判据**：本例 status=creating 停滞超过 24h 且无任何部署行。判活必须「liveUrl 实测（内网+公网双探测）+ deployments 计数」双条件。
+4. **需求录入时做一次「AC × 管线」对齐检查**：把验收标准逐条对照工作流管线的既有能力（构建方式、导出形态、依赖服务），措辞冲突当场改，不要留到部署后才发现。
+5. **同题材应用排认**：平台同 slug 命名空间下有多款躲陨石/收集类小游戏，验收复核必须 slug+标题+核心机制三重匹配，防止把兄弟应用的 200 当成本应用的交付证据。
+
+---
+**一句话总结**：app-2 首轮执行是「门禁前基础设施失败」的完整样本——工坊四棒尚未启动即在 git clone 阶段遭遇 github.com 间歇性连接失败（66 秒即败、零产物、app-2 停在 creating），独立复核以五步证据链确认验收 0/4、双门禁均未达但流程未被违规绕过；修复路径 = 探针确认网络恢复 + 先拍板「Godot 构建管线 vs 无构建步骤」的规格冲突 + 直接重跑，重跑成功后再补门禁一自测与门禁二试玩回填。
+
 
 ---
 
@@ -6988,6 +9310,780 @@ Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`�
 5. 部署抄「五查」：gitignore 的 /export/、apphost.toml 指向、gitRef=目标分支、壳三件套（文案/调参桥/音频解锁）、artifacts 回写 get→append→写回。
 
 关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
+
+## 沉淀 game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战经验（推箱子点亮方块解谜 · 全四棒工作流）
+
+# game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战沉淀（推箱子点亮方块解谜 · 全四棒工作流）
+
+> 来源：需求《推箱子点亮方块解谜（game-9）》（id=cmupsx443003om9dh5dwd5w9u，goal=cmupsrc19002sm9dhp5su0zaj）走完「前置体检 → scaffold → implement → deploy → playtest」全流程后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-9`（Godot 4.3.stable.official）。线上：liveUrl https://leomac-studio.tail49399e.ts.net/apps/game-9/（deploymentId=cmupxibnn0087m9dhz3cfhap4，commit 19a6d59，838ms 上线，app.status=ready）。工作流运行 /workflows/cmupsrc1v002wm9dh68sljxoq/runs/cmuputtey006dm9dht78nbbtm。
+>
+> 本文只写 game-9 新踩的坑与增量打法。门禁三层体系总论（preflight/smoke/fuzz 分工、E-16 带病绿灯）与 AppHost 部署总论见《沉淀 Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路实战经验》（id=27407691-bcf8-4e73-b686-1bb8df684e5c，oak-key 实测）；移动端触屏摇杆与音频解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca。三篇互为补充、不重复。
+
+## 一、事实基线：四棒各留下什么（审计入口）
+
+| 棒 | 提交 | 内容 | 结果 |
+| --- | --- | --- | --- |
+| scaffold | d297996 | 以 templates/minimal-2d 初始化 games/game-9：推箱骨架（推动/点亮/Undo/Restart/换关）+ 5 关关卡册 + tools/level_solver.py + tests/smoke.gd + verify.sh | ✅ |
+| implement | 4bfdb00 | 见证解回放 / 死锁反馈 / touch_swipe / AC5 响应断言；is_solved 口径修复；.myrd/spec/design-spec.json 落盘 | ✅ |
+| deploy | 19a6d59 | export_presets.cfg + 导出产物入库 + apphost 壳切 game-9 + §3C 调参桥 + 移除 candy-crush 残留 | ✅ 已部署 |
+| playtest | 0103b33 | docs：playtest blocked 报告（缺 playtest.sh） | ⛔ blocked |
+
+- **部署形态**：底座 A「资产出 bundle」——`apphost.toml` 里 `assets_dir="games/game-9/export/web"`，37MB 导出经对象存储懒加载，bundle 本体不含游戏资源（25MB bundle 上限不再约束资产体积）。
+- **导出产物形态**：index.wasm 33.7MB / index.pck 2.4MB / index.js 331KB / index.html 4.9KB / index.audio.worklet.js 7.3KB。线上资产通道 `/api/public/assets/`：index.js 原文直出，wasm/pck 走 `*.gz.b64` 文本（10.7MB / 3.3MB），端到端解码验证过（b64→gzip→`WebAssembly.validate()=true`、pck 魔数 `GDPC`）。
+- **部署记录层 status=running 与应用已 ready 并存**：判断游戏死活以 /health 与实际可达为准，别拿 deployment.status 当真。
+
+### 分支审计坑：同一目标两条远端分支并存
+
+- `myrd/game-9-goal-<goalId>`：前置体检节点首次推送建立，停在 implement 棒（4bfdb00）。
+- `myrd/games-goal-<goalId>`：工作流四棒实际跑的分支，tip=0103b33（多出 deploy/playtest 两棒）。
+- 结论：**复现/审计认 goal artifacts 里的 `gitRef` 与 `app_deployments.commit_hash`（本次 = 19a6d59）**，别按「目标 id 搜分支」想当然——两条分支都能搜到且不同步。另：线上部署的是 19a6d59，其后 playtest 棒只追加 docs（0103b33）未重新部署，属 docs-only 差异，游戏本体无差。
+
+## 二、Godot Web 导出：模板不含预设，从零补齐的六个决策
+
+1. **模板仓库不含 `export_presets.cfg`**。games/game-9 的 README 在 scaffold 棒就记了：「export_presets.cfg 尚未配置（模板不含），部署节点需按 games/game/ 的 web 导出先例补齐」。每个新游戏都要从上一个游戏的先例抄一份再改，别等部署节点现场发明。
+2. **必须用单线程变体：`variant/thread_support=false`**。M1 网关不发 COOP/COEP 头，SharedArrayBuffer 不可用，线程版直接白屏。这是 Web 导出第一坑：配错不报错、上线才白屏。
+3. **导出产物必须入库，`.gitignore` 加 `!/export/web/` 豁免**。`assets_dir` 是平台构建输入，产物不在仓库里平台打包 bundle 就缺资产。Godot 工程 .gitignore 默认把 export/ 排掉，这里要反着来。
+4. **全局中文字体是 Web 导出的底线**（preflight P13 机判）。浏览器沙箱拿不到系统字体，引擎内置字体只有拉丁字形；`[gui] theme/custom_font` 必须指向子集化中文字体（本工程用 Noto Sans CJK SC：GB2312 全集 + ASCII + 常用符号，OFL 1.1），删了所有中文变缺字方块。字体约 2.9MB，是 pck 体积大头，但属中文游戏必要成本。
+5. **渲染器钉死 `gl_compatibility`**（`renderer/rendering_method` 与 `.mobile` 双写）。Forward+ 在 Web 上不可用。
+6. **接手模板仓库先清上一个游戏的残留**。deploy 棒移除了基线残留的 candy-crush 工程 `games/game/`（39MB 导出）——模板仓库是「单游戏位」惯例，根壳一次只服务一个游戏；残留工程还会污染门禁参照（前置体检时 gate-selftest 拿 games/game 当参照，因 player.gd 缺 `moved.emit`/`const SPEED` 模板契约锚点，D4/D5 注入失败，换官方参照 `templates/minimal-2d` 后 D1–D5 全拦）。
+
+**壳侧三件套 + 调参桥**（沿用 oak-key 先例并加一层）：相对路径资产路由；移动端音频手势解锁器（AudioContext 包装 / 手势 resume / `__audioDebug` 取证口）；worklet 防御；新增 **§3C 调参桥**：
+
+- 壳把 URL `?tuning=<json>` 解析成 `window.__GAME_TUNING__`；
+- 游戏侧 `GameState._apply_tuning_overrides()` 仅 `OS.has_feature("web")` 时经 `JavaScriptBridge.eval("JSON.stringify(window.__GAME_TUNING__ || null)")` 读取；
+- `TUNING_META` 白名单四键 + min/max 钳制 + round 取整：`move_anim_ms` 0–400、`push_anim_ms` 0–400、`key_repeat_interval_ms` 50–600、`win_overlay_delay_ms` 0–1000。
+- 价值：试玩期调手感不用改代码重导出——「试玩调好的参数用 URL 复现」，试玩入口直接发 `?tuning=1` 工作台链接。无头冒烟/桌面自动跳过，门禁行为不受影响。
+
+## 三、冒烟门禁：game-9 的四个增量打法
+
+四步 routine 不变（`.myrd/routines.yaml` id=godot-smoke：resolve-godot → preflight 13 类 → `GODOT_SMOKE_FRAMES=240` headless-smoke → input-fuzz，seed=20260913），`games/game-9/verify.sh` 只调用 std-skills 判定脚本、不重实现。本次实测：preflight PASS / `GODOT_SMOKE: PASS`（240 帧，exit 0）/ `GODOT_FUZZ: PASS`。增量全在冒烟断言本身（tests/smoke.gd，628 行，11 项断言清单）：
+
+### 3.1 见证解回放：把 AC4「关卡可解」变成引擎内机判
+
+离线求解器说「可解」只是一句话结论；game-9 把它做成冒烟断言：
+
+- `tools/level_solver.py --paths` 生成每关见证解（U/D/L/R 移动串，长度 == par），Python 侧重放自证后落盘进 `sokoban_levels.gd` 的 `solution` 字段（与 layout 同处，单一事实源，防两处数据漂移）；
+- 冒烟逐关回放见证解，断言三条：**必须通关、步数 == par、回放全程不得误报死锁**；
+- solver 直接解析 `sokoban_levels.gd`（不复制关卡数据），「策划案 → 关卡册 → 求解器 → 冒烟」四层数据同源，par 漂移会在冒烟里直接爆。
+
+### 3.2 通关判据口径：常亮 ≠ 通关（冒烟实测拦下的真 bug）
+
+点亮目标格是 `onceLitStaysLit`（入场常亮、永不熄灭），但 `is_solved` 不能跟着用「全部点亮」口径——**常亮口径会把 level-05 最优路径第 35 步误判通关、提前停走**（冒烟回放见证解时实测拦下）。修复：`is_solved` = 「全部接线槽有方块驻留」，与求解器 / spec parMoves 同口径；点亮只作视觉态。
+
+教训：**「视觉状态」与「胜负判据」是两个变量。凡有常亮/累计态的玩法，胜负判据必须与求解器同口径，并让冒烟回放最优解来兜底。**
+
+### 3.3 死锁反馈机判：报与不报都要有断言
+
+角死锁检测 + `deadlock_changed` 信号 + HUD 卡死警示 + 死锁方块变红。冒烟断言四条：角死锁必报、在槽角不报（在槽角是合法终态）、开阔局面不报（防假阳性）、真实关卡把方块顶进角后信号通知 UI 且 **Undo 可脱离死锁态**。「无假阳性」的论证写在检测函数注释里供复核。
+
+### 3.4 AC5 量化成帧预算断言
+
+- 响应延迟：spec 200ms ≈ 60FPS 下 12 帧 → 断言「注入输入 → 首次步进 + HUD 同步刷新」≤ `RESPONSE_BUDGET_FRAMES=12` 帧，验收口径直接写进门禁；
+- 触屏滑动：越过 24px 阈值（`spec.numeric.input.touchSwipeThresholdPx`）的一次滑动**恰好步进 1 格**；冒烟注入 48px 拖拽验证（`SWIPE_DRAG_PX=48`）。
+
+### 3.5 headless 输入注入的坑（error-signatures E-08 的 game-9 变体）
+
+- headless 下 `Input.parse_input_event()` 的缓冲冲刷会清掉 `Input.action_press()` 的按下状态，**同帧混用两种注入方式会让「移动断言」假失败** → 冒烟分 7 相位（噪声/移动/滑动/逻辑/等弹层/下一关/收尾）互不重叠；
+- 触点下标隔离：噪声相位用触点 0/1，滑动断言用触点 7，防互相回收；
+- 滑动起点 (500,280) 刻意避开左下摇杆热区（24..160 × 400..536）与右下按钮排，否则手势被控件吃掉；
+- 噪声相位（30 帧悬挂手势/孤儿释放/乱键）放在一切正式断言之前——上一游戏（糖果三消，commit bbb872f4「致胜滑动后指针脏状态吞掉下一关第一次手势」）就是靠这类对抗注入防回归的。
+
+### 3.6 verify.sh 退出码四态（给修复方向做机器路由）
+
+0=通过；1=smoke/fuzz 运行期未过（改游戏代码）；2=环境不可用（缺 Godot/技能脚本/python3，装环境而非改代码）；3=preflight 静态未过（先修静态，不必跑冒烟）。关键设计：技能脚本存在性守卫放在一切判定之前，缺脚本必须报 2——否则会掉进下游非零退出码被误判成 3，诱导修复节点去改游戏代码。
+
+## 四、关卡求解器：三段演进与两个真 bug（策划案阶段就要做）
+
+固化策划案（create_design_spec）时就要求每关机器可解、par 机器可算——这步做了，实现、冒烟、验收全链路都有基准。求解器三段演进：
+
+1. **BFS**：前三关（状态空间小）够用；
+2. **A* + 拉拽距离启发 + 死格剪枝**：大关用（启发值 = 每方块到最近接线槽的拉拽距离下界，可采纳；死格 = 角死锁 / 墙边不可拉出格）；
+3. **精确状态 A\***：修掉「区域归一化」bug 后的最终形态。
+
+两个真 bug（都在求解器侧，不在游戏侧）：
+
+- **区域归一化把玩家站位合并掉**：对「推动数」精确，对「玩家步数」只是松弛下界——level-02 手推最少 10 步，求解器报 5。修复：玩家坐标显式入状态；修复后 A* 与纯 BFS 交叉验证一致（2/10/18）。
+- **开阔房间 + 5 方块状态空间爆炸**：单关搜索超时。解法不是更强的剪枝，而是**改关卡布局**——level-05 换成更紧凑、隔断更多的「总控机房」，对人更难、对求解器更小，验证 3.8s，par=58 > level-04 的 40，难度曲线反而更成立。
+
+工程参数：`EXPANSION_CAP=4_000_000`、`MAX_DEPTH=200`；par 不一致只告警（布局或 par 漂移），可解性才是硬判据（exit 0/1）。最终 par 曲线 2/10/18/40/58，方块数 1→5 严格递增（AC4），策划案 `numeric.difficulty.parMoves`、关卡册、冒烟断言三方一致。
+
+## 五、playtest blocked：判定器独立性纪律的一次实战
+
+playtest 节点硬约束：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 五个判定脚本**全部由模板仓库预置**，缺任何一个 → 立即 blocked，**严禁现场自造、拷贝注入副本、或用等价命令替代**——它们是判定器，被检方自己写门禁即失去独立性。
+
+本次实测缺 `playtest.sh`（及 `playtest_driver.gd`），按纪律停止：
+
+- **证据链五步**：① 工作区分支 scripts 目录实清（仅 7 个文件）→ ② origin/main fetch 后核对同样缺失（排除本地落后）→ ③ `git log --all` 该路径从未存在 → ④ 全仓库 find 仅命中 `.myrd-platform/.claude/skills/`（平台注入阅读副本，被 .gitignore 排除不入库，按硬约束不得作判定来源）→ ⑤ 前序 deploy 产物旁证。
+- **根因**：平台注入技能包（新版，含机器人试玩门禁：协议 `GODOT_PLAYTEST: PASS/FAIL` 退出码 0/1、2=环境不可用；`GODOT_PLAYTEST_METRICS: <JSON>`；bot 多局输出节奏代理指标——首次奖励/无反馈窗口/反馈密度/局间方差；阈值由工程内 `tests/playtest.json` 覆盖）**领先于模板仓库预置基线**（v1 仅四脚本，godot-smoke routine 也只有四步）。属模板仓库技能资产滞后，需运维补模板仓库，非 agent 现场可修。
+- **没做的事同样重要**：不交付试玩验收包、不拷贝注入副本、不自造判定器；四问量表标「待用户试玩」；spec 数值回写跳过（未收到用户结论，严禁编造）。
+- **影响面切割**：deploy 产物不受影响（游戏仍可访问），godot-smoke 四步门禁此前已全过——blocked 只挡 playtest 这一段。
+- **修复路径**：运维补模板仓库 `playtest.sh` + `playtest_driver.gd`（连同 SKILL.md 章节与 godot-smoke-routine.md 模板同步，脚本/文档/routine 三者一致）→ 经模板预置链路同步进项目仓库（不得手抄注入副本）→ 重跑 playtest 节点交付 `op=playtest_kit`（含 `<liveUrl>?tuning=1` 调参工作台入口）。取证报告在仓库 `docs/game-9-playtest-blocked-report.md`。
+
+## 六、下一个游戏直接抄的清单
+
+```bash
+# 1. 门禁入口（四步；退出码 0/1/2/3 见 §3.6）
+bash games/<game>/verify.sh
+
+# 2. 关卡可解性证据（--paths 生成见证解 → 落盘 solution 字段 → 冒烟回放）
+python3 games/<game>/tools/level_solver.py games/<game> --paths
+```
+
+Web 导出预设必查四项：
+
+| 项 | 值 | 不守的后果 |
+| --- | --- | --- |
+| `variant/thread_support` | `false`（单线程） | M1 网关无 COOP/COEP，SharedArrayBuffer 不可用 → 线程版上线白屏 |
+| `[gui] theme/custom_font` | 子集化中文字体 | 浏览器无系统字体 → 中文全部缺字方块（preflight P13 拦） |
+| `renderer/rendering_method` | `gl_compatibility`（desktop+mobile 双写） | Forward+ 在 Web 不可用 |
+| `.gitignore` | 加 `!/export/web/` 豁免 | assets_dir 构建输入缺资产，bundle 打包失败 |
+
+复用分工：门禁三层总论 / E-16 带病绿灯 / AppHost 部署总论 → id=27407691-bcf8-4e73-b686-1bb8df684e5c；移动端触屏摇杆 / 音频解锁规范 → id=82e419bb-b641-4b5e-bb58-d8b9633169ca；本文 = game-9 增量（导出预设从零补齐、见证解回放机判 AC4、通关判据口径、死锁反馈机判、AC5 帧预算断言、E-08 分相位注入、求解器演进、playtest blocked 纪律、双分支审计口径）。
+
+
+## 沉淀《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+# 《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+> 来源：需求《《hello》休闲收集小游戏》（id=cmuqk7luz002am9bfmmkouw9v，goal=cmuqk3j2o001mm9bfptrztaj1）走完「scaffold → implement → deploy → playtest」工坊主通道后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/hello`（std-skills minimal-2d 模板起步，Godot 4.3.stable，gl_compatibility）。线上终态：liveUrl `https://leomac-studio.tail49399e.ts.net/apps/hello`（HostedApp id=cmuqk3huq001km9bf5ejp7tdg，deployment v2=cmuqlxz2v001km9bxc0w5pspp，gitRef=`myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1@dfd20d1`，/health 200、线上标题《hello》 · 休闲收集）。**playtest 节点 status=blocked**（模板仓库未预置 playtest.sh），线上版经独立 assign_agent 复核确认可玩。本文只写 hello 的增量事实与新坑；门禁三层体系总论与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key），单游戏部署先例见 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9），触屏摇杆与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca。四篇互为补充、不重复。
+
+## 一、事实基线：提交链与四棒产出（审计入口）
+
+`origin/myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1` 提交链（逐字核实）：
+
+| commit | 内容 | 结果 |
+| --- | --- | --- |
+| f9bc9d65 | 模板起步：std-skills minimal-2d 脚手架建 `games/hello` | ✅ |
+| 1bc8fa24 | 收集玩法与胜利/重开闭环 + README 玩法说明 | ✅ |
+| a8b5fd09 | Web 导出可托管形态：export_presets.cfg + `.gitignore` 豁免 + 导出产物入库 | ✅ |
+| 16249412 | 关卡梯度 + 限时失败反馈 + 冒烟断言同步升级 | ✅ |
+| dfd20d1b | 根壳与 apphost.toml 切到 hello + 接通调参桥（=部署 commit） | ✅ 已部署 |
+
+- `myrd/hello-game-goal-cmuqk3j2o001mm9bfptrztaj1` 分支另含 508dcc6b（assign_agent 线上复核取证），与 games-goal 分支**不同步**——复核/审计一律认 goal artifacts 里的 `gitRef`（games-goal@dfd20d1），别按「目标 id 搜分支」。
+- 门禁终态：preflight 13 类 PASS / `GODOT_SMOKE: PASS`（240 帧）/ `GODOT_FUZZ: PASS`（seed=20260913，6 批次无崩溃无脚本错误）；`bash games/hello/verify.sh` 全链路 PASS。
+- 导出 11 文件落 `games/hello/export/web/`：index.wasm 35,376,909B / index.pck 2,497,520B / index.js 331,495B / index.html 4,848B / index.audio.worklet.js 7,298B。
+
+## 二、Godot4 工程结构：hello 的最小可玩模板契约（可复制起点）
+
+```
+games/hello/
+├── project.godot          # 三类必接线：run/main_scene、[autoload] GameState、[input]
+├── autoload/game_state.gd # 单例 + TUNING_META 白名单（调参唯一入口清单）
+├── scenes/{main,player,collectible}.tscn
+├── scripts/{main,player,collectible,virtual_joystick,touch_confirm_button}.gd
+├── assets/fonts/NotoSansSC-Regular.otf + OFL.txt   # Web 中文底线
+├── tests/{smoke.gd,smoke.tscn}                     # 相位状态机冒烟场景
+├── verify.sh               # 工程门禁入口（退出码 0/1/2/3）
+└── export_presets.cfg      # Web 导出预设（thread_support=false）
+```
+
+- **三类必接线是 preflight 静态机判对象**：主场景、autoload、input 映射缺任何一项就是「黑屏/无响应」。hello 实测：`config/name="hello"`、`run/main_scene="res://scenes/main.tscn"`、`GameState="*res://autoload/game_state.gd"`。
+- **渲染器钉死 gl_compatibility 且 `.mobile` 双写**；viewport 640×360；`[gui] theme/custom_font` 指向 NotoSansSC（OFL 1.1）——删了中文全变缺字方块（preflight P13 拦）。
+- **UI 挂独立 CanvasLayer（UI/TouchUI）**，与游戏世界分离；触屏端用 `virtual_joystick.gd` + `touch_confirm_button.gd` 承载移动与确认，桌面/触屏同一工程不加分叉构建。
+- **收集玩法碰撞口径写进代码注释**：Player 矩形 24×24（半宽 12）、Collectible 圆 r=22，可达判定=玩家中心进入收集物中心 34px 内；摆点相对 clamp 边界 (12..628, 12..348) 全可达不卡死角——**碰撞余量要在摆新点时先算再摆**，否则冒烟传送收集断言假失败。
+
+## 三、门禁增量：帧预算推导注释 + 键位契约断言
+
+- **帧推导写进 verify.sh 注释**：「噪声 30 帧 → 移动 10 帧 → 4 次传送收集（各 4 帧）→ 过关断言 → confirm 进第 2 关断言（梯度）→ 时限压 0 触发失败断言 → confirm 重来断言」约 94 物理帧，预算取 240 对齐 `.myrd/routines.yaml` 的 smokeFrames 默认值（两边同值不各说各话）。**推导过程留在门禁入口文件里**，后续调速度的人不必重推。
+- 冒烟 9 项玩法断言：噪声输入后仍能移动、收集计数累加、过关判定、难度梯度（4→5 目标、30→26s 时限）、超时失败反馈、失败重来复位，外加键位契约 `_check_key_bindings`（逐键 AND 判定）。
+- verify.sh 退出码语义与 oak-key 同源：0 通过 / 1 冒烟失败 / 2 环境不可用（**存在性守卫先行**：preflight.py、smoke.sh、resolve-godot.sh 缺一即 2，防「脚本缺失」被误判成 3 诱导改游戏代码）/ 3 静态不一致。
+- **复发坑（连续两作）**：`.myrd/routines.yaml` 默认 `gamePath: games/godot-coin-rush` 至今未修。oak-key 轮已记录，hello 轮依旧要靠 preHookParams 显式覆盖成 `games/hello` 才测对工程。**建议运维直接改模板默认值或置空强制必填**，别再指望每作自觉覆盖。
+
+## 四、playtest blocked 实录：模板仓库技能资产落后于平台注入副本（本轮最大增量）
+
+- **触发**：判定脚本五清单 `{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 要求全部由项目仓库预置，hello 实测唯独 `std-skills/godot-game-dev/scripts/playtest.sh` MISSING → 节点按硬约束立即 blocked（不产试玩验收包、不回填量表、不调参回写）。
+- **根因（版本分裂）**：仓库内 `std-skills/godot-game-dev/` 是**旧版**（SKILL.md 无 playtest，routines.yaml 4 步）；平台注入阅读副本 `.myrd-platform/.claude/skills/godot-game-dev/` 是**新版**（SKILL.md §4.5 机器人试玩门禁 + `playtest_driver.gd` + 5 步 routine，新增 `playtestFrames: "900"`）。即：**模板仓库落后于平台注入副本**。
+- **纪律（为什么 blocked 而不是补一个）**：判定器唯一来源是模板仓库预置；被检方自写判定脚本，门禁不再独立，PASS 一文不值；注入副本是阅读用，不得复制/改写/等价替代。
+- **运维待办（精确到文件）**：把 `WORKSHOP_GAME_TEMPLATE_REPO` 的 godot-game-dev 技能资产同步到含 `scripts/playtest.sh` + `scripts/playtest_driver.gd` 的版本，并让仓库 `.myrd/routines.yaml` 的 godot-smoke 升到 5 步。报告已落盘 `docs/playtest/hello-playtest-blocked.md`（commit 283773e）。
+- **教训泛化**：工坊每接入新模板资产前，先 diff「模板仓库 vs `.myrd-platform/` 注入副本」的技能版本，发现落后先报运维，别等跑到最后一棒才 blocked。
+
+## 五、Web 导出与部署：hello 的三个增量打法
+
+1. **导出配置前置到 scaffold 棒**（前两作是 deploy 棒现场补 preset）：scaffold 按 `games/game` 既有先例补齐 `export_presets.cfg`（`platform="Web"`、`export_path="export/web/index.html"`、`variant/thread_support=false`、`html/canvas_resize_policy=2`）+ `.gitignore` 加 `!/export/web/` 豁免 + 导出产物入库（a8b5fd09）。deploy 棒零决策复用重导出——**「可托管形态」应该在脚手架棒就建成，别留到部署棒现场发明**。
+2. **根壳单游戏位切换要核对三处**：`apphost.toml`（name=hello / assets_dir=games/hello/export/web / health=/health / runtime=node20）、server 壳的资产路由、调参桥全局注入。hello 轮根壳原指向 candy-crush-legend（games/game/export/web），已整体切到 hello。**每次上新游戏，部署前 grep 根壳里旧游戏名清残留**。
+3. **部署重发坑：v1 因 504 重发被 superseded，v2 才是终态**（两笔同 gitRef）。判断游戏死活以 `/health` + app status + liveUrl 实测为准，**别拿 deployment 列表第一笔当真**。另：`/` 会 308 重定向到 `/apps/hello`（尾斜杠归一化），curl 复核记得 `-L` 跟随。
+
+线上复核（assign_agent 独立完成，不复用 deploy 自测结论）：部署 gitRef 远端 HEAD 与 dfd20d1 逐字一致；资产通道全文本（wasm/pck 走 `*.gz.b64`），本地解码还原 wasm 35,376,909 字节与本地导出逐字一致、magic `\0asm` v1 有效，pck magic `GDPC`；壳契约四件（相对路径拉资产、移动端音频手势解锁器、`__audioDebug` 取证口、tuning 调参桥）逐项在位。
+
+## 六、调参桥 hello 实例：spec 数值与实现默认值的口径漂移（真实发生，值得记录）
+
+- `game_state.gd` 的 `TUNING_META` 白名单四键：`base_target` 1–6、`base_time` 10–90、`time_step` 0–10、`min_time` 5–90；键不在名单=拒绝（防 URL 乱注入）；缺壳层时全局 undefined 属预期，门禁行为不受影响。
+- **口径漂移**：GameDesignSpec v1（id=cmuqkaypy002hm9bf3wnk1k26，approved）写的是 3 关 10/15/25 件、30/45/60s、连击窗口 1.5s；实现默认值是 `BASE_TARGET=4 / BASE_TIME=30 / MIN_TIME=18 / TIME_STEP=4`（每关目标 4→5、时限 30→26s）。spec 数值**没有**作为默认值落地，而是寄望试玩期经调参桥回填——playtest blocked 后未回填，两者至今不一致。
+- **结论**：工坊「spec → 实现」的数值对齐不能靠默认值拍脑袋。两条路二选一：① 实现前把 spec 数值直接落成常量默认值；② spec 数值作为 TUNING_META 默认初值，并在工程 README 记「spec 口径 = 默认值」。否则验收对不上、复盘对不齐。
+
+## 七、坑位速查表（hello 新增/复发，出问题先对号）
+
+| # | 坑 | 一句话修法 |
+| --- | --- | --- |
+| 1 | 双分支并存：工作区实际建 `hello-game-goal-*`，任务指定 `games-goal-*` | scaffold 棒把同一 commit 推两条分支保证 gitRef 存在；审计认 goal artifacts 的 gitRef |
+| 2 | routines.yaml 默认 gamePath=games/godot-coin-rush（复发） | preHookParams 显式覆盖；运维改模板默认值根治 |
+| 3 | 模板仓库技能资产落后于平台注入副本 → playtest blocked | 接入前先 diff 两份技能版本；落后先报运维 |
+| 4 | 部署 504 重发 → v1 superseded / v2 running | 判终态看 /health + app status + liveUrl 实测 |
+| 5 | `/` 308 到 `/apps/hello` 尾斜杠归一化 | curl 复核加 `-L` |
+| 6 | github.com:443 从工作区不可达（3 次重试 75s 超时） | commit 留本地分支不丢；先走平台 API（localhost）回写再补推 |
+| 7 | 碰撞余量不算就摆点 → 传送收集断言假失败 | 半宽+半径先算可达包络，摆点落在 clamp 边界内 |
+| 8 | spec 数值与实现默认值漂移 | spec 数值落成默认值或 TUNING 初值，README 记口径 |
+| 9 | 导出配置留到部署棒现场发明 | scaffold 棒按上一作先例补 preset + .gitignore 豁免 + 产物入库 |
+| 10 | 根壳残留上一游戏（单游戏位惯例） | 部署前 grep 旧游戏名清残留，apphost.toml 三键核对 |
+
+## 八、关联知识与权威来源
+
+- Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路总论（oak-key）：27407691-bcf8-4e73-b686-1bb8df684e5c
+- game-9 单游戏部署先例与调参桥 §3C：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 移动端触屏虚拟摇杆与 AudioContext 解锁规范：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- MyRD 平台真实仓库结构地图：b07a928a-414b-4d48-9535-5b6d6cc859ae
+- 仓库内权威文件（本仓可直接复用）：`games/hello/{verify.sh,export_presets.cfg,tests/smoke.gd,autoload/game_state.gd}`、`docs/playtest/hello-playtest-blocked.md`、`std-skills/godot-game-dev/scripts/`、`.myrd/routines.yaml`
+- 平台产物链：requirement=cmuqk7luz002am9bfmmkouw9v → design_spec=cmuqkaypy002hm9bf3wnk1k26 → hosted_app=cmuqk3huq001km9bf5ejp7tdg → workflow run=cmuqkb8xl002nm9bf9pz8hw61（/workflows/cmuqk3j35001qm9bfsdw4xn8d/runs/cmuqkb8xl002nm9bf9pz8hw61）→ 线上复核 assign_agent=cmto42pg60004m9aq7jczszhy
+
+## 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+# 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+> **文档定位**：固化 game-8 v2 轮手感调优的**具体数值（前后对照）**、godot-smoke 门禁表现、线上链路诊断结论与**可照抄的复测方法**，形成「手感类反馈（再大一点 / 再慢一点）」的**可复用增量调参基线**——后续同类反馈直接对照本文 §五 playbook 执行，不必重新勘探。
+> **权威基准**：需求《牛牛打游戏 game-8 · v2 手感调优：牛牛体型放大、移动速度下调》（`cmuqmej89000ym9gg6mom93o0`）；策划案 v1 设计唯一来源（doc `80b9c193-6807-43e4-b2b0-5789f2d9e35b`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）；收口依赖清单（doc `943eb5eb-0949-43fe-b939-83cf171af2a3`）。
+> **实现基线**：部署分支 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`；数值提交 `3a396355`（feat v2 手感调优）→ 产物重导出 `1089e4b` → 诊断报告 `1afec443`（`games/game-8/docs/v2-liveurl-diagnosis.md`，docs-only）；线上部署 = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`。
+> **本文数字全部为一手实测值**（git diff 实录 / curl 取证 / 线上 pck 自跑门禁），非估算。
+
+## 一、v2 数值基线（前后对照，唯一落账）
+
+| 声明键 | v1 默认 | v2 落账 | 需求量化区间 | 实际占比 | TUNING_META 钳制 |
+|---|---|---|---|---|---|
+| `PLAYER_SCALE` | 1.0 | **1.4** | 1.3~1.5× 整体放大 | 1.4× | min 0.5 / max 2.0 / step 0.05 |
+| `PLAYER_SPEED` | 220.0 px/s | **145.0 px/s** | v1 的 60~70% | **65.9%** | min 60 / max 300 / step 5 |
+
+- **唯一落账位置**：`games/game-8/autoload/game_state.gd` 数值区（v2 HEAD 实测：`var PLAYER_SCALE: float = 1.4` / `var PLAYER_SPEED: float = 145.0`）。⚠️ 策划案 v1 写的路径是 `scripts/game_state.gd`，**实际权威路径是 `autoload/game_state.gd`**（scripts/ 下并无此文件），后续引用以本文为准。
+- **接线方式**（`scripts/player.gd`）：`_apply_tuned_scale()` 把 `PLAYER_SCALE` 以**根节点 uniform scale** 应用（`is_equal_approx` 脏检查，滑杆改动下一物理帧生效），同步作用于视觉精灵、`CollisionShape2D` 碰撞体与 `PickupArea/PickupShape` 判定体；`velocity = direction * GameState.PLAYER_SPEED` 每物理帧读声明键。
+- **判定几何联动（容易算错的口径，钉死）**：`player.tscn` PickupShape 本体半径 22px → v2 缩放后 **30.8px**；收集物本体半径 14px（`collectible.tscn`）；**触发距离（圆心距）= 30.8 + 14 = 44.8px**（v1 为 22+14=36px）。刷点安全间距常量 96px 未动 → 余量从 96/36 ≈ **2.67×** 收窄到 96/44.8 ≈ **2.14×**，仍满足「重开不贴脸白捡」。commit `3a396355` 提交信息里的「判定半径 44.8px」即此**触发距离**口径，不是 PickupShape 本体半径，别混淆。
+
+## 二、godot-smoke 门禁表现（v2 断言三件套 + 全链路复跑）
+
+### 2.1 门禁复跑结果（本地与 preHook 同源，全绿）
+| 门禁步 | 结果 |
+|---|---|
+| resolve-godot.sh | exit 0，Godot **4.3.stable.official.77dcf97d8** |
+| preflight.py | **PREFLIGHT: PASS**（13 类前置一致性检查、40 个工程文件，exit 0） |
+| smoke.sh（240 帧预算） | **GODOT_SMOKE: PASS**（exit 0、零 SCRIPT ERROR） |
+| input-fuzz.sh | **GODOT_FUZZ: PASS**（seed=20260913，6 批次 239 帧，exit 0） |
+| playtest.sh | **脚本缺失**（模板仓库未预置，D2 依赖 / bug `cmuktchmy000km97z6kj3r2ro` Bug1），维持 blocked、不代写不伪造 |
+
+### 2.2 smoke.gd 新增 v2 手感断言三件套（真实机判，含 FAIL 路径，约 L423-435 `_assert_v2_tuning`）
+1. **倍率区间**：`PLAYER_SCALE ∈ [V2_SCALE_MIN=1.3, V2_SCALE_MAX=1.5]`，违例 FAIL 签名「v2 手感断言 FAIL：体型倍率 %.2f 不在 %.1f~%.1f 区间」；
+2. **移速区间**：`PLAYER_SPEED ∈ [V2_SPEED_MIN=V1_SPEED×0.6=132.0, V2_SPEED_MAX=V1_SPEED×0.7=154.0]`，FAIL 签名「移速 %.1fpx/s 不在 v1 默认 %.0f 的 60%%~70%% 区间」；
+3. **接线集成断言** `_assert_node_scaled`：Player 根节点、`CollisionShape2D`、`PickupArea/PickupShape` 三节点的全局缩放必须都等于数值区 `PLAYER_SCALE`（与难度梯度 SpawnTimer 断言同口径，防「数值键写了但没接上」）。
+
+方向符号断言（A/← 后 position.x 减小、D/→ 后增大）与 50 连击判定一致性、难度梯度、过期回收、胜负四分支、一键重开、持久化等既有契约**全部保留不动且继续通过**——玩法零回退。
+
+### 2.3 可复用结论：断言区间与需求区间硬耦合
+smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的。后续若要把数值调**跨出**这个区间，必须**三处同步**：smoke.gd 常量、需求区间条款、策划案 revisions 数值区——否则门禁会以清晰签名 FAIL（这是门禁在强制「数值变更须先改需求基线」的设计行为，**不是误报，不许放松断言来绕**）。
+
+## 三、线上链路诊断结论（liveUrl 端到端实测，2026-10-02）
+
+**结论先行**：✅ v2 已在线上生效且量化达标——部署产物自跑门禁全绿（含 v2 手感基线机判），线上资产与仓库导出逐字节一致，**无需修复、无需回滚**。
+
+1. **部署元数据**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`）；当前部署 **version 5 `cmuqny37h001ficf0mpmr71mv` status=running**；gitRef=`myrd/games-goal-cmujpml1e006rm99i9hc33huu`（未落 main ✓）；commit `1089e4b`（其上仅 1 个 docs 提交，代码零差异）；v4=`cmuqnx9v6001dicf0fmfryxcz` superseded（重试冗余但无害）。
+2. **公网链路**：`GET /apps/game-8/health` → 200 `{"ok":true,"app":"game-8","game":"牛牛打游戏","assets":"lazy/object-storage"}`；`/apps/game-8/` → 308 规范化跳转 → 200；`/gw/health` → 200（网关透传正常）；壳页 11,626B，`__GAME_TUNING__` 调参桥 ×2、`__audioDebug` 音频手势解锁器、资产全走相对路径 `fetch(BASE_PATH + 'api/public/assets/' + name)` 三契约在位。
+3. **资产文本通道**：`index.pck` base64 3,333,340B → 解码 gzip 2,513,040B；`index.wasm` base64 **10,696,408B** → 解码 35,376,909B（与门禁经验 v6 一手实测值一致）。
+4. **逐字节一致（无版本漂移）**：本地导出（部署 commit 工作树）与线上对象存储拉回解码产物 sha256 完全一致——pck `5f556ad9adf47579cb38a1fd8f7549e33b478b56cd4b3b5f112346281d699e25`；wasm `fe5cebc590758c10bc4469be5a591e28edbde5ec8f458f21baeb83db50d028b9`。
+5. **最高等级证据——部署产物自跑门禁**：`godot --headless --main-pack <线上pck> --quit-after 240 res://tests/smoke.tscn` → exit 0、零 SCRIPT ERROR、`GODOT_SMOKE: PASS`，v2 手感基线机判全过（1.4∈[1.3,1.5]，145∈[132,154]）——「牛牛变大变慢」是**产物运行期实测**，不是代码推断。
+
+## 四、复测方法（照抄即用）
+
+1. **公网探测**：`curl -s <liveUrl>/apps/game-8/health`（期望 200 + ok:true）；`curl -sI <liveUrl>/apps/game-8/`（期望 308→200）；壳页 HTML grep `__GAME_TUNING__` / `__audioDebug`。
+2. **资产一致性**：`GET /api/public/assets/index.pck`（和 index.wasm）→ base64 解码 → gunzip → `shasum -a 256`，对照 §三.4 的两个哈希；不一致即版本漂移，先查部署 commit 再谈手感。
+3. **手感数值机判**：`godot --headless --main-pack <线上或本地 index.pck> --quit-after 240 res://tests/smoke.tscn`，判定三条件（`GODOT_SMOKE: PASS` + exit 0 + 零 SCRIPT ERROR），签名中应含「v2手感基线(体型1.3~1.5x·移速60~70%)」字样。
+4. **数值速查**：游戏内调参面板或壳页 `?tuning=1` URL 直接查看当前声明键值；或读 `games/game-8/autoload/game_state.gd` 数值区。
+5. **环境备注**：诊断沙箱对 github.com:443 直连超时（`Recv failure`），推送改走 `ssh.github.com:443` 通道——后续同环境取证直接用此通道，别反复试直连。
+
+## 五、「再大一点 / 再慢一点」类反馈的增量调参 playbook（可复用基线）
+
+**标准链路（全七步，禁止散点改代码对数值）**：
+调参入口（游戏内面板滑杆即时生效 / 壳页 `?tuning=` URL）→ 确定目标声明键与新值 → **经策划案 revisions 回写 `spec.numeric`**（doc `80b9c193-…`，spec 载体即该知识文档）→ 改 `autoload/game_state.gd` 数值区 → 复跑 godot-smoke 门禁 → 重导出 Web 产物并部署（gitRef 必须是 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`）→ 按本文 §四产物自跑门禁复测。
+
+**建议步长与边界**：
+| 反馈 | 动作 | 步长建议 | 边界 |
+|---|---|---|---|
+| 再大一点 | `PLAYER_SCALE` ↑ | +0.05~0.1 / 档 | 钳制 [0.5, 2.0]；跨出 [1.3,1.5] 须按 §2.3 三处同步 |
+| 再小一点 | `PLAYER_SCALE` ↓ | −0.05~0.1 / 档 | 同上；低于 1.3 同样触发门禁 FAIL |
+| 再慢一点 | `PLAYER_SPEED` ↓ | −5~15 / 档 | 钳制 [60, 300]；跨出 [132,154] 须三处同步 |
+| 再快一点 | `PLAYER_SPEED` ↑ | +5~15 / 档 | 同上 |
+
+**每次调整必做的三项联动复核**：
+1. **断言区间一致性**（§2.3）：数值是否跨出 smoke 常量带；
+2. **判定几何余量**：体型↑ → 触发距离 = 22×scale + 14 线性放大 → 96px 刷点间距余量 = 96/触发距离 收窄；低于 2× 时须复核刷点安全间距常量是否要同步上调（公平性属门禁议题，不许靠放松断言解决）；
+3. **达成余量**：移速↓ → 单位时间可达刷点数↓ → 60s/20 目标的通关可达性须复核（跑 50 连击一致性 + 全链路一条龙断言兜底；v2 @145px/s 已实测可通关）。
+
+**回滚口径**：v1 = `PLAYER_SCALE 1.0` / `PLAYER_SPEED 220.0`，两键均可在调参面板或 `?tuning=` URL 直接调回，代码零改动。
+
+**主观手感的最终裁决**：数值区间内「像不像用户要的手感」机器判不了，仍以 D3 用户试玩结论为准（入口 `…/apps/game-8?tuning=1` 已可用）；未决依赖 D1（iOS Safari 真机）/ D2（playtest.sh 模板资产）见收口清单 doc `943eb5eb-…`。
+
+**来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
+
+
+## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+# game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+> 来源：需求《测试连点防重的极简计数页（game-12）》（id=cmur8x93r0016icbsd90s6e60，goal=cmur8pnhn000kicbsvl0eoqx6）走完「录入需求 → 判定规则调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-12`（Godot 4.3.stable），分支 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`（scaffold e055e4f → implement ff779d0 → deploy c54fcc9/078f761/e5b292e → playtest 1f7a4a3）。线上：https://leomac-studio.tail49399e.ts.net/apps/game-12/（/health 200 `{"ok":true,"app":"game-12"}`，deploymentId=cmurba8yd001vicbsfdl79x8l，部署 commit c54fcc9）。门禁终态：**godot-smoke 全绿 + mobile-web-smoke PASS 10/10（实测 FPS 39）**，playtest 棒复跑双门禁结论一致。
+>
+> 本文只写 game-12 的增量结论：防重语义选型与实现契约、双门禁通过路径、踩坑清单与复用清单。门禁三层体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-9 增量见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be；移动端触屏摇杆与 AudioContext 解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；防重判定规则 R1–R6 / 事件契约 C1–C4 调研全文见项目文档库 id=8345388c-cf30-4d7c-8413-39ccd7e65887。互为补充、不重复。
+
+## 一、防重语义选型：只有「固定节流（采纳即锚定、拦截不延窗）」能同时过验收 2 和 3
+
+| 方案 | 机制 | 300ms 内连点 5 次 | 窗口后恢复累加 | 结论 |
+| --- | --- | --- | --- | --- |
+| **固定节流（首击入窗）** | 首击计数并锚定窗口；窗口内后续点击全拦且**不更新锚点** | 仅 +1 | 正常 | 采用 |
+| 防抖（末击重启窗口） | 每次点击都重置窗口，静默期满才计 | 0 次 | — | 违背验收 2 |
+| 首尾折叠 | 窗口首末各计一次 | +2 | — | 违背验收 2 |
+
+**最易写错的一行**：被拦截的点击不得触碰窗口锚点 `_last_count_ms`。一旦拦截分支也更新它，节流就退化成防抖——持续点击下计数永远不涨，验收 3 永远不过。
+
+实现（`games/game-12/autoload/game_state.gd`，时间注入纯函数，核心约 15 行）：
+
+```gdscript
+const TARGET_COUNT: int = 10
+const DEBOUNCE_MS: int = 300
+var _last_count_ms: int = -DEBOUNCE_MS   # 初值 = -窗口 → 开局首击立即有效
+
+func try_count(now_ms: int) -> bool:
+    if state != State.PLAYING:
+        return false                      # 已胜：忽略，不报错
+    if now_ms - _last_count_ms < DEBOUNCE_MS:
+        click_rejected.emit(DEBOUNCE_MS - (now_ms - _last_count_ms))
+        return false                      # 拦截：只发反馈信号，不动锚点
+    _last_count_ms = now_ms
+    count += 1
+    count_changed.emit(count)
+    if count >= TARGET_COUNT:
+        state = State.WON
+        state_changed.emit(state)
+    return true
+
+func reset() -> void:
+    count = 0
+    state = State.PLAYING
+    _last_count_ms = -DEBOUNCE_MS         # 重开同步清防重锚点 → 首击立即有效
+```
+
+三个不能省的细节：
+1. `_last_count_ms` 初值取 `-DEBOUNCE_MS`，否则开局第一击被吞（验收 1 首点即错）。
+2. `reset()` 必须同时清防重锚点——「刷新/重开无残留」包含防重状态本身。
+3. 拦截不静默：`click_rejected(remaining_ms)` 把「被吞的点击」变成可感知反馈（按钮闪红 + 状态栏「连点已拦截，还需 Nms」）。且关键反馈不能被高频更新覆盖——状态栏曾把指针坐标与拦截提示混在一行，坐标每物理帧刷新把「还需 Nms」冲掉，拆成反馈线/指针线两行才保住。
+
+时间注入是机判前提：`try_count(now_ms)` 不读时钟 → 无头冒烟可用合成时间戳逐毫秒断言（完全确定、与帧率零耦合）；只有真实点击路径才走 `Time.get_ticks_msec()`。
+
+## 二、单源单相：三个入口汇一个判定点，防「一次触碰计两次」
+
+Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`（调研已核实）→ 移动端一次触碰可能产生 touch/mouse 双事件，再加键盘空格/回车，同一「点击」有四个来源。game-12 的收敛方式：
+- `CountButton.pressed`（鼠标/触摸）与 `_unhandled_input("confirm")`（键盘/动作）都只调唯一入口 `_attempt_count()` → `GameState.try_count(...)`。防重判定只在 GameState 一处，不可能被绕过。
+- `TouchConfirmButton`（TouchScreenButton）**不直接调游戏逻辑**，而是 `Input.parse_input_event(InputEventAction("confirm"))` 注入动作 → 触摸与键盘走完全相同路径（顺带获得桌面端自动不响应的免费屏蔽）。热区用 shape 圆（半径 44）而非位图。
+
+## 三、把「防重」机判成确定性断言（附负例验证纪律）
+
+冒烟相位设计（`games/game-12/tests/smoke.gd`）：
+- **合成时间戳断言防重**：t0 有效；t0+100/200/299ms 连点全拦、只发 click_rejected、count 不变；跨窗后再点正常 +1。
+- **真实路径另测**：真实点击受真窗口约束 → 相位间显式等真实时间跨窗，并设帧数上限守卫（60fps 约 2s，超限报 `Engine.max_fps` 异常而非挂死）。
+- **噪声后复位**：乱键相位可能真触发计数/拦截，且末次乱键可能贴着 confirm 注入点不足 300ms → 进断言前 `GameState.reset()` 清锚点，消灭偶发失败。
+- **每条断言做负例验证**（证明会真 FAIL，不是永真）：热区 44→10、宽高比 keep→expand、脉冲阈值抬到 1.0，三次均如预期 FAIL。
+
+两个「静默漏判」陷阱（负例不触发才发现）：
+1. 静态几何断言放 `_ready()`：此时 `Control.size` 恒为 0，整段断言被静默跳过 → 移到第一物理帧再读。
+2. Button 有主题最小尺寸保护：`offset_right=110` 实际 size 被钳到 115，44px 负例测不出来 → 换 TouchScreenButton 圆形热区做负例。
+
+极简静止页的门禁特异问题：mobile 门禁「画面在动」检查会把完全静止的页面误判为渲染冻结。解法：+1 按钮加待机呼吸脉冲（scale 1.00→1.06 / 0.9s，实测极差 0.060 ≥ 阈值 0.02），一举两得——既是移动端可点示能，又是确定性的非零帧差证据。缩放绕 `pivot_offset`（控件中心），否则动画往右下飘。
+
+画布口径：调研建议设计宽 375 + Adaptive；实现落成 720×1280 竖屏 + `canvas_items`+`keep`（+1 按钮 560×240，375 宽实机约 291px），同样满足无横滚与 ≥44px。机判锚点是**宽高比策略必须 keep**（expand 会被冒烟断言拦，负例已验证）。
+
+## 四、Godot Web 双门禁：分工、顺序与标记辨析
+
+| 门禁 | 判定链 | 拦什么 | game-12 实测 |
+| --- | --- | --- | --- |
+| **godot-smoke** | resolve-godot → preflight.py（13 类静态一致性）→ headless smoke（`GODOT_SMOKE_FRAMES=240`，断言退出码 0 + `GODOT_SMOKE: PASS` 标记 + 日志无 SCRIPT ERROR）→ input-fuzz（seed=20260913，6 批/239 帧） | 游戏本体「跑得动且玩得动」（含防重/恢复/胜负/重开/触控目标/拉伸契约断言） | 四步全 exit 0 |
+| **mobile-web-smoke** | mobile-web-smoke.mjs --url <liveUrl>（headless Chrome 390×844 iPhone 仿真）10 项：网络全通/console 零错/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约（__audioDebug）/无横溢（scrollWidth=390）/FPS≥8（实测 39） | 部署后真实链路上的移动端可玩性 | PASS 10/10 |
+
+三条纪律：
+1. **mobile-web-smoke 必须打部署后的 liveUrl**——本地静态伺服 export/web 只能当预检（implement 棒做过 10 项预检），不能替代正式门禁：M1 网关、对象存储资产通道、壳契约只在真实链路暴露。所以它位于 deploy 之后，是产物验证而非 implement 棒门禁。
+2. **标记辨析**：判定脚本 stdout 是小写 `godot-smoke: PASS`，引擎日志里才是大写 `GODOT_SMOKE: PASS`（smoke.sh 内部 grep 大写标记后才自产小写行）。只 tail 游戏日志看不到大写标记不等于失败——先分清两层标记再下结论。
+3. **证据随仓库归档**：`games/game-12/qa/mobile/report.json` + phase-load/tap/joystick 三张截图入库，供复跑比对。
+
+## 五、部署链五个真实踩坑（每个都在本目标发生过）
+
+1. **`.gitignore` 里 `/export/` 不删 = 部署后全 404**：apphost.toml 的 `assets_dir` 指向 `games/game-12/export/web`，导出产物不入库则 wasm/pck 上线即丢。导出产物必须入库（37MB wasm 走底座 A「资产出 bundle」+ 对象存储懒加载 + `/api/public/assets/` b64 文本通道，总论见 27407691）。
+2. **apphost.toml 沿用上一游戏**：原值指向 candy-crush 的 `games/game/export/web`；构建管线按 gitRef 读它，不改会打包错应用 → `name`/`assets_dir` 随游戏改是 deploy 棒第一查。
+3. **gitRef 必须是目标分支不是 main**：本次 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`。注意本地工作区克隆出的分支名可能与远端目标分支不同名同指针（`myrd/game-12-goal-…` vs `myrd/games-goal-…`）→ 部署前 fetch + 显式切到目标分支再读 apphost/导出。
+4. **壳页三件套缺一不可**（`server/src/game-page.ts` / `games/game-12/export/web-shell.html`）：品牌文案适配（曾残留糖果粉碎传奇文案）；§3C 调参桥（引擎加载前解析 `?tuning=` → `window.__GAME_TUNING__`，只认对象形态、非法 JSON 静默忽略——game-12 缺，补约 8 行）；音频手势解锁器 + `window.__audioDebug`（即 mobile 门禁「音频解锁契约」的机判对象）。壳页另配 `overflow:hidden + touch-action:none` + `user-scalable=no`：彻底禁双击缩放/滚动，快速二连点不被浏览器手势吞掉造成防重误判（比调研建议的 `touch-action: manipulation` 更强）。
+5. **PATCH 目标 artifacts 是整体替换数组**：回写产物必须 get→append→写回（playtest 棒 3→4 条、既有条目原样保留 + 回读校验），直接 put 会抹掉前序产物。
+
+调参语义澄清：`TUNING_META` 未声明时 `?tuning=1` 是**安全 no-op**（正常进游戏、忽略键）。game-12 有意不把 `DEBOUNCE_MS=300` 做成可调——它是需求验收项本身，spec 是唯一事实源。要开放浏览器内调参需下一轮：spec.numeric 声明键 → TUNING_META + tuning_panel.gd + 冒烟断言 → 重导出重部署重跑 mobile 门禁。
+
+## 六、macOS 自带 bash 3.2 的全角括号坑
+
+`verify.sh` 里 `$FRAMES）`（全角右括号紧贴变量名）在 macOS bash 3.2 某些 locale 下把多字节字符并入变量名 → `FRAMES: unbound variable`，而上一行 echo 还能正常展开，极难定位。写法统一 `${FRAMES}`，用 `bash -x` 抓现行。game-12 修复后 verify.sh 端到端全绿（preflight/smoke/fuzz 全 exit 0）。
+
+## 七、如实上报的缺口（未绕过、未伪造）
+
+1. **playtest.sh 不在模板仓库**（`std-skills/godot-game-dev/scripts/` 同目录 9 个判定/驱动脚本中独缺它）：各节点均未自造等价判定器、未伪造 `GODOT_PLAYTEST: PASS`；`.myrd/routines.yaml` 两条 routine（godot-smoke / mobile-web-smoke）均不引用它 → 不阻塞双门禁，缺口随产物 detail 上报运维补资产。
+2. **真机抽查未做**（本环境建不了 iOS 会话）：mobile-web-smoke 是 headless Chrome 仿真，触摸结论的边界是仿真环境；真机验证留待用户试玩回填。
+3. **试玩结论只能来自用户**：playtest_kit 已交付（`games/game-12/qa/playtest-kit.md`，试玩指引 + 反馈对照表 + 四问量表），量表待回填，未代填任何「好玩/通过」结论；未收到用户调参 URL 前，无 spec revisions/approve 调用。
+
+## 八、复用清单（后续点击类小游戏直接抄）
+
+1. 防重抄 `try_count(now_ms)` 签名：时间注入纯函数 + 初值 `-DEBOUNCE_MS` + 拦截不动锚点 + reset 清锚点 + 拦截发 remaining_ms。
+2. 输入抄「单源单相」：所有入口 → 唯一 `_attempt_count()`；TouchScreenButton 注入 InputEventAction 而非直调逻辑。
+3. 断言抄四件套：合成时间断言 + 真实路径跨窗等待 + 噪声后 reset + 每条断言负例验证；几何断言放第一物理帧，44px 负例用 TouchScreenButton 热区。
+4. 静止页记得待机脉冲（≥0.02 极差同时换「画面在动」绿与可点示能）。
+5. 部署抄「五查」：gitignore 的 /export/、apphost.toml 指向、gitRef=目标分支、壳三件套（文案/调参桥/音频解锁）、artifacts 回写 get→append→写回。
+
+关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
+
+## 沉淀 game-14 Godot Web 导出与移动端门禁经验
+
+> 来源：goal cmusp1rab0028ic7q9shcdzyl（项目 cmusp1ra00022ic7qnk18nofm）「小游戏工坊 · game-14」工作流执行沉淀。上游输入：需求《game-14 太空飞船躲陨石捡金币》（cmusphfbp0062ic7qrxlt2nk4）、GameDesignSpec v1（cmuspm7sm006uic7qzrbqyilp，approved）。工作流 run cmuspmlex0072ic7qnjiqxmpc **真实结局 = failed，且失败于工作区准备阶段，四个节点全部 pending**。本卡如实记录本轮真实结论（失败模式与补救路径），并把 game-14 真正进入开发后要带上的导出/门禁契约收拢成清单（引用既有基线、不重复）。**本轮没有产生任何 game-14 代码、导出产物、门禁判定或部署事实——请勿把本卡第 4~6 节的复用清单误读为 game-14 实测数据。**
+
+## 一、本轮真实结局：准备阶段 git clone 失败，门禁与导出根本未执行
+
+- 时间线：run 创建 2026-10-03T18:12:57Z → failed 2026-10-03T18:15:25Z（存活 2 分 28 秒）；prepSteps 仅「解析模型配置 3ms」；失败点 = preparationPhase「正在准备代码工作区（克隆仓库、拉取最新代码）」。
+- run.result.error 逐字：`git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmusp1ra00022ic7qnk18nofm/run-cmuspmlex0072ic7qnjiqxmpc'... fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75009 ms: Couldn't connect to server`。
+- 节点状态：脚手架 / 实现玩法 / 导出并部署 / 试玩验收 全部 pending；implement 与 deploy 的 godot-smoke preHook、playtest 的 mobile-web-smoke preHook 也均 pending——**门禁一次都没跑过，不存在「门禁打回」**。
+- 复盘纪律：「已启动 ≠ 已成功」在本轮的具体形态就是「run 状态 failed + 节点全 pending」；判定真实结局唯一依据 run 状态与 run.result.error，禁止凭预期脑补「门禁打到第几轮」。
+
+## 二、根因分类与补救：环境不可用 ≠ 代码缺陷，正确动作是重跑而非改代码
+
+- 根因：github.com:443 连接 75 秒超时（connect 阶段即失败，非认证/仓库问题），属瞬时网络故障——与 godot-smoke 退出码 2「环境不可用」同层语义：**禁止为它改游戏代码，更不允许宣称门禁失败**。
+- 恢复复核（2026-10-04）：`curl https://github.com` → 200（0.59s）；`git ls-remote https://github.com/hl3w22bupt/myrd-playground.git` 正常返回分支列表 → 复跑条件已具备。
+- 补救动作：`POST /api/v1/workflows/runs/cmuspmlex0072ic7qnjiqxmpc/rerun`（平台手册 rerun 入口）。DAG 输入不变：需求 cmusphfbp0062ic7qrxlt2nk4 + spec cmuspm7sm006uic7qzrbqyilp（v1 approved）仍是唯一权威。
+- 若同签名（clone exit 128 / 443 connect timeout）复现：先做宿主机连通性探针（curl github.com + git ls-remote），如实按「环境不可用」上报等待恢复；不得降级为纸面交付，也不得空转烧修复预算。
+
+## 三、game-14 工坊流水线契约（经本轮 run 定义实测核实）
+
+- 四棒 DAG：脚手架 scaffold → 实现玩法 implement → 导出并部署 deploy → 试玩验收 playtest；仓库 github.com/hl3w22bupt/myrd-playground（game-14 预期落位 `games/game-14`，以 scaffold 实际产物为准）。
+- 门禁挂点：**implement、deploy 两棒都挂 godot-smoke；playtest 挂 mobile-web-smoke**。routine 均 gate:false、由 preHook 显式引用；`{{liveUrl}}` 无默认值 = fail-closed（不传就报错，不会静默跳过门禁）；`{{gamePath}}` 必须经 preHookParams 显式传参（默认值指向不存在工程的坑见 27407691 §1.3）。
+- 判定资产唯一来源：仓库 `std-skills/godot-game-dev/scripts/`（mobile-web-smoke 判定脚本 mobile-web-smoke.mjs + 负例自测 mobile_smoke_selftest.mjs + routine 片段模板已随 commit 4a8e4b76 落地）；被检工程不得自造判定器，scaffold 只校验不自造。
+
+## 四、game-14 验收标准 → 门禁断言映射（approved spec v1 的可机判数值）
+
+| 验收项 | spec v1 锚点 | 机判断言落法 |
+| --- | --- | --- |
+| 难度阶梯 | 陨石生成间隔 950ms 逐档递减至封顶 430ms、下落速度 130px/s 逐档递增至封顶 270px/s，共 5 档（每 100 分一档） | 冒烟分相位读各档生成间隔/单位位移帧数，断言逐档单调变化且封顶后不再变化；档位边界按得分 100/200/300/400 推导写进断言注释 |
+| 状态机与持久化 | 开始（含操作说明）/进行中/暂停恢复/游戏结束/一键重开五状态；最高分 localStorage 键 `game14.highScore` | 状态标志断言；重开后断言分数清零而最高分保留；localStorage 属线上行为，由 mobile-web-smoke 打 liveUrl 验证 |
+| 操控与边界 | 键盘 ←→/A/D（含上下）+ 触摸拖动，飞船不可越出画布 | E-08 纪律：按住方向键测位移与动作注入分帧做；越界 clamp 断言；触摸拖动必须真实改变飞船目标位置（mobile 门禁 touch-response 预修，见 §六） |
+| 计分与生命 | 拾金币 +10 实时显示；撞陨石 −1 命（共 3 命），命尽进游戏结束页并展示本局得分 + 历史最高分 | 拾取/碰撞事件计数断言；连续碰撞或生命归零路径必须可达并断言 GAME_OVER |
+| 视听契约 | 三层星空视差滚动；碰撞爆炸闪烁 + 300ms 震屏 + 1.2s 无敌闪烁；+10 飘分 | 事件标志/帧差断言；无敌期 = 「碰撞不再扣命」的断言窗口 |
+| 音频契约 | coin-pickup / meteor-explosion / game-over 三 SFX 可编程触发；M 键静音且不影响逻辑 | headless 侧编程触发断言；AudioContext 解锁契约（__audioDebug）归 mobile-web-smoke 第 8 项 |
+| 性能 | 连续游玩 60s 帧率 ≥ 30fps；页面无控制台报错 | **阈值辨析：mobile-web-smoke 的 FPS≥8 是底线门禁，≥30fps 是需求验收线——门禁全绿 ≠ 验收达标，验收仍按 spec 执行** |
+
+## 五、复用基线指针（执行时直接带上，本卡不重复其内容）
+
+- **27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 总论）**：Godot 4.3 Web 导出参数基线（`variant/thread_support=false` 免 COOP/COEP、`canvas_resize_policy=2`、中文必须 theme/custom_font=P13、导出 7 件套与 wasm≈35MB 量级）；AppHost 部署契约（**一游戏一清单**——game-14 必须 `name="game-14"`、`assets_dir="games/game-14/export/web"`，绝不沿用他游戏 apphost.toml；部署 gitRef 必须是部署分支 `myrd/games-goal-<goalId>` 不是 main；`/export/` 产物必须入库否则上线全 404；M1 网关拦二进制 → gzip+b64 文本回传；壳内资源全走相对路径）；godot-smoke 三层门禁与退出码语义 0/1/2/3；error-signatures 修复循环纪律；部署终态独立复核四步。
+- **00314649-c4d2-407c-871b-62f7de91b07d（game-12）**：mobile-web-smoke 10 项明细（网络/console/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约/无横溢/FPS≥8）与「必须打部署后 liveUrl」纪律（本地静态伺服只能当预检）；标记辨析（判定脚本 stdout 小写 `godot-smoke: PASS` vs 引擎日志大写 `GODOT_SMOKE: PASS`）；证据随仓归档（`games/<game>/qa/mobile/report.json` + phase 截图）。
+- **82e419bb-b641-4b5e-bb58-d8b9633169ca**：移动端触屏虚拟摇杆与 AudioContext 解锁三件套（首手势解锁 + 解锁前记账 + 退后台回来再解锁），壳页与游戏侧都要进。
+- **36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）/ 78180e88-6486-404e-9265-e315e0da3c66（hello）**：同系列工程结构、模板与门禁增量结论。
+
+## 六、mobile-web-smoke 已知失败图谱（5 款游戏实测 → game-14 预修清单）
+
+仓库 mobile-gate 系列实测 verdict（commits 11957bd3~585db60c）：game-3 疾风忍者跑 **PASS**（十项全绿，tap 触发跳跃实证触摸驱动玩法）；game-2 星尘收集者 FAIL（console Godot 缺 cfg 告警 + tap 后零帧差）；game-4 光路谜阵 FAIL（tap 落空格零帧差，探针坐标与 letterbox 棋盘错位）；game-9 推箱子 FAIL（探针落点错位，摇杆实际 CSS(44,502)）；game-10 天天酷跑 FAIL（tap 落横带无响应，尚需探针区分「点按开始未实现」与「落点错位」）。
+
+- 主失败源集中在 **touch-response**，两类根因：①游戏触摸未真正接入玩法状态（UI 自称支持触摸但点按无效）；②探针坐标与画布 letterbox/控件 CSS 实际位置错位（屏幕坐标 ≠ 游戏坐标）。
+- game-14 预修清单：触摸拖动直接改飞船目标位置并与键盘同路径（game-12「单源单相」范式：多输入源汇一个判定入口）；可交互热区 ≥44px，避免依赖 letterbox 偏移的绝对坐标；开始页不要做成纯静止层（会触发「画面在动」误判，game-12 用待机呼吸脉冲拿到确定性非零帧差）；音频解锁契约随壳页一并实现。
+- 证据纪律：verdict 逐字进 commit message + report.json + phase-load/tap/joystick 三截图入库，供复跑比对。
+
+## 七、关联知识与权威来源
+
+- 知识卡：27407691-bcf8-4e73-b686-1bb8df684e5c（导出+门禁+AppHost 总论）、00314649-c4d2-407c-871b-62f7de91b07d（双门禁与 mobile-web-smoke 10 项）、82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏/音频解锁）、36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）、78180e88-6486-404e-9265-e315e0da3c66（hello 工坊）、b07a928a-414b-4d48-9535-5b6d6cc859ae（平台仓库结构与路径陷阱）。
+- 仓库权威文件：`std-skills/godot-game-dev/scripts/{smoke.sh,preflight.py,input-fuzz.sh,resolve-godot.sh,mobile-web-smoke.mjs,mobile_smoke_selftest.mjs}`、`std-skills/godot-game-dev/references/{godot-smoke-routine.md,mobile-smoke-routine.md,error-signatures.md}`、`.myrd/routines.yaml`。
+- 平台事实源：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`（rerun 入口、「已启动 ≠ 已成功」纪律）；工作流 spec 与需求以平台登记产物为准。
+
+
+## 沉淀知识：Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+# Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+> 来源：目标「森林收集水果限时赛」（goal=cmuspb558003tic7qwgyd02c2）的小游戏工坊流水线（workflow=cmuspb55m003xic7q9o18vjk2 v1，scaffold→implement→deploy→playtest）首轮执行（run=cmuspld10006ric7qup55soew，2026-10-03T18:12:00Z 起、18:14:30Z 判 failed）。固定参数：工程 games/60-2，功能分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2，AppHost cmuspb3xg003ric7q1ksya6c3（slug 60-2），liveUrl https://leomac-studio.tail49399e.ts.net/apps/60-2/（部署前即确定）。本文只写本轮实测增量：①双门禁在 60-2 的挂点与分工；②本次 run 的真实卡点——双门禁之前的第一堵墙；③一次「参数漂移」疑云的证伪过程；④知识沉淀节点自身的 API 事实。godot-smoke 三层门禁体系、打回修复签名表、AppHost 部署总论见关联知识（§八），不重复。
+
+## 一、结论速览
+
+| # | 要点 | 结论 | 依据 |
+| --- | --- | --- | --- |
+| 1 | 双门禁分工 | 工程门（godot-smoke，挂 implement 与 deploy 之前，判工程本体）×线上门（mobile-web-smoke，只挂 playtest 之前，判公网 liveUrl）——判定对象、执行环境、证据落点都不同，不可合并为一道 | 工作流定义逐节点核对 |
+| 2 | 本次失败层级 | run 级失败发生在**门禁之前**：工作区 git clone 连不上 github.com（443 端口 75s 连接超时），四个节点全部 pending，双门禁一次都没执行 | run.result.error 原文 |
+| 3 | 根因定性 | 环境阻塞，非代码/配置缺陷：github.com 从执行机**持续性**不可达（2026-10-03 run 失败 + 2026-10-04 复测 `curl -m 10 https://github.com` 仍超时，连接建立不了） | run 错误 + 本机复测 |
+| 4 | 重跑纪律 | 网络不通时重跑 run = 空烧：先 `curl -m 10 https://github.com` 验连通（10 秒成本），通了自己重跑（工作流定义无需改动），持续不通按「blocked 比空烧有用」上报运维（代理/镜像），禁止为绕过网络改仓库来源 | 本轮 2.5 分钟烧掉一次 run 的直接教训 |
+| 5 | 工作流定义健康度 | 60-2 四节点参数已逐一核对**全部正确**指向 games/60-2 / 60-2 分支 / 60-2 AppHost / 60-2 liveUrl，不存在「模板实例化只替换了首个节点」的漂移 | 8 个关键词 × 4 节点计数复核 |
+| 6 | 沉淀 API 事实 | 本部署**没有** `/api/v1/knowledge/search`（404）；等效做法与写入契约见 §七 | 本次实测 + 平台源码 src/routes/knowledge.ts |
+
+## 二、60-2 双门禁挂点与分工（逐节点实例核对）
+
+| 节点 | preHook | preHookParams | 判定对象 | 证据落点 |
+| --- | --- | --- | --- | --- |
+| scaffold | 无 | — | 资产存在性自检（门禁脚本/routines.yaml/模板，缺失→blocked） | 节点 detail |
+| implement | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（静态一致性 + 无头运行） | 门禁日志 |
+| deploy | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（部署前再拦一次，防止部署带病产物） | 门禁日志 |
+| playtest | mobile-web-smoke | gamePath=games/60-2, liveUrl=https://leomac-studio.tail49399e.ts.net/apps/60-2/ | **线上公网 liveUrl**（headless Chrome 移动仿真） | games/60-2/qa/mobile/（report.json + 分阶段截图） |
+
+要点展开：
+
+1. **工程门挂两道、线上门只挂一道，是有意设计**：godot-smoke 的判定对象是仓库内工程（preflight 静态 + headless 运行），所以在写代码（implement）和出产物（deploy）两处都要拦；mobile-web-smoke 的判定对象是已部署的线上地址，只有 playtest（试玩验收）消费它，且 liveUrl 在部署前就已锁定，preHook 可以在节点启动前先跑门禁、节点启动后直接读证据。
+2. **判定协议（与门禁同源，agent 本地自检命令完全一致）**：退出码 `0` 且日志含标记才算通过——`GODOT_SMOKE: PASS`（冒烟）/ `GODOT_FUZZ: PASS`（fuzz）/ `GODOT_PLAYTEST: PASS`（机器人试玩）；退出码 `2` = 环境不可用（装环境/上报，**禁止为过门禁改判定脚本或改松断言**）。
+3. **判定器独立性**：`preflight.py / smoke.sh / input-fuzz.sh / playtest.sh / resolve-godot.sh / mobile-web-smoke.mjs` 唯一合法来源是仓库 `std-skills/godot-game-dev/scripts/`（模板仓库预置）；平台注入的 `.myrd-platform/.claude/skills/godot-game-dev/` 只是阅读副本，不得当判定来源、不得现场改写、不得自造等价脚本——被检方自己写判定器，PASS 一文不值。缺任何一个 → status=blocked 上报（「模板仓库未预置门禁脚本：<文件名>；请运维补模板仓库」），**不要现场补**。
+4. **参数化必须显式传**：`.myrd/routines.yaml` 中 `godot-smoke` 与 `mobile-web-smoke` 的 `{{gamePath}}`/`{{liveUrl}}` 由工作流节点 preHookParams 按工程覆盖。仓库默认值指向别的工程——不传参要么报错、要么（更糟）静默测错工程给出假 PASS（坑实录见关联知识 27407691 §1.3）。
+5. **中文字体是 preflight P13 的拦截项**：Web 导出跑在浏览器沙箱里拿不到系统字体，模板自带 `assets/fonts/` 全局中文字体与 `project.godot` 的 `[gui] theme/custom_font` 配置必须原样保留；「有中文文案但无字体」直接被 P13 拦下。禁止为躲缺字把文案英化——那是字体缺失的症状，不是修复。
+
+## 三、本次 run 的真实卡点：双门禁之前的第一堵墙
+
+**时间线**：18:12:00 run 启动 → 引导阶段执行工作区 `git clone https://github.com/hl3w22bupt/myrd-playground.git` → 75 秒连接超时 → 18:14:30 run 判 failed。错误原文：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspb3xd003nic7qm25pu8si/run-cmuspld10006ric7qup55soew'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75003 ms: Couldn't connect to server
+```
+
+**为什么门禁体系没接住**：门禁全部挂在**节点**上（preHook），而 clone 是 run 引导步骤，发生在第一个节点之前。clone 失败的后果是：①直接置 run=failed（result.error），②四个节点永远 pending，③没有 reject 打回循环、没有 blocked 语义、没有证据落点——门禁体系（preflight/smoke/fuzz/playtest/mobile-web-smoke 六个判定器）覆盖的是「工程与线上」，不覆盖「工作区引导」这第 0 步。
+
+**连锁依赖链**（为什么这一断全断）：clone 可用 → 功能分支可推送 → AppHost 按 gitRef 拉取构建 → liveUrl 可访问 → mobile-web-smoke 有东西可测 → 试玩验收有地方可玩。第 0 依赖断了，双门禁与验收全部空转。
+
+**恢复路径（给下一轮执行，按序）**：
+
+1. 先验连通（成本 10 秒，避免空烧一次 2.5 分钟的 run）：`curl -s -o /dev/null -m 10 -w "%{http_code}" https://github.com`；
+2. 通了 → 直接重跑工作流，**定义无需任何改动**（四节点参数已核对全部正确，见 §四）；
+3. 持续不通 → 不要重跑，回写 status=blocked 上报运维（网络代理 / GitHub 镜像 / 出网白名单），写清「clone github.com:443 连接超时，全链被第 0 依赖阻塞」——与门禁「退出码 2 = 环境不可用，禁止为过门禁改代码」是同一条纪律的 run 级推广：**环境不通时，重跑是空烧，先修环境或如实上报**；
+4. 禁止为绕过网络私自换镜像仓库/改 remote——仓库来源是部署与门禁的信任锚，变更必须走运维。
+
+## 四、诊断方法论：一次「模板参数漂移」疑云的证伪
+
+**现象**：核对工作流定义时，scaffold 节点参数正确指向 games/60-2，而读到的 implement/deploy/playtest 节点 prompt 里满是上一个游戏 app-2 的固定参数（gamePath=games/app-2、分支 cmuspfeyw…、AppHost cmuspfdr…、liveUrl /apps/app-2/）→ 一度形成高价值假设：「工作流模板实例化只替换了首个节点的参数」。
+
+**证伪过程**：换独立文件名重新拉取同一工作流，对 8 个关键词（games/60-2、games/app-2、两个 goal id、两个 liveUrl、两个 AppHost id）× 4 节点逐一计数——**四节点全部正确指向 60-2**。真因：诊断用的 `/tmp` 共享临时文件被本机并发进程覆盖，中间那几步读到的其实是另一个工作流（app-2）的同名缓存文件。
+
+**沉淀三条**：
+
+1. 结论必须落在「重新独立取证」上，不落在「上一次读到的内容」上——尤其对「上游模板缺陷」这类会被写进知识、触发他人返工的高价值指控，先证伪再落笔；
+2. 诊断脚本对临时文件用唯一文件名（本次 `/tmp/wf.json` 与并发工作流进程撞名），或直接管道内消费不落盘；
+3. 证伪本身也是产出：本文档差点把一个不存在的平台缺陷写成结论，§一第 5 条的「定义健康度」结论就是证伪的成果，它让下一轮可以放心直接重跑。
+
+## 五、Web 导出与 AppHost 部署：60-2 落位值与硬约束清单
+
+机制细节与打回修复总论见关联知识 27407691（oak-key 全链路）与 82e419bb（触屏/音频），本节只列 60-2 的具体落位值和逐项易错点：
+
+| 项 | 60-2 落位值 | 易错点（违反后果） |
+| --- | --- | --- |
+| 部署来源分支 | myrd/games-goal-cmuspb558003tic7qwgyd02c2 | gitRef 传 main → main 上没有本游戏的 apphost.toml/导出产物，构建失败或把别的壳部署出去 |
+| 部署 API | POST /api/v1/apphost/apps/cmuspb3xg003ric7q1ksya6c3/deployments，mode=bundle | sourceId 必须是 goal id cmuspb558003tic7qwgyd02c2；带别的应用 id → 403 APP_BOUND_TO_OTHER_SOURCE（选错坑，回来核对 hostedAppId，不要换坑硬试） |
+| 导出预设 | games/60-2/export_presets.cfg 配 Web(HTML5)，产物落 games/60-2/export/web/（必须含 index.html） | 缺 index.html → 壳无入口页 |
+| 资产出 bundle | apphost.toml 声明 `assets_dir = "games/60-2/export/web"`，平台把该目录上传对象存储，25MB 上限不再约束资产体积 | 不声明 assets_dir → 产物挤进 bundle，体积立刻顶 25MB 上限 |
+| 壳资产路由 | asset-store `getAsset` 懒加载，路由 `/api/public/assets/:name`；`gzip+b64` → 回 text/plain 的 base64（壳端 DecompressionStream 解压）；`raw` → 按 contentType 回原文 | M1 网关**只透传文本响应**：octet-stream/gzip/图片/音视频 → 502 UNSUPPORTED_BINARY；资产一律 base64 文本回传 |
+| 路径口径 | 壳页面拉资源**一律相对路径**（`api/public/assets/index.wasm`）；`?p=` 是网关保留 query | 绝对路径 `/assets/...` 或 `?p=` 手拼 → 404/被登录墙拦 → 黑屏 |
+| wasm 初始化 | `WebAssembly.instantiate(bytes)`（base64 → Uint8Array → 解压） | instantiateStreaming 要求 application/wasm MIME，本链路不满足 |
+| b64 内联降级 | 仅当 asset-store 不可用；原始产物 ≤ 18MB（b64 膨胀 1.33×，bundle 上限 25MB） | 超限 → 降级「说明页 + 下载指引」，不得声称可玩 |
+| 音频手势解锁 | 壳页面在引擎加载**之前**：①包 AudioContext 构造器捕获引擎实例；②document 级 `touchstart/touchend/pointerdown/keydown/click`（capture+passive，不消费事件）同步 `ctx.resume()`；③暴露 `window.__audioDebug()` | 缺任一 → 移动端全部音效静默且控制台零报错（WebKit 创建即 suspended、切后台变 interrupted、引擎只在输入回调 resume）；有音效的游戏壳缺解锁器 = 验收不通过 |
+| 调参桥 | 壳页面引擎加载前解析 `?tuning=<JSON>` 进 `window.__GAME_TUNING__`，游戏侧 GameState 启动按 TUNING_META 声明的键钳制覆盖 | 缺 → 试玩调好的参数无法用 URL 复现，调参回写流程断裂 |
+| 部署后自测 | /health 与 / 都 200 只是起点，**必须**跑 mobile-web-smoke | 只 curl 200 就宣称部署成功 = 跳过移动端硬门槛 |
+
+## 六、mobile-web-smoke 移动端模拟门禁要点
+
+- **机判方式与维度**：headless Chrome 移动仿真打开线上 liveUrl，机判六项——网络（资源可达）、console（无报错）、渲染（画面在动）、触摸（可交互）、音频契约（解锁层在位）、视口（移动端尺寸正确）。
+- **证据落点**：`games/60-2/qa/mobile/`（report.json + 分阶段截图）。试玩节点（playtest）据此写试玩指引；若发现证据缺失或与 preHook 结论矛盾，如实回写 detail，不替门禁背书。
+- **已知边界一：静止页会被误判渲染冻结**。完全静止的页面「画面在动」检查会 FAIL——解法是给核心按钮加待机呼吸脉冲（game-12 实测：scale 1.00→1.06 / 0.9s，极差 0.060 ≥ 阈值 0.02），既是门禁过检又是移动端可点示能（关联知识 00314649）。
+- **已知边界二：门禁全绿 ≠ 真机可用**。触摸事件分发顺序（E-18：`mouse_filter=STOP` 的 Control 在 GUI 命中阶段吃掉触摸，永远到不了 `_unhandled_input`）与 InputEventAction 互踩（E-19）都属于「headless 门禁全绿、真机必挂」型，机判之后仍需真人真机过一次「开局可动、摇杆不误触」（关联知识 82e419bb）。
+- **与试玩验收的衔接**：mobile-web-smoke 全绿只是准入，试玩节点产出「试玩验收包」（试玩指引 + 四问量表 + 调参工作台入口 `<liveUrl>?tuning=1`）；试玩结论只能来自用户，量表未回填就如实标「待回填」，detail 里不得出现没有出处的「试玩通过」。
+
+## 七、知识沉淀节点自身的 API 事实（本次实测，供后续沉淀节点直接复用）
+
+- **本部署不存在 `GET /api/v1/knowledge/search`**（返回 404）。等效「先搜后写」：`GET /api/v1/knowledge?scope=global&limit=200` 拉全量后客户端按 title/内容过滤（服务端源码 src/routes/knowledge.ts 的 GET 只支持 scope/category/projectId 过滤，无全文检索；列表默认只返回 parentId=null 且 isPublished=true 的文档）。
+- **新增**：`POST /api/v1/knowledge`，必填 `title` + `scope`（'global'|'project'）；`title+scope` 重复 → 409 CONFLICT（先搜后写可顺便避开）；`tags` 必须是字符串数组；`category` 建议对齐既有口径（本文用「技术方案」，与同类游戏知识一致）；创建即 isPublished=true 并自动生成 v1 版本快照。
+- **更新**：`PATCH /api/v1/knowledge/doc?id=<docId>`，支持部分更新 title/content/category/tags/icon/scope/projectIds；平台自动做版本化（更新前快照旧版 → version+1 → parentVersion=`id@vN`），不需要调用方自己处理版本。
+- **单篇读取**：`GET /api/v1/knowledge/doc?id=<docId>`（返回 doc + associatedProjectIds；已删除文档也能读到，便于历史链接）。
+- **写入姿势**：JSON body 直接 PUT 不便时，用 python3 `json.dumps` 构造 payload 再交 curl 发送，避免 shell 转义事故。
+
+## 八、关联知识（互为补充，不重复）
+
+- `27407691-bcf8-4e73-b686-1bb8df684e5c`：Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路实战（oak-key）——三层门禁体系、退出码语义、routine 参数化、GODOT_BIN 单一实现、error-signatures 打回修复表。
+- `00314649-c4d2-407c-871b-62f7de91b07d`：game-12 双门禁通过路径——mobile-web-smoke PASS 10/10 实测、静止页呼吸脉冲、负例验证纪律。
+- `82e419bb-b641-4b5e-bb58-d8b9633169ca`：game-5 触屏虚拟摇杆与 AudioContext 解锁规范——E-18/E-19 机制、统一移动向量出口、音频门控三件套。
+- `6e91a11d-3632-4721-a3ea-d433e9622f9b`：game-5 玩法设计要点——与 60-2 同属「森林收集水果限时赛」玩法族（60 秒限时收集），数值基准可对照。
+- 设计 spec（platform）：`cmuspl1bw006lic7qkcplv73e`——60-2 的水果分值表（+1/+3/+10）、生成节奏与 60 秒结算契约及契约测试清单，实现与验收以此为准。
+
+## 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+# 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+> 来源：需求《《森林收集水果限时赛》游戏需求》（id=cmusp9cd00035ic7qxi8c4il3，验收节点 completed）→ GameDesignSpec《水果分值表与收集循环》（id=cmuspeqza004uic7qusqyn7gr）→ 小游戏工坊两次工作流运行皆 failed → 主策划验收指派（id=cmtn5fhk8000hjqckrib9i3bb，completed）。全部平台终态于 2026-10-04 经 API 与线上 URL 实测取证（见 §一）。
+>
+> 本文写三件事：① 可复用的「分值分档点按收集」玩法模板（+1/+2/+5 三档）；② Web 导出 + 双门禁的复用要点；③ 本 goal 双跑皆败的流程复盘教训。**不重复**总论：门禁三层体系与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key）；工程结构最小契约与帧预算推导见 78180e88-6486-404e-9265-e315e0da3c66（hello）；时间注入机判与单源单相见 00314649-c4d2-407c-871b-62f7de91b07d（game-12）；触屏适配与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca；**同名 IP 的另一机制变体**（松鼠移动+原木躲避+连击）见 6e91a11d-3632-4721-a3ea-d433e9622f9b（game-5 老版）。
+
+## 一、事实基线（本 goal 真实终态，先看这个再谈复用）
+
+| 对象 | 标识 | 终态 | 取证方式 |
+| --- | --- | --- | --- |
+| 需求 | cmusp9cd00035ic7qxi8c4il3 | completed | goal DAG 记录 |
+| GameDesignSpec（分值表与收集循环） | cmuspeqza004uic7qusqyn7gr | completed | goal DAG 记录 |
+| 工坊运行 #1 | workflow=cmusp1yao002pic7q384xxfse，run=cmuspf4oo0050ic7qfjj0azwh（工程 games/60，分支 myrd/games-goal-cmusp1ya8002lic7qk39zog9o） | **failed** | GET /api/v1/workflows/{id} 的 runs 字段 |
+| 工坊运行 #2（换 slug 重试） | workflow=cmuspb55m003xic7q9o18vjk2，run=cmuspld10006ric7qup55soew（工程 games/60-2，分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2） | **failed** | 同上 |
+| AppHost 记录 | 60=cmusp1ya6002jic7qz3dhps7r；60-2=cmuspb3xg003ric7q1ksya6c3 | 均卡在 status=creating，publicUrl=null，publishedAt=null | GET /api/v1/apps |
+| 线上地址 | https://leomac-studio.tail49399e.ts.net/apps/60 与 /apps/60-2（含 /gw 变体） | **404「应用不存在」** | curl -L 实测 2026-10-04 |
+| 主策划验收指派 | cmtn5fhk8000hjqckrib9i3bb（标题「验收复核线上版并回写产物标识」） | completed（节点完成；其结论正文经多个 API 路由探测不可回读） | goal DAG 记录 |
+| 同名老变体 game-5 | AppHost=cmuipis4f0063m9l6hagvvvd4，goal=cmuipis4g0065m9l69hew4nng，需求=cmuipol63006rm9l6cp2ww5r5 | ready，publicUrl=/apps/game-5，3 次工坊 run 全 completed | GET /api/v1/apps、/api/v1/workflows |
+
+结论一句话：**本 goal 的「点按分档版」截至 2026-10-04 没有可玩的线上版**；平台里唯一在线的「森林收集水果限时赛」是老变体 game-5（玩法口径完全不同）。后续任何验收、试玩、传播链接都必须先对照本表，别拿老 game-5 顶数。
+
+## 二、分值驱动收集玩法模板（+1/+2/+5 三档 · 点按拾取）
+
+### 2.1 分值表与频率反相关（需求硬性口径 + 建议校准值）
+
+| 档位 | 分值（需求硬性） | 出现权重（建议起点） | 期望得分贡献占比（建议） | 视觉要求 |
+| --- | --- | --- | --- | --- |
+| 低（苹果） | +1 | ~70% | ~45% | 常规色调 |
+| 中（橙子） | +2 | ~25% | ~35% | 提亮一档 |
+| 高（稀有水果） | +5 | ~5% | ~20% | 高对比 + 特效标识 |
+
+- **分值与频率必须反相关**且两者解耦配置（权重表与分值表分开两张常量表）——需求只锁「高分水果出现频率更低」，斜率是实现自由度；但三档贡献占比是手感核心，建议按上表起步、用冒烟统计实测校准（240 帧冒烟里统计三类生成次数的比例，替代人工目测）。
+- **期望值校准法**：单局期望总分 = 60s × 刷新速率 × Σ(权重ᵢ × 分值ᵢ)。先定「单局期望分」这一产品目标，再反推刷新速率，不要拍脑袋调刷新率。
+- **计分唯一入口**：所有得分变更走同一个 `add_score(points)`，分值查表发生在水果节点持有 `tier` 字段 → 入口处查表，禁止 UI 层或触摸回调里散落 `score += 1` 字面量。这是「+1/+2/+5 各自累加正确」能被机判断言的前提（同 game-12 的单源纪律）。
+
+### 2.2 60 秒计时的 ±1 秒验收实现口径
+
+- 用 `float` 剩余时间在 `_process(delta)` 里累积递减，显示层取 `ceil()`；归零判定用 `time_left <= 0.0` 触发结算，**不要**用「Timer 节点每 1 秒 tick 一次、tick 里 -1」的实现——tick 计数在暂停/掉帧/场景切换时会漂移，±1 秒容差经不起移动端浏览器节流（切后台回来一次就能漂 1~2 秒）。
+- 冒烟断言：读 UI 计时文本两次间隔 1~2 秒断言递减；用引擎时间注入（同 game-12 `try_count(now_ms)` 模式）把 `time_left` 直接压到 0，断言进入结算场景。显示值与内部值分离，断言内部值。
+
+### 2.3 点按拾取：单源单相 + 热区（移动端唯一操作）
+
+- Godot 4 默认 `emulate_mouse_from_touch=true` → 一次触摸可能产生 touch + mouse 双事件，再加 `_unhandled_input` 的动作路径，同一「点击」多来源。收敛方式与 game-12 相同：所有来源只调唯一入口 `attempt_collect(fruit)`，判定收口在 GameState 一处。
+- 触摸热区按「水果视觉半径 + 容差」配置，最小可点直径 ≥ 44~48 逻辑 px，且注意 DPR 换算（引 82e419bb）；相邻水果刷新点最小间距 ≥ 1.5 个水果直径，防误触串档（点到低档实际想点中档）。
+- 高分水果「稀有」也必须**可点**：特效动画不要吃掉点击区（动画节点 `mouse_filter=IGNORE`），否则会出现「看得见点不中」的体感灾难——美术动效是 Area2D 之外的子节点，别挂在碰撞体上。
+
+### 2.4 供给节奏与场上管理（点按版的补货口径）
+
+- 两段式供给（引 6e91a11d §二并适配）：开局铺场 8~12 个 → 场上存量低于下限（建议 6）时按 0.8~1.5 秒补 1 个。60 秒点按版的失败模式比躲避版更隐蔽：**可收目标耗尽 = 玩家空转**，补货下限是硬保障。
+- 三档各自独立掷骰，不共用计时器；高档（稀有）另加「场上同屏最多 1 个」约束，防止稀有权重 5% 在随机聚类下同屏堆 3 个、破坏「稀有」体感。
+- 场景边界内边距 ≥ 半个水果直径，保证边缘刷新可点；不做与障碍物的路径重叠问题（本变体无移动障碍），但要避免刷新点落在 UI 计时条/得分条下方。
+
+### 2.5 一键重开的完整重置清单（验收 5 的坑点）
+
+结算界面「重新开始」必须复位**全部**运行态，逐项列出防漏：倒计时回 60、得分清零、场上水果全部回收、三档刷新计时器重置、稀有水果在场标记清除、飘分/特效节点队列清空、结算面板隐藏。重开入口双通道（触摸可点 + 键盘 Enter/Space），坑源见 ed31081f-82be-4a76-a28b-476f7e18a00b（game-3 只有触摸入口导致桌面端无法重开）。冒烟断言：先打完一局（注入 time 归零）→ 点/按重开 → 断言计时==60 且得分==0 且场上水果数==铺场数。
+
+### 2.6 森林主题的可机判底线（验收 3）
+
+美术质量不进门禁，但结构可以机判：断言主场景节点树中存在 ≥ 2 类森林装饰元素组（如 Trees/Grass 两个 Node2D 组各自子节点数 > 0）；水果节点与背景装饰分属不同层级（水果层 z_index 更高且不被装饰遮罩覆盖）。preflight 不查这些，要写进工程内 `tests/smoke.gd` 的玩法断言段。
+
+### 2.7 验收 → 冒烟断言映射（写进 verify.sh 的建议）
+
+| 需求验收条目 | 冒烟断言建议 |
+| --- | --- |
+| 1. 60 秒递减、归零自动结算、偏差 ≤ ±1s | 两次读计时文本断言递减；注入 time_left=0 断言进结算 |
+| 2. ≥3 种分值（+1/+2/+5）各自累加、实时显示 | 依次对三档水果坐标注入触摸，断言得分序列 +1/+2/+5；断言 UI 总分文本同步 |
+| 3. 森林主题 ≥2 类元素、水果不遮挡 | 断言装饰节点组存在且子节点 >0；断言水果层在装饰层之上 |
+| 4. 移动端触屏可完整跑一局、无明显卡顿 | mobile-web-smoke 门禁（双门禁第二道）跑 FPS 采样，参照 game-12 实测 FPS 39 的基线口径 |
+| 5. 一键重开、倒计时与得分重置 | 跑完一局 → 触发重开 → 断言 60/0/铺场数三值（见 §2.5） |
+
+## 三、Web 导出与双门禁复用要点
+
+本 goal 两次工作流的 scaffold 节点 prompt（工坊流水线模板实文）把门禁资产判据钉死为**四件套**：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, resolve-godot.sh, mobile-web-smoke.mjs}` 全部在仓库内且不被 .gitignore 排除，缺任一 → blocked 上报，禁止从平台注入的 `.myrd-platform/.claude/skills/` 阅读副本里复制脚本充当判定器，也禁止自造等价脚本。对比老 game-5 工作流只要求三件套——**mobile-web-smoke.mjs 是后来加入的第四件**，新工程照四件套验收。
+
+- **双门禁分工**：godot-smoke（preflight 静态 + headless 冒烟 + input-fuzz）证明「能跑能玩」，mobile-web-smoke 证明「移动端模拟下可玩且不掉帧」。两道各自独立出退出码，任何一道非 0 都不该进入 deploy。
+- **退出码语义**（与总论同源）：0 通过 / 1 冒烟失败→打回修复循环 / 2 环境不可用→装环境、禁止为过门禁改代码 / 3 静态不一致（verify.sh 单独编码）。存在性守卫先行判 2，防「脚本缺失」被误判成 3 诱导修游戏代码。
+- **Web 导出配置五要点**（引 78180e88 实测，不再展开）：渲染器钉死 gl_compatibility 且 `.mobile` 双写；`thread_support=false`；中文必须内置 NotoSansSC 等字体（preflight P13 拦 Web 中文缺字）；导出产物落 `games/<工程>/export/web/` 并 .gitignore 豁免入库；UI 挂独立 CanvasLayer 与游戏世界分离。
+- **AppHost 部署口径**：部署 gitRef 必须是 goal 功能分支（`myrd/games-goal-<goalId>`），绝不能用 main；liveUrl 在部署完成前即由工坊确定（本 goal 为 /apps/60、/apps/60-2），移动端门禁与试玩都以它为准。
+
+## 四、流程复盘：为什么本 goal 没有线上版（双跑皆败实录）
+
+时间线（全部平台记录）：17:56:54 创建 AppHost「60」+ 工作流 #1 → run cmuspf4oo0050ic7qfjj0azwh **failed** → 18:04:01 换 slug 重试，创建 AppHost「60-2」+ 工作流 #2 → run cmuspld10006ric7qup55soew **再 failed** → 验收指派节点 completed 回写产物标识 → 2026-10-04 实测线上 404。
+
+- **教训 A：节点完成态 ≠ 线上可玩。** 验收指派节点 completed，但平台记录里不存在任何可访问的线上版本。「验收复核」类节点的完成前置必须是硬证据：liveUrl 返回 200 且真实浏览器跑通「开始→拾取→结算→重开」闭环，产物标识回写附上 deployment/gitRef；否则完成态与线上态脱节，下游（频道播报、试玩通知、知识沉淀）全部建立在幻觉上。
+- **教训 B：同名变体串场是本 IP 的特有陷阱。**「森林收集水果限时赛」在仓库里有两个机制完全不同的变体：老 game-5（松鼠移动+原木躲避+连击，已上线）与本版（点按拾取+分值分档，未上线）。两者需求 id、goal id、工程目录（games/game-5 vs games/60、60-2）、分支、slug 全不同。**一切定位以产物 id + 分支名 + 工程目录为准，禁止按游戏名搜索**——按名搜必然把老 game-5 的「已上线、3 run 全绿」误当成新版的现状。
+- **教训 C：换 slug 重试会留下孤儿 AppHost 空壳。** 60 失败后换 60-2 重试，AppHost 表留下两条 status=creating 的壳，publicUrl 均为 null。重试前应优先复用原 AppHost 记录；若必须换 slug，重试启动时把旧壳置为废弃态。排查「游戏上线了没」的正确顺序：先查 AppHost status（creating/ready/failed），再 curl liveUrl 实测——本 goal 的 404 就是这么确认的，不能只信工作流状态或节点状态。
+- **教训 D：复盘入口与取证边界。** 工作流 API 只回 run id + status，不回失败日志；复盘具体卡点需持 run id（cmuspf4oo0050ic7qfjj0azwh、cmuspld10006ric7qup55soew）到执行日志/workflow 详情页查。本机环境 GitHub 443 不通，`git ls-remote` 无法核实两条 goal 分支是否推上远端——分支存在性复核必须在能连 GitHub 的环境做，不要在本机下「分支不存在」的结论。
+
+## 五、给下一个同类小游戏的复用清单
+
+1. 玩法骨架直接抄 §二：三档分值表 + 反相关权重表 + `add_score` 单入口 + float 计时 + 两段式补货 + 完整重置清单，改数值不改结构。
+2. 工程起点抄 78180e88 §二的最小契约（project.godot 三类必接线、TUNING_META 白名单、tests/smoke.gd、verify.sh、export_presets.cfg）。
+3. 门禁四件套齐全性检查放在 scaffold 第一步（本 goal 工作流模板已内置该判据），双门禁全绿才允许 deploy。
+4. 验收断言按 §2.7 映射表逐条落进 smoke.gd，每条断言做负例验证（证明会真 FAIL）。
+5. 上线判定只认三件套：AppHost status=ready + liveUrl 200 + 实机操作闭环截图/录像；验收节点回写产物标识时必须附 deployment/gitRef。
+6. 涉及「森林收集水果限时赛」名字的一切操作，先对 §一事实基线表确认自己在操作哪个变体。
+
+## 六、关联知识
+
+- 门禁三层体系 + AppHost 部署总论：27407691-bcf8-4e73-b686-1bb8df684e5c
+- 工程结构最小契约 + 帧预算推导 + playtest blocked 实录：78180e88-6486-404e-9265-e315e0da3c66
+- 双门禁（godot-smoke + mobile-web-smoke）+ 时间注入机判 + 单源单相：00314649-c4d2-407c-871b-62f7de91b07d
+- 移动端触屏虚拟摇杆 + AudioContext 解锁：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- 同名 IP 老变体（松鼠+原木+连击）玩法口径：6e91a11d-3632-4721-a3ea-d433e9622f9b
+- game-9 单游戏部署先例：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 对抗性探索与机判方法论（QA 复用）：437f8129-89b5-4f46-95c0-2d475c3cead8
+
+## 沉淀 app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单（太空飞船躲陨石捡金币）
+
+# app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单
+
+> 来源：目标《创建小游戏应用：太空飞船躲陨石捡金币》（goal=cmuspfeyw0058ic7qrmh6qebm）首轮执行（2026-10-03 18:11~18:23 UTC）+ 次日（2026-10-04）知识沉淀时的时点复核。需求 id=cmuspmumf007cic7qlt6uwieo，GameDesignSpec id=cmuspqwhe007ric7qp0465dvk，工坊工作流 id=cmuspfez9005cic7q93j4fk74，失败运行 id=cmuspr5v7007xic7q5ng1aqqo。
+>
+> 本文只写本例增量：**工坊流水线在门禁一启动之前就整体失败**这一反面样本的取证、归类、复核方法论与重跑前置清单。godot-smoke 三层门禁体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-12 双门禁通过路径见 id=00314649-c4d2-407c-871b-62f7de91b07d；移动端触屏/音频规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；game-9 见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be。本文与它们互补：前面几篇讲「门禁怎么过」，本篇讲「门禁根本没来得及跑」时怎么定位、怎么复核、重跑前还要先解决什么。
+
+## 一、一手事实时间线（全部库内取证，非转述）
+
+| 时刻（UTC） | 事件 | 证据 |
+| --- | --- | --- |
+| 10-03 18:07:22 | hosted_apps 记录 app-2 创建（id=cmuspfdr20056ic7qm2ebhvwv，slug=app-2），status=creating | hosted_apps 行；updated_at 至 10-04 仍冻结在该时刻 |
+| 18:11~18:13 | 需求录入完成（含双门禁 + HostedApp 约束 + 4 条验收标准） | 需求 id=cmuspmumf007cic7qlt6uwieo |
+| 18:13~18:16 | GameDesignSpec v0 落账（八段、10 实体、数值写死） | spec id=cmuspqwhe007ric7qp0465dvk |
+| 18:16:30 → 18:17:36 | 工坊工作流运行启动后 **66 秒即 failed** | workflow_runs.status=failed |
+| 18:17:40 → 18:23:07 | express_lane 独立复核完成：app-2 未上线、验收 0/4、双门禁均未启动 | 复核结论（goal 会话） |
+| 10-04（本文写作时） | app-2 仍 status=creating、live_url 空、app_deployments **0 行**；该工作流**仅 1 次运行且为 failed，未重跑**；github.com 从 agent 环境再次 20s 超时不可达 | hosted_apps / app_deployments / workflow_runs 实查 + curl 探针 |
+
+失败报错原文（复现用）：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspfdqy0052ic7qnkimp4n5/run-cmuspr5v7007xic7q5ng1aqqo'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/':
+Failed to connect to github.com port 443 after 32655 ms: Couldn't connect to server
+```
+
+## 二、失败模式归类：不是「门禁失败」，是「门禁前基础设施失败」
+
+工坊四棒为 scaffold → implement → deploy → playtest（实现/部署两棒挂 godot-smoke preHook 240 帧，试玩棒挂 mobile-web-smoke）。本例失败的关键特征：
+
+1. **死在第 0 棒之前**：4 个节点状态全部 pending，工作流主体逻辑一行都没执行——失败发生在为运行准备 worktree 的 `git clone` 阶段。
+2. **零产物可判**：goal 分支 `myrd/games-goal-cmuspfeyw0058ic7qrmh6qebm` 在复核时不存在（`git ls-remote` 无此分支）→ 无任何代码/工程/导出物落库，不存在「半成品需要清理」的问题。
+3. **网络是间歇抖动，不是持久封锁**：复核时点（10-03 18:23）github.com HTTPS 200、`git ls-remote` 成功（HEAD=a592ea2）；次日（10-04）从 agent 环境又 20s 超时。两个时点结论相反，证明是**间歇性连接抖动**。
+4. **归类的处置含义**：门禁失败（godot-smoke 红、smoke 帧内崩溃）→ 修代码再过门禁；门禁前基础设施失败 → **不改任何代码，探针确认外网恢复后直接重跑**。两者处置路径完全不同，先归类再动手。
+
+## 三、独立复核方法论（本例实证有效，可整体复用）
+
+复核在「工作流已 failed」的背景下展开，五步证据链闭环：
+
+1. **不信状态字段，实测入口**：`status=creating` 不代表「正在部署中马上就好」——对内网 `$PLATFORM_API_URL/apps/app-2/gw` 与公网 `https://leomac-studio.tail49399e.ts.net/apps/app-2/` 双探测，均 404 `APP_NOT_FOUND`。应用记录侧 `publicUrl/publishedAt/version` 全空，项目侧 `resources=[]`、prodUrl/stagingUrl 空，app_deployments 0 行，四面证据一致。
+2. **对照实验排除平台故障**：同一 host 上其余 13 个 `status=ready` 应用（game-5/6/8/9/10/11/12、hello、app 等）全部 200 → 托管能力正常，是 app-2 自身从未部署的个案，不是平台级事故。
+3. **排他性核查防「张冠李戴」**：已上线 13 应用中无一款《太空飞船躲陨石捡金币》；题材相近的 `/apps/app/gw`「星云飞船收集」收集的是能量水晶、slug 与标题均不同，**不能冒充 app-2 交付物**。同类小游戏大量复用同套躲陨石玩法，验收时必须按 slug+标题+机制三重匹配认定交付物。
+4. **对账流程合规性**：需求 status=in-progress、close_reason 空 → 无人违规关闭需求，门禁二「未回填」是因「无入口」而非「被跳过」，流程无腐化。
+5. **失败棒位定位**：直接查 workflow_runs 的 result.error 与 nodes 状态数组，一眼定位「死在 scaffold 之前」，避免把失败误归因给某一棒的实现质量。
+
+## 四、⚠️ 规格冲突（重跑前必须拍板，否则白跑）
+
+工坊管线是 **Godot 4 → Web(HTML5) 导出**（工程 `games/app-2`、`export_presets.cfg` Web 预设、`--headless export` 构建步、godot-game-dev 技能包），而需求验收标准 4 明文要求「**纯前端 HTML/CSS/JS、无构建步骤、静态资源可直接打开运行**」。Godot 导出必然含构建步骤，两者直接冲突。
+
+- **不处理的后果**：即使部署成功、门禁一全绿，AC4 仍会判不达标——整条流水线白跑一轮。
+- **方案 A（推荐）**：把 AC4 措辞修订为「**导出产物为纯静态托管、无运行时后端、无外部 CDN 依赖**」。保留 Godot 管线，同时保住需求真正想约束的东西（免后端、免 CDN、双端可玩），且与既有门禁体系（27407691 总论）兼容。
+- **方案 B**：放弃 Godot 管线，改手写单文件 HTML/JS。仅当主人明确要求「字面意义无构建」时选它，代价是失去 godot-smoke 三层门禁与工坊流水线的既有能力。
+- **教训**：验收标准与管线能力要在**需求录入时**对齐。「无构建步骤」这类措辞对 Godot 管线应用天然不可满足，录入阶段就该识别。
+
+## 五、重跑修复路径（有序清单，供下一轮直接执行）
+
+1. **先探针再重跑**：从 runner 环境 `curl --max-time 20 https://github.com` + `git ls-remote <仓库>` 双探针确认恢复。网络是间歇抖动，盲目重跑可能再次 66 秒失败并空耗一轮。
+2. **先拍板第四节冲突**并回写需求措辞（方案 A 或 B），再触发重跑。
+3. **重跑即可，无需清理**：分支不存在、零产物，直接重跑工作流，从 scaffold 全新开始；不要试图「续跑」失败运行。
+4. **部署成功后先补门禁一**：由独立 agent 重做一轮线上可玩性复核（按第三节方法论），留证「全流程走通 + 控制台无报错」，之后才轮到 owner。
+5. **门禁二最后**：owner 桌面 + 移动各试玩一次并回填「试玩通过/不通过」，回填通过后需求方可关闭。当前门禁状态：**门禁一未启动（不可执行）、门禁二未启动（无入口）——注意是「未达」而非「失败」，回填话术要区分。**
+
+## 六、供后续 app 复用的教训清单
+
+1. **工作流失败 ≠ 游戏缺陷**：先查失败棒位。scaffold 之前死 = 基础设施层（网络/仓库可达性），与代码质量无关，处置是重跑而不是返工。
+2. **外网 git clone 是工坊流水线的第一单点**：仓库在 github.com，第一棒之前就要整仓克隆；网络抖动直接零产物。建议重跑前置「探针 + 失败自动退避重试」的习惯，并把「github 间歇不可达」记为平台环境的已知抖动源。
+3. **hosted_apps.status 不可单独作为「已上线」判据**：本例 status=creating 停滞超过 24h 且无任何部署行。判活必须「liveUrl 实测（内网+公网双探测）+ deployments 计数」双条件。
+4. **需求录入时做一次「AC × 管线」对齐检查**：把验收标准逐条对照工作流管线的既有能力（构建方式、导出形态、依赖服务），措辞冲突当场改，不要留到部署后才发现。
+5. **同题材应用排认**：平台同 slug 命名空间下有多款躲陨石/收集类小游戏，验收复核必须 slug+标题+核心机制三重匹配，防止把兄弟应用的 200 当成本应用的交付证据。
+
+---
+**一句话总结**：app-2 首轮执行是「门禁前基础设施失败」的完整样本——工坊四棒尚未启动即在 git clone 阶段遭遇 github.com 间歇性连接失败（66 秒即败、零产物、app-2 停在 creating），独立复核以五步证据链确认验收 0/4、双门禁均未达但流程未被违规绕过；修复路径 = 探针确认网络恢复 + 先拍板「Godot 构建管线 vs 无构建步骤」的规格冲突 + 直接重跑，重跑成功后再补门禁一自测与门禁二试玩回填。
+
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
 
@@ -8762,6 +11858,780 @@ Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`�
 
 关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
 
+## 沉淀 game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战经验（推箱子点亮方块解谜 · 全四棒工作流）
+
+# game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战沉淀（推箱子点亮方块解谜 · 全四棒工作流）
+
+> 来源：需求《推箱子点亮方块解谜（game-9）》（id=cmupsx443003om9dh5dwd5w9u，goal=cmupsrc19002sm9dhp5su0zaj）走完「前置体检 → scaffold → implement → deploy → playtest」全流程后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-9`（Godot 4.3.stable.official）。线上：liveUrl https://leomac-studio.tail49399e.ts.net/apps/game-9/（deploymentId=cmupxibnn0087m9dhz3cfhap4，commit 19a6d59，838ms 上线，app.status=ready）。工作流运行 /workflows/cmupsrc1v002wm9dh68sljxoq/runs/cmuputtey006dm9dht78nbbtm。
+>
+> 本文只写 game-9 新踩的坑与增量打法。门禁三层体系总论（preflight/smoke/fuzz 分工、E-16 带病绿灯）与 AppHost 部署总论见《沉淀 Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路实战经验》（id=27407691-bcf8-4e73-b686-1bb8df684e5c，oak-key 实测）；移动端触屏摇杆与音频解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca。三篇互为补充、不重复。
+
+## 一、事实基线：四棒各留下什么（审计入口）
+
+| 棒 | 提交 | 内容 | 结果 |
+| --- | --- | --- | --- |
+| scaffold | d297996 | 以 templates/minimal-2d 初始化 games/game-9：推箱骨架（推动/点亮/Undo/Restart/换关）+ 5 关关卡册 + tools/level_solver.py + tests/smoke.gd + verify.sh | ✅ |
+| implement | 4bfdb00 | 见证解回放 / 死锁反馈 / touch_swipe / AC5 响应断言；is_solved 口径修复；.myrd/spec/design-spec.json 落盘 | ✅ |
+| deploy | 19a6d59 | export_presets.cfg + 导出产物入库 + apphost 壳切 game-9 + §3C 调参桥 + 移除 candy-crush 残留 | ✅ 已部署 |
+| playtest | 0103b33 | docs：playtest blocked 报告（缺 playtest.sh） | ⛔ blocked |
+
+- **部署形态**：底座 A「资产出 bundle」——`apphost.toml` 里 `assets_dir="games/game-9/export/web"`，37MB 导出经对象存储懒加载，bundle 本体不含游戏资源（25MB bundle 上限不再约束资产体积）。
+- **导出产物形态**：index.wasm 33.7MB / index.pck 2.4MB / index.js 331KB / index.html 4.9KB / index.audio.worklet.js 7.3KB。线上资产通道 `/api/public/assets/`：index.js 原文直出，wasm/pck 走 `*.gz.b64` 文本（10.7MB / 3.3MB），端到端解码验证过（b64→gzip→`WebAssembly.validate()=true`、pck 魔数 `GDPC`）。
+- **部署记录层 status=running 与应用已 ready 并存**：判断游戏死活以 /health 与实际可达为准，别拿 deployment.status 当真。
+
+### 分支审计坑：同一目标两条远端分支并存
+
+- `myrd/game-9-goal-<goalId>`：前置体检节点首次推送建立，停在 implement 棒（4bfdb00）。
+- `myrd/games-goal-<goalId>`：工作流四棒实际跑的分支，tip=0103b33（多出 deploy/playtest 两棒）。
+- 结论：**复现/审计认 goal artifacts 里的 `gitRef` 与 `app_deployments.commit_hash`（本次 = 19a6d59）**，别按「目标 id 搜分支」想当然——两条分支都能搜到且不同步。另：线上部署的是 19a6d59，其后 playtest 棒只追加 docs（0103b33）未重新部署，属 docs-only 差异，游戏本体无差。
+
+## 二、Godot Web 导出：模板不含预设，从零补齐的六个决策
+
+1. **模板仓库不含 `export_presets.cfg`**。games/game-9 的 README 在 scaffold 棒就记了：「export_presets.cfg 尚未配置（模板不含），部署节点需按 games/game/ 的 web 导出先例补齐」。每个新游戏都要从上一个游戏的先例抄一份再改，别等部署节点现场发明。
+2. **必须用单线程变体：`variant/thread_support=false`**。M1 网关不发 COOP/COEP 头，SharedArrayBuffer 不可用，线程版直接白屏。这是 Web 导出第一坑：配错不报错、上线才白屏。
+3. **导出产物必须入库，`.gitignore` 加 `!/export/web/` 豁免**。`assets_dir` 是平台构建输入，产物不在仓库里平台打包 bundle 就缺资产。Godot 工程 .gitignore 默认把 export/ 排掉，这里要反着来。
+4. **全局中文字体是 Web 导出的底线**（preflight P13 机判）。浏览器沙箱拿不到系统字体，引擎内置字体只有拉丁字形；`[gui] theme/custom_font` 必须指向子集化中文字体（本工程用 Noto Sans CJK SC：GB2312 全集 + ASCII + 常用符号，OFL 1.1），删了所有中文变缺字方块。字体约 2.9MB，是 pck 体积大头，但属中文游戏必要成本。
+5. **渲染器钉死 `gl_compatibility`**（`renderer/rendering_method` 与 `.mobile` 双写）。Forward+ 在 Web 上不可用。
+6. **接手模板仓库先清上一个游戏的残留**。deploy 棒移除了基线残留的 candy-crush 工程 `games/game/`（39MB 导出）——模板仓库是「单游戏位」惯例，根壳一次只服务一个游戏；残留工程还会污染门禁参照（前置体检时 gate-selftest 拿 games/game 当参照，因 player.gd 缺 `moved.emit`/`const SPEED` 模板契约锚点，D4/D5 注入失败，换官方参照 `templates/minimal-2d` 后 D1–D5 全拦）。
+
+**壳侧三件套 + 调参桥**（沿用 oak-key 先例并加一层）：相对路径资产路由；移动端音频手势解锁器（AudioContext 包装 / 手势 resume / `__audioDebug` 取证口）；worklet 防御；新增 **§3C 调参桥**：
+
+- 壳把 URL `?tuning=<json>` 解析成 `window.__GAME_TUNING__`；
+- 游戏侧 `GameState._apply_tuning_overrides()` 仅 `OS.has_feature("web")` 时经 `JavaScriptBridge.eval("JSON.stringify(window.__GAME_TUNING__ || null)")` 读取；
+- `TUNING_META` 白名单四键 + min/max 钳制 + round 取整：`move_anim_ms` 0–400、`push_anim_ms` 0–400、`key_repeat_interval_ms` 50–600、`win_overlay_delay_ms` 0–1000。
+- 价值：试玩期调手感不用改代码重导出——「试玩调好的参数用 URL 复现」，试玩入口直接发 `?tuning=1` 工作台链接。无头冒烟/桌面自动跳过，门禁行为不受影响。
+
+## 三、冒烟门禁：game-9 的四个增量打法
+
+四步 routine 不变（`.myrd/routines.yaml` id=godot-smoke：resolve-godot → preflight 13 类 → `GODOT_SMOKE_FRAMES=240` headless-smoke → input-fuzz，seed=20260913），`games/game-9/verify.sh` 只调用 std-skills 判定脚本、不重实现。本次实测：preflight PASS / `GODOT_SMOKE: PASS`（240 帧，exit 0）/ `GODOT_FUZZ: PASS`。增量全在冒烟断言本身（tests/smoke.gd，628 行，11 项断言清单）：
+
+### 3.1 见证解回放：把 AC4「关卡可解」变成引擎内机判
+
+离线求解器说「可解」只是一句话结论；game-9 把它做成冒烟断言：
+
+- `tools/level_solver.py --paths` 生成每关见证解（U/D/L/R 移动串，长度 == par），Python 侧重放自证后落盘进 `sokoban_levels.gd` 的 `solution` 字段（与 layout 同处，单一事实源，防两处数据漂移）；
+- 冒烟逐关回放见证解，断言三条：**必须通关、步数 == par、回放全程不得误报死锁**；
+- solver 直接解析 `sokoban_levels.gd`（不复制关卡数据），「策划案 → 关卡册 → 求解器 → 冒烟」四层数据同源，par 漂移会在冒烟里直接爆。
+
+### 3.2 通关判据口径：常亮 ≠ 通关（冒烟实测拦下的真 bug）
+
+点亮目标格是 `onceLitStaysLit`（入场常亮、永不熄灭），但 `is_solved` 不能跟着用「全部点亮」口径——**常亮口径会把 level-05 最优路径第 35 步误判通关、提前停走**（冒烟回放见证解时实测拦下）。修复：`is_solved` = 「全部接线槽有方块驻留」，与求解器 / spec parMoves 同口径；点亮只作视觉态。
+
+教训：**「视觉状态」与「胜负判据」是两个变量。凡有常亮/累计态的玩法，胜负判据必须与求解器同口径，并让冒烟回放最优解来兜底。**
+
+### 3.3 死锁反馈机判：报与不报都要有断言
+
+角死锁检测 + `deadlock_changed` 信号 + HUD 卡死警示 + 死锁方块变红。冒烟断言四条：角死锁必报、在槽角不报（在槽角是合法终态）、开阔局面不报（防假阳性）、真实关卡把方块顶进角后信号通知 UI 且 **Undo 可脱离死锁态**。「无假阳性」的论证写在检测函数注释里供复核。
+
+### 3.4 AC5 量化成帧预算断言
+
+- 响应延迟：spec 200ms ≈ 60FPS 下 12 帧 → 断言「注入输入 → 首次步进 + HUD 同步刷新」≤ `RESPONSE_BUDGET_FRAMES=12` 帧，验收口径直接写进门禁；
+- 触屏滑动：越过 24px 阈值（`spec.numeric.input.touchSwipeThresholdPx`）的一次滑动**恰好步进 1 格**；冒烟注入 48px 拖拽验证（`SWIPE_DRAG_PX=48`）。
+
+### 3.5 headless 输入注入的坑（error-signatures E-08 的 game-9 变体）
+
+- headless 下 `Input.parse_input_event()` 的缓冲冲刷会清掉 `Input.action_press()` 的按下状态，**同帧混用两种注入方式会让「移动断言」假失败** → 冒烟分 7 相位（噪声/移动/滑动/逻辑/等弹层/下一关/收尾）互不重叠；
+- 触点下标隔离：噪声相位用触点 0/1，滑动断言用触点 7，防互相回收；
+- 滑动起点 (500,280) 刻意避开左下摇杆热区（24..160 × 400..536）与右下按钮排，否则手势被控件吃掉；
+- 噪声相位（30 帧悬挂手势/孤儿释放/乱键）放在一切正式断言之前——上一游戏（糖果三消，commit bbb872f4「致胜滑动后指针脏状态吞掉下一关第一次手势」）就是靠这类对抗注入防回归的。
+
+### 3.6 verify.sh 退出码四态（给修复方向做机器路由）
+
+0=通过；1=smoke/fuzz 运行期未过（改游戏代码）；2=环境不可用（缺 Godot/技能脚本/python3，装环境而非改代码）；3=preflight 静态未过（先修静态，不必跑冒烟）。关键设计：技能脚本存在性守卫放在一切判定之前，缺脚本必须报 2——否则会掉进下游非零退出码被误判成 3，诱导修复节点去改游戏代码。
+
+## 四、关卡求解器：三段演进与两个真 bug（策划案阶段就要做）
+
+固化策划案（create_design_spec）时就要求每关机器可解、par 机器可算——这步做了，实现、冒烟、验收全链路都有基准。求解器三段演进：
+
+1. **BFS**：前三关（状态空间小）够用；
+2. **A* + 拉拽距离启发 + 死格剪枝**：大关用（启发值 = 每方块到最近接线槽的拉拽距离下界，可采纳；死格 = 角死锁 / 墙边不可拉出格）；
+3. **精确状态 A\***：修掉「区域归一化」bug 后的最终形态。
+
+两个真 bug（都在求解器侧，不在游戏侧）：
+
+- **区域归一化把玩家站位合并掉**：对「推动数」精确，对「玩家步数」只是松弛下界——level-02 手推最少 10 步，求解器报 5。修复：玩家坐标显式入状态；修复后 A* 与纯 BFS 交叉验证一致（2/10/18）。
+- **开阔房间 + 5 方块状态空间爆炸**：单关搜索超时。解法不是更强的剪枝，而是**改关卡布局**——level-05 换成更紧凑、隔断更多的「总控机房」，对人更难、对求解器更小，验证 3.8s，par=58 > level-04 的 40，难度曲线反而更成立。
+
+工程参数：`EXPANSION_CAP=4_000_000`、`MAX_DEPTH=200`；par 不一致只告警（布局或 par 漂移），可解性才是硬判据（exit 0/1）。最终 par 曲线 2/10/18/40/58，方块数 1→5 严格递增（AC4），策划案 `numeric.difficulty.parMoves`、关卡册、冒烟断言三方一致。
+
+## 五、playtest blocked：判定器独立性纪律的一次实战
+
+playtest 节点硬约束：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 五个判定脚本**全部由模板仓库预置**，缺任何一个 → 立即 blocked，**严禁现场自造、拷贝注入副本、或用等价命令替代**——它们是判定器，被检方自己写门禁即失去独立性。
+
+本次实测缺 `playtest.sh`（及 `playtest_driver.gd`），按纪律停止：
+
+- **证据链五步**：① 工作区分支 scripts 目录实清（仅 7 个文件）→ ② origin/main fetch 后核对同样缺失（排除本地落后）→ ③ `git log --all` 该路径从未存在 → ④ 全仓库 find 仅命中 `.myrd-platform/.claude/skills/`（平台注入阅读副本，被 .gitignore 排除不入库，按硬约束不得作判定来源）→ ⑤ 前序 deploy 产物旁证。
+- **根因**：平台注入技能包（新版，含机器人试玩门禁：协议 `GODOT_PLAYTEST: PASS/FAIL` 退出码 0/1、2=环境不可用；`GODOT_PLAYTEST_METRICS: <JSON>`；bot 多局输出节奏代理指标——首次奖励/无反馈窗口/反馈密度/局间方差；阈值由工程内 `tests/playtest.json` 覆盖）**领先于模板仓库预置基线**（v1 仅四脚本，godot-smoke routine 也只有四步）。属模板仓库技能资产滞后，需运维补模板仓库，非 agent 现场可修。
+- **没做的事同样重要**：不交付试玩验收包、不拷贝注入副本、不自造判定器；四问量表标「待用户试玩」；spec 数值回写跳过（未收到用户结论，严禁编造）。
+- **影响面切割**：deploy 产物不受影响（游戏仍可访问），godot-smoke 四步门禁此前已全过——blocked 只挡 playtest 这一段。
+- **修复路径**：运维补模板仓库 `playtest.sh` + `playtest_driver.gd`（连同 SKILL.md 章节与 godot-smoke-routine.md 模板同步，脚本/文档/routine 三者一致）→ 经模板预置链路同步进项目仓库（不得手抄注入副本）→ 重跑 playtest 节点交付 `op=playtest_kit`（含 `<liveUrl>?tuning=1` 调参工作台入口）。取证报告在仓库 `docs/game-9-playtest-blocked-report.md`。
+
+## 六、下一个游戏直接抄的清单
+
+```bash
+# 1. 门禁入口（四步；退出码 0/1/2/3 见 §3.6）
+bash games/<game>/verify.sh
+
+# 2. 关卡可解性证据（--paths 生成见证解 → 落盘 solution 字段 → 冒烟回放）
+python3 games/<game>/tools/level_solver.py games/<game> --paths
+```
+
+Web 导出预设必查四项：
+
+| 项 | 值 | 不守的后果 |
+| --- | --- | --- |
+| `variant/thread_support` | `false`（单线程） | M1 网关无 COOP/COEP，SharedArrayBuffer 不可用 → 线程版上线白屏 |
+| `[gui] theme/custom_font` | 子集化中文字体 | 浏览器无系统字体 → 中文全部缺字方块（preflight P13 拦） |
+| `renderer/rendering_method` | `gl_compatibility`（desktop+mobile 双写） | Forward+ 在 Web 不可用 |
+| `.gitignore` | 加 `!/export/web/` 豁免 | assets_dir 构建输入缺资产，bundle 打包失败 |
+
+复用分工：门禁三层总论 / E-16 带病绿灯 / AppHost 部署总论 → id=27407691-bcf8-4e73-b686-1bb8df684e5c；移动端触屏摇杆 / 音频解锁规范 → id=82e419bb-b641-4b5e-bb58-d8b9633169ca；本文 = game-9 增量（导出预设从零补齐、见证解回放机判 AC4、通关判据口径、死锁反馈机判、AC5 帧预算断言、E-08 分相位注入、求解器演进、playtest blocked 纪律、双分支审计口径）。
+
+
+## 沉淀《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+# 《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+> 来源：需求《《hello》休闲收集小游戏》（id=cmuqk7luz002am9bfmmkouw9v，goal=cmuqk3j2o001mm9bfptrztaj1）走完「scaffold → implement → deploy → playtest」工坊主通道后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/hello`（std-skills minimal-2d 模板起步，Godot 4.3.stable，gl_compatibility）。线上终态：liveUrl `https://leomac-studio.tail49399e.ts.net/apps/hello`（HostedApp id=cmuqk3huq001km9bf5ejp7tdg，deployment v2=cmuqlxz2v001km9bxc0w5pspp，gitRef=`myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1@dfd20d1`，/health 200、线上标题《hello》 · 休闲收集）。**playtest 节点 status=blocked**（模板仓库未预置 playtest.sh），线上版经独立 assign_agent 复核确认可玩。本文只写 hello 的增量事实与新坑；门禁三层体系总论与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key），单游戏部署先例见 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9），触屏摇杆与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca。四篇互为补充、不重复。
+
+## 一、事实基线：提交链与四棒产出（审计入口）
+
+`origin/myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1` 提交链（逐字核实）：
+
+| commit | 内容 | 结果 |
+| --- | --- | --- |
+| f9bc9d65 | 模板起步：std-skills minimal-2d 脚手架建 `games/hello` | ✅ |
+| 1bc8fa24 | 收集玩法与胜利/重开闭环 + README 玩法说明 | ✅ |
+| a8b5fd09 | Web 导出可托管形态：export_presets.cfg + `.gitignore` 豁免 + 导出产物入库 | ✅ |
+| 16249412 | 关卡梯度 + 限时失败反馈 + 冒烟断言同步升级 | ✅ |
+| dfd20d1b | 根壳与 apphost.toml 切到 hello + 接通调参桥（=部署 commit） | ✅ 已部署 |
+
+- `myrd/hello-game-goal-cmuqk3j2o001mm9bfptrztaj1` 分支另含 508dcc6b（assign_agent 线上复核取证），与 games-goal 分支**不同步**——复核/审计一律认 goal artifacts 里的 `gitRef`（games-goal@dfd20d1），别按「目标 id 搜分支」。
+- 门禁终态：preflight 13 类 PASS / `GODOT_SMOKE: PASS`（240 帧）/ `GODOT_FUZZ: PASS`（seed=20260913，6 批次无崩溃无脚本错误）；`bash games/hello/verify.sh` 全链路 PASS。
+- 导出 11 文件落 `games/hello/export/web/`：index.wasm 35,376,909B / index.pck 2,497,520B / index.js 331,495B / index.html 4,848B / index.audio.worklet.js 7,298B。
+
+## 二、Godot4 工程结构：hello 的最小可玩模板契约（可复制起点）
+
+```
+games/hello/
+├── project.godot          # 三类必接线：run/main_scene、[autoload] GameState、[input]
+├── autoload/game_state.gd # 单例 + TUNING_META 白名单（调参唯一入口清单）
+├── scenes/{main,player,collectible}.tscn
+├── scripts/{main,player,collectible,virtual_joystick,touch_confirm_button}.gd
+├── assets/fonts/NotoSansSC-Regular.otf + OFL.txt   # Web 中文底线
+├── tests/{smoke.gd,smoke.tscn}                     # 相位状态机冒烟场景
+├── verify.sh               # 工程门禁入口（退出码 0/1/2/3）
+└── export_presets.cfg      # Web 导出预设（thread_support=false）
+```
+
+- **三类必接线是 preflight 静态机判对象**：主场景、autoload、input 映射缺任何一项就是「黑屏/无响应」。hello 实测：`config/name="hello"`、`run/main_scene="res://scenes/main.tscn"`、`GameState="*res://autoload/game_state.gd"`。
+- **渲染器钉死 gl_compatibility 且 `.mobile` 双写**；viewport 640×360；`[gui] theme/custom_font` 指向 NotoSansSC（OFL 1.1）——删了中文全变缺字方块（preflight P13 拦）。
+- **UI 挂独立 CanvasLayer（UI/TouchUI）**，与游戏世界分离；触屏端用 `virtual_joystick.gd` + `touch_confirm_button.gd` 承载移动与确认，桌面/触屏同一工程不加分叉构建。
+- **收集玩法碰撞口径写进代码注释**：Player 矩形 24×24（半宽 12）、Collectible 圆 r=22，可达判定=玩家中心进入收集物中心 34px 内；摆点相对 clamp 边界 (12..628, 12..348) 全可达不卡死角——**碰撞余量要在摆新点时先算再摆**，否则冒烟传送收集断言假失败。
+
+## 三、门禁增量：帧预算推导注释 + 键位契约断言
+
+- **帧推导写进 verify.sh 注释**：「噪声 30 帧 → 移动 10 帧 → 4 次传送收集（各 4 帧）→ 过关断言 → confirm 进第 2 关断言（梯度）→ 时限压 0 触发失败断言 → confirm 重来断言」约 94 物理帧，预算取 240 对齐 `.myrd/routines.yaml` 的 smokeFrames 默认值（两边同值不各说各话）。**推导过程留在门禁入口文件里**，后续调速度的人不必重推。
+- 冒烟 9 项玩法断言：噪声输入后仍能移动、收集计数累加、过关判定、难度梯度（4→5 目标、30→26s 时限）、超时失败反馈、失败重来复位，外加键位契约 `_check_key_bindings`（逐键 AND 判定）。
+- verify.sh 退出码语义与 oak-key 同源：0 通过 / 1 冒烟失败 / 2 环境不可用（**存在性守卫先行**：preflight.py、smoke.sh、resolve-godot.sh 缺一即 2，防「脚本缺失」被误判成 3 诱导改游戏代码）/ 3 静态不一致。
+- **复发坑（连续两作）**：`.myrd/routines.yaml` 默认 `gamePath: games/godot-coin-rush` 至今未修。oak-key 轮已记录，hello 轮依旧要靠 preHookParams 显式覆盖成 `games/hello` 才测对工程。**建议运维直接改模板默认值或置空强制必填**，别再指望每作自觉覆盖。
+
+## 四、playtest blocked 实录：模板仓库技能资产落后于平台注入副本（本轮最大增量）
+
+- **触发**：判定脚本五清单 `{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 要求全部由项目仓库预置，hello 实测唯独 `std-skills/godot-game-dev/scripts/playtest.sh` MISSING → 节点按硬约束立即 blocked（不产试玩验收包、不回填量表、不调参回写）。
+- **根因（版本分裂）**：仓库内 `std-skills/godot-game-dev/` 是**旧版**（SKILL.md 无 playtest，routines.yaml 4 步）；平台注入阅读副本 `.myrd-platform/.claude/skills/godot-game-dev/` 是**新版**（SKILL.md §4.5 机器人试玩门禁 + `playtest_driver.gd` + 5 步 routine，新增 `playtestFrames: "900"`）。即：**模板仓库落后于平台注入副本**。
+- **纪律（为什么 blocked 而不是补一个）**：判定器唯一来源是模板仓库预置；被检方自写判定脚本，门禁不再独立，PASS 一文不值；注入副本是阅读用，不得复制/改写/等价替代。
+- **运维待办（精确到文件）**：把 `WORKSHOP_GAME_TEMPLATE_REPO` 的 godot-game-dev 技能资产同步到含 `scripts/playtest.sh` + `scripts/playtest_driver.gd` 的版本，并让仓库 `.myrd/routines.yaml` 的 godot-smoke 升到 5 步。报告已落盘 `docs/playtest/hello-playtest-blocked.md`（commit 283773e）。
+- **教训泛化**：工坊每接入新模板资产前，先 diff「模板仓库 vs `.myrd-platform/` 注入副本」的技能版本，发现落后先报运维，别等跑到最后一棒才 blocked。
+
+## 五、Web 导出与部署：hello 的三个增量打法
+
+1. **导出配置前置到 scaffold 棒**（前两作是 deploy 棒现场补 preset）：scaffold 按 `games/game` 既有先例补齐 `export_presets.cfg`（`platform="Web"`、`export_path="export/web/index.html"`、`variant/thread_support=false`、`html/canvas_resize_policy=2`）+ `.gitignore` 加 `!/export/web/` 豁免 + 导出产物入库（a8b5fd09）。deploy 棒零决策复用重导出——**「可托管形态」应该在脚手架棒就建成，别留到部署棒现场发明**。
+2. **根壳单游戏位切换要核对三处**：`apphost.toml`（name=hello / assets_dir=games/hello/export/web / health=/health / runtime=node20）、server 壳的资产路由、调参桥全局注入。hello 轮根壳原指向 candy-crush-legend（games/game/export/web），已整体切到 hello。**每次上新游戏，部署前 grep 根壳里旧游戏名清残留**。
+3. **部署重发坑：v1 因 504 重发被 superseded，v2 才是终态**（两笔同 gitRef）。判断游戏死活以 `/health` + app status + liveUrl 实测为准，**别拿 deployment 列表第一笔当真**。另：`/` 会 308 重定向到 `/apps/hello`（尾斜杠归一化），curl 复核记得 `-L` 跟随。
+
+线上复核（assign_agent 独立完成，不复用 deploy 自测结论）：部署 gitRef 远端 HEAD 与 dfd20d1 逐字一致；资产通道全文本（wasm/pck 走 `*.gz.b64`），本地解码还原 wasm 35,376,909 字节与本地导出逐字一致、magic `\0asm` v1 有效，pck magic `GDPC`；壳契约四件（相对路径拉资产、移动端音频手势解锁器、`__audioDebug` 取证口、tuning 调参桥）逐项在位。
+
+## 六、调参桥 hello 实例：spec 数值与实现默认值的口径漂移（真实发生，值得记录）
+
+- `game_state.gd` 的 `TUNING_META` 白名单四键：`base_target` 1–6、`base_time` 10–90、`time_step` 0–10、`min_time` 5–90；键不在名单=拒绝（防 URL 乱注入）；缺壳层时全局 undefined 属预期，门禁行为不受影响。
+- **口径漂移**：GameDesignSpec v1（id=cmuqkaypy002hm9bf3wnk1k26，approved）写的是 3 关 10/15/25 件、30/45/60s、连击窗口 1.5s；实现默认值是 `BASE_TARGET=4 / BASE_TIME=30 / MIN_TIME=18 / TIME_STEP=4`（每关目标 4→5、时限 30→26s）。spec 数值**没有**作为默认值落地，而是寄望试玩期经调参桥回填——playtest blocked 后未回填，两者至今不一致。
+- **结论**：工坊「spec → 实现」的数值对齐不能靠默认值拍脑袋。两条路二选一：① 实现前把 spec 数值直接落成常量默认值；② spec 数值作为 TUNING_META 默认初值，并在工程 README 记「spec 口径 = 默认值」。否则验收对不上、复盘对不齐。
+
+## 七、坑位速查表（hello 新增/复发，出问题先对号）
+
+| # | 坑 | 一句话修法 |
+| --- | --- | --- |
+| 1 | 双分支并存：工作区实际建 `hello-game-goal-*`，任务指定 `games-goal-*` | scaffold 棒把同一 commit 推两条分支保证 gitRef 存在；审计认 goal artifacts 的 gitRef |
+| 2 | routines.yaml 默认 gamePath=games/godot-coin-rush（复发） | preHookParams 显式覆盖；运维改模板默认值根治 |
+| 3 | 模板仓库技能资产落后于平台注入副本 → playtest blocked | 接入前先 diff 两份技能版本；落后先报运维 |
+| 4 | 部署 504 重发 → v1 superseded / v2 running | 判终态看 /health + app status + liveUrl 实测 |
+| 5 | `/` 308 到 `/apps/hello` 尾斜杠归一化 | curl 复核加 `-L` |
+| 6 | github.com:443 从工作区不可达（3 次重试 75s 超时） | commit 留本地分支不丢；先走平台 API（localhost）回写再补推 |
+| 7 | 碰撞余量不算就摆点 → 传送收集断言假失败 | 半宽+半径先算可达包络，摆点落在 clamp 边界内 |
+| 8 | spec 数值与实现默认值漂移 | spec 数值落成默认值或 TUNING 初值，README 记口径 |
+| 9 | 导出配置留到部署棒现场发明 | scaffold 棒按上一作先例补 preset + .gitignore 豁免 + 产物入库 |
+| 10 | 根壳残留上一游戏（单游戏位惯例） | 部署前 grep 旧游戏名清残留，apphost.toml 三键核对 |
+
+## 八、关联知识与权威来源
+
+- Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路总论（oak-key）：27407691-bcf8-4e73-b686-1bb8df684e5c
+- game-9 单游戏部署先例与调参桥 §3C：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 移动端触屏虚拟摇杆与 AudioContext 解锁规范：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- MyRD 平台真实仓库结构地图：b07a928a-414b-4d48-9535-5b6d6cc859ae
+- 仓库内权威文件（本仓可直接复用）：`games/hello/{verify.sh,export_presets.cfg,tests/smoke.gd,autoload/game_state.gd}`、`docs/playtest/hello-playtest-blocked.md`、`std-skills/godot-game-dev/scripts/`、`.myrd/routines.yaml`
+- 平台产物链：requirement=cmuqk7luz002am9bfmmkouw9v → design_spec=cmuqkaypy002hm9bf3wnk1k26 → hosted_app=cmuqk3huq001km9bf5ejp7tdg → workflow run=cmuqkb8xl002nm9bf9pz8hw61（/workflows/cmuqk3j35001qm9bfsdw4xn8d/runs/cmuqkb8xl002nm9bf9pz8hw61）→ 线上复核 assign_agent=cmto42pg60004m9aq7jczszhy
+
+## 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+# 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+> **文档定位**：固化 game-8 v2 轮手感调优的**具体数值（前后对照）**、godot-smoke 门禁表现、线上链路诊断结论与**可照抄的复测方法**，形成「手感类反馈（再大一点 / 再慢一点）」的**可复用增量调参基线**——后续同类反馈直接对照本文 §五 playbook 执行，不必重新勘探。
+> **权威基准**：需求《牛牛打游戏 game-8 · v2 手感调优：牛牛体型放大、移动速度下调》（`cmuqmej89000ym9gg6mom93o0`）；策划案 v1 设计唯一来源（doc `80b9c193-6807-43e4-b2b0-5789f2d9e35b`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）；收口依赖清单（doc `943eb5eb-0949-43fe-b939-83cf171af2a3`）。
+> **实现基线**：部署分支 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`；数值提交 `3a396355`（feat v2 手感调优）→ 产物重导出 `1089e4b` → 诊断报告 `1afec443`（`games/game-8/docs/v2-liveurl-diagnosis.md`，docs-only）；线上部署 = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`。
+> **本文数字全部为一手实测值**（git diff 实录 / curl 取证 / 线上 pck 自跑门禁），非估算。
+
+## 一、v2 数值基线（前后对照，唯一落账）
+
+| 声明键 | v1 默认 | v2 落账 | 需求量化区间 | 实际占比 | TUNING_META 钳制 |
+|---|---|---|---|---|---|
+| `PLAYER_SCALE` | 1.0 | **1.4** | 1.3~1.5× 整体放大 | 1.4× | min 0.5 / max 2.0 / step 0.05 |
+| `PLAYER_SPEED` | 220.0 px/s | **145.0 px/s** | v1 的 60~70% | **65.9%** | min 60 / max 300 / step 5 |
+
+- **唯一落账位置**：`games/game-8/autoload/game_state.gd` 数值区（v2 HEAD 实测：`var PLAYER_SCALE: float = 1.4` / `var PLAYER_SPEED: float = 145.0`）。⚠️ 策划案 v1 写的路径是 `scripts/game_state.gd`，**实际权威路径是 `autoload/game_state.gd`**（scripts/ 下并无此文件），后续引用以本文为准。
+- **接线方式**（`scripts/player.gd`）：`_apply_tuned_scale()` 把 `PLAYER_SCALE` 以**根节点 uniform scale** 应用（`is_equal_approx` 脏检查，滑杆改动下一物理帧生效），同步作用于视觉精灵、`CollisionShape2D` 碰撞体与 `PickupArea/PickupShape` 判定体；`velocity = direction * GameState.PLAYER_SPEED` 每物理帧读声明键。
+- **判定几何联动（容易算错的口径，钉死）**：`player.tscn` PickupShape 本体半径 22px → v2 缩放后 **30.8px**；收集物本体半径 14px（`collectible.tscn`）；**触发距离（圆心距）= 30.8 + 14 = 44.8px**（v1 为 22+14=36px）。刷点安全间距常量 96px 未动 → 余量从 96/36 ≈ **2.67×** 收窄到 96/44.8 ≈ **2.14×**，仍满足「重开不贴脸白捡」。commit `3a396355` 提交信息里的「判定半径 44.8px」即此**触发距离**口径，不是 PickupShape 本体半径，别混淆。
+
+## 二、godot-smoke 门禁表现（v2 断言三件套 + 全链路复跑）
+
+### 2.1 门禁复跑结果（本地与 preHook 同源，全绿）
+| 门禁步 | 结果 |
+|---|---|
+| resolve-godot.sh | exit 0，Godot **4.3.stable.official.77dcf97d8** |
+| preflight.py | **PREFLIGHT: PASS**（13 类前置一致性检查、40 个工程文件，exit 0） |
+| smoke.sh（240 帧预算） | **GODOT_SMOKE: PASS**（exit 0、零 SCRIPT ERROR） |
+| input-fuzz.sh | **GODOT_FUZZ: PASS**（seed=20260913，6 批次 239 帧，exit 0） |
+| playtest.sh | **脚本缺失**（模板仓库未预置，D2 依赖 / bug `cmuktchmy000km97z6kj3r2ro` Bug1），维持 blocked、不代写不伪造 |
+
+### 2.2 smoke.gd 新增 v2 手感断言三件套（真实机判，含 FAIL 路径，约 L423-435 `_assert_v2_tuning`）
+1. **倍率区间**：`PLAYER_SCALE ∈ [V2_SCALE_MIN=1.3, V2_SCALE_MAX=1.5]`，违例 FAIL 签名「v2 手感断言 FAIL：体型倍率 %.2f 不在 %.1f~%.1f 区间」；
+2. **移速区间**：`PLAYER_SPEED ∈ [V2_SPEED_MIN=V1_SPEED×0.6=132.0, V2_SPEED_MAX=V1_SPEED×0.7=154.0]`，FAIL 签名「移速 %.1fpx/s 不在 v1 默认 %.0f 的 60%%~70%% 区间」；
+3. **接线集成断言** `_assert_node_scaled`：Player 根节点、`CollisionShape2D`、`PickupArea/PickupShape` 三节点的全局缩放必须都等于数值区 `PLAYER_SCALE`（与难度梯度 SpawnTimer 断言同口径，防「数值键写了但没接上」）。
+
+方向符号断言（A/← 后 position.x 减小、D/→ 后增大）与 50 连击判定一致性、难度梯度、过期回收、胜负四分支、一键重开、持久化等既有契约**全部保留不动且继续通过**——玩法零回退。
+
+### 2.3 可复用结论：断言区间与需求区间硬耦合
+smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的。后续若要把数值调**跨出**这个区间，必须**三处同步**：smoke.gd 常量、需求区间条款、策划案 revisions 数值区——否则门禁会以清晰签名 FAIL（这是门禁在强制「数值变更须先改需求基线」的设计行为，**不是误报，不许放松断言来绕**）。
+
+## 三、线上链路诊断结论（liveUrl 端到端实测，2026-10-02）
+
+**结论先行**：✅ v2 已在线上生效且量化达标——部署产物自跑门禁全绿（含 v2 手感基线机判），线上资产与仓库导出逐字节一致，**无需修复、无需回滚**。
+
+1. **部署元数据**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`）；当前部署 **version 5 `cmuqny37h001ficf0mpmr71mv` status=running**；gitRef=`myrd/games-goal-cmujpml1e006rm99i9hc33huu`（未落 main ✓）；commit `1089e4b`（其上仅 1 个 docs 提交，代码零差异）；v4=`cmuqnx9v6001dicf0fmfryxcz` superseded（重试冗余但无害）。
+2. **公网链路**：`GET /apps/game-8/health` → 200 `{"ok":true,"app":"game-8","game":"牛牛打游戏","assets":"lazy/object-storage"}`；`/apps/game-8/` → 308 规范化跳转 → 200；`/gw/health` → 200（网关透传正常）；壳页 11,626B，`__GAME_TUNING__` 调参桥 ×2、`__audioDebug` 音频手势解锁器、资产全走相对路径 `fetch(BASE_PATH + 'api/public/assets/' + name)` 三契约在位。
+3. **资产文本通道**：`index.pck` base64 3,333,340B → 解码 gzip 2,513,040B；`index.wasm` base64 **10,696,408B** → 解码 35,376,909B（与门禁经验 v6 一手实测值一致）。
+4. **逐字节一致（无版本漂移）**：本地导出（部署 commit 工作树）与线上对象存储拉回解码产物 sha256 完全一致——pck `5f556ad9adf47579cb38a1fd8f7549e33b478b56cd4b3b5f112346281d699e25`；wasm `fe5cebc590758c10bc4469be5a591e28edbde5ec8f458f21baeb83db50d028b9`。
+5. **最高等级证据——部署产物自跑门禁**：`godot --headless --main-pack <线上pck> --quit-after 240 res://tests/smoke.tscn` → exit 0、零 SCRIPT ERROR、`GODOT_SMOKE: PASS`，v2 手感基线机判全过（1.4∈[1.3,1.5]，145∈[132,154]）——「牛牛变大变慢」是**产物运行期实测**，不是代码推断。
+
+## 四、复测方法（照抄即用）
+
+1. **公网探测**：`curl -s <liveUrl>/apps/game-8/health`（期望 200 + ok:true）；`curl -sI <liveUrl>/apps/game-8/`（期望 308→200）；壳页 HTML grep `__GAME_TUNING__` / `__audioDebug`。
+2. **资产一致性**：`GET /api/public/assets/index.pck`（和 index.wasm）→ base64 解码 → gunzip → `shasum -a 256`，对照 §三.4 的两个哈希；不一致即版本漂移，先查部署 commit 再谈手感。
+3. **手感数值机判**：`godot --headless --main-pack <线上或本地 index.pck> --quit-after 240 res://tests/smoke.tscn`，判定三条件（`GODOT_SMOKE: PASS` + exit 0 + 零 SCRIPT ERROR），签名中应含「v2手感基线(体型1.3~1.5x·移速60~70%)」字样。
+4. **数值速查**：游戏内调参面板或壳页 `?tuning=1` URL 直接查看当前声明键值；或读 `games/game-8/autoload/game_state.gd` 数值区。
+5. **环境备注**：诊断沙箱对 github.com:443 直连超时（`Recv failure`），推送改走 `ssh.github.com:443` 通道——后续同环境取证直接用此通道，别反复试直连。
+
+## 五、「再大一点 / 再慢一点」类反馈的增量调参 playbook（可复用基线）
+
+**标准链路（全七步，禁止散点改代码对数值）**：
+调参入口（游戏内面板滑杆即时生效 / 壳页 `?tuning=` URL）→ 确定目标声明键与新值 → **经策划案 revisions 回写 `spec.numeric`**（doc `80b9c193-…`，spec 载体即该知识文档）→ 改 `autoload/game_state.gd` 数值区 → 复跑 godot-smoke 门禁 → 重导出 Web 产物并部署（gitRef 必须是 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`）→ 按本文 §四产物自跑门禁复测。
+
+**建议步长与边界**：
+| 反馈 | 动作 | 步长建议 | 边界 |
+|---|---|---|---|
+| 再大一点 | `PLAYER_SCALE` ↑ | +0.05~0.1 / 档 | 钳制 [0.5, 2.0]；跨出 [1.3,1.5] 须按 §2.3 三处同步 |
+| 再小一点 | `PLAYER_SCALE` ↓ | −0.05~0.1 / 档 | 同上；低于 1.3 同样触发门禁 FAIL |
+| 再慢一点 | `PLAYER_SPEED` ↓ | −5~15 / 档 | 钳制 [60, 300]；跨出 [132,154] 须三处同步 |
+| 再快一点 | `PLAYER_SPEED` ↑ | +5~15 / 档 | 同上 |
+
+**每次调整必做的三项联动复核**：
+1. **断言区间一致性**（§2.3）：数值是否跨出 smoke 常量带；
+2. **判定几何余量**：体型↑ → 触发距离 = 22×scale + 14 线性放大 → 96px 刷点间距余量 = 96/触发距离 收窄；低于 2× 时须复核刷点安全间距常量是否要同步上调（公平性属门禁议题，不许靠放松断言解决）；
+3. **达成余量**：移速↓ → 单位时间可达刷点数↓ → 60s/20 目标的通关可达性须复核（跑 50 连击一致性 + 全链路一条龙断言兜底；v2 @145px/s 已实测可通关）。
+
+**回滚口径**：v1 = `PLAYER_SCALE 1.0` / `PLAYER_SPEED 220.0`，两键均可在调参面板或 `?tuning=` URL 直接调回，代码零改动。
+
+**主观手感的最终裁决**：数值区间内「像不像用户要的手感」机器判不了，仍以 D3 用户试玩结论为准（入口 `…/apps/game-8?tuning=1` 已可用）；未决依赖 D1（iOS Safari 真机）/ D2（playtest.sh 模板资产）见收口清单 doc `943eb5eb-…`。
+
+**来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
+
+
+## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+# game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+> 来源：需求《测试连点防重的极简计数页（game-12）》（id=cmur8x93r0016icbsd90s6e60，goal=cmur8pnhn000kicbsvl0eoqx6）走完「录入需求 → 判定规则调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-12`（Godot 4.3.stable），分支 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`（scaffold e055e4f → implement ff779d0 → deploy c54fcc9/078f761/e5b292e → playtest 1f7a4a3）。线上：https://leomac-studio.tail49399e.ts.net/apps/game-12/（/health 200 `{"ok":true,"app":"game-12"}`，deploymentId=cmurba8yd001vicbsfdl79x8l，部署 commit c54fcc9）。门禁终态：**godot-smoke 全绿 + mobile-web-smoke PASS 10/10（实测 FPS 39）**，playtest 棒复跑双门禁结论一致。
+>
+> 本文只写 game-12 的增量结论：防重语义选型与实现契约、双门禁通过路径、踩坑清单与复用清单。门禁三层体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-9 增量见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be；移动端触屏摇杆与 AudioContext 解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；防重判定规则 R1–R6 / 事件契约 C1–C4 调研全文见项目文档库 id=8345388c-cf30-4d7c-8413-39ccd7e65887。互为补充、不重复。
+
+## 一、防重语义选型：只有「固定节流（采纳即锚定、拦截不延窗）」能同时过验收 2 和 3
+
+| 方案 | 机制 | 300ms 内连点 5 次 | 窗口后恢复累加 | 结论 |
+| --- | --- | --- | --- | --- |
+| **固定节流（首击入窗）** | 首击计数并锚定窗口；窗口内后续点击全拦且**不更新锚点** | 仅 +1 | 正常 | 采用 |
+| 防抖（末击重启窗口） | 每次点击都重置窗口，静默期满才计 | 0 次 | — | 违背验收 2 |
+| 首尾折叠 | 窗口首末各计一次 | +2 | — | 违背验收 2 |
+
+**最易写错的一行**：被拦截的点击不得触碰窗口锚点 `_last_count_ms`。一旦拦截分支也更新它，节流就退化成防抖——持续点击下计数永远不涨，验收 3 永远不过。
+
+实现（`games/game-12/autoload/game_state.gd`，时间注入纯函数，核心约 15 行）：
+
+```gdscript
+const TARGET_COUNT: int = 10
+const DEBOUNCE_MS: int = 300
+var _last_count_ms: int = -DEBOUNCE_MS   # 初值 = -窗口 → 开局首击立即有效
+
+func try_count(now_ms: int) -> bool:
+    if state != State.PLAYING:
+        return false                      # 已胜：忽略，不报错
+    if now_ms - _last_count_ms < DEBOUNCE_MS:
+        click_rejected.emit(DEBOUNCE_MS - (now_ms - _last_count_ms))
+        return false                      # 拦截：只发反馈信号，不动锚点
+    _last_count_ms = now_ms
+    count += 1
+    count_changed.emit(count)
+    if count >= TARGET_COUNT:
+        state = State.WON
+        state_changed.emit(state)
+    return true
+
+func reset() -> void:
+    count = 0
+    state = State.PLAYING
+    _last_count_ms = -DEBOUNCE_MS         # 重开同步清防重锚点 → 首击立即有效
+```
+
+三个不能省的细节：
+1. `_last_count_ms` 初值取 `-DEBOUNCE_MS`，否则开局第一击被吞（验收 1 首点即错）。
+2. `reset()` 必须同时清防重锚点——「刷新/重开无残留」包含防重状态本身。
+3. 拦截不静默：`click_rejected(remaining_ms)` 把「被吞的点击」变成可感知反馈（按钮闪红 + 状态栏「连点已拦截，还需 Nms」）。且关键反馈不能被高频更新覆盖——状态栏曾把指针坐标与拦截提示混在一行，坐标每物理帧刷新把「还需 Nms」冲掉，拆成反馈线/指针线两行才保住。
+
+时间注入是机判前提：`try_count(now_ms)` 不读时钟 → 无头冒烟可用合成时间戳逐毫秒断言（完全确定、与帧率零耦合）；只有真实点击路径才走 `Time.get_ticks_msec()`。
+
+## 二、单源单相：三个入口汇一个判定点，防「一次触碰计两次」
+
+Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`（调研已核实）→ 移动端一次触碰可能产生 touch/mouse 双事件，再加键盘空格/回车，同一「点击」有四个来源。game-12 的收敛方式：
+- `CountButton.pressed`（鼠标/触摸）与 `_unhandled_input("confirm")`（键盘/动作）都只调唯一入口 `_attempt_count()` → `GameState.try_count(...)`。防重判定只在 GameState 一处，不可能被绕过。
+- `TouchConfirmButton`（TouchScreenButton）**不直接调游戏逻辑**，而是 `Input.parse_input_event(InputEventAction("confirm"))` 注入动作 → 触摸与键盘走完全相同路径（顺带获得桌面端自动不响应的免费屏蔽）。热区用 shape 圆（半径 44）而非位图。
+
+## 三、把「防重」机判成确定性断言（附负例验证纪律）
+
+冒烟相位设计（`games/game-12/tests/smoke.gd`）：
+- **合成时间戳断言防重**：t0 有效；t0+100/200/299ms 连点全拦、只发 click_rejected、count 不变；跨窗后再点正常 +1。
+- **真实路径另测**：真实点击受真窗口约束 → 相位间显式等真实时间跨窗，并设帧数上限守卫（60fps 约 2s，超限报 `Engine.max_fps` 异常而非挂死）。
+- **噪声后复位**：乱键相位可能真触发计数/拦截，且末次乱键可能贴着 confirm 注入点不足 300ms → 进断言前 `GameState.reset()` 清锚点，消灭偶发失败。
+- **每条断言做负例验证**（证明会真 FAIL，不是永真）：热区 44→10、宽高比 keep→expand、脉冲阈值抬到 1.0，三次均如预期 FAIL。
+
+两个「静默漏判」陷阱（负例不触发才发现）：
+1. 静态几何断言放 `_ready()`：此时 `Control.size` 恒为 0，整段断言被静默跳过 → 移到第一物理帧再读。
+2. Button 有主题最小尺寸保护：`offset_right=110` 实际 size 被钳到 115，44px 负例测不出来 → 换 TouchScreenButton 圆形热区做负例。
+
+极简静止页的门禁特异问题：mobile 门禁「画面在动」检查会把完全静止的页面误判为渲染冻结。解法：+1 按钮加待机呼吸脉冲（scale 1.00→1.06 / 0.9s，实测极差 0.060 ≥ 阈值 0.02），一举两得——既是移动端可点示能，又是确定性的非零帧差证据。缩放绕 `pivot_offset`（控件中心），否则动画往右下飘。
+
+画布口径：调研建议设计宽 375 + Adaptive；实现落成 720×1280 竖屏 + `canvas_items`+`keep`（+1 按钮 560×240，375 宽实机约 291px），同样满足无横滚与 ≥44px。机判锚点是**宽高比策略必须 keep**（expand 会被冒烟断言拦，负例已验证）。
+
+## 四、Godot Web 双门禁：分工、顺序与标记辨析
+
+| 门禁 | 判定链 | 拦什么 | game-12 实测 |
+| --- | --- | --- | --- |
+| **godot-smoke** | resolve-godot → preflight.py（13 类静态一致性）→ headless smoke（`GODOT_SMOKE_FRAMES=240`，断言退出码 0 + `GODOT_SMOKE: PASS` 标记 + 日志无 SCRIPT ERROR）→ input-fuzz（seed=20260913，6 批/239 帧） | 游戏本体「跑得动且玩得动」（含防重/恢复/胜负/重开/触控目标/拉伸契约断言） | 四步全 exit 0 |
+| **mobile-web-smoke** | mobile-web-smoke.mjs --url <liveUrl>（headless Chrome 390×844 iPhone 仿真）10 项：网络全通/console 零错/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约（__audioDebug）/无横溢（scrollWidth=390）/FPS≥8（实测 39） | 部署后真实链路上的移动端可玩性 | PASS 10/10 |
+
+三条纪律：
+1. **mobile-web-smoke 必须打部署后的 liveUrl**——本地静态伺服 export/web 只能当预检（implement 棒做过 10 项预检），不能替代正式门禁：M1 网关、对象存储资产通道、壳契约只在真实链路暴露。所以它位于 deploy 之后，是产物验证而非 implement 棒门禁。
+2. **标记辨析**：判定脚本 stdout 是小写 `godot-smoke: PASS`，引擎日志里才是大写 `GODOT_SMOKE: PASS`（smoke.sh 内部 grep 大写标记后才自产小写行）。只 tail 游戏日志看不到大写标记不等于失败——先分清两层标记再下结论。
+3. **证据随仓库归档**：`games/game-12/qa/mobile/report.json` + phase-load/tap/joystick 三张截图入库，供复跑比对。
+
+## 五、部署链五个真实踩坑（每个都在本目标发生过）
+
+1. **`.gitignore` 里 `/export/` 不删 = 部署后全 404**：apphost.toml 的 `assets_dir` 指向 `games/game-12/export/web`，导出产物不入库则 wasm/pck 上线即丢。导出产物必须入库（37MB wasm 走底座 A「资产出 bundle」+ 对象存储懒加载 + `/api/public/assets/` b64 文本通道，总论见 27407691）。
+2. **apphost.toml 沿用上一游戏**：原值指向 candy-crush 的 `games/game/export/web`；构建管线按 gitRef 读它，不改会打包错应用 → `name`/`assets_dir` 随游戏改是 deploy 棒第一查。
+3. **gitRef 必须是目标分支不是 main**：本次 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`。注意本地工作区克隆出的分支名可能与远端目标分支不同名同指针（`myrd/game-12-goal-…` vs `myrd/games-goal-…`）→ 部署前 fetch + 显式切到目标分支再读 apphost/导出。
+4. **壳页三件套缺一不可**（`server/src/game-page.ts` / `games/game-12/export/web-shell.html`）：品牌文案适配（曾残留糖果粉碎传奇文案）；§3C 调参桥（引擎加载前解析 `?tuning=` → `window.__GAME_TUNING__`，只认对象形态、非法 JSON 静默忽略——game-12 缺，补约 8 行）；音频手势解锁器 + `window.__audioDebug`（即 mobile 门禁「音频解锁契约」的机判对象）。壳页另配 `overflow:hidden + touch-action:none` + `user-scalable=no`：彻底禁双击缩放/滚动，快速二连点不被浏览器手势吞掉造成防重误判（比调研建议的 `touch-action: manipulation` 更强）。
+5. **PATCH 目标 artifacts 是整体替换数组**：回写产物必须 get→append→写回（playtest 棒 3→4 条、既有条目原样保留 + 回读校验），直接 put 会抹掉前序产物。
+
+调参语义澄清：`TUNING_META` 未声明时 `?tuning=1` 是**安全 no-op**（正常进游戏、忽略键）。game-12 有意不把 `DEBOUNCE_MS=300` 做成可调——它是需求验收项本身，spec 是唯一事实源。要开放浏览器内调参需下一轮：spec.numeric 声明键 → TUNING_META + tuning_panel.gd + 冒烟断言 → 重导出重部署重跑 mobile 门禁。
+
+## 六、macOS 自带 bash 3.2 的全角括号坑
+
+`verify.sh` 里 `$FRAMES）`（全角右括号紧贴变量名）在 macOS bash 3.2 某些 locale 下把多字节字符并入变量名 → `FRAMES: unbound variable`，而上一行 echo 还能正常展开，极难定位。写法统一 `${FRAMES}`，用 `bash -x` 抓现行。game-12 修复后 verify.sh 端到端全绿（preflight/smoke/fuzz 全 exit 0）。
+
+## 七、如实上报的缺口（未绕过、未伪造）
+
+1. **playtest.sh 不在模板仓库**（`std-skills/godot-game-dev/scripts/` 同目录 9 个判定/驱动脚本中独缺它）：各节点均未自造等价判定器、未伪造 `GODOT_PLAYTEST: PASS`；`.myrd/routines.yaml` 两条 routine（godot-smoke / mobile-web-smoke）均不引用它 → 不阻塞双门禁，缺口随产物 detail 上报运维补资产。
+2. **真机抽查未做**（本环境建不了 iOS 会话）：mobile-web-smoke 是 headless Chrome 仿真，触摸结论的边界是仿真环境；真机验证留待用户试玩回填。
+3. **试玩结论只能来自用户**：playtest_kit 已交付（`games/game-12/qa/playtest-kit.md`，试玩指引 + 反馈对照表 + 四问量表），量表待回填，未代填任何「好玩/通过」结论；未收到用户调参 URL 前，无 spec revisions/approve 调用。
+
+## 八、复用清单（后续点击类小游戏直接抄）
+
+1. 防重抄 `try_count(now_ms)` 签名：时间注入纯函数 + 初值 `-DEBOUNCE_MS` + 拦截不动锚点 + reset 清锚点 + 拦截发 remaining_ms。
+2. 输入抄「单源单相」：所有入口 → 唯一 `_attempt_count()`；TouchScreenButton 注入 InputEventAction 而非直调逻辑。
+3. 断言抄四件套：合成时间断言 + 真实路径跨窗等待 + 噪声后 reset + 每条断言负例验证；几何断言放第一物理帧，44px 负例用 TouchScreenButton 热区。
+4. 静止页记得待机脉冲（≥0.02 极差同时换「画面在动」绿与可点示能）。
+5. 部署抄「五查」：gitignore 的 /export/、apphost.toml 指向、gitRef=目标分支、壳三件套（文案/调参桥/音频解锁）、artifacts 回写 get→append→写回。
+
+关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
+
+## 沉淀 game-14 Godot Web 导出与移动端门禁经验
+
+> 来源：goal cmusp1rab0028ic7q9shcdzyl（项目 cmusp1ra00022ic7qnk18nofm）「小游戏工坊 · game-14」工作流执行沉淀。上游输入：需求《game-14 太空飞船躲陨石捡金币》（cmusphfbp0062ic7qrxlt2nk4）、GameDesignSpec v1（cmuspm7sm006uic7qzrbqyilp，approved）。工作流 run cmuspmlex0072ic7qnjiqxmpc **真实结局 = failed，且失败于工作区准备阶段，四个节点全部 pending**。本卡如实记录本轮真实结论（失败模式与补救路径），并把 game-14 真正进入开发后要带上的导出/门禁契约收拢成清单（引用既有基线、不重复）。**本轮没有产生任何 game-14 代码、导出产物、门禁判定或部署事实——请勿把本卡第 4~6 节的复用清单误读为 game-14 实测数据。**
+
+## 一、本轮真实结局：准备阶段 git clone 失败，门禁与导出根本未执行
+
+- 时间线：run 创建 2026-10-03T18:12:57Z → failed 2026-10-03T18:15:25Z（存活 2 分 28 秒）；prepSteps 仅「解析模型配置 3ms」；失败点 = preparationPhase「正在准备代码工作区（克隆仓库、拉取最新代码）」。
+- run.result.error 逐字：`git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmusp1ra00022ic7qnk18nofm/run-cmuspmlex0072ic7qnjiqxmpc'... fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75009 ms: Couldn't connect to server`。
+- 节点状态：脚手架 / 实现玩法 / 导出并部署 / 试玩验收 全部 pending；implement 与 deploy 的 godot-smoke preHook、playtest 的 mobile-web-smoke preHook 也均 pending——**门禁一次都没跑过，不存在「门禁打回」**。
+- 复盘纪律：「已启动 ≠ 已成功」在本轮的具体形态就是「run 状态 failed + 节点全 pending」；判定真实结局唯一依据 run 状态与 run.result.error，禁止凭预期脑补「门禁打到第几轮」。
+
+## 二、根因分类与补救：环境不可用 ≠ 代码缺陷，正确动作是重跑而非改代码
+
+- 根因：github.com:443 连接 75 秒超时（connect 阶段即失败，非认证/仓库问题），属瞬时网络故障——与 godot-smoke 退出码 2「环境不可用」同层语义：**禁止为它改游戏代码，更不允许宣称门禁失败**。
+- 恢复复核（2026-10-04）：`curl https://github.com` → 200（0.59s）；`git ls-remote https://github.com/hl3w22bupt/myrd-playground.git` 正常返回分支列表 → 复跑条件已具备。
+- 补救动作：`POST /api/v1/workflows/runs/cmuspmlex0072ic7qnjiqxmpc/rerun`（平台手册 rerun 入口）。DAG 输入不变：需求 cmusphfbp0062ic7qrxlt2nk4 + spec cmuspm7sm006uic7qzrbqyilp（v1 approved）仍是唯一权威。
+- 若同签名（clone exit 128 / 443 connect timeout）复现：先做宿主机连通性探针（curl github.com + git ls-remote），如实按「环境不可用」上报等待恢复；不得降级为纸面交付，也不得空转烧修复预算。
+
+## 三、game-14 工坊流水线契约（经本轮 run 定义实测核实）
+
+- 四棒 DAG：脚手架 scaffold → 实现玩法 implement → 导出并部署 deploy → 试玩验收 playtest；仓库 github.com/hl3w22bupt/myrd-playground（game-14 预期落位 `games/game-14`，以 scaffold 实际产物为准）。
+- 门禁挂点：**implement、deploy 两棒都挂 godot-smoke；playtest 挂 mobile-web-smoke**。routine 均 gate:false、由 preHook 显式引用；`{{liveUrl}}` 无默认值 = fail-closed（不传就报错，不会静默跳过门禁）；`{{gamePath}}` 必须经 preHookParams 显式传参（默认值指向不存在工程的坑见 27407691 §1.3）。
+- 判定资产唯一来源：仓库 `std-skills/godot-game-dev/scripts/`（mobile-web-smoke 判定脚本 mobile-web-smoke.mjs + 负例自测 mobile_smoke_selftest.mjs + routine 片段模板已随 commit 4a8e4b76 落地）；被检工程不得自造判定器，scaffold 只校验不自造。
+
+## 四、game-14 验收标准 → 门禁断言映射（approved spec v1 的可机判数值）
+
+| 验收项 | spec v1 锚点 | 机判断言落法 |
+| --- | --- | --- |
+| 难度阶梯 | 陨石生成间隔 950ms 逐档递减至封顶 430ms、下落速度 130px/s 逐档递增至封顶 270px/s，共 5 档（每 100 分一档） | 冒烟分相位读各档生成间隔/单位位移帧数，断言逐档单调变化且封顶后不再变化；档位边界按得分 100/200/300/400 推导写进断言注释 |
+| 状态机与持久化 | 开始（含操作说明）/进行中/暂停恢复/游戏结束/一键重开五状态；最高分 localStorage 键 `game14.highScore` | 状态标志断言；重开后断言分数清零而最高分保留；localStorage 属线上行为，由 mobile-web-smoke 打 liveUrl 验证 |
+| 操控与边界 | 键盘 ←→/A/D（含上下）+ 触摸拖动，飞船不可越出画布 | E-08 纪律：按住方向键测位移与动作注入分帧做；越界 clamp 断言；触摸拖动必须真实改变飞船目标位置（mobile 门禁 touch-response 预修，见 §六） |
+| 计分与生命 | 拾金币 +10 实时显示；撞陨石 −1 命（共 3 命），命尽进游戏结束页并展示本局得分 + 历史最高分 | 拾取/碰撞事件计数断言；连续碰撞或生命归零路径必须可达并断言 GAME_OVER |
+| 视听契约 | 三层星空视差滚动；碰撞爆炸闪烁 + 300ms 震屏 + 1.2s 无敌闪烁；+10 飘分 | 事件标志/帧差断言；无敌期 = 「碰撞不再扣命」的断言窗口 |
+| 音频契约 | coin-pickup / meteor-explosion / game-over 三 SFX 可编程触发；M 键静音且不影响逻辑 | headless 侧编程触发断言；AudioContext 解锁契约（__audioDebug）归 mobile-web-smoke 第 8 项 |
+| 性能 | 连续游玩 60s 帧率 ≥ 30fps；页面无控制台报错 | **阈值辨析：mobile-web-smoke 的 FPS≥8 是底线门禁，≥30fps 是需求验收线——门禁全绿 ≠ 验收达标，验收仍按 spec 执行** |
+
+## 五、复用基线指针（执行时直接带上，本卡不重复其内容）
+
+- **27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 总论）**：Godot 4.3 Web 导出参数基线（`variant/thread_support=false` 免 COOP/COEP、`canvas_resize_policy=2`、中文必须 theme/custom_font=P13、导出 7 件套与 wasm≈35MB 量级）；AppHost 部署契约（**一游戏一清单**——game-14 必须 `name="game-14"`、`assets_dir="games/game-14/export/web"`，绝不沿用他游戏 apphost.toml；部署 gitRef 必须是部署分支 `myrd/games-goal-<goalId>` 不是 main；`/export/` 产物必须入库否则上线全 404；M1 网关拦二进制 → gzip+b64 文本回传；壳内资源全走相对路径）；godot-smoke 三层门禁与退出码语义 0/1/2/3；error-signatures 修复循环纪律；部署终态独立复核四步。
+- **00314649-c4d2-407c-871b-62f7de91b07d（game-12）**：mobile-web-smoke 10 项明细（网络/console/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约/无横溢/FPS≥8）与「必须打部署后 liveUrl」纪律（本地静态伺服只能当预检）；标记辨析（判定脚本 stdout 小写 `godot-smoke: PASS` vs 引擎日志大写 `GODOT_SMOKE: PASS`）；证据随仓归档（`games/<game>/qa/mobile/report.json` + phase 截图）。
+- **82e419bb-b641-4b5e-bb58-d8b9633169ca**：移动端触屏虚拟摇杆与 AudioContext 解锁三件套（首手势解锁 + 解锁前记账 + 退后台回来再解锁），壳页与游戏侧都要进。
+- **36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）/ 78180e88-6486-404e-9265-e315e0da3c66（hello）**：同系列工程结构、模板与门禁增量结论。
+
+## 六、mobile-web-smoke 已知失败图谱（5 款游戏实测 → game-14 预修清单）
+
+仓库 mobile-gate 系列实测 verdict（commits 11957bd3~585db60c）：game-3 疾风忍者跑 **PASS**（十项全绿，tap 触发跳跃实证触摸驱动玩法）；game-2 星尘收集者 FAIL（console Godot 缺 cfg 告警 + tap 后零帧差）；game-4 光路谜阵 FAIL（tap 落空格零帧差，探针坐标与 letterbox 棋盘错位）；game-9 推箱子 FAIL（探针落点错位，摇杆实际 CSS(44,502)）；game-10 天天酷跑 FAIL（tap 落横带无响应，尚需探针区分「点按开始未实现」与「落点错位」）。
+
+- 主失败源集中在 **touch-response**，两类根因：①游戏触摸未真正接入玩法状态（UI 自称支持触摸但点按无效）；②探针坐标与画布 letterbox/控件 CSS 实际位置错位（屏幕坐标 ≠ 游戏坐标）。
+- game-14 预修清单：触摸拖动直接改飞船目标位置并与键盘同路径（game-12「单源单相」范式：多输入源汇一个判定入口）；可交互热区 ≥44px，避免依赖 letterbox 偏移的绝对坐标；开始页不要做成纯静止层（会触发「画面在动」误判，game-12 用待机呼吸脉冲拿到确定性非零帧差）；音频解锁契约随壳页一并实现。
+- 证据纪律：verdict 逐字进 commit message + report.json + phase-load/tap/joystick 三截图入库，供复跑比对。
+
+## 七、关联知识与权威来源
+
+- 知识卡：27407691-bcf8-4e73-b686-1bb8df684e5c（导出+门禁+AppHost 总论）、00314649-c4d2-407c-871b-62f7de91b07d（双门禁与 mobile-web-smoke 10 项）、82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏/音频解锁）、36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）、78180e88-6486-404e-9265-e315e0da3c66（hello 工坊）、b07a928a-414b-4d48-9535-5b6d6cc859ae（平台仓库结构与路径陷阱）。
+- 仓库权威文件：`std-skills/godot-game-dev/scripts/{smoke.sh,preflight.py,input-fuzz.sh,resolve-godot.sh,mobile-web-smoke.mjs,mobile_smoke_selftest.mjs}`、`std-skills/godot-game-dev/references/{godot-smoke-routine.md,mobile-smoke-routine.md,error-signatures.md}`、`.myrd/routines.yaml`。
+- 平台事实源：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`（rerun 入口、「已启动 ≠ 已成功」纪律）；工作流 spec 与需求以平台登记产物为准。
+
+
+## 沉淀知识：Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+# Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+> 来源：目标「森林收集水果限时赛」（goal=cmuspb558003tic7qwgyd02c2）的小游戏工坊流水线（workflow=cmuspb55m003xic7q9o18vjk2 v1，scaffold→implement→deploy→playtest）首轮执行（run=cmuspld10006ric7qup55soew，2026-10-03T18:12:00Z 起、18:14:30Z 判 failed）。固定参数：工程 games/60-2，功能分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2，AppHost cmuspb3xg003ric7q1ksya6c3（slug 60-2），liveUrl https://leomac-studio.tail49399e.ts.net/apps/60-2/（部署前即确定）。本文只写本轮实测增量：①双门禁在 60-2 的挂点与分工；②本次 run 的真实卡点——双门禁之前的第一堵墙；③一次「参数漂移」疑云的证伪过程；④知识沉淀节点自身的 API 事实。godot-smoke 三层门禁体系、打回修复签名表、AppHost 部署总论见关联知识（§八），不重复。
+
+## 一、结论速览
+
+| # | 要点 | 结论 | 依据 |
+| --- | --- | --- | --- |
+| 1 | 双门禁分工 | 工程门（godot-smoke，挂 implement 与 deploy 之前，判工程本体）×线上门（mobile-web-smoke，只挂 playtest 之前，判公网 liveUrl）——判定对象、执行环境、证据落点都不同，不可合并为一道 | 工作流定义逐节点核对 |
+| 2 | 本次失败层级 | run 级失败发生在**门禁之前**：工作区 git clone 连不上 github.com（443 端口 75s 连接超时），四个节点全部 pending，双门禁一次都没执行 | run.result.error 原文 |
+| 3 | 根因定性 | 环境阻塞，非代码/配置缺陷：github.com 从执行机**持续性**不可达（2026-10-03 run 失败 + 2026-10-04 复测 `curl -m 10 https://github.com` 仍超时，连接建立不了） | run 错误 + 本机复测 |
+| 4 | 重跑纪律 | 网络不通时重跑 run = 空烧：先 `curl -m 10 https://github.com` 验连通（10 秒成本），通了自己重跑（工作流定义无需改动），持续不通按「blocked 比空烧有用」上报运维（代理/镜像），禁止为绕过网络改仓库来源 | 本轮 2.5 分钟烧掉一次 run 的直接教训 |
+| 5 | 工作流定义健康度 | 60-2 四节点参数已逐一核对**全部正确**指向 games/60-2 / 60-2 分支 / 60-2 AppHost / 60-2 liveUrl，不存在「模板实例化只替换了首个节点」的漂移 | 8 个关键词 × 4 节点计数复核 |
+| 6 | 沉淀 API 事实 | 本部署**没有** `/api/v1/knowledge/search`（404）；等效做法与写入契约见 §七 | 本次实测 + 平台源码 src/routes/knowledge.ts |
+
+## 二、60-2 双门禁挂点与分工（逐节点实例核对）
+
+| 节点 | preHook | preHookParams | 判定对象 | 证据落点 |
+| --- | --- | --- | --- | --- |
+| scaffold | 无 | — | 资产存在性自检（门禁脚本/routines.yaml/模板，缺失→blocked） | 节点 detail |
+| implement | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（静态一致性 + 无头运行） | 门禁日志 |
+| deploy | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（部署前再拦一次，防止部署带病产物） | 门禁日志 |
+| playtest | mobile-web-smoke | gamePath=games/60-2, liveUrl=https://leomac-studio.tail49399e.ts.net/apps/60-2/ | **线上公网 liveUrl**（headless Chrome 移动仿真） | games/60-2/qa/mobile/（report.json + 分阶段截图） |
+
+要点展开：
+
+1. **工程门挂两道、线上门只挂一道，是有意设计**：godot-smoke 的判定对象是仓库内工程（preflight 静态 + headless 运行），所以在写代码（implement）和出产物（deploy）两处都要拦；mobile-web-smoke 的判定对象是已部署的线上地址，只有 playtest（试玩验收）消费它，且 liveUrl 在部署前就已锁定，preHook 可以在节点启动前先跑门禁、节点启动后直接读证据。
+2. **判定协议（与门禁同源，agent 本地自检命令完全一致）**：退出码 `0` 且日志含标记才算通过——`GODOT_SMOKE: PASS`（冒烟）/ `GODOT_FUZZ: PASS`（fuzz）/ `GODOT_PLAYTEST: PASS`（机器人试玩）；退出码 `2` = 环境不可用（装环境/上报，**禁止为过门禁改判定脚本或改松断言**）。
+3. **判定器独立性**：`preflight.py / smoke.sh / input-fuzz.sh / playtest.sh / resolve-godot.sh / mobile-web-smoke.mjs` 唯一合法来源是仓库 `std-skills/godot-game-dev/scripts/`（模板仓库预置）；平台注入的 `.myrd-platform/.claude/skills/godot-game-dev/` 只是阅读副本，不得当判定来源、不得现场改写、不得自造等价脚本——被检方自己写判定器，PASS 一文不值。缺任何一个 → status=blocked 上报（「模板仓库未预置门禁脚本：<文件名>；请运维补模板仓库」），**不要现场补**。
+4. **参数化必须显式传**：`.myrd/routines.yaml` 中 `godot-smoke` 与 `mobile-web-smoke` 的 `{{gamePath}}`/`{{liveUrl}}` 由工作流节点 preHookParams 按工程覆盖。仓库默认值指向别的工程——不传参要么报错、要么（更糟）静默测错工程给出假 PASS（坑实录见关联知识 27407691 §1.3）。
+5. **中文字体是 preflight P13 的拦截项**：Web 导出跑在浏览器沙箱里拿不到系统字体，模板自带 `assets/fonts/` 全局中文字体与 `project.godot` 的 `[gui] theme/custom_font` 配置必须原样保留；「有中文文案但无字体」直接被 P13 拦下。禁止为躲缺字把文案英化——那是字体缺失的症状，不是修复。
+
+## 三、本次 run 的真实卡点：双门禁之前的第一堵墙
+
+**时间线**：18:12:00 run 启动 → 引导阶段执行工作区 `git clone https://github.com/hl3w22bupt/myrd-playground.git` → 75 秒连接超时 → 18:14:30 run 判 failed。错误原文：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspb3xd003nic7qm25pu8si/run-cmuspld10006ric7qup55soew'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75003 ms: Couldn't connect to server
+```
+
+**为什么门禁体系没接住**：门禁全部挂在**节点**上（preHook），而 clone 是 run 引导步骤，发生在第一个节点之前。clone 失败的后果是：①直接置 run=failed（result.error），②四个节点永远 pending，③没有 reject 打回循环、没有 blocked 语义、没有证据落点——门禁体系（preflight/smoke/fuzz/playtest/mobile-web-smoke 六个判定器）覆盖的是「工程与线上」，不覆盖「工作区引导」这第 0 步。
+
+**连锁依赖链**（为什么这一断全断）：clone 可用 → 功能分支可推送 → AppHost 按 gitRef 拉取构建 → liveUrl 可访问 → mobile-web-smoke 有东西可测 → 试玩验收有地方可玩。第 0 依赖断了，双门禁与验收全部空转。
+
+**恢复路径（给下一轮执行，按序）**：
+
+1. 先验连通（成本 10 秒，避免空烧一次 2.5 分钟的 run）：`curl -s -o /dev/null -m 10 -w "%{http_code}" https://github.com`；
+2. 通了 → 直接重跑工作流，**定义无需任何改动**（四节点参数已核对全部正确，见 §四）；
+3. 持续不通 → 不要重跑，回写 status=blocked 上报运维（网络代理 / GitHub 镜像 / 出网白名单），写清「clone github.com:443 连接超时，全链被第 0 依赖阻塞」——与门禁「退出码 2 = 环境不可用，禁止为过门禁改代码」是同一条纪律的 run 级推广：**环境不通时，重跑是空烧，先修环境或如实上报**；
+4. 禁止为绕过网络私自换镜像仓库/改 remote——仓库来源是部署与门禁的信任锚，变更必须走运维。
+
+## 四、诊断方法论：一次「模板参数漂移」疑云的证伪
+
+**现象**：核对工作流定义时，scaffold 节点参数正确指向 games/60-2，而读到的 implement/deploy/playtest 节点 prompt 里满是上一个游戏 app-2 的固定参数（gamePath=games/app-2、分支 cmuspfeyw…、AppHost cmuspfdr…、liveUrl /apps/app-2/）→ 一度形成高价值假设：「工作流模板实例化只替换了首个节点的参数」。
+
+**证伪过程**：换独立文件名重新拉取同一工作流，对 8 个关键词（games/60-2、games/app-2、两个 goal id、两个 liveUrl、两个 AppHost id）× 4 节点逐一计数——**四节点全部正确指向 60-2**。真因：诊断用的 `/tmp` 共享临时文件被本机并发进程覆盖，中间那几步读到的其实是另一个工作流（app-2）的同名缓存文件。
+
+**沉淀三条**：
+
+1. 结论必须落在「重新独立取证」上，不落在「上一次读到的内容」上——尤其对「上游模板缺陷」这类会被写进知识、触发他人返工的高价值指控，先证伪再落笔；
+2. 诊断脚本对临时文件用唯一文件名（本次 `/tmp/wf.json` 与并发工作流进程撞名），或直接管道内消费不落盘；
+3. 证伪本身也是产出：本文档差点把一个不存在的平台缺陷写成结论，§一第 5 条的「定义健康度」结论就是证伪的成果，它让下一轮可以放心直接重跑。
+
+## 五、Web 导出与 AppHost 部署：60-2 落位值与硬约束清单
+
+机制细节与打回修复总论见关联知识 27407691（oak-key 全链路）与 82e419bb（触屏/音频），本节只列 60-2 的具体落位值和逐项易错点：
+
+| 项 | 60-2 落位值 | 易错点（违反后果） |
+| --- | --- | --- |
+| 部署来源分支 | myrd/games-goal-cmuspb558003tic7qwgyd02c2 | gitRef 传 main → main 上没有本游戏的 apphost.toml/导出产物，构建失败或把别的壳部署出去 |
+| 部署 API | POST /api/v1/apphost/apps/cmuspb3xg003ric7q1ksya6c3/deployments，mode=bundle | sourceId 必须是 goal id cmuspb558003tic7qwgyd02c2；带别的应用 id → 403 APP_BOUND_TO_OTHER_SOURCE（选错坑，回来核对 hostedAppId，不要换坑硬试） |
+| 导出预设 | games/60-2/export_presets.cfg 配 Web(HTML5)，产物落 games/60-2/export/web/（必须含 index.html） | 缺 index.html → 壳无入口页 |
+| 资产出 bundle | apphost.toml 声明 `assets_dir = "games/60-2/export/web"`，平台把该目录上传对象存储，25MB 上限不再约束资产体积 | 不声明 assets_dir → 产物挤进 bundle，体积立刻顶 25MB 上限 |
+| 壳资产路由 | asset-store `getAsset` 懒加载，路由 `/api/public/assets/:name`；`gzip+b64` → 回 text/plain 的 base64（壳端 DecompressionStream 解压）；`raw` → 按 contentType 回原文 | M1 网关**只透传文本响应**：octet-stream/gzip/图片/音视频 → 502 UNSUPPORTED_BINARY；资产一律 base64 文本回传 |
+| 路径口径 | 壳页面拉资源**一律相对路径**（`api/public/assets/index.wasm`）；`?p=` 是网关保留 query | 绝对路径 `/assets/...` 或 `?p=` 手拼 → 404/被登录墙拦 → 黑屏 |
+| wasm 初始化 | `WebAssembly.instantiate(bytes)`（base64 → Uint8Array → 解压） | instantiateStreaming 要求 application/wasm MIME，本链路不满足 |
+| b64 内联降级 | 仅当 asset-store 不可用；原始产物 ≤ 18MB（b64 膨胀 1.33×，bundle 上限 25MB） | 超限 → 降级「说明页 + 下载指引」，不得声称可玩 |
+| 音频手势解锁 | 壳页面在引擎加载**之前**：①包 AudioContext 构造器捕获引擎实例；②document 级 `touchstart/touchend/pointerdown/keydown/click`（capture+passive，不消费事件）同步 `ctx.resume()`；③暴露 `window.__audioDebug()` | 缺任一 → 移动端全部音效静默且控制台零报错（WebKit 创建即 suspended、切后台变 interrupted、引擎只在输入回调 resume）；有音效的游戏壳缺解锁器 = 验收不通过 |
+| 调参桥 | 壳页面引擎加载前解析 `?tuning=<JSON>` 进 `window.__GAME_TUNING__`，游戏侧 GameState 启动按 TUNING_META 声明的键钳制覆盖 | 缺 → 试玩调好的参数无法用 URL 复现，调参回写流程断裂 |
+| 部署后自测 | /health 与 / 都 200 只是起点，**必须**跑 mobile-web-smoke | 只 curl 200 就宣称部署成功 = 跳过移动端硬门槛 |
+
+## 六、mobile-web-smoke 移动端模拟门禁要点
+
+- **机判方式与维度**：headless Chrome 移动仿真打开线上 liveUrl，机判六项——网络（资源可达）、console（无报错）、渲染（画面在动）、触摸（可交互）、音频契约（解锁层在位）、视口（移动端尺寸正确）。
+- **证据落点**：`games/60-2/qa/mobile/`（report.json + 分阶段截图）。试玩节点（playtest）据此写试玩指引；若发现证据缺失或与 preHook 结论矛盾，如实回写 detail，不替门禁背书。
+- **已知边界一：静止页会被误判渲染冻结**。完全静止的页面「画面在动」检查会 FAIL——解法是给核心按钮加待机呼吸脉冲（game-12 实测：scale 1.00→1.06 / 0.9s，极差 0.060 ≥ 阈值 0.02），既是门禁过检又是移动端可点示能（关联知识 00314649）。
+- **已知边界二：门禁全绿 ≠ 真机可用**。触摸事件分发顺序（E-18：`mouse_filter=STOP` 的 Control 在 GUI 命中阶段吃掉触摸，永远到不了 `_unhandled_input`）与 InputEventAction 互踩（E-19）都属于「headless 门禁全绿、真机必挂」型，机判之后仍需真人真机过一次「开局可动、摇杆不误触」（关联知识 82e419bb）。
+- **与试玩验收的衔接**：mobile-web-smoke 全绿只是准入，试玩节点产出「试玩验收包」（试玩指引 + 四问量表 + 调参工作台入口 `<liveUrl>?tuning=1`）；试玩结论只能来自用户，量表未回填就如实标「待回填」，detail 里不得出现没有出处的「试玩通过」。
+
+## 七、知识沉淀节点自身的 API 事实（本次实测，供后续沉淀节点直接复用）
+
+- **本部署不存在 `GET /api/v1/knowledge/search`**（返回 404）。等效「先搜后写」：`GET /api/v1/knowledge?scope=global&limit=200` 拉全量后客户端按 title/内容过滤（服务端源码 src/routes/knowledge.ts 的 GET 只支持 scope/category/projectId 过滤，无全文检索；列表默认只返回 parentId=null 且 isPublished=true 的文档）。
+- **新增**：`POST /api/v1/knowledge`，必填 `title` + `scope`（'global'|'project'）；`title+scope` 重复 → 409 CONFLICT（先搜后写可顺便避开）；`tags` 必须是字符串数组；`category` 建议对齐既有口径（本文用「技术方案」，与同类游戏知识一致）；创建即 isPublished=true 并自动生成 v1 版本快照。
+- **更新**：`PATCH /api/v1/knowledge/doc?id=<docId>`，支持部分更新 title/content/category/tags/icon/scope/projectIds；平台自动做版本化（更新前快照旧版 → version+1 → parentVersion=`id@vN`），不需要调用方自己处理版本。
+- **单篇读取**：`GET /api/v1/knowledge/doc?id=<docId>`（返回 doc + associatedProjectIds；已删除文档也能读到，便于历史链接）。
+- **写入姿势**：JSON body 直接 PUT 不便时，用 python3 `json.dumps` 构造 payload 再交 curl 发送，避免 shell 转义事故。
+
+## 八、关联知识（互为补充，不重复）
+
+- `27407691-bcf8-4e73-b686-1bb8df684e5c`：Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路实战（oak-key）——三层门禁体系、退出码语义、routine 参数化、GODOT_BIN 单一实现、error-signatures 打回修复表。
+- `00314649-c4d2-407c-871b-62f7de91b07d`：game-12 双门禁通过路径——mobile-web-smoke PASS 10/10 实测、静止页呼吸脉冲、负例验证纪律。
+- `82e419bb-b641-4b5e-bb58-d8b9633169ca`：game-5 触屏虚拟摇杆与 AudioContext 解锁规范——E-18/E-19 机制、统一移动向量出口、音频门控三件套。
+- `6e91a11d-3632-4721-a3ea-d433e9622f9b`：game-5 玩法设计要点——与 60-2 同属「森林收集水果限时赛」玩法族（60 秒限时收集），数值基准可对照。
+- 设计 spec（platform）：`cmuspl1bw006lic7qkcplv73e`——60-2 的水果分值表（+1/+3/+10）、生成节奏与 60 秒结算契约及契约测试清单，实现与验收以此为准。
+
+## 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+# 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+> 来源：需求《《森林收集水果限时赛》游戏需求》（id=cmusp9cd00035ic7qxi8c4il3，验收节点 completed）→ GameDesignSpec《水果分值表与收集循环》（id=cmuspeqza004uic7qusqyn7gr）→ 小游戏工坊两次工作流运行皆 failed → 主策划验收指派（id=cmtn5fhk8000hjqckrib9i3bb，completed）。全部平台终态于 2026-10-04 经 API 与线上 URL 实测取证（见 §一）。
+>
+> 本文写三件事：① 可复用的「分值分档点按收集」玩法模板（+1/+2/+5 三档）；② Web 导出 + 双门禁的复用要点；③ 本 goal 双跑皆败的流程复盘教训。**不重复**总论：门禁三层体系与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key）；工程结构最小契约与帧预算推导见 78180e88-6486-404e-9265-e315e0da3c66（hello）；时间注入机判与单源单相见 00314649-c4d2-407c-871b-62f7de91b07d（game-12）；触屏适配与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca；**同名 IP 的另一机制变体**（松鼠移动+原木躲避+连击）见 6e91a11d-3632-4721-a3ea-d433e9622f9b（game-5 老版）。
+
+## 一、事实基线（本 goal 真实终态，先看这个再谈复用）
+
+| 对象 | 标识 | 终态 | 取证方式 |
+| --- | --- | --- | --- |
+| 需求 | cmusp9cd00035ic7qxi8c4il3 | completed | goal DAG 记录 |
+| GameDesignSpec（分值表与收集循环） | cmuspeqza004uic7qusqyn7gr | completed | goal DAG 记录 |
+| 工坊运行 #1 | workflow=cmusp1yao002pic7q384xxfse，run=cmuspf4oo0050ic7qfjj0azwh（工程 games/60，分支 myrd/games-goal-cmusp1ya8002lic7qk39zog9o） | **failed** | GET /api/v1/workflows/{id} 的 runs 字段 |
+| 工坊运行 #2（换 slug 重试） | workflow=cmuspb55m003xic7q9o18vjk2，run=cmuspld10006ric7qup55soew（工程 games/60-2，分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2） | **failed** | 同上 |
+| AppHost 记录 | 60=cmusp1ya6002jic7qz3dhps7r；60-2=cmuspb3xg003ric7q1ksya6c3 | 均卡在 status=creating，publicUrl=null，publishedAt=null | GET /api/v1/apps |
+| 线上地址 | https://leomac-studio.tail49399e.ts.net/apps/60 与 /apps/60-2（含 /gw 变体） | **404「应用不存在」** | curl -L 实测 2026-10-04 |
+| 主策划验收指派 | cmtn5fhk8000hjqckrib9i3bb（标题「验收复核线上版并回写产物标识」） | completed（节点完成；其结论正文经多个 API 路由探测不可回读） | goal DAG 记录 |
+| 同名老变体 game-5 | AppHost=cmuipis4f0063m9l6hagvvvd4，goal=cmuipis4g0065m9l69hew4nng，需求=cmuipol63006rm9l6cp2ww5r5 | ready，publicUrl=/apps/game-5，3 次工坊 run 全 completed | GET /api/v1/apps、/api/v1/workflows |
+
+结论一句话：**本 goal 的「点按分档版」截至 2026-10-04 没有可玩的线上版**；平台里唯一在线的「森林收集水果限时赛」是老变体 game-5（玩法口径完全不同）。后续任何验收、试玩、传播链接都必须先对照本表，别拿老 game-5 顶数。
+
+## 二、分值驱动收集玩法模板（+1/+2/+5 三档 · 点按拾取）
+
+### 2.1 分值表与频率反相关（需求硬性口径 + 建议校准值）
+
+| 档位 | 分值（需求硬性） | 出现权重（建议起点） | 期望得分贡献占比（建议） | 视觉要求 |
+| --- | --- | --- | --- | --- |
+| 低（苹果） | +1 | ~70% | ~45% | 常规色调 |
+| 中（橙子） | +2 | ~25% | ~35% | 提亮一档 |
+| 高（稀有水果） | +5 | ~5% | ~20% | 高对比 + 特效标识 |
+
+- **分值与频率必须反相关**且两者解耦配置（权重表与分值表分开两张常量表）——需求只锁「高分水果出现频率更低」，斜率是实现自由度；但三档贡献占比是手感核心，建议按上表起步、用冒烟统计实测校准（240 帧冒烟里统计三类生成次数的比例，替代人工目测）。
+- **期望值校准法**：单局期望总分 = 60s × 刷新速率 × Σ(权重ᵢ × 分值ᵢ)。先定「单局期望分」这一产品目标，再反推刷新速率，不要拍脑袋调刷新率。
+- **计分唯一入口**：所有得分变更走同一个 `add_score(points)`，分值查表发生在水果节点持有 `tier` 字段 → 入口处查表，禁止 UI 层或触摸回调里散落 `score += 1` 字面量。这是「+1/+2/+5 各自累加正确」能被机判断言的前提（同 game-12 的单源纪律）。
+
+### 2.2 60 秒计时的 ±1 秒验收实现口径
+
+- 用 `float` 剩余时间在 `_process(delta)` 里累积递减，显示层取 `ceil()`；归零判定用 `time_left <= 0.0` 触发结算，**不要**用「Timer 节点每 1 秒 tick 一次、tick 里 -1」的实现——tick 计数在暂停/掉帧/场景切换时会漂移，±1 秒容差经不起移动端浏览器节流（切后台回来一次就能漂 1~2 秒）。
+- 冒烟断言：读 UI 计时文本两次间隔 1~2 秒断言递减；用引擎时间注入（同 game-12 `try_count(now_ms)` 模式）把 `time_left` 直接压到 0，断言进入结算场景。显示值与内部值分离，断言内部值。
+
+### 2.3 点按拾取：单源单相 + 热区（移动端唯一操作）
+
+- Godot 4 默认 `emulate_mouse_from_touch=true` → 一次触摸可能产生 touch + mouse 双事件，再加 `_unhandled_input` 的动作路径，同一「点击」多来源。收敛方式与 game-12 相同：所有来源只调唯一入口 `attempt_collect(fruit)`，判定收口在 GameState 一处。
+- 触摸热区按「水果视觉半径 + 容差」配置，最小可点直径 ≥ 44~48 逻辑 px，且注意 DPR 换算（引 82e419bb）；相邻水果刷新点最小间距 ≥ 1.5 个水果直径，防误触串档（点到低档实际想点中档）。
+- 高分水果「稀有」也必须**可点**：特效动画不要吃掉点击区（动画节点 `mouse_filter=IGNORE`），否则会出现「看得见点不中」的体感灾难——美术动效是 Area2D 之外的子节点，别挂在碰撞体上。
+
+### 2.4 供给节奏与场上管理（点按版的补货口径）
+
+- 两段式供给（引 6e91a11d §二并适配）：开局铺场 8~12 个 → 场上存量低于下限（建议 6）时按 0.8~1.5 秒补 1 个。60 秒点按版的失败模式比躲避版更隐蔽：**可收目标耗尽 = 玩家空转**，补货下限是硬保障。
+- 三档各自独立掷骰，不共用计时器；高档（稀有）另加「场上同屏最多 1 个」约束，防止稀有权重 5% 在随机聚类下同屏堆 3 个、破坏「稀有」体感。
+- 场景边界内边距 ≥ 半个水果直径，保证边缘刷新可点；不做与障碍物的路径重叠问题（本变体无移动障碍），但要避免刷新点落在 UI 计时条/得分条下方。
+
+### 2.5 一键重开的完整重置清单（验收 5 的坑点）
+
+结算界面「重新开始」必须复位**全部**运行态，逐项列出防漏：倒计时回 60、得分清零、场上水果全部回收、三档刷新计时器重置、稀有水果在场标记清除、飘分/特效节点队列清空、结算面板隐藏。重开入口双通道（触摸可点 + 键盘 Enter/Space），坑源见 ed31081f-82be-4a76-a28b-476f7e18a00b（game-3 只有触摸入口导致桌面端无法重开）。冒烟断言：先打完一局（注入 time 归零）→ 点/按重开 → 断言计时==60 且得分==0 且场上水果数==铺场数。
+
+### 2.6 森林主题的可机判底线（验收 3）
+
+美术质量不进门禁，但结构可以机判：断言主场景节点树中存在 ≥ 2 类森林装饰元素组（如 Trees/Grass 两个 Node2D 组各自子节点数 > 0）；水果节点与背景装饰分属不同层级（水果层 z_index 更高且不被装饰遮罩覆盖）。preflight 不查这些，要写进工程内 `tests/smoke.gd` 的玩法断言段。
+
+### 2.7 验收 → 冒烟断言映射（写进 verify.sh 的建议）
+
+| 需求验收条目 | 冒烟断言建议 |
+| --- | --- |
+| 1. 60 秒递减、归零自动结算、偏差 ≤ ±1s | 两次读计时文本断言递减；注入 time_left=0 断言进结算 |
+| 2. ≥3 种分值（+1/+2/+5）各自累加、实时显示 | 依次对三档水果坐标注入触摸，断言得分序列 +1/+2/+5；断言 UI 总分文本同步 |
+| 3. 森林主题 ≥2 类元素、水果不遮挡 | 断言装饰节点组存在且子节点 >0；断言水果层在装饰层之上 |
+| 4. 移动端触屏可完整跑一局、无明显卡顿 | mobile-web-smoke 门禁（双门禁第二道）跑 FPS 采样，参照 game-12 实测 FPS 39 的基线口径 |
+| 5. 一键重开、倒计时与得分重置 | 跑完一局 → 触发重开 → 断言 60/0/铺场数三值（见 §2.5） |
+
+## 三、Web 导出与双门禁复用要点
+
+本 goal 两次工作流的 scaffold 节点 prompt（工坊流水线模板实文）把门禁资产判据钉死为**四件套**：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, resolve-godot.sh, mobile-web-smoke.mjs}` 全部在仓库内且不被 .gitignore 排除，缺任一 → blocked 上报，禁止从平台注入的 `.myrd-platform/.claude/skills/` 阅读副本里复制脚本充当判定器，也禁止自造等价脚本。对比老 game-5 工作流只要求三件套——**mobile-web-smoke.mjs 是后来加入的第四件**，新工程照四件套验收。
+
+- **双门禁分工**：godot-smoke（preflight 静态 + headless 冒烟 + input-fuzz）证明「能跑能玩」，mobile-web-smoke 证明「移动端模拟下可玩且不掉帧」。两道各自独立出退出码，任何一道非 0 都不该进入 deploy。
+- **退出码语义**（与总论同源）：0 通过 / 1 冒烟失败→打回修复循环 / 2 环境不可用→装环境、禁止为过门禁改代码 / 3 静态不一致（verify.sh 单独编码）。存在性守卫先行判 2，防「脚本缺失」被误判成 3 诱导修游戏代码。
+- **Web 导出配置五要点**（引 78180e88 实测，不再展开）：渲染器钉死 gl_compatibility 且 `.mobile` 双写；`thread_support=false`；中文必须内置 NotoSansSC 等字体（preflight P13 拦 Web 中文缺字）；导出产物落 `games/<工程>/export/web/` 并 .gitignore 豁免入库；UI 挂独立 CanvasLayer 与游戏世界分离。
+- **AppHost 部署口径**：部署 gitRef 必须是 goal 功能分支（`myrd/games-goal-<goalId>`），绝不能用 main；liveUrl 在部署完成前即由工坊确定（本 goal 为 /apps/60、/apps/60-2），移动端门禁与试玩都以它为准。
+
+## 四、流程复盘：为什么本 goal 没有线上版（双跑皆败实录）
+
+时间线（全部平台记录）：17:56:54 创建 AppHost「60」+ 工作流 #1 → run cmuspf4oo0050ic7qfjj0azwh **failed** → 18:04:01 换 slug 重试，创建 AppHost「60-2」+ 工作流 #2 → run cmuspld10006ric7qup55soew **再 failed** → 验收指派节点 completed 回写产物标识 → 2026-10-04 实测线上 404。
+
+- **教训 A：节点完成态 ≠ 线上可玩。** 验收指派节点 completed，但平台记录里不存在任何可访问的线上版本。「验收复核」类节点的完成前置必须是硬证据：liveUrl 返回 200 且真实浏览器跑通「开始→拾取→结算→重开」闭环，产物标识回写附上 deployment/gitRef；否则完成态与线上态脱节，下游（频道播报、试玩通知、知识沉淀）全部建立在幻觉上。
+- **教训 B：同名变体串场是本 IP 的特有陷阱。**「森林收集水果限时赛」在仓库里有两个机制完全不同的变体：老 game-5（松鼠移动+原木躲避+连击，已上线）与本版（点按拾取+分值分档，未上线）。两者需求 id、goal id、工程目录（games/game-5 vs games/60、60-2）、分支、slug 全不同。**一切定位以产物 id + 分支名 + 工程目录为准，禁止按游戏名搜索**——按名搜必然把老 game-5 的「已上线、3 run 全绿」误当成新版的现状。
+- **教训 C：换 slug 重试会留下孤儿 AppHost 空壳。** 60 失败后换 60-2 重试，AppHost 表留下两条 status=creating 的壳，publicUrl 均为 null。重试前应优先复用原 AppHost 记录；若必须换 slug，重试启动时把旧壳置为废弃态。排查「游戏上线了没」的正确顺序：先查 AppHost status（creating/ready/failed），再 curl liveUrl 实测——本 goal 的 404 就是这么确认的，不能只信工作流状态或节点状态。
+- **教训 D：复盘入口与取证边界。** 工作流 API 只回 run id + status，不回失败日志；复盘具体卡点需持 run id（cmuspf4oo0050ic7qfjj0azwh、cmuspld10006ric7qup55soew）到执行日志/workflow 详情页查。本机环境 GitHub 443 不通，`git ls-remote` 无法核实两条 goal 分支是否推上远端——分支存在性复核必须在能连 GitHub 的环境做，不要在本机下「分支不存在」的结论。
+
+## 五、给下一个同类小游戏的复用清单
+
+1. 玩法骨架直接抄 §二：三档分值表 + 反相关权重表 + `add_score` 单入口 + float 计时 + 两段式补货 + 完整重置清单，改数值不改结构。
+2. 工程起点抄 78180e88 §二的最小契约（project.godot 三类必接线、TUNING_META 白名单、tests/smoke.gd、verify.sh、export_presets.cfg）。
+3. 门禁四件套齐全性检查放在 scaffold 第一步（本 goal 工作流模板已内置该判据），双门禁全绿才允许 deploy。
+4. 验收断言按 §2.7 映射表逐条落进 smoke.gd，每条断言做负例验证（证明会真 FAIL）。
+5. 上线判定只认三件套：AppHost status=ready + liveUrl 200 + 实机操作闭环截图/录像；验收节点回写产物标识时必须附 deployment/gitRef。
+6. 涉及「森林收集水果限时赛」名字的一切操作，先对 §一事实基线表确认自己在操作哪个变体。
+
+## 六、关联知识
+
+- 门禁三层体系 + AppHost 部署总论：27407691-bcf8-4e73-b686-1bb8df684e5c
+- 工程结构最小契约 + 帧预算推导 + playtest blocked 实录：78180e88-6486-404e-9265-e315e0da3c66
+- 双门禁（godot-smoke + mobile-web-smoke）+ 时间注入机判 + 单源单相：00314649-c4d2-407c-871b-62f7de91b07d
+- 移动端触屏虚拟摇杆 + AudioContext 解锁：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- 同名 IP 老变体（松鼠+原木+连击）玩法口径：6e91a11d-3632-4721-a3ea-d433e9622f9b
+- game-9 单游戏部署先例：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 对抗性探索与机判方法论（QA 复用）：437f8129-89b5-4f46-95c0-2d475c3cead8
+
+## 沉淀 app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单（太空飞船躲陨石捡金币）
+
+# app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单
+
+> 来源：目标《创建小游戏应用：太空飞船躲陨石捡金币》（goal=cmuspfeyw0058ic7qrmh6qebm）首轮执行（2026-10-03 18:11~18:23 UTC）+ 次日（2026-10-04）知识沉淀时的时点复核。需求 id=cmuspmumf007cic7qlt6uwieo，GameDesignSpec id=cmuspqwhe007ric7qp0465dvk，工坊工作流 id=cmuspfez9005cic7q93j4fk74，失败运行 id=cmuspr5v7007xic7q5ng1aqqo。
+>
+> 本文只写本例增量：**工坊流水线在门禁一启动之前就整体失败**这一反面样本的取证、归类、复核方法论与重跑前置清单。godot-smoke 三层门禁体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-12 双门禁通过路径见 id=00314649-c4d2-407c-871b-62f7de91b07d；移动端触屏/音频规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；game-9 见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be。本文与它们互补：前面几篇讲「门禁怎么过」，本篇讲「门禁根本没来得及跑」时怎么定位、怎么复核、重跑前还要先解决什么。
+
+## 一、一手事实时间线（全部库内取证，非转述）
+
+| 时刻（UTC） | 事件 | 证据 |
+| --- | --- | --- |
+| 10-03 18:07:22 | hosted_apps 记录 app-2 创建（id=cmuspfdr20056ic7qm2ebhvwv，slug=app-2），status=creating | hosted_apps 行；updated_at 至 10-04 仍冻结在该时刻 |
+| 18:11~18:13 | 需求录入完成（含双门禁 + HostedApp 约束 + 4 条验收标准） | 需求 id=cmuspmumf007cic7qlt6uwieo |
+| 18:13~18:16 | GameDesignSpec v0 落账（八段、10 实体、数值写死） | spec id=cmuspqwhe007ric7qp0465dvk |
+| 18:16:30 → 18:17:36 | 工坊工作流运行启动后 **66 秒即 failed** | workflow_runs.status=failed |
+| 18:17:40 → 18:23:07 | express_lane 独立复核完成：app-2 未上线、验收 0/4、双门禁均未启动 | 复核结论（goal 会话） |
+| 10-04（本文写作时） | app-2 仍 status=creating、live_url 空、app_deployments **0 行**；该工作流**仅 1 次运行且为 failed，未重跑**；github.com 从 agent 环境再次 20s 超时不可达 | hosted_apps / app_deployments / workflow_runs 实查 + curl 探针 |
+
+失败报错原文（复现用）：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspfdqy0052ic7qnkimp4n5/run-cmuspr5v7007xic7q5ng1aqqo'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/':
+Failed to connect to github.com port 443 after 32655 ms: Couldn't connect to server
+```
+
+## 二、失败模式归类：不是「门禁失败」，是「门禁前基础设施失败」
+
+工坊四棒为 scaffold → implement → deploy → playtest（实现/部署两棒挂 godot-smoke preHook 240 帧，试玩棒挂 mobile-web-smoke）。本例失败的关键特征：
+
+1. **死在第 0 棒之前**：4 个节点状态全部 pending，工作流主体逻辑一行都没执行——失败发生在为运行准备 worktree 的 `git clone` 阶段。
+2. **零产物可判**：goal 分支 `myrd/games-goal-cmuspfeyw0058ic7qrmh6qebm` 在复核时不存在（`git ls-remote` 无此分支）→ 无任何代码/工程/导出物落库，不存在「半成品需要清理」的问题。
+3. **网络是间歇抖动，不是持久封锁**：复核时点（10-03 18:23）github.com HTTPS 200、`git ls-remote` 成功（HEAD=a592ea2）；次日（10-04）从 agent 环境又 20s 超时。两个时点结论相反，证明是**间歇性连接抖动**。
+4. **归类的处置含义**：门禁失败（godot-smoke 红、smoke 帧内崩溃）→ 修代码再过门禁；门禁前基础设施失败 → **不改任何代码，探针确认外网恢复后直接重跑**。两者处置路径完全不同，先归类再动手。
+
+## 三、独立复核方法论（本例实证有效，可整体复用）
+
+复核在「工作流已 failed」的背景下展开，五步证据链闭环：
+
+1. **不信状态字段，实测入口**：`status=creating` 不代表「正在部署中马上就好」——对内网 `$PLATFORM_API_URL/apps/app-2/gw` 与公网 `https://leomac-studio.tail49399e.ts.net/apps/app-2/` 双探测，均 404 `APP_NOT_FOUND`。应用记录侧 `publicUrl/publishedAt/version` 全空，项目侧 `resources=[]`、prodUrl/stagingUrl 空，app_deployments 0 行，四面证据一致。
+2. **对照实验排除平台故障**：同一 host 上其余 13 个 `status=ready` 应用（game-5/6/8/9/10/11/12、hello、app 等）全部 200 → 托管能力正常，是 app-2 自身从未部署的个案，不是平台级事故。
+3. **排他性核查防「张冠李戴」**：已上线 13 应用中无一款《太空飞船躲陨石捡金币》；题材相近的 `/apps/app/gw`「星云飞船收集」收集的是能量水晶、slug 与标题均不同，**不能冒充 app-2 交付物**。同类小游戏大量复用同套躲陨石玩法，验收时必须按 slug+标题+机制三重匹配认定交付物。
+4. **对账流程合规性**：需求 status=in-progress、close_reason 空 → 无人违规关闭需求，门禁二「未回填」是因「无入口」而非「被跳过」，流程无腐化。
+5. **失败棒位定位**：直接查 workflow_runs 的 result.error 与 nodes 状态数组，一眼定位「死在 scaffold 之前」，避免把失败误归因给某一棒的实现质量。
+
+## 四、⚠️ 规格冲突（重跑前必须拍板，否则白跑）
+
+工坊管线是 **Godot 4 → Web(HTML5) 导出**（工程 `games/app-2`、`export_presets.cfg` Web 预设、`--headless export` 构建步、godot-game-dev 技能包），而需求验收标准 4 明文要求「**纯前端 HTML/CSS/JS、无构建步骤、静态资源可直接打开运行**」。Godot 导出必然含构建步骤，两者直接冲突。
+
+- **不处理的后果**：即使部署成功、门禁一全绿，AC4 仍会判不达标——整条流水线白跑一轮。
+- **方案 A（推荐）**：把 AC4 措辞修订为「**导出产物为纯静态托管、无运行时后端、无外部 CDN 依赖**」。保留 Godot 管线，同时保住需求真正想约束的东西（免后端、免 CDN、双端可玩），且与既有门禁体系（27407691 总论）兼容。
+- **方案 B**：放弃 Godot 管线，改手写单文件 HTML/JS。仅当主人明确要求「字面意义无构建」时选它，代价是失去 godot-smoke 三层门禁与工坊流水线的既有能力。
+- **教训**：验收标准与管线能力要在**需求录入时**对齐。「无构建步骤」这类措辞对 Godot 管线应用天然不可满足，录入阶段就该识别。
+
+## 五、重跑修复路径（有序清单，供下一轮直接执行）
+
+1. **先探针再重跑**：从 runner 环境 `curl --max-time 20 https://github.com` + `git ls-remote <仓库>` 双探针确认恢复。网络是间歇抖动，盲目重跑可能再次 66 秒失败并空耗一轮。
+2. **先拍板第四节冲突**并回写需求措辞（方案 A 或 B），再触发重跑。
+3. **重跑即可，无需清理**：分支不存在、零产物，直接重跑工作流，从 scaffold 全新开始；不要试图「续跑」失败运行。
+4. **部署成功后先补门禁一**：由独立 agent 重做一轮线上可玩性复核（按第三节方法论），留证「全流程走通 + 控制台无报错」，之后才轮到 owner。
+5. **门禁二最后**：owner 桌面 + 移动各试玩一次并回填「试玩通过/不通过」，回填通过后需求方可关闭。当前门禁状态：**门禁一未启动（不可执行）、门禁二未启动（无入口）——注意是「未达」而非「失败」，回填话术要区分。**
+
+## 六、供后续 app 复用的教训清单
+
+1. **工作流失败 ≠ 游戏缺陷**：先查失败棒位。scaffold 之前死 = 基础设施层（网络/仓库可达性），与代码质量无关，处置是重跑而不是返工。
+2. **外网 git clone 是工坊流水线的第一单点**：仓库在 github.com，第一棒之前就要整仓克隆；网络抖动直接零产物。建议重跑前置「探针 + 失败自动退避重试」的习惯，并把「github 间歇不可达」记为平台环境的已知抖动源。
+3. **hosted_apps.status 不可单独作为「已上线」判据**：本例 status=creating 停滞超过 24h 且无任何部署行。判活必须「liveUrl 实测（内网+公网双探测）+ deployments 计数」双条件。
+4. **需求录入时做一次「AC × 管线」对齐检查**：把验收标准逐条对照工作流管线的既有能力（构建方式、导出形态、依赖服务），措辞冲突当场改，不要留到部署后才发现。
+5. **同题材应用排认**：平台同 slug 命名空间下有多款躲陨石/收集类小游戏，验收复核必须 slug+标题+核心机制三重匹配，防止把兄弟应用的 200 当成本应用的交付证据。
+
+---
+**一句话总结**：app-2 首轮执行是「门禁前基础设施失败」的完整样本——工坊四棒尚未启动即在 git clone 阶段遭遇 github.com 间歇性连接失败（66 秒即败、零产物、app-2 停在 creating），独立复核以五步证据链确认验收 0/4、双门禁均未达但流程未被违规绕过；修复路径 = 探针确认网络恢复 + 先拍板「Godot 构建管线 vs 无构建步骤」的规格冲突 + 直接重跑，重跑成功后再补门禁一自测与门禁二试玩回填。
+
+
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
 
 # 知识：僵尸/孤儿运行轨迹的识别与处置
@@ -10525,6 +14395,780 @@ Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`�
 
 关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
 
+## 沉淀 game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战经验（推箱子点亮方块解谜 · 全四棒工作流）
+
+# game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战沉淀（推箱子点亮方块解谜 · 全四棒工作流）
+
+> 来源：需求《推箱子点亮方块解谜（game-9）》（id=cmupsx443003om9dh5dwd5w9u，goal=cmupsrc19002sm9dhp5su0zaj）走完「前置体检 → scaffold → implement → deploy → playtest」全流程后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-9`（Godot 4.3.stable.official）。线上：liveUrl https://leomac-studio.tail49399e.ts.net/apps/game-9/（deploymentId=cmupxibnn0087m9dhz3cfhap4，commit 19a6d59，838ms 上线，app.status=ready）。工作流运行 /workflows/cmupsrc1v002wm9dh68sljxoq/runs/cmuputtey006dm9dht78nbbtm。
+>
+> 本文只写 game-9 新踩的坑与增量打法。门禁三层体系总论（preflight/smoke/fuzz 分工、E-16 带病绿灯）与 AppHost 部署总论见《沉淀 Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路实战经验》（id=27407691-bcf8-4e73-b686-1bb8df684e5c，oak-key 实测）；移动端触屏摇杆与音频解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca。三篇互为补充、不重复。
+
+## 一、事实基线：四棒各留下什么（审计入口）
+
+| 棒 | 提交 | 内容 | 结果 |
+| --- | --- | --- | --- |
+| scaffold | d297996 | 以 templates/minimal-2d 初始化 games/game-9：推箱骨架（推动/点亮/Undo/Restart/换关）+ 5 关关卡册 + tools/level_solver.py + tests/smoke.gd + verify.sh | ✅ |
+| implement | 4bfdb00 | 见证解回放 / 死锁反馈 / touch_swipe / AC5 响应断言；is_solved 口径修复；.myrd/spec/design-spec.json 落盘 | ✅ |
+| deploy | 19a6d59 | export_presets.cfg + 导出产物入库 + apphost 壳切 game-9 + §3C 调参桥 + 移除 candy-crush 残留 | ✅ 已部署 |
+| playtest | 0103b33 | docs：playtest blocked 报告（缺 playtest.sh） | ⛔ blocked |
+
+- **部署形态**：底座 A「资产出 bundle」——`apphost.toml` 里 `assets_dir="games/game-9/export/web"`，37MB 导出经对象存储懒加载，bundle 本体不含游戏资源（25MB bundle 上限不再约束资产体积）。
+- **导出产物形态**：index.wasm 33.7MB / index.pck 2.4MB / index.js 331KB / index.html 4.9KB / index.audio.worklet.js 7.3KB。线上资产通道 `/api/public/assets/`：index.js 原文直出，wasm/pck 走 `*.gz.b64` 文本（10.7MB / 3.3MB），端到端解码验证过（b64→gzip→`WebAssembly.validate()=true`、pck 魔数 `GDPC`）。
+- **部署记录层 status=running 与应用已 ready 并存**：判断游戏死活以 /health 与实际可达为准，别拿 deployment.status 当真。
+
+### 分支审计坑：同一目标两条远端分支并存
+
+- `myrd/game-9-goal-<goalId>`：前置体检节点首次推送建立，停在 implement 棒（4bfdb00）。
+- `myrd/games-goal-<goalId>`：工作流四棒实际跑的分支，tip=0103b33（多出 deploy/playtest 两棒）。
+- 结论：**复现/审计认 goal artifacts 里的 `gitRef` 与 `app_deployments.commit_hash`（本次 = 19a6d59）**，别按「目标 id 搜分支」想当然——两条分支都能搜到且不同步。另：线上部署的是 19a6d59，其后 playtest 棒只追加 docs（0103b33）未重新部署，属 docs-only 差异，游戏本体无差。
+
+## 二、Godot Web 导出：模板不含预设，从零补齐的六个决策
+
+1. **模板仓库不含 `export_presets.cfg`**。games/game-9 的 README 在 scaffold 棒就记了：「export_presets.cfg 尚未配置（模板不含），部署节点需按 games/game/ 的 web 导出先例补齐」。每个新游戏都要从上一个游戏的先例抄一份再改，别等部署节点现场发明。
+2. **必须用单线程变体：`variant/thread_support=false`**。M1 网关不发 COOP/COEP 头，SharedArrayBuffer 不可用，线程版直接白屏。这是 Web 导出第一坑：配错不报错、上线才白屏。
+3. **导出产物必须入库，`.gitignore` 加 `!/export/web/` 豁免**。`assets_dir` 是平台构建输入，产物不在仓库里平台打包 bundle 就缺资产。Godot 工程 .gitignore 默认把 export/ 排掉，这里要反着来。
+4. **全局中文字体是 Web 导出的底线**（preflight P13 机判）。浏览器沙箱拿不到系统字体，引擎内置字体只有拉丁字形；`[gui] theme/custom_font` 必须指向子集化中文字体（本工程用 Noto Sans CJK SC：GB2312 全集 + ASCII + 常用符号，OFL 1.1），删了所有中文变缺字方块。字体约 2.9MB，是 pck 体积大头，但属中文游戏必要成本。
+5. **渲染器钉死 `gl_compatibility`**（`renderer/rendering_method` 与 `.mobile` 双写）。Forward+ 在 Web 上不可用。
+6. **接手模板仓库先清上一个游戏的残留**。deploy 棒移除了基线残留的 candy-crush 工程 `games/game/`（39MB 导出）——模板仓库是「单游戏位」惯例，根壳一次只服务一个游戏；残留工程还会污染门禁参照（前置体检时 gate-selftest 拿 games/game 当参照，因 player.gd 缺 `moved.emit`/`const SPEED` 模板契约锚点，D4/D5 注入失败，换官方参照 `templates/minimal-2d` 后 D1–D5 全拦）。
+
+**壳侧三件套 + 调参桥**（沿用 oak-key 先例并加一层）：相对路径资产路由；移动端音频手势解锁器（AudioContext 包装 / 手势 resume / `__audioDebug` 取证口）；worklet 防御；新增 **§3C 调参桥**：
+
+- 壳把 URL `?tuning=<json>` 解析成 `window.__GAME_TUNING__`；
+- 游戏侧 `GameState._apply_tuning_overrides()` 仅 `OS.has_feature("web")` 时经 `JavaScriptBridge.eval("JSON.stringify(window.__GAME_TUNING__ || null)")` 读取；
+- `TUNING_META` 白名单四键 + min/max 钳制 + round 取整：`move_anim_ms` 0–400、`push_anim_ms` 0–400、`key_repeat_interval_ms` 50–600、`win_overlay_delay_ms` 0–1000。
+- 价值：试玩期调手感不用改代码重导出——「试玩调好的参数用 URL 复现」，试玩入口直接发 `?tuning=1` 工作台链接。无头冒烟/桌面自动跳过，门禁行为不受影响。
+
+## 三、冒烟门禁：game-9 的四个增量打法
+
+四步 routine 不变（`.myrd/routines.yaml` id=godot-smoke：resolve-godot → preflight 13 类 → `GODOT_SMOKE_FRAMES=240` headless-smoke → input-fuzz，seed=20260913），`games/game-9/verify.sh` 只调用 std-skills 判定脚本、不重实现。本次实测：preflight PASS / `GODOT_SMOKE: PASS`（240 帧，exit 0）/ `GODOT_FUZZ: PASS`。增量全在冒烟断言本身（tests/smoke.gd，628 行，11 项断言清单）：
+
+### 3.1 见证解回放：把 AC4「关卡可解」变成引擎内机判
+
+离线求解器说「可解」只是一句话结论；game-9 把它做成冒烟断言：
+
+- `tools/level_solver.py --paths` 生成每关见证解（U/D/L/R 移动串，长度 == par），Python 侧重放自证后落盘进 `sokoban_levels.gd` 的 `solution` 字段（与 layout 同处，单一事实源，防两处数据漂移）；
+- 冒烟逐关回放见证解，断言三条：**必须通关、步数 == par、回放全程不得误报死锁**；
+- solver 直接解析 `sokoban_levels.gd`（不复制关卡数据），「策划案 → 关卡册 → 求解器 → 冒烟」四层数据同源，par 漂移会在冒烟里直接爆。
+
+### 3.2 通关判据口径：常亮 ≠ 通关（冒烟实测拦下的真 bug）
+
+点亮目标格是 `onceLitStaysLit`（入场常亮、永不熄灭），但 `is_solved` 不能跟着用「全部点亮」口径——**常亮口径会把 level-05 最优路径第 35 步误判通关、提前停走**（冒烟回放见证解时实测拦下）。修复：`is_solved` = 「全部接线槽有方块驻留」，与求解器 / spec parMoves 同口径；点亮只作视觉态。
+
+教训：**「视觉状态」与「胜负判据」是两个变量。凡有常亮/累计态的玩法，胜负判据必须与求解器同口径，并让冒烟回放最优解来兜底。**
+
+### 3.3 死锁反馈机判：报与不报都要有断言
+
+角死锁检测 + `deadlock_changed` 信号 + HUD 卡死警示 + 死锁方块变红。冒烟断言四条：角死锁必报、在槽角不报（在槽角是合法终态）、开阔局面不报（防假阳性）、真实关卡把方块顶进角后信号通知 UI 且 **Undo 可脱离死锁态**。「无假阳性」的论证写在检测函数注释里供复核。
+
+### 3.4 AC5 量化成帧预算断言
+
+- 响应延迟：spec 200ms ≈ 60FPS 下 12 帧 → 断言「注入输入 → 首次步进 + HUD 同步刷新」≤ `RESPONSE_BUDGET_FRAMES=12` 帧，验收口径直接写进门禁；
+- 触屏滑动：越过 24px 阈值（`spec.numeric.input.touchSwipeThresholdPx`）的一次滑动**恰好步进 1 格**；冒烟注入 48px 拖拽验证（`SWIPE_DRAG_PX=48`）。
+
+### 3.5 headless 输入注入的坑（error-signatures E-08 的 game-9 变体）
+
+- headless 下 `Input.parse_input_event()` 的缓冲冲刷会清掉 `Input.action_press()` 的按下状态，**同帧混用两种注入方式会让「移动断言」假失败** → 冒烟分 7 相位（噪声/移动/滑动/逻辑/等弹层/下一关/收尾）互不重叠；
+- 触点下标隔离：噪声相位用触点 0/1，滑动断言用触点 7，防互相回收；
+- 滑动起点 (500,280) 刻意避开左下摇杆热区（24..160 × 400..536）与右下按钮排，否则手势被控件吃掉；
+- 噪声相位（30 帧悬挂手势/孤儿释放/乱键）放在一切正式断言之前——上一游戏（糖果三消，commit bbb872f4「致胜滑动后指针脏状态吞掉下一关第一次手势」）就是靠这类对抗注入防回归的。
+
+### 3.6 verify.sh 退出码四态（给修复方向做机器路由）
+
+0=通过；1=smoke/fuzz 运行期未过（改游戏代码）；2=环境不可用（缺 Godot/技能脚本/python3，装环境而非改代码）；3=preflight 静态未过（先修静态，不必跑冒烟）。关键设计：技能脚本存在性守卫放在一切判定之前，缺脚本必须报 2——否则会掉进下游非零退出码被误判成 3，诱导修复节点去改游戏代码。
+
+## 四、关卡求解器：三段演进与两个真 bug（策划案阶段就要做）
+
+固化策划案（create_design_spec）时就要求每关机器可解、par 机器可算——这步做了，实现、冒烟、验收全链路都有基准。求解器三段演进：
+
+1. **BFS**：前三关（状态空间小）够用；
+2. **A* + 拉拽距离启发 + 死格剪枝**：大关用（启发值 = 每方块到最近接线槽的拉拽距离下界，可采纳；死格 = 角死锁 / 墙边不可拉出格）；
+3. **精确状态 A\***：修掉「区域归一化」bug 后的最终形态。
+
+两个真 bug（都在求解器侧，不在游戏侧）：
+
+- **区域归一化把玩家站位合并掉**：对「推动数」精确，对「玩家步数」只是松弛下界——level-02 手推最少 10 步，求解器报 5。修复：玩家坐标显式入状态；修复后 A* 与纯 BFS 交叉验证一致（2/10/18）。
+- **开阔房间 + 5 方块状态空间爆炸**：单关搜索超时。解法不是更强的剪枝，而是**改关卡布局**——level-05 换成更紧凑、隔断更多的「总控机房」，对人更难、对求解器更小，验证 3.8s，par=58 > level-04 的 40，难度曲线反而更成立。
+
+工程参数：`EXPANSION_CAP=4_000_000`、`MAX_DEPTH=200`；par 不一致只告警（布局或 par 漂移），可解性才是硬判据（exit 0/1）。最终 par 曲线 2/10/18/40/58，方块数 1→5 严格递增（AC4），策划案 `numeric.difficulty.parMoves`、关卡册、冒烟断言三方一致。
+
+## 五、playtest blocked：判定器独立性纪律的一次实战
+
+playtest 节点硬约束：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 五个判定脚本**全部由模板仓库预置**，缺任何一个 → 立即 blocked，**严禁现场自造、拷贝注入副本、或用等价命令替代**——它们是判定器，被检方自己写门禁即失去独立性。
+
+本次实测缺 `playtest.sh`（及 `playtest_driver.gd`），按纪律停止：
+
+- **证据链五步**：① 工作区分支 scripts 目录实清（仅 7 个文件）→ ② origin/main fetch 后核对同样缺失（排除本地落后）→ ③ `git log --all` 该路径从未存在 → ④ 全仓库 find 仅命中 `.myrd-platform/.claude/skills/`（平台注入阅读副本，被 .gitignore 排除不入库，按硬约束不得作判定来源）→ ⑤ 前序 deploy 产物旁证。
+- **根因**：平台注入技能包（新版，含机器人试玩门禁：协议 `GODOT_PLAYTEST: PASS/FAIL` 退出码 0/1、2=环境不可用；`GODOT_PLAYTEST_METRICS: <JSON>`；bot 多局输出节奏代理指标——首次奖励/无反馈窗口/反馈密度/局间方差；阈值由工程内 `tests/playtest.json` 覆盖）**领先于模板仓库预置基线**（v1 仅四脚本，godot-smoke routine 也只有四步）。属模板仓库技能资产滞后，需运维补模板仓库，非 agent 现场可修。
+- **没做的事同样重要**：不交付试玩验收包、不拷贝注入副本、不自造判定器；四问量表标「待用户试玩」；spec 数值回写跳过（未收到用户结论，严禁编造）。
+- **影响面切割**：deploy 产物不受影响（游戏仍可访问），godot-smoke 四步门禁此前已全过——blocked 只挡 playtest 这一段。
+- **修复路径**：运维补模板仓库 `playtest.sh` + `playtest_driver.gd`（连同 SKILL.md 章节与 godot-smoke-routine.md 模板同步，脚本/文档/routine 三者一致）→ 经模板预置链路同步进项目仓库（不得手抄注入副本）→ 重跑 playtest 节点交付 `op=playtest_kit`（含 `<liveUrl>?tuning=1` 调参工作台入口）。取证报告在仓库 `docs/game-9-playtest-blocked-report.md`。
+
+## 六、下一个游戏直接抄的清单
+
+```bash
+# 1. 门禁入口（四步；退出码 0/1/2/3 见 §3.6）
+bash games/<game>/verify.sh
+
+# 2. 关卡可解性证据（--paths 生成见证解 → 落盘 solution 字段 → 冒烟回放）
+python3 games/<game>/tools/level_solver.py games/<game> --paths
+```
+
+Web 导出预设必查四项：
+
+| 项 | 值 | 不守的后果 |
+| --- | --- | --- |
+| `variant/thread_support` | `false`（单线程） | M1 网关无 COOP/COEP，SharedArrayBuffer 不可用 → 线程版上线白屏 |
+| `[gui] theme/custom_font` | 子集化中文字体 | 浏览器无系统字体 → 中文全部缺字方块（preflight P13 拦） |
+| `renderer/rendering_method` | `gl_compatibility`（desktop+mobile 双写） | Forward+ 在 Web 不可用 |
+| `.gitignore` | 加 `!/export/web/` 豁免 | assets_dir 构建输入缺资产，bundle 打包失败 |
+
+复用分工：门禁三层总论 / E-16 带病绿灯 / AppHost 部署总论 → id=27407691-bcf8-4e73-b686-1bb8df684e5c；移动端触屏摇杆 / 音频解锁规范 → id=82e419bb-b641-4b5e-bb58-d8b9633169ca；本文 = game-9 增量（导出预设从零补齐、见证解回放机判 AC4、通关判据口径、死锁反馈机判、AC5 帧预算断言、E-08 分相位注入、求解器演进、playtest blocked 纪律、双分支审计口径）。
+
+
+## 沉淀《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+# 《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+> 来源：需求《《hello》休闲收集小游戏》（id=cmuqk7luz002am9bfmmkouw9v，goal=cmuqk3j2o001mm9bfptrztaj1）走完「scaffold → implement → deploy → playtest」工坊主通道后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/hello`（std-skills minimal-2d 模板起步，Godot 4.3.stable，gl_compatibility）。线上终态：liveUrl `https://leomac-studio.tail49399e.ts.net/apps/hello`（HostedApp id=cmuqk3huq001km9bf5ejp7tdg，deployment v2=cmuqlxz2v001km9bxc0w5pspp，gitRef=`myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1@dfd20d1`，/health 200、线上标题《hello》 · 休闲收集）。**playtest 节点 status=blocked**（模板仓库未预置 playtest.sh），线上版经独立 assign_agent 复核确认可玩。本文只写 hello 的增量事实与新坑；门禁三层体系总论与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key），单游戏部署先例见 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9），触屏摇杆与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca。四篇互为补充、不重复。
+
+## 一、事实基线：提交链与四棒产出（审计入口）
+
+`origin/myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1` 提交链（逐字核实）：
+
+| commit | 内容 | 结果 |
+| --- | --- | --- |
+| f9bc9d65 | 模板起步：std-skills minimal-2d 脚手架建 `games/hello` | ✅ |
+| 1bc8fa24 | 收集玩法与胜利/重开闭环 + README 玩法说明 | ✅ |
+| a8b5fd09 | Web 导出可托管形态：export_presets.cfg + `.gitignore` 豁免 + 导出产物入库 | ✅ |
+| 16249412 | 关卡梯度 + 限时失败反馈 + 冒烟断言同步升级 | ✅ |
+| dfd20d1b | 根壳与 apphost.toml 切到 hello + 接通调参桥（=部署 commit） | ✅ 已部署 |
+
+- `myrd/hello-game-goal-cmuqk3j2o001mm9bfptrztaj1` 分支另含 508dcc6b（assign_agent 线上复核取证），与 games-goal 分支**不同步**——复核/审计一律认 goal artifacts 里的 `gitRef`（games-goal@dfd20d1），别按「目标 id 搜分支」。
+- 门禁终态：preflight 13 类 PASS / `GODOT_SMOKE: PASS`（240 帧）/ `GODOT_FUZZ: PASS`（seed=20260913，6 批次无崩溃无脚本错误）；`bash games/hello/verify.sh` 全链路 PASS。
+- 导出 11 文件落 `games/hello/export/web/`：index.wasm 35,376,909B / index.pck 2,497,520B / index.js 331,495B / index.html 4,848B / index.audio.worklet.js 7,298B。
+
+## 二、Godot4 工程结构：hello 的最小可玩模板契约（可复制起点）
+
+```
+games/hello/
+├── project.godot          # 三类必接线：run/main_scene、[autoload] GameState、[input]
+├── autoload/game_state.gd # 单例 + TUNING_META 白名单（调参唯一入口清单）
+├── scenes/{main,player,collectible}.tscn
+├── scripts/{main,player,collectible,virtual_joystick,touch_confirm_button}.gd
+├── assets/fonts/NotoSansSC-Regular.otf + OFL.txt   # Web 中文底线
+├── tests/{smoke.gd,smoke.tscn}                     # 相位状态机冒烟场景
+├── verify.sh               # 工程门禁入口（退出码 0/1/2/3）
+└── export_presets.cfg      # Web 导出预设（thread_support=false）
+```
+
+- **三类必接线是 preflight 静态机判对象**：主场景、autoload、input 映射缺任何一项就是「黑屏/无响应」。hello 实测：`config/name="hello"`、`run/main_scene="res://scenes/main.tscn"`、`GameState="*res://autoload/game_state.gd"`。
+- **渲染器钉死 gl_compatibility 且 `.mobile` 双写**；viewport 640×360；`[gui] theme/custom_font` 指向 NotoSansSC（OFL 1.1）——删了中文全变缺字方块（preflight P13 拦）。
+- **UI 挂独立 CanvasLayer（UI/TouchUI）**，与游戏世界分离；触屏端用 `virtual_joystick.gd` + `touch_confirm_button.gd` 承载移动与确认，桌面/触屏同一工程不加分叉构建。
+- **收集玩法碰撞口径写进代码注释**：Player 矩形 24×24（半宽 12）、Collectible 圆 r=22，可达判定=玩家中心进入收集物中心 34px 内；摆点相对 clamp 边界 (12..628, 12..348) 全可达不卡死角——**碰撞余量要在摆新点时先算再摆**，否则冒烟传送收集断言假失败。
+
+## 三、门禁增量：帧预算推导注释 + 键位契约断言
+
+- **帧推导写进 verify.sh 注释**：「噪声 30 帧 → 移动 10 帧 → 4 次传送收集（各 4 帧）→ 过关断言 → confirm 进第 2 关断言（梯度）→ 时限压 0 触发失败断言 → confirm 重来断言」约 94 物理帧，预算取 240 对齐 `.myrd/routines.yaml` 的 smokeFrames 默认值（两边同值不各说各话）。**推导过程留在门禁入口文件里**，后续调速度的人不必重推。
+- 冒烟 9 项玩法断言：噪声输入后仍能移动、收集计数累加、过关判定、难度梯度（4→5 目标、30→26s 时限）、超时失败反馈、失败重来复位，外加键位契约 `_check_key_bindings`（逐键 AND 判定）。
+- verify.sh 退出码语义与 oak-key 同源：0 通过 / 1 冒烟失败 / 2 环境不可用（**存在性守卫先行**：preflight.py、smoke.sh、resolve-godot.sh 缺一即 2，防「脚本缺失」被误判成 3 诱导改游戏代码）/ 3 静态不一致。
+- **复发坑（连续两作）**：`.myrd/routines.yaml` 默认 `gamePath: games/godot-coin-rush` 至今未修。oak-key 轮已记录，hello 轮依旧要靠 preHookParams 显式覆盖成 `games/hello` 才测对工程。**建议运维直接改模板默认值或置空强制必填**，别再指望每作自觉覆盖。
+
+## 四、playtest blocked 实录：模板仓库技能资产落后于平台注入副本（本轮最大增量）
+
+- **触发**：判定脚本五清单 `{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 要求全部由项目仓库预置，hello 实测唯独 `std-skills/godot-game-dev/scripts/playtest.sh` MISSING → 节点按硬约束立即 blocked（不产试玩验收包、不回填量表、不调参回写）。
+- **根因（版本分裂）**：仓库内 `std-skills/godot-game-dev/` 是**旧版**（SKILL.md 无 playtest，routines.yaml 4 步）；平台注入阅读副本 `.myrd-platform/.claude/skills/godot-game-dev/` 是**新版**（SKILL.md §4.5 机器人试玩门禁 + `playtest_driver.gd` + 5 步 routine，新增 `playtestFrames: "900"`）。即：**模板仓库落后于平台注入副本**。
+- **纪律（为什么 blocked 而不是补一个）**：判定器唯一来源是模板仓库预置；被检方自写判定脚本，门禁不再独立，PASS 一文不值；注入副本是阅读用，不得复制/改写/等价替代。
+- **运维待办（精确到文件）**：把 `WORKSHOP_GAME_TEMPLATE_REPO` 的 godot-game-dev 技能资产同步到含 `scripts/playtest.sh` + `scripts/playtest_driver.gd` 的版本，并让仓库 `.myrd/routines.yaml` 的 godot-smoke 升到 5 步。报告已落盘 `docs/playtest/hello-playtest-blocked.md`（commit 283773e）。
+- **教训泛化**：工坊每接入新模板资产前，先 diff「模板仓库 vs `.myrd-platform/` 注入副本」的技能版本，发现落后先报运维，别等跑到最后一棒才 blocked。
+
+## 五、Web 导出与部署：hello 的三个增量打法
+
+1. **导出配置前置到 scaffold 棒**（前两作是 deploy 棒现场补 preset）：scaffold 按 `games/game` 既有先例补齐 `export_presets.cfg`（`platform="Web"`、`export_path="export/web/index.html"`、`variant/thread_support=false`、`html/canvas_resize_policy=2`）+ `.gitignore` 加 `!/export/web/` 豁免 + 导出产物入库（a8b5fd09）。deploy 棒零决策复用重导出——**「可托管形态」应该在脚手架棒就建成，别留到部署棒现场发明**。
+2. **根壳单游戏位切换要核对三处**：`apphost.toml`（name=hello / assets_dir=games/hello/export/web / health=/health / runtime=node20）、server 壳的资产路由、调参桥全局注入。hello 轮根壳原指向 candy-crush-legend（games/game/export/web），已整体切到 hello。**每次上新游戏，部署前 grep 根壳里旧游戏名清残留**。
+3. **部署重发坑：v1 因 504 重发被 superseded，v2 才是终态**（两笔同 gitRef）。判断游戏死活以 `/health` + app status + liveUrl 实测为准，**别拿 deployment 列表第一笔当真**。另：`/` 会 308 重定向到 `/apps/hello`（尾斜杠归一化），curl 复核记得 `-L` 跟随。
+
+线上复核（assign_agent 独立完成，不复用 deploy 自测结论）：部署 gitRef 远端 HEAD 与 dfd20d1 逐字一致；资产通道全文本（wasm/pck 走 `*.gz.b64`），本地解码还原 wasm 35,376,909 字节与本地导出逐字一致、magic `\0asm` v1 有效，pck magic `GDPC`；壳契约四件（相对路径拉资产、移动端音频手势解锁器、`__audioDebug` 取证口、tuning 调参桥）逐项在位。
+
+## 六、调参桥 hello 实例：spec 数值与实现默认值的口径漂移（真实发生，值得记录）
+
+- `game_state.gd` 的 `TUNING_META` 白名单四键：`base_target` 1–6、`base_time` 10–90、`time_step` 0–10、`min_time` 5–90；键不在名单=拒绝（防 URL 乱注入）；缺壳层时全局 undefined 属预期，门禁行为不受影响。
+- **口径漂移**：GameDesignSpec v1（id=cmuqkaypy002hm9bf3wnk1k26，approved）写的是 3 关 10/15/25 件、30/45/60s、连击窗口 1.5s；实现默认值是 `BASE_TARGET=4 / BASE_TIME=30 / MIN_TIME=18 / TIME_STEP=4`（每关目标 4→5、时限 30→26s）。spec 数值**没有**作为默认值落地，而是寄望试玩期经调参桥回填——playtest blocked 后未回填，两者至今不一致。
+- **结论**：工坊「spec → 实现」的数值对齐不能靠默认值拍脑袋。两条路二选一：① 实现前把 spec 数值直接落成常量默认值；② spec 数值作为 TUNING_META 默认初值，并在工程 README 记「spec 口径 = 默认值」。否则验收对不上、复盘对不齐。
+
+## 七、坑位速查表（hello 新增/复发，出问题先对号）
+
+| # | 坑 | 一句话修法 |
+| --- | --- | --- |
+| 1 | 双分支并存：工作区实际建 `hello-game-goal-*`，任务指定 `games-goal-*` | scaffold 棒把同一 commit 推两条分支保证 gitRef 存在；审计认 goal artifacts 的 gitRef |
+| 2 | routines.yaml 默认 gamePath=games/godot-coin-rush（复发） | preHookParams 显式覆盖；运维改模板默认值根治 |
+| 3 | 模板仓库技能资产落后于平台注入副本 → playtest blocked | 接入前先 diff 两份技能版本；落后先报运维 |
+| 4 | 部署 504 重发 → v1 superseded / v2 running | 判终态看 /health + app status + liveUrl 实测 |
+| 5 | `/` 308 到 `/apps/hello` 尾斜杠归一化 | curl 复核加 `-L` |
+| 6 | github.com:443 从工作区不可达（3 次重试 75s 超时） | commit 留本地分支不丢；先走平台 API（localhost）回写再补推 |
+| 7 | 碰撞余量不算就摆点 → 传送收集断言假失败 | 半宽+半径先算可达包络，摆点落在 clamp 边界内 |
+| 8 | spec 数值与实现默认值漂移 | spec 数值落成默认值或 TUNING 初值，README 记口径 |
+| 9 | 导出配置留到部署棒现场发明 | scaffold 棒按上一作先例补 preset + .gitignore 豁免 + 产物入库 |
+| 10 | 根壳残留上一游戏（单游戏位惯例） | 部署前 grep 旧游戏名清残留，apphost.toml 三键核对 |
+
+## 八、关联知识与权威来源
+
+- Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路总论（oak-key）：27407691-bcf8-4e73-b686-1bb8df684e5c
+- game-9 单游戏部署先例与调参桥 §3C：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 移动端触屏虚拟摇杆与 AudioContext 解锁规范：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- MyRD 平台真实仓库结构地图：b07a928a-414b-4d48-9535-5b6d6cc859ae
+- 仓库内权威文件（本仓可直接复用）：`games/hello/{verify.sh,export_presets.cfg,tests/smoke.gd,autoload/game_state.gd}`、`docs/playtest/hello-playtest-blocked.md`、`std-skills/godot-game-dev/scripts/`、`.myrd/routines.yaml`
+- 平台产物链：requirement=cmuqk7luz002am9bfmmkouw9v → design_spec=cmuqkaypy002hm9bf3wnk1k26 → hosted_app=cmuqk3huq001km9bf5ejp7tdg → workflow run=cmuqkb8xl002nm9bf9pz8hw61（/workflows/cmuqk3j35001qm9bfsdw4xn8d/runs/cmuqkb8xl002nm9bf9pz8hw61）→ 线上复核 assign_agent=cmto42pg60004m9aq7jczszhy
+
+## 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+# 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+> **文档定位**：固化 game-8 v2 轮手感调优的**具体数值（前后对照）**、godot-smoke 门禁表现、线上链路诊断结论与**可照抄的复测方法**，形成「手感类反馈（再大一点 / 再慢一点）」的**可复用增量调参基线**——后续同类反馈直接对照本文 §五 playbook 执行，不必重新勘探。
+> **权威基准**：需求《牛牛打游戏 game-8 · v2 手感调优：牛牛体型放大、移动速度下调》（`cmuqmej89000ym9gg6mom93o0`）；策划案 v1 设计唯一来源（doc `80b9c193-6807-43e4-b2b0-5789f2d9e35b`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）；收口依赖清单（doc `943eb5eb-0949-43fe-b939-83cf171af2a3`）。
+> **实现基线**：部署分支 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`；数值提交 `3a396355`（feat v2 手感调优）→ 产物重导出 `1089e4b` → 诊断报告 `1afec443`（`games/game-8/docs/v2-liveurl-diagnosis.md`，docs-only）；线上部署 = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`。
+> **本文数字全部为一手实测值**（git diff 实录 / curl 取证 / 线上 pck 自跑门禁），非估算。
+
+## 一、v2 数值基线（前后对照，唯一落账）
+
+| 声明键 | v1 默认 | v2 落账 | 需求量化区间 | 实际占比 | TUNING_META 钳制 |
+|---|---|---|---|---|---|
+| `PLAYER_SCALE` | 1.0 | **1.4** | 1.3~1.5× 整体放大 | 1.4× | min 0.5 / max 2.0 / step 0.05 |
+| `PLAYER_SPEED` | 220.0 px/s | **145.0 px/s** | v1 的 60~70% | **65.9%** | min 60 / max 300 / step 5 |
+
+- **唯一落账位置**：`games/game-8/autoload/game_state.gd` 数值区（v2 HEAD 实测：`var PLAYER_SCALE: float = 1.4` / `var PLAYER_SPEED: float = 145.0`）。⚠️ 策划案 v1 写的路径是 `scripts/game_state.gd`，**实际权威路径是 `autoload/game_state.gd`**（scripts/ 下并无此文件），后续引用以本文为准。
+- **接线方式**（`scripts/player.gd`）：`_apply_tuned_scale()` 把 `PLAYER_SCALE` 以**根节点 uniform scale** 应用（`is_equal_approx` 脏检查，滑杆改动下一物理帧生效），同步作用于视觉精灵、`CollisionShape2D` 碰撞体与 `PickupArea/PickupShape` 判定体；`velocity = direction * GameState.PLAYER_SPEED` 每物理帧读声明键。
+- **判定几何联动（容易算错的口径，钉死）**：`player.tscn` PickupShape 本体半径 22px → v2 缩放后 **30.8px**；收集物本体半径 14px（`collectible.tscn`）；**触发距离（圆心距）= 30.8 + 14 = 44.8px**（v1 为 22+14=36px）。刷点安全间距常量 96px 未动 → 余量从 96/36 ≈ **2.67×** 收窄到 96/44.8 ≈ **2.14×**，仍满足「重开不贴脸白捡」。commit `3a396355` 提交信息里的「判定半径 44.8px」即此**触发距离**口径，不是 PickupShape 本体半径，别混淆。
+
+## 二、godot-smoke 门禁表现（v2 断言三件套 + 全链路复跑）
+
+### 2.1 门禁复跑结果（本地与 preHook 同源，全绿）
+| 门禁步 | 结果 |
+|---|---|
+| resolve-godot.sh | exit 0，Godot **4.3.stable.official.77dcf97d8** |
+| preflight.py | **PREFLIGHT: PASS**（13 类前置一致性检查、40 个工程文件，exit 0） |
+| smoke.sh（240 帧预算） | **GODOT_SMOKE: PASS**（exit 0、零 SCRIPT ERROR） |
+| input-fuzz.sh | **GODOT_FUZZ: PASS**（seed=20260913，6 批次 239 帧，exit 0） |
+| playtest.sh | **脚本缺失**（模板仓库未预置，D2 依赖 / bug `cmuktchmy000km97z6kj3r2ro` Bug1），维持 blocked、不代写不伪造 |
+
+### 2.2 smoke.gd 新增 v2 手感断言三件套（真实机判，含 FAIL 路径，约 L423-435 `_assert_v2_tuning`）
+1. **倍率区间**：`PLAYER_SCALE ∈ [V2_SCALE_MIN=1.3, V2_SCALE_MAX=1.5]`，违例 FAIL 签名「v2 手感断言 FAIL：体型倍率 %.2f 不在 %.1f~%.1f 区间」；
+2. **移速区间**：`PLAYER_SPEED ∈ [V2_SPEED_MIN=V1_SPEED×0.6=132.0, V2_SPEED_MAX=V1_SPEED×0.7=154.0]`，FAIL 签名「移速 %.1fpx/s 不在 v1 默认 %.0f 的 60%%~70%% 区间」；
+3. **接线集成断言** `_assert_node_scaled`：Player 根节点、`CollisionShape2D`、`PickupArea/PickupShape` 三节点的全局缩放必须都等于数值区 `PLAYER_SCALE`（与难度梯度 SpawnTimer 断言同口径，防「数值键写了但没接上」）。
+
+方向符号断言（A/← 后 position.x 减小、D/→ 后增大）与 50 连击判定一致性、难度梯度、过期回收、胜负四分支、一键重开、持久化等既有契约**全部保留不动且继续通过**——玩法零回退。
+
+### 2.3 可复用结论：断言区间与需求区间硬耦合
+smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的。后续若要把数值调**跨出**这个区间，必须**三处同步**：smoke.gd 常量、需求区间条款、策划案 revisions 数值区——否则门禁会以清晰签名 FAIL（这是门禁在强制「数值变更须先改需求基线」的设计行为，**不是误报，不许放松断言来绕**）。
+
+## 三、线上链路诊断结论（liveUrl 端到端实测，2026-10-02）
+
+**结论先行**：✅ v2 已在线上生效且量化达标——部署产物自跑门禁全绿（含 v2 手感基线机判），线上资产与仓库导出逐字节一致，**无需修复、无需回滚**。
+
+1. **部署元数据**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`）；当前部署 **version 5 `cmuqny37h001ficf0mpmr71mv` status=running**；gitRef=`myrd/games-goal-cmujpml1e006rm99i9hc33huu`（未落 main ✓）；commit `1089e4b`（其上仅 1 个 docs 提交，代码零差异）；v4=`cmuqnx9v6001dicf0fmfryxcz` superseded（重试冗余但无害）。
+2. **公网链路**：`GET /apps/game-8/health` → 200 `{"ok":true,"app":"game-8","game":"牛牛打游戏","assets":"lazy/object-storage"}`；`/apps/game-8/` → 308 规范化跳转 → 200；`/gw/health` → 200（网关透传正常）；壳页 11,626B，`__GAME_TUNING__` 调参桥 ×2、`__audioDebug` 音频手势解锁器、资产全走相对路径 `fetch(BASE_PATH + 'api/public/assets/' + name)` 三契约在位。
+3. **资产文本通道**：`index.pck` base64 3,333,340B → 解码 gzip 2,513,040B；`index.wasm` base64 **10,696,408B** → 解码 35,376,909B（与门禁经验 v6 一手实测值一致）。
+4. **逐字节一致（无版本漂移）**：本地导出（部署 commit 工作树）与线上对象存储拉回解码产物 sha256 完全一致——pck `5f556ad9adf47579cb38a1fd8f7549e33b478b56cd4b3b5f112346281d699e25`；wasm `fe5cebc590758c10bc4469be5a591e28edbde5ec8f458f21baeb83db50d028b9`。
+5. **最高等级证据——部署产物自跑门禁**：`godot --headless --main-pack <线上pck> --quit-after 240 res://tests/smoke.tscn` → exit 0、零 SCRIPT ERROR、`GODOT_SMOKE: PASS`，v2 手感基线机判全过（1.4∈[1.3,1.5]，145∈[132,154]）——「牛牛变大变慢」是**产物运行期实测**，不是代码推断。
+
+## 四、复测方法（照抄即用）
+
+1. **公网探测**：`curl -s <liveUrl>/apps/game-8/health`（期望 200 + ok:true）；`curl -sI <liveUrl>/apps/game-8/`（期望 308→200）；壳页 HTML grep `__GAME_TUNING__` / `__audioDebug`。
+2. **资产一致性**：`GET /api/public/assets/index.pck`（和 index.wasm）→ base64 解码 → gunzip → `shasum -a 256`，对照 §三.4 的两个哈希；不一致即版本漂移，先查部署 commit 再谈手感。
+3. **手感数值机判**：`godot --headless --main-pack <线上或本地 index.pck> --quit-after 240 res://tests/smoke.tscn`，判定三条件（`GODOT_SMOKE: PASS` + exit 0 + 零 SCRIPT ERROR），签名中应含「v2手感基线(体型1.3~1.5x·移速60~70%)」字样。
+4. **数值速查**：游戏内调参面板或壳页 `?tuning=1` URL 直接查看当前声明键值；或读 `games/game-8/autoload/game_state.gd` 数值区。
+5. **环境备注**：诊断沙箱对 github.com:443 直连超时（`Recv failure`），推送改走 `ssh.github.com:443` 通道——后续同环境取证直接用此通道，别反复试直连。
+
+## 五、「再大一点 / 再慢一点」类反馈的增量调参 playbook（可复用基线）
+
+**标准链路（全七步，禁止散点改代码对数值）**：
+调参入口（游戏内面板滑杆即时生效 / 壳页 `?tuning=` URL）→ 确定目标声明键与新值 → **经策划案 revisions 回写 `spec.numeric`**（doc `80b9c193-…`，spec 载体即该知识文档）→ 改 `autoload/game_state.gd` 数值区 → 复跑 godot-smoke 门禁 → 重导出 Web 产物并部署（gitRef 必须是 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`）→ 按本文 §四产物自跑门禁复测。
+
+**建议步长与边界**：
+| 反馈 | 动作 | 步长建议 | 边界 |
+|---|---|---|---|
+| 再大一点 | `PLAYER_SCALE` ↑ | +0.05~0.1 / 档 | 钳制 [0.5, 2.0]；跨出 [1.3,1.5] 须按 §2.3 三处同步 |
+| 再小一点 | `PLAYER_SCALE` ↓ | −0.05~0.1 / 档 | 同上；低于 1.3 同样触发门禁 FAIL |
+| 再慢一点 | `PLAYER_SPEED` ↓ | −5~15 / 档 | 钳制 [60, 300]；跨出 [132,154] 须三处同步 |
+| 再快一点 | `PLAYER_SPEED` ↑ | +5~15 / 档 | 同上 |
+
+**每次调整必做的三项联动复核**：
+1. **断言区间一致性**（§2.3）：数值是否跨出 smoke 常量带；
+2. **判定几何余量**：体型↑ → 触发距离 = 22×scale + 14 线性放大 → 96px 刷点间距余量 = 96/触发距离 收窄；低于 2× 时须复核刷点安全间距常量是否要同步上调（公平性属门禁议题，不许靠放松断言解决）；
+3. **达成余量**：移速↓ → 单位时间可达刷点数↓ → 60s/20 目标的通关可达性须复核（跑 50 连击一致性 + 全链路一条龙断言兜底；v2 @145px/s 已实测可通关）。
+
+**回滚口径**：v1 = `PLAYER_SCALE 1.0` / `PLAYER_SPEED 220.0`，两键均可在调参面板或 `?tuning=` URL 直接调回，代码零改动。
+
+**主观手感的最终裁决**：数值区间内「像不像用户要的手感」机器判不了，仍以 D3 用户试玩结论为准（入口 `…/apps/game-8?tuning=1` 已可用）；未决依赖 D1（iOS Safari 真机）/ D2（playtest.sh 模板资产）见收口清单 doc `943eb5eb-…`。
+
+**来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
+
+
+## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+# game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+> 来源：需求《测试连点防重的极简计数页（game-12）》（id=cmur8x93r0016icbsd90s6e60，goal=cmur8pnhn000kicbsvl0eoqx6）走完「录入需求 → 判定规则调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-12`（Godot 4.3.stable），分支 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`（scaffold e055e4f → implement ff779d0 → deploy c54fcc9/078f761/e5b292e → playtest 1f7a4a3）。线上：https://leomac-studio.tail49399e.ts.net/apps/game-12/（/health 200 `{"ok":true,"app":"game-12"}`，deploymentId=cmurba8yd001vicbsfdl79x8l，部署 commit c54fcc9）。门禁终态：**godot-smoke 全绿 + mobile-web-smoke PASS 10/10（实测 FPS 39）**，playtest 棒复跑双门禁结论一致。
+>
+> 本文只写 game-12 的增量结论：防重语义选型与实现契约、双门禁通过路径、踩坑清单与复用清单。门禁三层体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-9 增量见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be；移动端触屏摇杆与 AudioContext 解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；防重判定规则 R1–R6 / 事件契约 C1–C4 调研全文见项目文档库 id=8345388c-cf30-4d7c-8413-39ccd7e65887。互为补充、不重复。
+
+## 一、防重语义选型：只有「固定节流（采纳即锚定、拦截不延窗）」能同时过验收 2 和 3
+
+| 方案 | 机制 | 300ms 内连点 5 次 | 窗口后恢复累加 | 结论 |
+| --- | --- | --- | --- | --- |
+| **固定节流（首击入窗）** | 首击计数并锚定窗口；窗口内后续点击全拦且**不更新锚点** | 仅 +1 | 正常 | 采用 |
+| 防抖（末击重启窗口） | 每次点击都重置窗口，静默期满才计 | 0 次 | — | 违背验收 2 |
+| 首尾折叠 | 窗口首末各计一次 | +2 | — | 违背验收 2 |
+
+**最易写错的一行**：被拦截的点击不得触碰窗口锚点 `_last_count_ms`。一旦拦截分支也更新它，节流就退化成防抖——持续点击下计数永远不涨，验收 3 永远不过。
+
+实现（`games/game-12/autoload/game_state.gd`，时间注入纯函数，核心约 15 行）：
+
+```gdscript
+const TARGET_COUNT: int = 10
+const DEBOUNCE_MS: int = 300
+var _last_count_ms: int = -DEBOUNCE_MS   # 初值 = -窗口 → 开局首击立即有效
+
+func try_count(now_ms: int) -> bool:
+    if state != State.PLAYING:
+        return false                      # 已胜：忽略，不报错
+    if now_ms - _last_count_ms < DEBOUNCE_MS:
+        click_rejected.emit(DEBOUNCE_MS - (now_ms - _last_count_ms))
+        return false                      # 拦截：只发反馈信号，不动锚点
+    _last_count_ms = now_ms
+    count += 1
+    count_changed.emit(count)
+    if count >= TARGET_COUNT:
+        state = State.WON
+        state_changed.emit(state)
+    return true
+
+func reset() -> void:
+    count = 0
+    state = State.PLAYING
+    _last_count_ms = -DEBOUNCE_MS         # 重开同步清防重锚点 → 首击立即有效
+```
+
+三个不能省的细节：
+1. `_last_count_ms` 初值取 `-DEBOUNCE_MS`，否则开局第一击被吞（验收 1 首点即错）。
+2. `reset()` 必须同时清防重锚点——「刷新/重开无残留」包含防重状态本身。
+3. 拦截不静默：`click_rejected(remaining_ms)` 把「被吞的点击」变成可感知反馈（按钮闪红 + 状态栏「连点已拦截，还需 Nms」）。且关键反馈不能被高频更新覆盖——状态栏曾把指针坐标与拦截提示混在一行，坐标每物理帧刷新把「还需 Nms」冲掉，拆成反馈线/指针线两行才保住。
+
+时间注入是机判前提：`try_count(now_ms)` 不读时钟 → 无头冒烟可用合成时间戳逐毫秒断言（完全确定、与帧率零耦合）；只有真实点击路径才走 `Time.get_ticks_msec()`。
+
+## 二、单源单相：三个入口汇一个判定点，防「一次触碰计两次」
+
+Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`（调研已核实）→ 移动端一次触碰可能产生 touch/mouse 双事件，再加键盘空格/回车，同一「点击」有四个来源。game-12 的收敛方式：
+- `CountButton.pressed`（鼠标/触摸）与 `_unhandled_input("confirm")`（键盘/动作）都只调唯一入口 `_attempt_count()` → `GameState.try_count(...)`。防重判定只在 GameState 一处，不可能被绕过。
+- `TouchConfirmButton`（TouchScreenButton）**不直接调游戏逻辑**，而是 `Input.parse_input_event(InputEventAction("confirm"))` 注入动作 → 触摸与键盘走完全相同路径（顺带获得桌面端自动不响应的免费屏蔽）。热区用 shape 圆（半径 44）而非位图。
+
+## 三、把「防重」机判成确定性断言（附负例验证纪律）
+
+冒烟相位设计（`games/game-12/tests/smoke.gd`）：
+- **合成时间戳断言防重**：t0 有效；t0+100/200/299ms 连点全拦、只发 click_rejected、count 不变；跨窗后再点正常 +1。
+- **真实路径另测**：真实点击受真窗口约束 → 相位间显式等真实时间跨窗，并设帧数上限守卫（60fps 约 2s，超限报 `Engine.max_fps` 异常而非挂死）。
+- **噪声后复位**：乱键相位可能真触发计数/拦截，且末次乱键可能贴着 confirm 注入点不足 300ms → 进断言前 `GameState.reset()` 清锚点，消灭偶发失败。
+- **每条断言做负例验证**（证明会真 FAIL，不是永真）：热区 44→10、宽高比 keep→expand、脉冲阈值抬到 1.0，三次均如预期 FAIL。
+
+两个「静默漏判」陷阱（负例不触发才发现）：
+1. 静态几何断言放 `_ready()`：此时 `Control.size` 恒为 0，整段断言被静默跳过 → 移到第一物理帧再读。
+2. Button 有主题最小尺寸保护：`offset_right=110` 实际 size 被钳到 115，44px 负例测不出来 → 换 TouchScreenButton 圆形热区做负例。
+
+极简静止页的门禁特异问题：mobile 门禁「画面在动」检查会把完全静止的页面误判为渲染冻结。解法：+1 按钮加待机呼吸脉冲（scale 1.00→1.06 / 0.9s，实测极差 0.060 ≥ 阈值 0.02），一举两得——既是移动端可点示能，又是确定性的非零帧差证据。缩放绕 `pivot_offset`（控件中心），否则动画往右下飘。
+
+画布口径：调研建议设计宽 375 + Adaptive；实现落成 720×1280 竖屏 + `canvas_items`+`keep`（+1 按钮 560×240，375 宽实机约 291px），同样满足无横滚与 ≥44px。机判锚点是**宽高比策略必须 keep**（expand 会被冒烟断言拦，负例已验证）。
+
+## 四、Godot Web 双门禁：分工、顺序与标记辨析
+
+| 门禁 | 判定链 | 拦什么 | game-12 实测 |
+| --- | --- | --- | --- |
+| **godot-smoke** | resolve-godot → preflight.py（13 类静态一致性）→ headless smoke（`GODOT_SMOKE_FRAMES=240`，断言退出码 0 + `GODOT_SMOKE: PASS` 标记 + 日志无 SCRIPT ERROR）→ input-fuzz（seed=20260913，6 批/239 帧） | 游戏本体「跑得动且玩得动」（含防重/恢复/胜负/重开/触控目标/拉伸契约断言） | 四步全 exit 0 |
+| **mobile-web-smoke** | mobile-web-smoke.mjs --url <liveUrl>（headless Chrome 390×844 iPhone 仿真）10 项：网络全通/console 零错/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约（__audioDebug）/无横溢（scrollWidth=390）/FPS≥8（实测 39） | 部署后真实链路上的移动端可玩性 | PASS 10/10 |
+
+三条纪律：
+1. **mobile-web-smoke 必须打部署后的 liveUrl**——本地静态伺服 export/web 只能当预检（implement 棒做过 10 项预检），不能替代正式门禁：M1 网关、对象存储资产通道、壳契约只在真实链路暴露。所以它位于 deploy 之后，是产物验证而非 implement 棒门禁。
+2. **标记辨析**：判定脚本 stdout 是小写 `godot-smoke: PASS`，引擎日志里才是大写 `GODOT_SMOKE: PASS`（smoke.sh 内部 grep 大写标记后才自产小写行）。只 tail 游戏日志看不到大写标记不等于失败——先分清两层标记再下结论。
+3. **证据随仓库归档**：`games/game-12/qa/mobile/report.json` + phase-load/tap/joystick 三张截图入库，供复跑比对。
+
+## 五、部署链五个真实踩坑（每个都在本目标发生过）
+
+1. **`.gitignore` 里 `/export/` 不删 = 部署后全 404**：apphost.toml 的 `assets_dir` 指向 `games/game-12/export/web`，导出产物不入库则 wasm/pck 上线即丢。导出产物必须入库（37MB wasm 走底座 A「资产出 bundle」+ 对象存储懒加载 + `/api/public/assets/` b64 文本通道，总论见 27407691）。
+2. **apphost.toml 沿用上一游戏**：原值指向 candy-crush 的 `games/game/export/web`；构建管线按 gitRef 读它，不改会打包错应用 → `name`/`assets_dir` 随游戏改是 deploy 棒第一查。
+3. **gitRef 必须是目标分支不是 main**：本次 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`。注意本地工作区克隆出的分支名可能与远端目标分支不同名同指针（`myrd/game-12-goal-…` vs `myrd/games-goal-…`）→ 部署前 fetch + 显式切到目标分支再读 apphost/导出。
+4. **壳页三件套缺一不可**（`server/src/game-page.ts` / `games/game-12/export/web-shell.html`）：品牌文案适配（曾残留糖果粉碎传奇文案）；§3C 调参桥（引擎加载前解析 `?tuning=` → `window.__GAME_TUNING__`，只认对象形态、非法 JSON 静默忽略——game-12 缺，补约 8 行）；音频手势解锁器 + `window.__audioDebug`（即 mobile 门禁「音频解锁契约」的机判对象）。壳页另配 `overflow:hidden + touch-action:none` + `user-scalable=no`：彻底禁双击缩放/滚动，快速二连点不被浏览器手势吞掉造成防重误判（比调研建议的 `touch-action: manipulation` 更强）。
+5. **PATCH 目标 artifacts 是整体替换数组**：回写产物必须 get→append→写回（playtest 棒 3→4 条、既有条目原样保留 + 回读校验），直接 put 会抹掉前序产物。
+
+调参语义澄清：`TUNING_META` 未声明时 `?tuning=1` 是**安全 no-op**（正常进游戏、忽略键）。game-12 有意不把 `DEBOUNCE_MS=300` 做成可调——它是需求验收项本身，spec 是唯一事实源。要开放浏览器内调参需下一轮：spec.numeric 声明键 → TUNING_META + tuning_panel.gd + 冒烟断言 → 重导出重部署重跑 mobile 门禁。
+
+## 六、macOS 自带 bash 3.2 的全角括号坑
+
+`verify.sh` 里 `$FRAMES）`（全角右括号紧贴变量名）在 macOS bash 3.2 某些 locale 下把多字节字符并入变量名 → `FRAMES: unbound variable`，而上一行 echo 还能正常展开，极难定位。写法统一 `${FRAMES}`，用 `bash -x` 抓现行。game-12 修复后 verify.sh 端到端全绿（preflight/smoke/fuzz 全 exit 0）。
+
+## 七、如实上报的缺口（未绕过、未伪造）
+
+1. **playtest.sh 不在模板仓库**（`std-skills/godot-game-dev/scripts/` 同目录 9 个判定/驱动脚本中独缺它）：各节点均未自造等价判定器、未伪造 `GODOT_PLAYTEST: PASS`；`.myrd/routines.yaml` 两条 routine（godot-smoke / mobile-web-smoke）均不引用它 → 不阻塞双门禁，缺口随产物 detail 上报运维补资产。
+2. **真机抽查未做**（本环境建不了 iOS 会话）：mobile-web-smoke 是 headless Chrome 仿真，触摸结论的边界是仿真环境；真机验证留待用户试玩回填。
+3. **试玩结论只能来自用户**：playtest_kit 已交付（`games/game-12/qa/playtest-kit.md`，试玩指引 + 反馈对照表 + 四问量表），量表待回填，未代填任何「好玩/通过」结论；未收到用户调参 URL 前，无 spec revisions/approve 调用。
+
+## 八、复用清单（后续点击类小游戏直接抄）
+
+1. 防重抄 `try_count(now_ms)` 签名：时间注入纯函数 + 初值 `-DEBOUNCE_MS` + 拦截不动锚点 + reset 清锚点 + 拦截发 remaining_ms。
+2. 输入抄「单源单相」：所有入口 → 唯一 `_attempt_count()`；TouchScreenButton 注入 InputEventAction 而非直调逻辑。
+3. 断言抄四件套：合成时间断言 + 真实路径跨窗等待 + 噪声后 reset + 每条断言负例验证；几何断言放第一物理帧，44px 负例用 TouchScreenButton 热区。
+4. 静止页记得待机脉冲（≥0.02 极差同时换「画面在动」绿与可点示能）。
+5. 部署抄「五查」：gitignore 的 /export/、apphost.toml 指向、gitRef=目标分支、壳三件套（文案/调参桥/音频解锁）、artifacts 回写 get→append→写回。
+
+关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
+
+## 沉淀 game-14 Godot Web 导出与移动端门禁经验
+
+> 来源：goal cmusp1rab0028ic7q9shcdzyl（项目 cmusp1ra00022ic7qnk18nofm）「小游戏工坊 · game-14」工作流执行沉淀。上游输入：需求《game-14 太空飞船躲陨石捡金币》（cmusphfbp0062ic7qrxlt2nk4）、GameDesignSpec v1（cmuspm7sm006uic7qzrbqyilp，approved）。工作流 run cmuspmlex0072ic7qnjiqxmpc **真实结局 = failed，且失败于工作区准备阶段，四个节点全部 pending**。本卡如实记录本轮真实结论（失败模式与补救路径），并把 game-14 真正进入开发后要带上的导出/门禁契约收拢成清单（引用既有基线、不重复）。**本轮没有产生任何 game-14 代码、导出产物、门禁判定或部署事实——请勿把本卡第 4~6 节的复用清单误读为 game-14 实测数据。**
+
+## 一、本轮真实结局：准备阶段 git clone 失败，门禁与导出根本未执行
+
+- 时间线：run 创建 2026-10-03T18:12:57Z → failed 2026-10-03T18:15:25Z（存活 2 分 28 秒）；prepSteps 仅「解析模型配置 3ms」；失败点 = preparationPhase「正在准备代码工作区（克隆仓库、拉取最新代码）」。
+- run.result.error 逐字：`git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmusp1ra00022ic7qnk18nofm/run-cmuspmlex0072ic7qnjiqxmpc'... fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75009 ms: Couldn't connect to server`。
+- 节点状态：脚手架 / 实现玩法 / 导出并部署 / 试玩验收 全部 pending；implement 与 deploy 的 godot-smoke preHook、playtest 的 mobile-web-smoke preHook 也均 pending——**门禁一次都没跑过，不存在「门禁打回」**。
+- 复盘纪律：「已启动 ≠ 已成功」在本轮的具体形态就是「run 状态 failed + 节点全 pending」；判定真实结局唯一依据 run 状态与 run.result.error，禁止凭预期脑补「门禁打到第几轮」。
+
+## 二、根因分类与补救：环境不可用 ≠ 代码缺陷，正确动作是重跑而非改代码
+
+- 根因：github.com:443 连接 75 秒超时（connect 阶段即失败，非认证/仓库问题），属瞬时网络故障——与 godot-smoke 退出码 2「环境不可用」同层语义：**禁止为它改游戏代码，更不允许宣称门禁失败**。
+- 恢复复核（2026-10-04）：`curl https://github.com` → 200（0.59s）；`git ls-remote https://github.com/hl3w22bupt/myrd-playground.git` 正常返回分支列表 → 复跑条件已具备。
+- 补救动作：`POST /api/v1/workflows/runs/cmuspmlex0072ic7qnjiqxmpc/rerun`（平台手册 rerun 入口）。DAG 输入不变：需求 cmusphfbp0062ic7qrxlt2nk4 + spec cmuspm7sm006uic7qzrbqyilp（v1 approved）仍是唯一权威。
+- 若同签名（clone exit 128 / 443 connect timeout）复现：先做宿主机连通性探针（curl github.com + git ls-remote），如实按「环境不可用」上报等待恢复；不得降级为纸面交付，也不得空转烧修复预算。
+
+## 三、game-14 工坊流水线契约（经本轮 run 定义实测核实）
+
+- 四棒 DAG：脚手架 scaffold → 实现玩法 implement → 导出并部署 deploy → 试玩验收 playtest；仓库 github.com/hl3w22bupt/myrd-playground（game-14 预期落位 `games/game-14`，以 scaffold 实际产物为准）。
+- 门禁挂点：**implement、deploy 两棒都挂 godot-smoke；playtest 挂 mobile-web-smoke**。routine 均 gate:false、由 preHook 显式引用；`{{liveUrl}}` 无默认值 = fail-closed（不传就报错，不会静默跳过门禁）；`{{gamePath}}` 必须经 preHookParams 显式传参（默认值指向不存在工程的坑见 27407691 §1.3）。
+- 判定资产唯一来源：仓库 `std-skills/godot-game-dev/scripts/`（mobile-web-smoke 判定脚本 mobile-web-smoke.mjs + 负例自测 mobile_smoke_selftest.mjs + routine 片段模板已随 commit 4a8e4b76 落地）；被检工程不得自造判定器，scaffold 只校验不自造。
+
+## 四、game-14 验收标准 → 门禁断言映射（approved spec v1 的可机判数值）
+
+| 验收项 | spec v1 锚点 | 机判断言落法 |
+| --- | --- | --- |
+| 难度阶梯 | 陨石生成间隔 950ms 逐档递减至封顶 430ms、下落速度 130px/s 逐档递增至封顶 270px/s，共 5 档（每 100 分一档） | 冒烟分相位读各档生成间隔/单位位移帧数，断言逐档单调变化且封顶后不再变化；档位边界按得分 100/200/300/400 推导写进断言注释 |
+| 状态机与持久化 | 开始（含操作说明）/进行中/暂停恢复/游戏结束/一键重开五状态；最高分 localStorage 键 `game14.highScore` | 状态标志断言；重开后断言分数清零而最高分保留；localStorage 属线上行为，由 mobile-web-smoke 打 liveUrl 验证 |
+| 操控与边界 | 键盘 ←→/A/D（含上下）+ 触摸拖动，飞船不可越出画布 | E-08 纪律：按住方向键测位移与动作注入分帧做；越界 clamp 断言；触摸拖动必须真实改变飞船目标位置（mobile 门禁 touch-response 预修，见 §六） |
+| 计分与生命 | 拾金币 +10 实时显示；撞陨石 −1 命（共 3 命），命尽进游戏结束页并展示本局得分 + 历史最高分 | 拾取/碰撞事件计数断言；连续碰撞或生命归零路径必须可达并断言 GAME_OVER |
+| 视听契约 | 三层星空视差滚动；碰撞爆炸闪烁 + 300ms 震屏 + 1.2s 无敌闪烁；+10 飘分 | 事件标志/帧差断言；无敌期 = 「碰撞不再扣命」的断言窗口 |
+| 音频契约 | coin-pickup / meteor-explosion / game-over 三 SFX 可编程触发；M 键静音且不影响逻辑 | headless 侧编程触发断言；AudioContext 解锁契约（__audioDebug）归 mobile-web-smoke 第 8 项 |
+| 性能 | 连续游玩 60s 帧率 ≥ 30fps；页面无控制台报错 | **阈值辨析：mobile-web-smoke 的 FPS≥8 是底线门禁，≥30fps 是需求验收线——门禁全绿 ≠ 验收达标，验收仍按 spec 执行** |
+
+## 五、复用基线指针（执行时直接带上，本卡不重复其内容）
+
+- **27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 总论）**：Godot 4.3 Web 导出参数基线（`variant/thread_support=false` 免 COOP/COEP、`canvas_resize_policy=2`、中文必须 theme/custom_font=P13、导出 7 件套与 wasm≈35MB 量级）；AppHost 部署契约（**一游戏一清单**——game-14 必须 `name="game-14"`、`assets_dir="games/game-14/export/web"`，绝不沿用他游戏 apphost.toml；部署 gitRef 必须是部署分支 `myrd/games-goal-<goalId>` 不是 main；`/export/` 产物必须入库否则上线全 404；M1 网关拦二进制 → gzip+b64 文本回传；壳内资源全走相对路径）；godot-smoke 三层门禁与退出码语义 0/1/2/3；error-signatures 修复循环纪律；部署终态独立复核四步。
+- **00314649-c4d2-407c-871b-62f7de91b07d（game-12）**：mobile-web-smoke 10 项明细（网络/console/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约/无横溢/FPS≥8）与「必须打部署后 liveUrl」纪律（本地静态伺服只能当预检）；标记辨析（判定脚本 stdout 小写 `godot-smoke: PASS` vs 引擎日志大写 `GODOT_SMOKE: PASS`）；证据随仓归档（`games/<game>/qa/mobile/report.json` + phase 截图）。
+- **82e419bb-b641-4b5e-bb58-d8b9633169ca**：移动端触屏虚拟摇杆与 AudioContext 解锁三件套（首手势解锁 + 解锁前记账 + 退后台回来再解锁），壳页与游戏侧都要进。
+- **36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）/ 78180e88-6486-404e-9265-e315e0da3c66（hello）**：同系列工程结构、模板与门禁增量结论。
+
+## 六、mobile-web-smoke 已知失败图谱（5 款游戏实测 → game-14 预修清单）
+
+仓库 mobile-gate 系列实测 verdict（commits 11957bd3~585db60c）：game-3 疾风忍者跑 **PASS**（十项全绿，tap 触发跳跃实证触摸驱动玩法）；game-2 星尘收集者 FAIL（console Godot 缺 cfg 告警 + tap 后零帧差）；game-4 光路谜阵 FAIL（tap 落空格零帧差，探针坐标与 letterbox 棋盘错位）；game-9 推箱子 FAIL（探针落点错位，摇杆实际 CSS(44,502)）；game-10 天天酷跑 FAIL（tap 落横带无响应，尚需探针区分「点按开始未实现」与「落点错位」）。
+
+- 主失败源集中在 **touch-response**，两类根因：①游戏触摸未真正接入玩法状态（UI 自称支持触摸但点按无效）；②探针坐标与画布 letterbox/控件 CSS 实际位置错位（屏幕坐标 ≠ 游戏坐标）。
+- game-14 预修清单：触摸拖动直接改飞船目标位置并与键盘同路径（game-12「单源单相」范式：多输入源汇一个判定入口）；可交互热区 ≥44px，避免依赖 letterbox 偏移的绝对坐标；开始页不要做成纯静止层（会触发「画面在动」误判，game-12 用待机呼吸脉冲拿到确定性非零帧差）；音频解锁契约随壳页一并实现。
+- 证据纪律：verdict 逐字进 commit message + report.json + phase-load/tap/joystick 三截图入库，供复跑比对。
+
+## 七、关联知识与权威来源
+
+- 知识卡：27407691-bcf8-4e73-b686-1bb8df684e5c（导出+门禁+AppHost 总论）、00314649-c4d2-407c-871b-62f7de91b07d（双门禁与 mobile-web-smoke 10 项）、82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏/音频解锁）、36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）、78180e88-6486-404e-9265-e315e0da3c66（hello 工坊）、b07a928a-414b-4d48-9535-5b6d6cc859ae（平台仓库结构与路径陷阱）。
+- 仓库权威文件：`std-skills/godot-game-dev/scripts/{smoke.sh,preflight.py,input-fuzz.sh,resolve-godot.sh,mobile-web-smoke.mjs,mobile_smoke_selftest.mjs}`、`std-skills/godot-game-dev/references/{godot-smoke-routine.md,mobile-smoke-routine.md,error-signatures.md}`、`.myrd/routines.yaml`。
+- 平台事实源：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`（rerun 入口、「已启动 ≠ 已成功」纪律）；工作流 spec 与需求以平台登记产物为准。
+
+
+## 沉淀知识：Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+# Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+> 来源：目标「森林收集水果限时赛」（goal=cmuspb558003tic7qwgyd02c2）的小游戏工坊流水线（workflow=cmuspb55m003xic7q9o18vjk2 v1，scaffold→implement→deploy→playtest）首轮执行（run=cmuspld10006ric7qup55soew，2026-10-03T18:12:00Z 起、18:14:30Z 判 failed）。固定参数：工程 games/60-2，功能分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2，AppHost cmuspb3xg003ric7q1ksya6c3（slug 60-2），liveUrl https://leomac-studio.tail49399e.ts.net/apps/60-2/（部署前即确定）。本文只写本轮实测增量：①双门禁在 60-2 的挂点与分工；②本次 run 的真实卡点——双门禁之前的第一堵墙；③一次「参数漂移」疑云的证伪过程；④知识沉淀节点自身的 API 事实。godot-smoke 三层门禁体系、打回修复签名表、AppHost 部署总论见关联知识（§八），不重复。
+
+## 一、结论速览
+
+| # | 要点 | 结论 | 依据 |
+| --- | --- | --- | --- |
+| 1 | 双门禁分工 | 工程门（godot-smoke，挂 implement 与 deploy 之前，判工程本体）×线上门（mobile-web-smoke，只挂 playtest 之前，判公网 liveUrl）——判定对象、执行环境、证据落点都不同，不可合并为一道 | 工作流定义逐节点核对 |
+| 2 | 本次失败层级 | run 级失败发生在**门禁之前**：工作区 git clone 连不上 github.com（443 端口 75s 连接超时），四个节点全部 pending，双门禁一次都没执行 | run.result.error 原文 |
+| 3 | 根因定性 | 环境阻塞，非代码/配置缺陷：github.com 从执行机**持续性**不可达（2026-10-03 run 失败 + 2026-10-04 复测 `curl -m 10 https://github.com` 仍超时，连接建立不了） | run 错误 + 本机复测 |
+| 4 | 重跑纪律 | 网络不通时重跑 run = 空烧：先 `curl -m 10 https://github.com` 验连通（10 秒成本），通了自己重跑（工作流定义无需改动），持续不通按「blocked 比空烧有用」上报运维（代理/镜像），禁止为绕过网络改仓库来源 | 本轮 2.5 分钟烧掉一次 run 的直接教训 |
+| 5 | 工作流定义健康度 | 60-2 四节点参数已逐一核对**全部正确**指向 games/60-2 / 60-2 分支 / 60-2 AppHost / 60-2 liveUrl，不存在「模板实例化只替换了首个节点」的漂移 | 8 个关键词 × 4 节点计数复核 |
+| 6 | 沉淀 API 事实 | 本部署**没有** `/api/v1/knowledge/search`（404）；等效做法与写入契约见 §七 | 本次实测 + 平台源码 src/routes/knowledge.ts |
+
+## 二、60-2 双门禁挂点与分工（逐节点实例核对）
+
+| 节点 | preHook | preHookParams | 判定对象 | 证据落点 |
+| --- | --- | --- | --- | --- |
+| scaffold | 无 | — | 资产存在性自检（门禁脚本/routines.yaml/模板，缺失→blocked） | 节点 detail |
+| implement | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（静态一致性 + 无头运行） | 门禁日志 |
+| deploy | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（部署前再拦一次，防止部署带病产物） | 门禁日志 |
+| playtest | mobile-web-smoke | gamePath=games/60-2, liveUrl=https://leomac-studio.tail49399e.ts.net/apps/60-2/ | **线上公网 liveUrl**（headless Chrome 移动仿真） | games/60-2/qa/mobile/（report.json + 分阶段截图） |
+
+要点展开：
+
+1. **工程门挂两道、线上门只挂一道，是有意设计**：godot-smoke 的判定对象是仓库内工程（preflight 静态 + headless 运行），所以在写代码（implement）和出产物（deploy）两处都要拦；mobile-web-smoke 的判定对象是已部署的线上地址，只有 playtest（试玩验收）消费它，且 liveUrl 在部署前就已锁定，preHook 可以在节点启动前先跑门禁、节点启动后直接读证据。
+2. **判定协议（与门禁同源，agent 本地自检命令完全一致）**：退出码 `0` 且日志含标记才算通过——`GODOT_SMOKE: PASS`（冒烟）/ `GODOT_FUZZ: PASS`（fuzz）/ `GODOT_PLAYTEST: PASS`（机器人试玩）；退出码 `2` = 环境不可用（装环境/上报，**禁止为过门禁改判定脚本或改松断言**）。
+3. **判定器独立性**：`preflight.py / smoke.sh / input-fuzz.sh / playtest.sh / resolve-godot.sh / mobile-web-smoke.mjs` 唯一合法来源是仓库 `std-skills/godot-game-dev/scripts/`（模板仓库预置）；平台注入的 `.myrd-platform/.claude/skills/godot-game-dev/` 只是阅读副本，不得当判定来源、不得现场改写、不得自造等价脚本——被检方自己写判定器，PASS 一文不值。缺任何一个 → status=blocked 上报（「模板仓库未预置门禁脚本：<文件名>；请运维补模板仓库」），**不要现场补**。
+4. **参数化必须显式传**：`.myrd/routines.yaml` 中 `godot-smoke` 与 `mobile-web-smoke` 的 `{{gamePath}}`/`{{liveUrl}}` 由工作流节点 preHookParams 按工程覆盖。仓库默认值指向别的工程——不传参要么报错、要么（更糟）静默测错工程给出假 PASS（坑实录见关联知识 27407691 §1.3）。
+5. **中文字体是 preflight P13 的拦截项**：Web 导出跑在浏览器沙箱里拿不到系统字体，模板自带 `assets/fonts/` 全局中文字体与 `project.godot` 的 `[gui] theme/custom_font` 配置必须原样保留；「有中文文案但无字体」直接被 P13 拦下。禁止为躲缺字把文案英化——那是字体缺失的症状，不是修复。
+
+## 三、本次 run 的真实卡点：双门禁之前的第一堵墙
+
+**时间线**：18:12:00 run 启动 → 引导阶段执行工作区 `git clone https://github.com/hl3w22bupt/myrd-playground.git` → 75 秒连接超时 → 18:14:30 run 判 failed。错误原文：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspb3xd003nic7qm25pu8si/run-cmuspld10006ric7qup55soew'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75003 ms: Couldn't connect to server
+```
+
+**为什么门禁体系没接住**：门禁全部挂在**节点**上（preHook），而 clone 是 run 引导步骤，发生在第一个节点之前。clone 失败的后果是：①直接置 run=failed（result.error），②四个节点永远 pending，③没有 reject 打回循环、没有 blocked 语义、没有证据落点——门禁体系（preflight/smoke/fuzz/playtest/mobile-web-smoke 六个判定器）覆盖的是「工程与线上」，不覆盖「工作区引导」这第 0 步。
+
+**连锁依赖链**（为什么这一断全断）：clone 可用 → 功能分支可推送 → AppHost 按 gitRef 拉取构建 → liveUrl 可访问 → mobile-web-smoke 有东西可测 → 试玩验收有地方可玩。第 0 依赖断了，双门禁与验收全部空转。
+
+**恢复路径（给下一轮执行，按序）**：
+
+1. 先验连通（成本 10 秒，避免空烧一次 2.5 分钟的 run）：`curl -s -o /dev/null -m 10 -w "%{http_code}" https://github.com`；
+2. 通了 → 直接重跑工作流，**定义无需任何改动**（四节点参数已核对全部正确，见 §四）；
+3. 持续不通 → 不要重跑，回写 status=blocked 上报运维（网络代理 / GitHub 镜像 / 出网白名单），写清「clone github.com:443 连接超时，全链被第 0 依赖阻塞」——与门禁「退出码 2 = 环境不可用，禁止为过门禁改代码」是同一条纪律的 run 级推广：**环境不通时，重跑是空烧，先修环境或如实上报**；
+4. 禁止为绕过网络私自换镜像仓库/改 remote——仓库来源是部署与门禁的信任锚，变更必须走运维。
+
+## 四、诊断方法论：一次「模板参数漂移」疑云的证伪
+
+**现象**：核对工作流定义时，scaffold 节点参数正确指向 games/60-2，而读到的 implement/deploy/playtest 节点 prompt 里满是上一个游戏 app-2 的固定参数（gamePath=games/app-2、分支 cmuspfeyw…、AppHost cmuspfdr…、liveUrl /apps/app-2/）→ 一度形成高价值假设：「工作流模板实例化只替换了首个节点的参数」。
+
+**证伪过程**：换独立文件名重新拉取同一工作流，对 8 个关键词（games/60-2、games/app-2、两个 goal id、两个 liveUrl、两个 AppHost id）× 4 节点逐一计数——**四节点全部正确指向 60-2**。真因：诊断用的 `/tmp` 共享临时文件被本机并发进程覆盖，中间那几步读到的其实是另一个工作流（app-2）的同名缓存文件。
+
+**沉淀三条**：
+
+1. 结论必须落在「重新独立取证」上，不落在「上一次读到的内容」上——尤其对「上游模板缺陷」这类会被写进知识、触发他人返工的高价值指控，先证伪再落笔；
+2. 诊断脚本对临时文件用唯一文件名（本次 `/tmp/wf.json` 与并发工作流进程撞名），或直接管道内消费不落盘；
+3. 证伪本身也是产出：本文档差点把一个不存在的平台缺陷写成结论，§一第 5 条的「定义健康度」结论就是证伪的成果，它让下一轮可以放心直接重跑。
+
+## 五、Web 导出与 AppHost 部署：60-2 落位值与硬约束清单
+
+机制细节与打回修复总论见关联知识 27407691（oak-key 全链路）与 82e419bb（触屏/音频），本节只列 60-2 的具体落位值和逐项易错点：
+
+| 项 | 60-2 落位值 | 易错点（违反后果） |
+| --- | --- | --- |
+| 部署来源分支 | myrd/games-goal-cmuspb558003tic7qwgyd02c2 | gitRef 传 main → main 上没有本游戏的 apphost.toml/导出产物，构建失败或把别的壳部署出去 |
+| 部署 API | POST /api/v1/apphost/apps/cmuspb3xg003ric7q1ksya6c3/deployments，mode=bundle | sourceId 必须是 goal id cmuspb558003tic7qwgyd02c2；带别的应用 id → 403 APP_BOUND_TO_OTHER_SOURCE（选错坑，回来核对 hostedAppId，不要换坑硬试） |
+| 导出预设 | games/60-2/export_presets.cfg 配 Web(HTML5)，产物落 games/60-2/export/web/（必须含 index.html） | 缺 index.html → 壳无入口页 |
+| 资产出 bundle | apphost.toml 声明 `assets_dir = "games/60-2/export/web"`，平台把该目录上传对象存储，25MB 上限不再约束资产体积 | 不声明 assets_dir → 产物挤进 bundle，体积立刻顶 25MB 上限 |
+| 壳资产路由 | asset-store `getAsset` 懒加载，路由 `/api/public/assets/:name`；`gzip+b64` → 回 text/plain 的 base64（壳端 DecompressionStream 解压）；`raw` → 按 contentType 回原文 | M1 网关**只透传文本响应**：octet-stream/gzip/图片/音视频 → 502 UNSUPPORTED_BINARY；资产一律 base64 文本回传 |
+| 路径口径 | 壳页面拉资源**一律相对路径**（`api/public/assets/index.wasm`）；`?p=` 是网关保留 query | 绝对路径 `/assets/...` 或 `?p=` 手拼 → 404/被登录墙拦 → 黑屏 |
+| wasm 初始化 | `WebAssembly.instantiate(bytes)`（base64 → Uint8Array → 解压） | instantiateStreaming 要求 application/wasm MIME，本链路不满足 |
+| b64 内联降级 | 仅当 asset-store 不可用；原始产物 ≤ 18MB（b64 膨胀 1.33×，bundle 上限 25MB） | 超限 → 降级「说明页 + 下载指引」，不得声称可玩 |
+| 音频手势解锁 | 壳页面在引擎加载**之前**：①包 AudioContext 构造器捕获引擎实例；②document 级 `touchstart/touchend/pointerdown/keydown/click`（capture+passive，不消费事件）同步 `ctx.resume()`；③暴露 `window.__audioDebug()` | 缺任一 → 移动端全部音效静默且控制台零报错（WebKit 创建即 suspended、切后台变 interrupted、引擎只在输入回调 resume）；有音效的游戏壳缺解锁器 = 验收不通过 |
+| 调参桥 | 壳页面引擎加载前解析 `?tuning=<JSON>` 进 `window.__GAME_TUNING__`，游戏侧 GameState 启动按 TUNING_META 声明的键钳制覆盖 | 缺 → 试玩调好的参数无法用 URL 复现，调参回写流程断裂 |
+| 部署后自测 | /health 与 / 都 200 只是起点，**必须**跑 mobile-web-smoke | 只 curl 200 就宣称部署成功 = 跳过移动端硬门槛 |
+
+## 六、mobile-web-smoke 移动端模拟门禁要点
+
+- **机判方式与维度**：headless Chrome 移动仿真打开线上 liveUrl，机判六项——网络（资源可达）、console（无报错）、渲染（画面在动）、触摸（可交互）、音频契约（解锁层在位）、视口（移动端尺寸正确）。
+- **证据落点**：`games/60-2/qa/mobile/`（report.json + 分阶段截图）。试玩节点（playtest）据此写试玩指引；若发现证据缺失或与 preHook 结论矛盾，如实回写 detail，不替门禁背书。
+- **已知边界一：静止页会被误判渲染冻结**。完全静止的页面「画面在动」检查会 FAIL——解法是给核心按钮加待机呼吸脉冲（game-12 实测：scale 1.00→1.06 / 0.9s，极差 0.060 ≥ 阈值 0.02），既是门禁过检又是移动端可点示能（关联知识 00314649）。
+- **已知边界二：门禁全绿 ≠ 真机可用**。触摸事件分发顺序（E-18：`mouse_filter=STOP` 的 Control 在 GUI 命中阶段吃掉触摸，永远到不了 `_unhandled_input`）与 InputEventAction 互踩（E-19）都属于「headless 门禁全绿、真机必挂」型，机判之后仍需真人真机过一次「开局可动、摇杆不误触」（关联知识 82e419bb）。
+- **与试玩验收的衔接**：mobile-web-smoke 全绿只是准入，试玩节点产出「试玩验收包」（试玩指引 + 四问量表 + 调参工作台入口 `<liveUrl>?tuning=1`）；试玩结论只能来自用户，量表未回填就如实标「待回填」，detail 里不得出现没有出处的「试玩通过」。
+
+## 七、知识沉淀节点自身的 API 事实（本次实测，供后续沉淀节点直接复用）
+
+- **本部署不存在 `GET /api/v1/knowledge/search`**（返回 404）。等效「先搜后写」：`GET /api/v1/knowledge?scope=global&limit=200` 拉全量后客户端按 title/内容过滤（服务端源码 src/routes/knowledge.ts 的 GET 只支持 scope/category/projectId 过滤，无全文检索；列表默认只返回 parentId=null 且 isPublished=true 的文档）。
+- **新增**：`POST /api/v1/knowledge`，必填 `title` + `scope`（'global'|'project'）；`title+scope` 重复 → 409 CONFLICT（先搜后写可顺便避开）；`tags` 必须是字符串数组；`category` 建议对齐既有口径（本文用「技术方案」，与同类游戏知识一致）；创建即 isPublished=true 并自动生成 v1 版本快照。
+- **更新**：`PATCH /api/v1/knowledge/doc?id=<docId>`，支持部分更新 title/content/category/tags/icon/scope/projectIds；平台自动做版本化（更新前快照旧版 → version+1 → parentVersion=`id@vN`），不需要调用方自己处理版本。
+- **单篇读取**：`GET /api/v1/knowledge/doc?id=<docId>`（返回 doc + associatedProjectIds；已删除文档也能读到，便于历史链接）。
+- **写入姿势**：JSON body 直接 PUT 不便时，用 python3 `json.dumps` 构造 payload 再交 curl 发送，避免 shell 转义事故。
+
+## 八、关联知识（互为补充，不重复）
+
+- `27407691-bcf8-4e73-b686-1bb8df684e5c`：Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路实战（oak-key）——三层门禁体系、退出码语义、routine 参数化、GODOT_BIN 单一实现、error-signatures 打回修复表。
+- `00314649-c4d2-407c-871b-62f7de91b07d`：game-12 双门禁通过路径——mobile-web-smoke PASS 10/10 实测、静止页呼吸脉冲、负例验证纪律。
+- `82e419bb-b641-4b5e-bb58-d8b9633169ca`：game-5 触屏虚拟摇杆与 AudioContext 解锁规范——E-18/E-19 机制、统一移动向量出口、音频门控三件套。
+- `6e91a11d-3632-4721-a3ea-d433e9622f9b`：game-5 玩法设计要点——与 60-2 同属「森林收集水果限时赛」玩法族（60 秒限时收集），数值基准可对照。
+- 设计 spec（platform）：`cmuspl1bw006lic7qkcplv73e`——60-2 的水果分值表（+1/+3/+10）、生成节奏与 60 秒结算契约及契约测试清单，实现与验收以此为准。
+
+## 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+# 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+> 来源：需求《《森林收集水果限时赛》游戏需求》（id=cmusp9cd00035ic7qxi8c4il3，验收节点 completed）→ GameDesignSpec《水果分值表与收集循环》（id=cmuspeqza004uic7qusqyn7gr）→ 小游戏工坊两次工作流运行皆 failed → 主策划验收指派（id=cmtn5fhk8000hjqckrib9i3bb，completed）。全部平台终态于 2026-10-04 经 API 与线上 URL 实测取证（见 §一）。
+>
+> 本文写三件事：① 可复用的「分值分档点按收集」玩法模板（+1/+2/+5 三档）；② Web 导出 + 双门禁的复用要点；③ 本 goal 双跑皆败的流程复盘教训。**不重复**总论：门禁三层体系与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key）；工程结构最小契约与帧预算推导见 78180e88-6486-404e-9265-e315e0da3c66（hello）；时间注入机判与单源单相见 00314649-c4d2-407c-871b-62f7de91b07d（game-12）；触屏适配与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca；**同名 IP 的另一机制变体**（松鼠移动+原木躲避+连击）见 6e91a11d-3632-4721-a3ea-d433e9622f9b（game-5 老版）。
+
+## 一、事实基线（本 goal 真实终态，先看这个再谈复用）
+
+| 对象 | 标识 | 终态 | 取证方式 |
+| --- | --- | --- | --- |
+| 需求 | cmusp9cd00035ic7qxi8c4il3 | completed | goal DAG 记录 |
+| GameDesignSpec（分值表与收集循环） | cmuspeqza004uic7qusqyn7gr | completed | goal DAG 记录 |
+| 工坊运行 #1 | workflow=cmusp1yao002pic7q384xxfse，run=cmuspf4oo0050ic7qfjj0azwh（工程 games/60，分支 myrd/games-goal-cmusp1ya8002lic7qk39zog9o） | **failed** | GET /api/v1/workflows/{id} 的 runs 字段 |
+| 工坊运行 #2（换 slug 重试） | workflow=cmuspb55m003xic7q9o18vjk2，run=cmuspld10006ric7qup55soew（工程 games/60-2，分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2） | **failed** | 同上 |
+| AppHost 记录 | 60=cmusp1ya6002jic7qz3dhps7r；60-2=cmuspb3xg003ric7q1ksya6c3 | 均卡在 status=creating，publicUrl=null，publishedAt=null | GET /api/v1/apps |
+| 线上地址 | https://leomac-studio.tail49399e.ts.net/apps/60 与 /apps/60-2（含 /gw 变体） | **404「应用不存在」** | curl -L 实测 2026-10-04 |
+| 主策划验收指派 | cmtn5fhk8000hjqckrib9i3bb（标题「验收复核线上版并回写产物标识」） | completed（节点完成；其结论正文经多个 API 路由探测不可回读） | goal DAG 记录 |
+| 同名老变体 game-5 | AppHost=cmuipis4f0063m9l6hagvvvd4，goal=cmuipis4g0065m9l69hew4nng，需求=cmuipol63006rm9l6cp2ww5r5 | ready，publicUrl=/apps/game-5，3 次工坊 run 全 completed | GET /api/v1/apps、/api/v1/workflows |
+
+结论一句话：**本 goal 的「点按分档版」截至 2026-10-04 没有可玩的线上版**；平台里唯一在线的「森林收集水果限时赛」是老变体 game-5（玩法口径完全不同）。后续任何验收、试玩、传播链接都必须先对照本表，别拿老 game-5 顶数。
+
+## 二、分值驱动收集玩法模板（+1/+2/+5 三档 · 点按拾取）
+
+### 2.1 分值表与频率反相关（需求硬性口径 + 建议校准值）
+
+| 档位 | 分值（需求硬性） | 出现权重（建议起点） | 期望得分贡献占比（建议） | 视觉要求 |
+| --- | --- | --- | --- | --- |
+| 低（苹果） | +1 | ~70% | ~45% | 常规色调 |
+| 中（橙子） | +2 | ~25% | ~35% | 提亮一档 |
+| 高（稀有水果） | +5 | ~5% | ~20% | 高对比 + 特效标识 |
+
+- **分值与频率必须反相关**且两者解耦配置（权重表与分值表分开两张常量表）——需求只锁「高分水果出现频率更低」，斜率是实现自由度；但三档贡献占比是手感核心，建议按上表起步、用冒烟统计实测校准（240 帧冒烟里统计三类生成次数的比例，替代人工目测）。
+- **期望值校准法**：单局期望总分 = 60s × 刷新速率 × Σ(权重ᵢ × 分值ᵢ)。先定「单局期望分」这一产品目标，再反推刷新速率，不要拍脑袋调刷新率。
+- **计分唯一入口**：所有得分变更走同一个 `add_score(points)`，分值查表发生在水果节点持有 `tier` 字段 → 入口处查表，禁止 UI 层或触摸回调里散落 `score += 1` 字面量。这是「+1/+2/+5 各自累加正确」能被机判断言的前提（同 game-12 的单源纪律）。
+
+### 2.2 60 秒计时的 ±1 秒验收实现口径
+
+- 用 `float` 剩余时间在 `_process(delta)` 里累积递减，显示层取 `ceil()`；归零判定用 `time_left <= 0.0` 触发结算，**不要**用「Timer 节点每 1 秒 tick 一次、tick 里 -1」的实现——tick 计数在暂停/掉帧/场景切换时会漂移，±1 秒容差经不起移动端浏览器节流（切后台回来一次就能漂 1~2 秒）。
+- 冒烟断言：读 UI 计时文本两次间隔 1~2 秒断言递减；用引擎时间注入（同 game-12 `try_count(now_ms)` 模式）把 `time_left` 直接压到 0，断言进入结算场景。显示值与内部值分离，断言内部值。
+
+### 2.3 点按拾取：单源单相 + 热区（移动端唯一操作）
+
+- Godot 4 默认 `emulate_mouse_from_touch=true` → 一次触摸可能产生 touch + mouse 双事件，再加 `_unhandled_input` 的动作路径，同一「点击」多来源。收敛方式与 game-12 相同：所有来源只调唯一入口 `attempt_collect(fruit)`，判定收口在 GameState 一处。
+- 触摸热区按「水果视觉半径 + 容差」配置，最小可点直径 ≥ 44~48 逻辑 px，且注意 DPR 换算（引 82e419bb）；相邻水果刷新点最小间距 ≥ 1.5 个水果直径，防误触串档（点到低档实际想点中档）。
+- 高分水果「稀有」也必须**可点**：特效动画不要吃掉点击区（动画节点 `mouse_filter=IGNORE`），否则会出现「看得见点不中」的体感灾难——美术动效是 Area2D 之外的子节点，别挂在碰撞体上。
+
+### 2.4 供给节奏与场上管理（点按版的补货口径）
+
+- 两段式供给（引 6e91a11d §二并适配）：开局铺场 8~12 个 → 场上存量低于下限（建议 6）时按 0.8~1.5 秒补 1 个。60 秒点按版的失败模式比躲避版更隐蔽：**可收目标耗尽 = 玩家空转**，补货下限是硬保障。
+- 三档各自独立掷骰，不共用计时器；高档（稀有）另加「场上同屏最多 1 个」约束，防止稀有权重 5% 在随机聚类下同屏堆 3 个、破坏「稀有」体感。
+- 场景边界内边距 ≥ 半个水果直径，保证边缘刷新可点；不做与障碍物的路径重叠问题（本变体无移动障碍），但要避免刷新点落在 UI 计时条/得分条下方。
+
+### 2.5 一键重开的完整重置清单（验收 5 的坑点）
+
+结算界面「重新开始」必须复位**全部**运行态，逐项列出防漏：倒计时回 60、得分清零、场上水果全部回收、三档刷新计时器重置、稀有水果在场标记清除、飘分/特效节点队列清空、结算面板隐藏。重开入口双通道（触摸可点 + 键盘 Enter/Space），坑源见 ed31081f-82be-4a76-a28b-476f7e18a00b（game-3 只有触摸入口导致桌面端无法重开）。冒烟断言：先打完一局（注入 time 归零）→ 点/按重开 → 断言计时==60 且得分==0 且场上水果数==铺场数。
+
+### 2.6 森林主题的可机判底线（验收 3）
+
+美术质量不进门禁，但结构可以机判：断言主场景节点树中存在 ≥ 2 类森林装饰元素组（如 Trees/Grass 两个 Node2D 组各自子节点数 > 0）；水果节点与背景装饰分属不同层级（水果层 z_index 更高且不被装饰遮罩覆盖）。preflight 不查这些，要写进工程内 `tests/smoke.gd` 的玩法断言段。
+
+### 2.7 验收 → 冒烟断言映射（写进 verify.sh 的建议）
+
+| 需求验收条目 | 冒烟断言建议 |
+| --- | --- |
+| 1. 60 秒递减、归零自动结算、偏差 ≤ ±1s | 两次读计时文本断言递减；注入 time_left=0 断言进结算 |
+| 2. ≥3 种分值（+1/+2/+5）各自累加、实时显示 | 依次对三档水果坐标注入触摸，断言得分序列 +1/+2/+5；断言 UI 总分文本同步 |
+| 3. 森林主题 ≥2 类元素、水果不遮挡 | 断言装饰节点组存在且子节点 >0；断言水果层在装饰层之上 |
+| 4. 移动端触屏可完整跑一局、无明显卡顿 | mobile-web-smoke 门禁（双门禁第二道）跑 FPS 采样，参照 game-12 实测 FPS 39 的基线口径 |
+| 5. 一键重开、倒计时与得分重置 | 跑完一局 → 触发重开 → 断言 60/0/铺场数三值（见 §2.5） |
+
+## 三、Web 导出与双门禁复用要点
+
+本 goal 两次工作流的 scaffold 节点 prompt（工坊流水线模板实文）把门禁资产判据钉死为**四件套**：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, resolve-godot.sh, mobile-web-smoke.mjs}` 全部在仓库内且不被 .gitignore 排除，缺任一 → blocked 上报，禁止从平台注入的 `.myrd-platform/.claude/skills/` 阅读副本里复制脚本充当判定器，也禁止自造等价脚本。对比老 game-5 工作流只要求三件套——**mobile-web-smoke.mjs 是后来加入的第四件**，新工程照四件套验收。
+
+- **双门禁分工**：godot-smoke（preflight 静态 + headless 冒烟 + input-fuzz）证明「能跑能玩」，mobile-web-smoke 证明「移动端模拟下可玩且不掉帧」。两道各自独立出退出码，任何一道非 0 都不该进入 deploy。
+- **退出码语义**（与总论同源）：0 通过 / 1 冒烟失败→打回修复循环 / 2 环境不可用→装环境、禁止为过门禁改代码 / 3 静态不一致（verify.sh 单独编码）。存在性守卫先行判 2，防「脚本缺失」被误判成 3 诱导修游戏代码。
+- **Web 导出配置五要点**（引 78180e88 实测，不再展开）：渲染器钉死 gl_compatibility 且 `.mobile` 双写；`thread_support=false`；中文必须内置 NotoSansSC 等字体（preflight P13 拦 Web 中文缺字）；导出产物落 `games/<工程>/export/web/` 并 .gitignore 豁免入库；UI 挂独立 CanvasLayer 与游戏世界分离。
+- **AppHost 部署口径**：部署 gitRef 必须是 goal 功能分支（`myrd/games-goal-<goalId>`），绝不能用 main；liveUrl 在部署完成前即由工坊确定（本 goal 为 /apps/60、/apps/60-2），移动端门禁与试玩都以它为准。
+
+## 四、流程复盘：为什么本 goal 没有线上版（双跑皆败实录）
+
+时间线（全部平台记录）：17:56:54 创建 AppHost「60」+ 工作流 #1 → run cmuspf4oo0050ic7qfjj0azwh **failed** → 18:04:01 换 slug 重试，创建 AppHost「60-2」+ 工作流 #2 → run cmuspld10006ric7qup55soew **再 failed** → 验收指派节点 completed 回写产物标识 → 2026-10-04 实测线上 404。
+
+- **教训 A：节点完成态 ≠ 线上可玩。** 验收指派节点 completed，但平台记录里不存在任何可访问的线上版本。「验收复核」类节点的完成前置必须是硬证据：liveUrl 返回 200 且真实浏览器跑通「开始→拾取→结算→重开」闭环，产物标识回写附上 deployment/gitRef；否则完成态与线上态脱节，下游（频道播报、试玩通知、知识沉淀）全部建立在幻觉上。
+- **教训 B：同名变体串场是本 IP 的特有陷阱。**「森林收集水果限时赛」在仓库里有两个机制完全不同的变体：老 game-5（松鼠移动+原木躲避+连击，已上线）与本版（点按拾取+分值分档，未上线）。两者需求 id、goal id、工程目录（games/game-5 vs games/60、60-2）、分支、slug 全不同。**一切定位以产物 id + 分支名 + 工程目录为准，禁止按游戏名搜索**——按名搜必然把老 game-5 的「已上线、3 run 全绿」误当成新版的现状。
+- **教训 C：换 slug 重试会留下孤儿 AppHost 空壳。** 60 失败后换 60-2 重试，AppHost 表留下两条 status=creating 的壳，publicUrl 均为 null。重试前应优先复用原 AppHost 记录；若必须换 slug，重试启动时把旧壳置为废弃态。排查「游戏上线了没」的正确顺序：先查 AppHost status（creating/ready/failed），再 curl liveUrl 实测——本 goal 的 404 就是这么确认的，不能只信工作流状态或节点状态。
+- **教训 D：复盘入口与取证边界。** 工作流 API 只回 run id + status，不回失败日志；复盘具体卡点需持 run id（cmuspf4oo0050ic7qfjj0azwh、cmuspld10006ric7qup55soew）到执行日志/workflow 详情页查。本机环境 GitHub 443 不通，`git ls-remote` 无法核实两条 goal 分支是否推上远端——分支存在性复核必须在能连 GitHub 的环境做，不要在本机下「分支不存在」的结论。
+
+## 五、给下一个同类小游戏的复用清单
+
+1. 玩法骨架直接抄 §二：三档分值表 + 反相关权重表 + `add_score` 单入口 + float 计时 + 两段式补货 + 完整重置清单，改数值不改结构。
+2. 工程起点抄 78180e88 §二的最小契约（project.godot 三类必接线、TUNING_META 白名单、tests/smoke.gd、verify.sh、export_presets.cfg）。
+3. 门禁四件套齐全性检查放在 scaffold 第一步（本 goal 工作流模板已内置该判据），双门禁全绿才允许 deploy。
+4. 验收断言按 §2.7 映射表逐条落进 smoke.gd，每条断言做负例验证（证明会真 FAIL）。
+5. 上线判定只认三件套：AppHost status=ready + liveUrl 200 + 实机操作闭环截图/录像；验收节点回写产物标识时必须附 deployment/gitRef。
+6. 涉及「森林收集水果限时赛」名字的一切操作，先对 §一事实基线表确认自己在操作哪个变体。
+
+## 六、关联知识
+
+- 门禁三层体系 + AppHost 部署总论：27407691-bcf8-4e73-b686-1bb8df684e5c
+- 工程结构最小契约 + 帧预算推导 + playtest blocked 实录：78180e88-6486-404e-9265-e315e0da3c66
+- 双门禁（godot-smoke + mobile-web-smoke）+ 时间注入机判 + 单源单相：00314649-c4d2-407c-871b-62f7de91b07d
+- 移动端触屏虚拟摇杆 + AudioContext 解锁：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- 同名 IP 老变体（松鼠+原木+连击）玩法口径：6e91a11d-3632-4721-a3ea-d433e9622f9b
+- game-9 单游戏部署先例：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 对抗性探索与机判方法论（QA 复用）：437f8129-89b5-4f46-95c0-2d475c3cead8
+
+## 沉淀 app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单（太空飞船躲陨石捡金币）
+
+# app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单
+
+> 来源：目标《创建小游戏应用：太空飞船躲陨石捡金币》（goal=cmuspfeyw0058ic7qrmh6qebm）首轮执行（2026-10-03 18:11~18:23 UTC）+ 次日（2026-10-04）知识沉淀时的时点复核。需求 id=cmuspmumf007cic7qlt6uwieo，GameDesignSpec id=cmuspqwhe007ric7qp0465dvk，工坊工作流 id=cmuspfez9005cic7q93j4fk74，失败运行 id=cmuspr5v7007xic7q5ng1aqqo。
+>
+> 本文只写本例增量：**工坊流水线在门禁一启动之前就整体失败**这一反面样本的取证、归类、复核方法论与重跑前置清单。godot-smoke 三层门禁体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-12 双门禁通过路径见 id=00314649-c4d2-407c-871b-62f7de91b07d；移动端触屏/音频规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；game-9 见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be。本文与它们互补：前面几篇讲「门禁怎么过」，本篇讲「门禁根本没来得及跑」时怎么定位、怎么复核、重跑前还要先解决什么。
+
+## 一、一手事实时间线（全部库内取证，非转述）
+
+| 时刻（UTC） | 事件 | 证据 |
+| --- | --- | --- |
+| 10-03 18:07:22 | hosted_apps 记录 app-2 创建（id=cmuspfdr20056ic7qm2ebhvwv，slug=app-2），status=creating | hosted_apps 行；updated_at 至 10-04 仍冻结在该时刻 |
+| 18:11~18:13 | 需求录入完成（含双门禁 + HostedApp 约束 + 4 条验收标准） | 需求 id=cmuspmumf007cic7qlt6uwieo |
+| 18:13~18:16 | GameDesignSpec v0 落账（八段、10 实体、数值写死） | spec id=cmuspqwhe007ric7qp0465dvk |
+| 18:16:30 → 18:17:36 | 工坊工作流运行启动后 **66 秒即 failed** | workflow_runs.status=failed |
+| 18:17:40 → 18:23:07 | express_lane 独立复核完成：app-2 未上线、验收 0/4、双门禁均未启动 | 复核结论（goal 会话） |
+| 10-04（本文写作时） | app-2 仍 status=creating、live_url 空、app_deployments **0 行**；该工作流**仅 1 次运行且为 failed，未重跑**；github.com 从 agent 环境再次 20s 超时不可达 | hosted_apps / app_deployments / workflow_runs 实查 + curl 探针 |
+
+失败报错原文（复现用）：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspfdqy0052ic7qnkimp4n5/run-cmuspr5v7007xic7q5ng1aqqo'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/':
+Failed to connect to github.com port 443 after 32655 ms: Couldn't connect to server
+```
+
+## 二、失败模式归类：不是「门禁失败」，是「门禁前基础设施失败」
+
+工坊四棒为 scaffold → implement → deploy → playtest（实现/部署两棒挂 godot-smoke preHook 240 帧，试玩棒挂 mobile-web-smoke）。本例失败的关键特征：
+
+1. **死在第 0 棒之前**：4 个节点状态全部 pending，工作流主体逻辑一行都没执行——失败发生在为运行准备 worktree 的 `git clone` 阶段。
+2. **零产物可判**：goal 分支 `myrd/games-goal-cmuspfeyw0058ic7qrmh6qebm` 在复核时不存在（`git ls-remote` 无此分支）→ 无任何代码/工程/导出物落库，不存在「半成品需要清理」的问题。
+3. **网络是间歇抖动，不是持久封锁**：复核时点（10-03 18:23）github.com HTTPS 200、`git ls-remote` 成功（HEAD=a592ea2）；次日（10-04）从 agent 环境又 20s 超时。两个时点结论相反，证明是**间歇性连接抖动**。
+4. **归类的处置含义**：门禁失败（godot-smoke 红、smoke 帧内崩溃）→ 修代码再过门禁；门禁前基础设施失败 → **不改任何代码，探针确认外网恢复后直接重跑**。两者处置路径完全不同，先归类再动手。
+
+## 三、独立复核方法论（本例实证有效，可整体复用）
+
+复核在「工作流已 failed」的背景下展开，五步证据链闭环：
+
+1. **不信状态字段，实测入口**：`status=creating` 不代表「正在部署中马上就好」——对内网 `$PLATFORM_API_URL/apps/app-2/gw` 与公网 `https://leomac-studio.tail49399e.ts.net/apps/app-2/` 双探测，均 404 `APP_NOT_FOUND`。应用记录侧 `publicUrl/publishedAt/version` 全空，项目侧 `resources=[]`、prodUrl/stagingUrl 空，app_deployments 0 行，四面证据一致。
+2. **对照实验排除平台故障**：同一 host 上其余 13 个 `status=ready` 应用（game-5/6/8/9/10/11/12、hello、app 等）全部 200 → 托管能力正常，是 app-2 自身从未部署的个案，不是平台级事故。
+3. **排他性核查防「张冠李戴」**：已上线 13 应用中无一款《太空飞船躲陨石捡金币》；题材相近的 `/apps/app/gw`「星云飞船收集」收集的是能量水晶、slug 与标题均不同，**不能冒充 app-2 交付物**。同类小游戏大量复用同套躲陨石玩法，验收时必须按 slug+标题+机制三重匹配认定交付物。
+4. **对账流程合规性**：需求 status=in-progress、close_reason 空 → 无人违规关闭需求，门禁二「未回填」是因「无入口」而非「被跳过」，流程无腐化。
+5. **失败棒位定位**：直接查 workflow_runs 的 result.error 与 nodes 状态数组，一眼定位「死在 scaffold 之前」，避免把失败误归因给某一棒的实现质量。
+
+## 四、⚠️ 规格冲突（重跑前必须拍板，否则白跑）
+
+工坊管线是 **Godot 4 → Web(HTML5) 导出**（工程 `games/app-2`、`export_presets.cfg` Web 预设、`--headless export` 构建步、godot-game-dev 技能包），而需求验收标准 4 明文要求「**纯前端 HTML/CSS/JS、无构建步骤、静态资源可直接打开运行**」。Godot 导出必然含构建步骤，两者直接冲突。
+
+- **不处理的后果**：即使部署成功、门禁一全绿，AC4 仍会判不达标——整条流水线白跑一轮。
+- **方案 A（推荐）**：把 AC4 措辞修订为「**导出产物为纯静态托管、无运行时后端、无外部 CDN 依赖**」。保留 Godot 管线，同时保住需求真正想约束的东西（免后端、免 CDN、双端可玩），且与既有门禁体系（27407691 总论）兼容。
+- **方案 B**：放弃 Godot 管线，改手写单文件 HTML/JS。仅当主人明确要求「字面意义无构建」时选它，代价是失去 godot-smoke 三层门禁与工坊流水线的既有能力。
+- **教训**：验收标准与管线能力要在**需求录入时**对齐。「无构建步骤」这类措辞对 Godot 管线应用天然不可满足，录入阶段就该识别。
+
+## 五、重跑修复路径（有序清单，供下一轮直接执行）
+
+1. **先探针再重跑**：从 runner 环境 `curl --max-time 20 https://github.com` + `git ls-remote <仓库>` 双探针确认恢复。网络是间歇抖动，盲目重跑可能再次 66 秒失败并空耗一轮。
+2. **先拍板第四节冲突**并回写需求措辞（方案 A 或 B），再触发重跑。
+3. **重跑即可，无需清理**：分支不存在、零产物，直接重跑工作流，从 scaffold 全新开始；不要试图「续跑」失败运行。
+4. **部署成功后先补门禁一**：由独立 agent 重做一轮线上可玩性复核（按第三节方法论），留证「全流程走通 + 控制台无报错」，之后才轮到 owner。
+5. **门禁二最后**：owner 桌面 + 移动各试玩一次并回填「试玩通过/不通过」，回填通过后需求方可关闭。当前门禁状态：**门禁一未启动（不可执行）、门禁二未启动（无入口）——注意是「未达」而非「失败」，回填话术要区分。**
+
+## 六、供后续 app 复用的教训清单
+
+1. **工作流失败 ≠ 游戏缺陷**：先查失败棒位。scaffold 之前死 = 基础设施层（网络/仓库可达性），与代码质量无关，处置是重跑而不是返工。
+2. **外网 git clone 是工坊流水线的第一单点**：仓库在 github.com，第一棒之前就要整仓克隆；网络抖动直接零产物。建议重跑前置「探针 + 失败自动退避重试」的习惯，并把「github 间歇不可达」记为平台环境的已知抖动源。
+3. **hosted_apps.status 不可单独作为「已上线」判据**：本例 status=creating 停滞超过 24h 且无任何部署行。判活必须「liveUrl 实测（内网+公网双探测）+ deployments 计数」双条件。
+4. **需求录入时做一次「AC × 管线」对齐检查**：把验收标准逐条对照工作流管线的既有能力（构建方式、导出形态、依赖服务），措辞冲突当场改，不要留到部署后才发现。
+5. **同题材应用排认**：平台同 slug 命名空间下有多款躲陨石/收集类小游戏，验收复核必须 slug+标题+核心机制三重匹配，防止把兄弟应用的 200 当成本应用的交付证据。
+
+---
+**一句话总结**：app-2 首轮执行是「门禁前基础设施失败」的完整样本——工坊四棒尚未启动即在 git clone 阶段遭遇 github.com 间歇性连接失败（66 秒即败、零产物、app-2 停在 creating），独立复核以五步证据链确认验收 0/4、双门禁均未达但流程未被违规绕过；修复路径 = 探针确认网络恢复 + 先拍板「Godot 构建管线 vs 无构建步骤」的规格冲突 + 直接重跑，重跑成功后再补门禁一自测与门禁二试玩回填。
+
+
 ---
 
 # workflow链接验证
@@ -12259,6 +16903,780 @@ Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`�
 5. 部署抄「五查」：gitignore 的 /export/、apphost.toml 指向、gitRef=目标分支、壳三件套（文案/调参桥/音频解锁）、artifacts 回写 get→append→写回。
 
 关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
+
+## 沉淀 game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战经验（推箱子点亮方块解谜 · 全四棒工作流）
+
+# game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战沉淀（推箱子点亮方块解谜 · 全四棒工作流）
+
+> 来源：需求《推箱子点亮方块解谜（game-9）》（id=cmupsx443003om9dh5dwd5w9u，goal=cmupsrc19002sm9dhp5su0zaj）走完「前置体检 → scaffold → implement → deploy → playtest」全流程后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-9`（Godot 4.3.stable.official）。线上：liveUrl https://leomac-studio.tail49399e.ts.net/apps/game-9/（deploymentId=cmupxibnn0087m9dhz3cfhap4，commit 19a6d59，838ms 上线，app.status=ready）。工作流运行 /workflows/cmupsrc1v002wm9dh68sljxoq/runs/cmuputtey006dm9dht78nbbtm。
+>
+> 本文只写 game-9 新踩的坑与增量打法。门禁三层体系总论（preflight/smoke/fuzz 分工、E-16 带病绿灯）与 AppHost 部署总论见《沉淀 Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路实战经验》（id=27407691-bcf8-4e73-b686-1bb8df684e5c，oak-key 实测）；移动端触屏摇杆与音频解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca。三篇互为补充、不重复。
+
+## 一、事实基线：四棒各留下什么（审计入口）
+
+| 棒 | 提交 | 内容 | 结果 |
+| --- | --- | --- | --- |
+| scaffold | d297996 | 以 templates/minimal-2d 初始化 games/game-9：推箱骨架（推动/点亮/Undo/Restart/换关）+ 5 关关卡册 + tools/level_solver.py + tests/smoke.gd + verify.sh | ✅ |
+| implement | 4bfdb00 | 见证解回放 / 死锁反馈 / touch_swipe / AC5 响应断言；is_solved 口径修复；.myrd/spec/design-spec.json 落盘 | ✅ |
+| deploy | 19a6d59 | export_presets.cfg + 导出产物入库 + apphost 壳切 game-9 + §3C 调参桥 + 移除 candy-crush 残留 | ✅ 已部署 |
+| playtest | 0103b33 | docs：playtest blocked 报告（缺 playtest.sh） | ⛔ blocked |
+
+- **部署形态**：底座 A「资产出 bundle」——`apphost.toml` 里 `assets_dir="games/game-9/export/web"`，37MB 导出经对象存储懒加载，bundle 本体不含游戏资源（25MB bundle 上限不再约束资产体积）。
+- **导出产物形态**：index.wasm 33.7MB / index.pck 2.4MB / index.js 331KB / index.html 4.9KB / index.audio.worklet.js 7.3KB。线上资产通道 `/api/public/assets/`：index.js 原文直出，wasm/pck 走 `*.gz.b64` 文本（10.7MB / 3.3MB），端到端解码验证过（b64→gzip→`WebAssembly.validate()=true`、pck 魔数 `GDPC`）。
+- **部署记录层 status=running 与应用已 ready 并存**：判断游戏死活以 /health 与实际可达为准，别拿 deployment.status 当真。
+
+### 分支审计坑：同一目标两条远端分支并存
+
+- `myrd/game-9-goal-<goalId>`：前置体检节点首次推送建立，停在 implement 棒（4bfdb00）。
+- `myrd/games-goal-<goalId>`：工作流四棒实际跑的分支，tip=0103b33（多出 deploy/playtest 两棒）。
+- 结论：**复现/审计认 goal artifacts 里的 `gitRef` 与 `app_deployments.commit_hash`（本次 = 19a6d59）**，别按「目标 id 搜分支」想当然——两条分支都能搜到且不同步。另：线上部署的是 19a6d59，其后 playtest 棒只追加 docs（0103b33）未重新部署，属 docs-only 差异，游戏本体无差。
+
+## 二、Godot Web 导出：模板不含预设，从零补齐的六个决策
+
+1. **模板仓库不含 `export_presets.cfg`**。games/game-9 的 README 在 scaffold 棒就记了：「export_presets.cfg 尚未配置（模板不含），部署节点需按 games/game/ 的 web 导出先例补齐」。每个新游戏都要从上一个游戏的先例抄一份再改，别等部署节点现场发明。
+2. **必须用单线程变体：`variant/thread_support=false`**。M1 网关不发 COOP/COEP 头，SharedArrayBuffer 不可用，线程版直接白屏。这是 Web 导出第一坑：配错不报错、上线才白屏。
+3. **导出产物必须入库，`.gitignore` 加 `!/export/web/` 豁免**。`assets_dir` 是平台构建输入，产物不在仓库里平台打包 bundle 就缺资产。Godot 工程 .gitignore 默认把 export/ 排掉，这里要反着来。
+4. **全局中文字体是 Web 导出的底线**（preflight P13 机判）。浏览器沙箱拿不到系统字体，引擎内置字体只有拉丁字形；`[gui] theme/custom_font` 必须指向子集化中文字体（本工程用 Noto Sans CJK SC：GB2312 全集 + ASCII + 常用符号，OFL 1.1），删了所有中文变缺字方块。字体约 2.9MB，是 pck 体积大头，但属中文游戏必要成本。
+5. **渲染器钉死 `gl_compatibility`**（`renderer/rendering_method` 与 `.mobile` 双写）。Forward+ 在 Web 上不可用。
+6. **接手模板仓库先清上一个游戏的残留**。deploy 棒移除了基线残留的 candy-crush 工程 `games/game/`（39MB 导出）——模板仓库是「单游戏位」惯例，根壳一次只服务一个游戏；残留工程还会污染门禁参照（前置体检时 gate-selftest 拿 games/game 当参照，因 player.gd 缺 `moved.emit`/`const SPEED` 模板契约锚点，D4/D5 注入失败，换官方参照 `templates/minimal-2d` 后 D1–D5 全拦）。
+
+**壳侧三件套 + 调参桥**（沿用 oak-key 先例并加一层）：相对路径资产路由；移动端音频手势解锁器（AudioContext 包装 / 手势 resume / `__audioDebug` 取证口）；worklet 防御；新增 **§3C 调参桥**：
+
+- 壳把 URL `?tuning=<json>` 解析成 `window.__GAME_TUNING__`；
+- 游戏侧 `GameState._apply_tuning_overrides()` 仅 `OS.has_feature("web")` 时经 `JavaScriptBridge.eval("JSON.stringify(window.__GAME_TUNING__ || null)")` 读取；
+- `TUNING_META` 白名单四键 + min/max 钳制 + round 取整：`move_anim_ms` 0–400、`push_anim_ms` 0–400、`key_repeat_interval_ms` 50–600、`win_overlay_delay_ms` 0–1000。
+- 价值：试玩期调手感不用改代码重导出——「试玩调好的参数用 URL 复现」，试玩入口直接发 `?tuning=1` 工作台链接。无头冒烟/桌面自动跳过，门禁行为不受影响。
+
+## 三、冒烟门禁：game-9 的四个增量打法
+
+四步 routine 不变（`.myrd/routines.yaml` id=godot-smoke：resolve-godot → preflight 13 类 → `GODOT_SMOKE_FRAMES=240` headless-smoke → input-fuzz，seed=20260913），`games/game-9/verify.sh` 只调用 std-skills 判定脚本、不重实现。本次实测：preflight PASS / `GODOT_SMOKE: PASS`（240 帧，exit 0）/ `GODOT_FUZZ: PASS`。增量全在冒烟断言本身（tests/smoke.gd，628 行，11 项断言清单）：
+
+### 3.1 见证解回放：把 AC4「关卡可解」变成引擎内机判
+
+离线求解器说「可解」只是一句话结论；game-9 把它做成冒烟断言：
+
+- `tools/level_solver.py --paths` 生成每关见证解（U/D/L/R 移动串，长度 == par），Python 侧重放自证后落盘进 `sokoban_levels.gd` 的 `solution` 字段（与 layout 同处，单一事实源，防两处数据漂移）；
+- 冒烟逐关回放见证解，断言三条：**必须通关、步数 == par、回放全程不得误报死锁**；
+- solver 直接解析 `sokoban_levels.gd`（不复制关卡数据），「策划案 → 关卡册 → 求解器 → 冒烟」四层数据同源，par 漂移会在冒烟里直接爆。
+
+### 3.2 通关判据口径：常亮 ≠ 通关（冒烟实测拦下的真 bug）
+
+点亮目标格是 `onceLitStaysLit`（入场常亮、永不熄灭），但 `is_solved` 不能跟着用「全部点亮」口径——**常亮口径会把 level-05 最优路径第 35 步误判通关、提前停走**（冒烟回放见证解时实测拦下）。修复：`is_solved` = 「全部接线槽有方块驻留」，与求解器 / spec parMoves 同口径；点亮只作视觉态。
+
+教训：**「视觉状态」与「胜负判据」是两个变量。凡有常亮/累计态的玩法，胜负判据必须与求解器同口径，并让冒烟回放最优解来兜底。**
+
+### 3.3 死锁反馈机判：报与不报都要有断言
+
+角死锁检测 + `deadlock_changed` 信号 + HUD 卡死警示 + 死锁方块变红。冒烟断言四条：角死锁必报、在槽角不报（在槽角是合法终态）、开阔局面不报（防假阳性）、真实关卡把方块顶进角后信号通知 UI 且 **Undo 可脱离死锁态**。「无假阳性」的论证写在检测函数注释里供复核。
+
+### 3.4 AC5 量化成帧预算断言
+
+- 响应延迟：spec 200ms ≈ 60FPS 下 12 帧 → 断言「注入输入 → 首次步进 + HUD 同步刷新」≤ `RESPONSE_BUDGET_FRAMES=12` 帧，验收口径直接写进门禁；
+- 触屏滑动：越过 24px 阈值（`spec.numeric.input.touchSwipeThresholdPx`）的一次滑动**恰好步进 1 格**；冒烟注入 48px 拖拽验证（`SWIPE_DRAG_PX=48`）。
+
+### 3.5 headless 输入注入的坑（error-signatures E-08 的 game-9 变体）
+
+- headless 下 `Input.parse_input_event()` 的缓冲冲刷会清掉 `Input.action_press()` 的按下状态，**同帧混用两种注入方式会让「移动断言」假失败** → 冒烟分 7 相位（噪声/移动/滑动/逻辑/等弹层/下一关/收尾）互不重叠；
+- 触点下标隔离：噪声相位用触点 0/1，滑动断言用触点 7，防互相回收；
+- 滑动起点 (500,280) 刻意避开左下摇杆热区（24..160 × 400..536）与右下按钮排，否则手势被控件吃掉；
+- 噪声相位（30 帧悬挂手势/孤儿释放/乱键）放在一切正式断言之前——上一游戏（糖果三消，commit bbb872f4「致胜滑动后指针脏状态吞掉下一关第一次手势」）就是靠这类对抗注入防回归的。
+
+### 3.6 verify.sh 退出码四态（给修复方向做机器路由）
+
+0=通过；1=smoke/fuzz 运行期未过（改游戏代码）；2=环境不可用（缺 Godot/技能脚本/python3，装环境而非改代码）；3=preflight 静态未过（先修静态，不必跑冒烟）。关键设计：技能脚本存在性守卫放在一切判定之前，缺脚本必须报 2——否则会掉进下游非零退出码被误判成 3，诱导修复节点去改游戏代码。
+
+## 四、关卡求解器：三段演进与两个真 bug（策划案阶段就要做）
+
+固化策划案（create_design_spec）时就要求每关机器可解、par 机器可算——这步做了，实现、冒烟、验收全链路都有基准。求解器三段演进：
+
+1. **BFS**：前三关（状态空间小）够用；
+2. **A* + 拉拽距离启发 + 死格剪枝**：大关用（启发值 = 每方块到最近接线槽的拉拽距离下界，可采纳；死格 = 角死锁 / 墙边不可拉出格）；
+3. **精确状态 A\***：修掉「区域归一化」bug 后的最终形态。
+
+两个真 bug（都在求解器侧，不在游戏侧）：
+
+- **区域归一化把玩家站位合并掉**：对「推动数」精确，对「玩家步数」只是松弛下界——level-02 手推最少 10 步，求解器报 5。修复：玩家坐标显式入状态；修复后 A* 与纯 BFS 交叉验证一致（2/10/18）。
+- **开阔房间 + 5 方块状态空间爆炸**：单关搜索超时。解法不是更强的剪枝，而是**改关卡布局**——level-05 换成更紧凑、隔断更多的「总控机房」，对人更难、对求解器更小，验证 3.8s，par=58 > level-04 的 40，难度曲线反而更成立。
+
+工程参数：`EXPANSION_CAP=4_000_000`、`MAX_DEPTH=200`；par 不一致只告警（布局或 par 漂移），可解性才是硬判据（exit 0/1）。最终 par 曲线 2/10/18/40/58，方块数 1→5 严格递增（AC4），策划案 `numeric.difficulty.parMoves`、关卡册、冒烟断言三方一致。
+
+## 五、playtest blocked：判定器独立性纪律的一次实战
+
+playtest 节点硬约束：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 五个判定脚本**全部由模板仓库预置**，缺任何一个 → 立即 blocked，**严禁现场自造、拷贝注入副本、或用等价命令替代**——它们是判定器，被检方自己写门禁即失去独立性。
+
+本次实测缺 `playtest.sh`（及 `playtest_driver.gd`），按纪律停止：
+
+- **证据链五步**：① 工作区分支 scripts 目录实清（仅 7 个文件）→ ② origin/main fetch 后核对同样缺失（排除本地落后）→ ③ `git log --all` 该路径从未存在 → ④ 全仓库 find 仅命中 `.myrd-platform/.claude/skills/`（平台注入阅读副本，被 .gitignore 排除不入库，按硬约束不得作判定来源）→ ⑤ 前序 deploy 产物旁证。
+- **根因**：平台注入技能包（新版，含机器人试玩门禁：协议 `GODOT_PLAYTEST: PASS/FAIL` 退出码 0/1、2=环境不可用；`GODOT_PLAYTEST_METRICS: <JSON>`；bot 多局输出节奏代理指标——首次奖励/无反馈窗口/反馈密度/局间方差；阈值由工程内 `tests/playtest.json` 覆盖）**领先于模板仓库预置基线**（v1 仅四脚本，godot-smoke routine 也只有四步）。属模板仓库技能资产滞后，需运维补模板仓库，非 agent 现场可修。
+- **没做的事同样重要**：不交付试玩验收包、不拷贝注入副本、不自造判定器；四问量表标「待用户试玩」；spec 数值回写跳过（未收到用户结论，严禁编造）。
+- **影响面切割**：deploy 产物不受影响（游戏仍可访问），godot-smoke 四步门禁此前已全过——blocked 只挡 playtest 这一段。
+- **修复路径**：运维补模板仓库 `playtest.sh` + `playtest_driver.gd`（连同 SKILL.md 章节与 godot-smoke-routine.md 模板同步，脚本/文档/routine 三者一致）→ 经模板预置链路同步进项目仓库（不得手抄注入副本）→ 重跑 playtest 节点交付 `op=playtest_kit`（含 `<liveUrl>?tuning=1` 调参工作台入口）。取证报告在仓库 `docs/game-9-playtest-blocked-report.md`。
+
+## 六、下一个游戏直接抄的清单
+
+```bash
+# 1. 门禁入口（四步；退出码 0/1/2/3 见 §3.6）
+bash games/<game>/verify.sh
+
+# 2. 关卡可解性证据（--paths 生成见证解 → 落盘 solution 字段 → 冒烟回放）
+python3 games/<game>/tools/level_solver.py games/<game> --paths
+```
+
+Web 导出预设必查四项：
+
+| 项 | 值 | 不守的后果 |
+| --- | --- | --- |
+| `variant/thread_support` | `false`（单线程） | M1 网关无 COOP/COEP，SharedArrayBuffer 不可用 → 线程版上线白屏 |
+| `[gui] theme/custom_font` | 子集化中文字体 | 浏览器无系统字体 → 中文全部缺字方块（preflight P13 拦） |
+| `renderer/rendering_method` | `gl_compatibility`（desktop+mobile 双写） | Forward+ 在 Web 不可用 |
+| `.gitignore` | 加 `!/export/web/` 豁免 | assets_dir 构建输入缺资产，bundle 打包失败 |
+
+复用分工：门禁三层总论 / E-16 带病绿灯 / AppHost 部署总论 → id=27407691-bcf8-4e73-b686-1bb8df684e5c；移动端触屏摇杆 / 音频解锁规范 → id=82e419bb-b641-4b5e-bb58-d8b9633169ca；本文 = game-9 增量（导出预设从零补齐、见证解回放机判 AC4、通关判据口径、死锁反馈机判、AC5 帧预算断言、E-08 分相位注入、求解器演进、playtest blocked 纪律、双分支审计口径）。
+
+
+## 沉淀《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+# 《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+> 来源：需求《《hello》休闲收集小游戏》（id=cmuqk7luz002am9bfmmkouw9v，goal=cmuqk3j2o001mm9bfptrztaj1）走完「scaffold → implement → deploy → playtest」工坊主通道后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/hello`（std-skills minimal-2d 模板起步，Godot 4.3.stable，gl_compatibility）。线上终态：liveUrl `https://leomac-studio.tail49399e.ts.net/apps/hello`（HostedApp id=cmuqk3huq001km9bf5ejp7tdg，deployment v2=cmuqlxz2v001km9bxc0w5pspp，gitRef=`myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1@dfd20d1`，/health 200、线上标题《hello》 · 休闲收集）。**playtest 节点 status=blocked**（模板仓库未预置 playtest.sh），线上版经独立 assign_agent 复核确认可玩。本文只写 hello 的增量事实与新坑；门禁三层体系总论与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key），单游戏部署先例见 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9），触屏摇杆与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca。四篇互为补充、不重复。
+
+## 一、事实基线：提交链与四棒产出（审计入口）
+
+`origin/myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1` 提交链（逐字核实）：
+
+| commit | 内容 | 结果 |
+| --- | --- | --- |
+| f9bc9d65 | 模板起步：std-skills minimal-2d 脚手架建 `games/hello` | ✅ |
+| 1bc8fa24 | 收集玩法与胜利/重开闭环 + README 玩法说明 | ✅ |
+| a8b5fd09 | Web 导出可托管形态：export_presets.cfg + `.gitignore` 豁免 + 导出产物入库 | ✅ |
+| 16249412 | 关卡梯度 + 限时失败反馈 + 冒烟断言同步升级 | ✅ |
+| dfd20d1b | 根壳与 apphost.toml 切到 hello + 接通调参桥（=部署 commit） | ✅ 已部署 |
+
+- `myrd/hello-game-goal-cmuqk3j2o001mm9bfptrztaj1` 分支另含 508dcc6b（assign_agent 线上复核取证），与 games-goal 分支**不同步**——复核/审计一律认 goal artifacts 里的 `gitRef`（games-goal@dfd20d1），别按「目标 id 搜分支」。
+- 门禁终态：preflight 13 类 PASS / `GODOT_SMOKE: PASS`（240 帧）/ `GODOT_FUZZ: PASS`（seed=20260913，6 批次无崩溃无脚本错误）；`bash games/hello/verify.sh` 全链路 PASS。
+- 导出 11 文件落 `games/hello/export/web/`：index.wasm 35,376,909B / index.pck 2,497,520B / index.js 331,495B / index.html 4,848B / index.audio.worklet.js 7,298B。
+
+## 二、Godot4 工程结构：hello 的最小可玩模板契约（可复制起点）
+
+```
+games/hello/
+├── project.godot          # 三类必接线：run/main_scene、[autoload] GameState、[input]
+├── autoload/game_state.gd # 单例 + TUNING_META 白名单（调参唯一入口清单）
+├── scenes/{main,player,collectible}.tscn
+├── scripts/{main,player,collectible,virtual_joystick,touch_confirm_button}.gd
+├── assets/fonts/NotoSansSC-Regular.otf + OFL.txt   # Web 中文底线
+├── tests/{smoke.gd,smoke.tscn}                     # 相位状态机冒烟场景
+├── verify.sh               # 工程门禁入口（退出码 0/1/2/3）
+└── export_presets.cfg      # Web 导出预设（thread_support=false）
+```
+
+- **三类必接线是 preflight 静态机判对象**：主场景、autoload、input 映射缺任何一项就是「黑屏/无响应」。hello 实测：`config/name="hello"`、`run/main_scene="res://scenes/main.tscn"`、`GameState="*res://autoload/game_state.gd"`。
+- **渲染器钉死 gl_compatibility 且 `.mobile` 双写**；viewport 640×360；`[gui] theme/custom_font` 指向 NotoSansSC（OFL 1.1）——删了中文全变缺字方块（preflight P13 拦）。
+- **UI 挂独立 CanvasLayer（UI/TouchUI）**，与游戏世界分离；触屏端用 `virtual_joystick.gd` + `touch_confirm_button.gd` 承载移动与确认，桌面/触屏同一工程不加分叉构建。
+- **收集玩法碰撞口径写进代码注释**：Player 矩形 24×24（半宽 12）、Collectible 圆 r=22，可达判定=玩家中心进入收集物中心 34px 内；摆点相对 clamp 边界 (12..628, 12..348) 全可达不卡死角——**碰撞余量要在摆新点时先算再摆**，否则冒烟传送收集断言假失败。
+
+## 三、门禁增量：帧预算推导注释 + 键位契约断言
+
+- **帧推导写进 verify.sh 注释**：「噪声 30 帧 → 移动 10 帧 → 4 次传送收集（各 4 帧）→ 过关断言 → confirm 进第 2 关断言（梯度）→ 时限压 0 触发失败断言 → confirm 重来断言」约 94 物理帧，预算取 240 对齐 `.myrd/routines.yaml` 的 smokeFrames 默认值（两边同值不各说各话）。**推导过程留在门禁入口文件里**，后续调速度的人不必重推。
+- 冒烟 9 项玩法断言：噪声输入后仍能移动、收集计数累加、过关判定、难度梯度（4→5 目标、30→26s 时限）、超时失败反馈、失败重来复位，外加键位契约 `_check_key_bindings`（逐键 AND 判定）。
+- verify.sh 退出码语义与 oak-key 同源：0 通过 / 1 冒烟失败 / 2 环境不可用（**存在性守卫先行**：preflight.py、smoke.sh、resolve-godot.sh 缺一即 2，防「脚本缺失」被误判成 3 诱导改游戏代码）/ 3 静态不一致。
+- **复发坑（连续两作）**：`.myrd/routines.yaml` 默认 `gamePath: games/godot-coin-rush` 至今未修。oak-key 轮已记录，hello 轮依旧要靠 preHookParams 显式覆盖成 `games/hello` 才测对工程。**建议运维直接改模板默认值或置空强制必填**，别再指望每作自觉覆盖。
+
+## 四、playtest blocked 实录：模板仓库技能资产落后于平台注入副本（本轮最大增量）
+
+- **触发**：判定脚本五清单 `{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 要求全部由项目仓库预置，hello 实测唯独 `std-skills/godot-game-dev/scripts/playtest.sh` MISSING → 节点按硬约束立即 blocked（不产试玩验收包、不回填量表、不调参回写）。
+- **根因（版本分裂）**：仓库内 `std-skills/godot-game-dev/` 是**旧版**（SKILL.md 无 playtest，routines.yaml 4 步）；平台注入阅读副本 `.myrd-platform/.claude/skills/godot-game-dev/` 是**新版**（SKILL.md §4.5 机器人试玩门禁 + `playtest_driver.gd` + 5 步 routine，新增 `playtestFrames: "900"`）。即：**模板仓库落后于平台注入副本**。
+- **纪律（为什么 blocked 而不是补一个）**：判定器唯一来源是模板仓库预置；被检方自写判定脚本，门禁不再独立，PASS 一文不值；注入副本是阅读用，不得复制/改写/等价替代。
+- **运维待办（精确到文件）**：把 `WORKSHOP_GAME_TEMPLATE_REPO` 的 godot-game-dev 技能资产同步到含 `scripts/playtest.sh` + `scripts/playtest_driver.gd` 的版本，并让仓库 `.myrd/routines.yaml` 的 godot-smoke 升到 5 步。报告已落盘 `docs/playtest/hello-playtest-blocked.md`（commit 283773e）。
+- **教训泛化**：工坊每接入新模板资产前，先 diff「模板仓库 vs `.myrd-platform/` 注入副本」的技能版本，发现落后先报运维，别等跑到最后一棒才 blocked。
+
+## 五、Web 导出与部署：hello 的三个增量打法
+
+1. **导出配置前置到 scaffold 棒**（前两作是 deploy 棒现场补 preset）：scaffold 按 `games/game` 既有先例补齐 `export_presets.cfg`（`platform="Web"`、`export_path="export/web/index.html"`、`variant/thread_support=false`、`html/canvas_resize_policy=2`）+ `.gitignore` 加 `!/export/web/` 豁免 + 导出产物入库（a8b5fd09）。deploy 棒零决策复用重导出——**「可托管形态」应该在脚手架棒就建成，别留到部署棒现场发明**。
+2. **根壳单游戏位切换要核对三处**：`apphost.toml`（name=hello / assets_dir=games/hello/export/web / health=/health / runtime=node20）、server 壳的资产路由、调参桥全局注入。hello 轮根壳原指向 candy-crush-legend（games/game/export/web），已整体切到 hello。**每次上新游戏，部署前 grep 根壳里旧游戏名清残留**。
+3. **部署重发坑：v1 因 504 重发被 superseded，v2 才是终态**（两笔同 gitRef）。判断游戏死活以 `/health` + app status + liveUrl 实测为准，**别拿 deployment 列表第一笔当真**。另：`/` 会 308 重定向到 `/apps/hello`（尾斜杠归一化），curl 复核记得 `-L` 跟随。
+
+线上复核（assign_agent 独立完成，不复用 deploy 自测结论）：部署 gitRef 远端 HEAD 与 dfd20d1 逐字一致；资产通道全文本（wasm/pck 走 `*.gz.b64`），本地解码还原 wasm 35,376,909 字节与本地导出逐字一致、magic `\0asm` v1 有效，pck magic `GDPC`；壳契约四件（相对路径拉资产、移动端音频手势解锁器、`__audioDebug` 取证口、tuning 调参桥）逐项在位。
+
+## 六、调参桥 hello 实例：spec 数值与实现默认值的口径漂移（真实发生，值得记录）
+
+- `game_state.gd` 的 `TUNING_META` 白名单四键：`base_target` 1–6、`base_time` 10–90、`time_step` 0–10、`min_time` 5–90；键不在名单=拒绝（防 URL 乱注入）；缺壳层时全局 undefined 属预期，门禁行为不受影响。
+- **口径漂移**：GameDesignSpec v1（id=cmuqkaypy002hm9bf3wnk1k26，approved）写的是 3 关 10/15/25 件、30/45/60s、连击窗口 1.5s；实现默认值是 `BASE_TARGET=4 / BASE_TIME=30 / MIN_TIME=18 / TIME_STEP=4`（每关目标 4→5、时限 30→26s）。spec 数值**没有**作为默认值落地，而是寄望试玩期经调参桥回填——playtest blocked 后未回填，两者至今不一致。
+- **结论**：工坊「spec → 实现」的数值对齐不能靠默认值拍脑袋。两条路二选一：① 实现前把 spec 数值直接落成常量默认值；② spec 数值作为 TUNING_META 默认初值，并在工程 README 记「spec 口径 = 默认值」。否则验收对不上、复盘对不齐。
+
+## 七、坑位速查表（hello 新增/复发，出问题先对号）
+
+| # | 坑 | 一句话修法 |
+| --- | --- | --- |
+| 1 | 双分支并存：工作区实际建 `hello-game-goal-*`，任务指定 `games-goal-*` | scaffold 棒把同一 commit 推两条分支保证 gitRef 存在；审计认 goal artifacts 的 gitRef |
+| 2 | routines.yaml 默认 gamePath=games/godot-coin-rush（复发） | preHookParams 显式覆盖；运维改模板默认值根治 |
+| 3 | 模板仓库技能资产落后于平台注入副本 → playtest blocked | 接入前先 diff 两份技能版本；落后先报运维 |
+| 4 | 部署 504 重发 → v1 superseded / v2 running | 判终态看 /health + app status + liveUrl 实测 |
+| 5 | `/` 308 到 `/apps/hello` 尾斜杠归一化 | curl 复核加 `-L` |
+| 6 | github.com:443 从工作区不可达（3 次重试 75s 超时） | commit 留本地分支不丢；先走平台 API（localhost）回写再补推 |
+| 7 | 碰撞余量不算就摆点 → 传送收集断言假失败 | 半宽+半径先算可达包络，摆点落在 clamp 边界内 |
+| 8 | spec 数值与实现默认值漂移 | spec 数值落成默认值或 TUNING 初值，README 记口径 |
+| 9 | 导出配置留到部署棒现场发明 | scaffold 棒按上一作先例补 preset + .gitignore 豁免 + 产物入库 |
+| 10 | 根壳残留上一游戏（单游戏位惯例） | 部署前 grep 旧游戏名清残留，apphost.toml 三键核对 |
+
+## 八、关联知识与权威来源
+
+- Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路总论（oak-key）：27407691-bcf8-4e73-b686-1bb8df684e5c
+- game-9 单游戏部署先例与调参桥 §3C：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 移动端触屏虚拟摇杆与 AudioContext 解锁规范：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- MyRD 平台真实仓库结构地图：b07a928a-414b-4d48-9535-5b6d6cc859ae
+- 仓库内权威文件（本仓可直接复用）：`games/hello/{verify.sh,export_presets.cfg,tests/smoke.gd,autoload/game_state.gd}`、`docs/playtest/hello-playtest-blocked.md`、`std-skills/godot-game-dev/scripts/`、`.myrd/routines.yaml`
+- 平台产物链：requirement=cmuqk7luz002am9bfmmkouw9v → design_spec=cmuqkaypy002hm9bf3wnk1k26 → hosted_app=cmuqk3huq001km9bf5ejp7tdg → workflow run=cmuqkb8xl002nm9bf9pz8hw61（/workflows/cmuqk3j35001qm9bfsdw4xn8d/runs/cmuqkb8xl002nm9bf9pz8hw61）→ 线上复核 assign_agent=cmto42pg60004m9aq7jczszhy
+
+## 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+# 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+> **文档定位**：固化 game-8 v2 轮手感调优的**具体数值（前后对照）**、godot-smoke 门禁表现、线上链路诊断结论与**可照抄的复测方法**，形成「手感类反馈（再大一点 / 再慢一点）」的**可复用增量调参基线**——后续同类反馈直接对照本文 §五 playbook 执行，不必重新勘探。
+> **权威基准**：需求《牛牛打游戏 game-8 · v2 手感调优：牛牛体型放大、移动速度下调》（`cmuqmej89000ym9gg6mom93o0`）；策划案 v1 设计唯一来源（doc `80b9c193-6807-43e4-b2b0-5789f2d9e35b`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）；收口依赖清单（doc `943eb5eb-0949-43fe-b939-83cf171af2a3`）。
+> **实现基线**：部署分支 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`；数值提交 `3a396355`（feat v2 手感调优）→ 产物重导出 `1089e4b` → 诊断报告 `1afec443`（`games/game-8/docs/v2-liveurl-diagnosis.md`，docs-only）；线上部署 = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`。
+> **本文数字全部为一手实测值**（git diff 实录 / curl 取证 / 线上 pck 自跑门禁），非估算。
+
+## 一、v2 数值基线（前后对照，唯一落账）
+
+| 声明键 | v1 默认 | v2 落账 | 需求量化区间 | 实际占比 | TUNING_META 钳制 |
+|---|---|---|---|---|---|
+| `PLAYER_SCALE` | 1.0 | **1.4** | 1.3~1.5× 整体放大 | 1.4× | min 0.5 / max 2.0 / step 0.05 |
+| `PLAYER_SPEED` | 220.0 px/s | **145.0 px/s** | v1 的 60~70% | **65.9%** | min 60 / max 300 / step 5 |
+
+- **唯一落账位置**：`games/game-8/autoload/game_state.gd` 数值区（v2 HEAD 实测：`var PLAYER_SCALE: float = 1.4` / `var PLAYER_SPEED: float = 145.0`）。⚠️ 策划案 v1 写的路径是 `scripts/game_state.gd`，**实际权威路径是 `autoload/game_state.gd`**（scripts/ 下并无此文件），后续引用以本文为准。
+- **接线方式**（`scripts/player.gd`）：`_apply_tuned_scale()` 把 `PLAYER_SCALE` 以**根节点 uniform scale** 应用（`is_equal_approx` 脏检查，滑杆改动下一物理帧生效），同步作用于视觉精灵、`CollisionShape2D` 碰撞体与 `PickupArea/PickupShape` 判定体；`velocity = direction * GameState.PLAYER_SPEED` 每物理帧读声明键。
+- **判定几何联动（容易算错的口径，钉死）**：`player.tscn` PickupShape 本体半径 22px → v2 缩放后 **30.8px**；收集物本体半径 14px（`collectible.tscn`）；**触发距离（圆心距）= 30.8 + 14 = 44.8px**（v1 为 22+14=36px）。刷点安全间距常量 96px 未动 → 余量从 96/36 ≈ **2.67×** 收窄到 96/44.8 ≈ **2.14×**，仍满足「重开不贴脸白捡」。commit `3a396355` 提交信息里的「判定半径 44.8px」即此**触发距离**口径，不是 PickupShape 本体半径，别混淆。
+
+## 二、godot-smoke 门禁表现（v2 断言三件套 + 全链路复跑）
+
+### 2.1 门禁复跑结果（本地与 preHook 同源，全绿）
+| 门禁步 | 结果 |
+|---|---|
+| resolve-godot.sh | exit 0，Godot **4.3.stable.official.77dcf97d8** |
+| preflight.py | **PREFLIGHT: PASS**（13 类前置一致性检查、40 个工程文件，exit 0） |
+| smoke.sh（240 帧预算） | **GODOT_SMOKE: PASS**（exit 0、零 SCRIPT ERROR） |
+| input-fuzz.sh | **GODOT_FUZZ: PASS**（seed=20260913，6 批次 239 帧，exit 0） |
+| playtest.sh | **脚本缺失**（模板仓库未预置，D2 依赖 / bug `cmuktchmy000km97z6kj3r2ro` Bug1），维持 blocked、不代写不伪造 |
+
+### 2.2 smoke.gd 新增 v2 手感断言三件套（真实机判，含 FAIL 路径，约 L423-435 `_assert_v2_tuning`）
+1. **倍率区间**：`PLAYER_SCALE ∈ [V2_SCALE_MIN=1.3, V2_SCALE_MAX=1.5]`，违例 FAIL 签名「v2 手感断言 FAIL：体型倍率 %.2f 不在 %.1f~%.1f 区间」；
+2. **移速区间**：`PLAYER_SPEED ∈ [V2_SPEED_MIN=V1_SPEED×0.6=132.0, V2_SPEED_MAX=V1_SPEED×0.7=154.0]`，FAIL 签名「移速 %.1fpx/s 不在 v1 默认 %.0f 的 60%%~70%% 区间」；
+3. **接线集成断言** `_assert_node_scaled`：Player 根节点、`CollisionShape2D`、`PickupArea/PickupShape` 三节点的全局缩放必须都等于数值区 `PLAYER_SCALE`（与难度梯度 SpawnTimer 断言同口径，防「数值键写了但没接上」）。
+
+方向符号断言（A/← 后 position.x 减小、D/→ 后增大）与 50 连击判定一致性、难度梯度、过期回收、胜负四分支、一键重开、持久化等既有契约**全部保留不动且继续通过**——玩法零回退。
+
+### 2.3 可复用结论：断言区间与需求区间硬耦合
+smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的。后续若要把数值调**跨出**这个区间，必须**三处同步**：smoke.gd 常量、需求区间条款、策划案 revisions 数值区——否则门禁会以清晰签名 FAIL（这是门禁在强制「数值变更须先改需求基线」的设计行为，**不是误报，不许放松断言来绕**）。
+
+## 三、线上链路诊断结论（liveUrl 端到端实测，2026-10-02）
+
+**结论先行**：✅ v2 已在线上生效且量化达标——部署产物自跑门禁全绿（含 v2 手感基线机判），线上资产与仓库导出逐字节一致，**无需修复、无需回滚**。
+
+1. **部署元数据**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`）；当前部署 **version 5 `cmuqny37h001ficf0mpmr71mv` status=running**；gitRef=`myrd/games-goal-cmujpml1e006rm99i9hc33huu`（未落 main ✓）；commit `1089e4b`（其上仅 1 个 docs 提交，代码零差异）；v4=`cmuqnx9v6001dicf0fmfryxcz` superseded（重试冗余但无害）。
+2. **公网链路**：`GET /apps/game-8/health` → 200 `{"ok":true,"app":"game-8","game":"牛牛打游戏","assets":"lazy/object-storage"}`；`/apps/game-8/` → 308 规范化跳转 → 200；`/gw/health` → 200（网关透传正常）；壳页 11,626B，`__GAME_TUNING__` 调参桥 ×2、`__audioDebug` 音频手势解锁器、资产全走相对路径 `fetch(BASE_PATH + 'api/public/assets/' + name)` 三契约在位。
+3. **资产文本通道**：`index.pck` base64 3,333,340B → 解码 gzip 2,513,040B；`index.wasm` base64 **10,696,408B** → 解码 35,376,909B（与门禁经验 v6 一手实测值一致）。
+4. **逐字节一致（无版本漂移）**：本地导出（部署 commit 工作树）与线上对象存储拉回解码产物 sha256 完全一致——pck `5f556ad9adf47579cb38a1fd8f7549e33b478b56cd4b3b5f112346281d699e25`；wasm `fe5cebc590758c10bc4469be5a591e28edbde5ec8f458f21baeb83db50d028b9`。
+5. **最高等级证据——部署产物自跑门禁**：`godot --headless --main-pack <线上pck> --quit-after 240 res://tests/smoke.tscn` → exit 0、零 SCRIPT ERROR、`GODOT_SMOKE: PASS`，v2 手感基线机判全过（1.4∈[1.3,1.5]，145∈[132,154]）——「牛牛变大变慢」是**产物运行期实测**，不是代码推断。
+
+## 四、复测方法（照抄即用）
+
+1. **公网探测**：`curl -s <liveUrl>/apps/game-8/health`（期望 200 + ok:true）；`curl -sI <liveUrl>/apps/game-8/`（期望 308→200）；壳页 HTML grep `__GAME_TUNING__` / `__audioDebug`。
+2. **资产一致性**：`GET /api/public/assets/index.pck`（和 index.wasm）→ base64 解码 → gunzip → `shasum -a 256`，对照 §三.4 的两个哈希；不一致即版本漂移，先查部署 commit 再谈手感。
+3. **手感数值机判**：`godot --headless --main-pack <线上或本地 index.pck> --quit-after 240 res://tests/smoke.tscn`，判定三条件（`GODOT_SMOKE: PASS` + exit 0 + 零 SCRIPT ERROR），签名中应含「v2手感基线(体型1.3~1.5x·移速60~70%)」字样。
+4. **数值速查**：游戏内调参面板或壳页 `?tuning=1` URL 直接查看当前声明键值；或读 `games/game-8/autoload/game_state.gd` 数值区。
+5. **环境备注**：诊断沙箱对 github.com:443 直连超时（`Recv failure`），推送改走 `ssh.github.com:443` 通道——后续同环境取证直接用此通道，别反复试直连。
+
+## 五、「再大一点 / 再慢一点」类反馈的增量调参 playbook（可复用基线）
+
+**标准链路（全七步，禁止散点改代码对数值）**：
+调参入口（游戏内面板滑杆即时生效 / 壳页 `?tuning=` URL）→ 确定目标声明键与新值 → **经策划案 revisions 回写 `spec.numeric`**（doc `80b9c193-…`，spec 载体即该知识文档）→ 改 `autoload/game_state.gd` 数值区 → 复跑 godot-smoke 门禁 → 重导出 Web 产物并部署（gitRef 必须是 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`）→ 按本文 §四产物自跑门禁复测。
+
+**建议步长与边界**：
+| 反馈 | 动作 | 步长建议 | 边界 |
+|---|---|---|---|
+| 再大一点 | `PLAYER_SCALE` ↑ | +0.05~0.1 / 档 | 钳制 [0.5, 2.0]；跨出 [1.3,1.5] 须按 §2.3 三处同步 |
+| 再小一点 | `PLAYER_SCALE` ↓ | −0.05~0.1 / 档 | 同上；低于 1.3 同样触发门禁 FAIL |
+| 再慢一点 | `PLAYER_SPEED` ↓ | −5~15 / 档 | 钳制 [60, 300]；跨出 [132,154] 须三处同步 |
+| 再快一点 | `PLAYER_SPEED` ↑ | +5~15 / 档 | 同上 |
+
+**每次调整必做的三项联动复核**：
+1. **断言区间一致性**（§2.3）：数值是否跨出 smoke 常量带；
+2. **判定几何余量**：体型↑ → 触发距离 = 22×scale + 14 线性放大 → 96px 刷点间距余量 = 96/触发距离 收窄；低于 2× 时须复核刷点安全间距常量是否要同步上调（公平性属门禁议题，不许靠放松断言解决）；
+3. **达成余量**：移速↓ → 单位时间可达刷点数↓ → 60s/20 目标的通关可达性须复核（跑 50 连击一致性 + 全链路一条龙断言兜底；v2 @145px/s 已实测可通关）。
+
+**回滚口径**：v1 = `PLAYER_SCALE 1.0` / `PLAYER_SPEED 220.0`，两键均可在调参面板或 `?tuning=` URL 直接调回，代码零改动。
+
+**主观手感的最终裁决**：数值区间内「像不像用户要的手感」机器判不了，仍以 D3 用户试玩结论为准（入口 `…/apps/game-8?tuning=1` 已可用）；未决依赖 D1（iOS Safari 真机）/ D2（playtest.sh 模板资产）见收口清单 doc `943eb5eb-…`。
+
+**来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
+
+
+## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+# game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+> 来源：需求《测试连点防重的极简计数页（game-12）》（id=cmur8x93r0016icbsd90s6e60，goal=cmur8pnhn000kicbsvl0eoqx6）走完「录入需求 → 判定规则调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-12`（Godot 4.3.stable），分支 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`（scaffold e055e4f → implement ff779d0 → deploy c54fcc9/078f761/e5b292e → playtest 1f7a4a3）。线上：https://leomac-studio.tail49399e.ts.net/apps/game-12/（/health 200 `{"ok":true,"app":"game-12"}`，deploymentId=cmurba8yd001vicbsfdl79x8l，部署 commit c54fcc9）。门禁终态：**godot-smoke 全绿 + mobile-web-smoke PASS 10/10（实测 FPS 39）**，playtest 棒复跑双门禁结论一致。
+>
+> 本文只写 game-12 的增量结论：防重语义选型与实现契约、双门禁通过路径、踩坑清单与复用清单。门禁三层体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-9 增量见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be；移动端触屏摇杆与 AudioContext 解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；防重判定规则 R1–R6 / 事件契约 C1–C4 调研全文见项目文档库 id=8345388c-cf30-4d7c-8413-39ccd7e65887。互为补充、不重复。
+
+## 一、防重语义选型：只有「固定节流（采纳即锚定、拦截不延窗）」能同时过验收 2 和 3
+
+| 方案 | 机制 | 300ms 内连点 5 次 | 窗口后恢复累加 | 结论 |
+| --- | --- | --- | --- | --- |
+| **固定节流（首击入窗）** | 首击计数并锚定窗口；窗口内后续点击全拦且**不更新锚点** | 仅 +1 | 正常 | 采用 |
+| 防抖（末击重启窗口） | 每次点击都重置窗口，静默期满才计 | 0 次 | — | 违背验收 2 |
+| 首尾折叠 | 窗口首末各计一次 | +2 | — | 违背验收 2 |
+
+**最易写错的一行**：被拦截的点击不得触碰窗口锚点 `_last_count_ms`。一旦拦截分支也更新它，节流就退化成防抖——持续点击下计数永远不涨，验收 3 永远不过。
+
+实现（`games/game-12/autoload/game_state.gd`，时间注入纯函数，核心约 15 行）：
+
+```gdscript
+const TARGET_COUNT: int = 10
+const DEBOUNCE_MS: int = 300
+var _last_count_ms: int = -DEBOUNCE_MS   # 初值 = -窗口 → 开局首击立即有效
+
+func try_count(now_ms: int) -> bool:
+    if state != State.PLAYING:
+        return false                      # 已胜：忽略，不报错
+    if now_ms - _last_count_ms < DEBOUNCE_MS:
+        click_rejected.emit(DEBOUNCE_MS - (now_ms - _last_count_ms))
+        return false                      # 拦截：只发反馈信号，不动锚点
+    _last_count_ms = now_ms
+    count += 1
+    count_changed.emit(count)
+    if count >= TARGET_COUNT:
+        state = State.WON
+        state_changed.emit(state)
+    return true
+
+func reset() -> void:
+    count = 0
+    state = State.PLAYING
+    _last_count_ms = -DEBOUNCE_MS         # 重开同步清防重锚点 → 首击立即有效
+```
+
+三个不能省的细节：
+1. `_last_count_ms` 初值取 `-DEBOUNCE_MS`，否则开局第一击被吞（验收 1 首点即错）。
+2. `reset()` 必须同时清防重锚点——「刷新/重开无残留」包含防重状态本身。
+3. 拦截不静默：`click_rejected(remaining_ms)` 把「被吞的点击」变成可感知反馈（按钮闪红 + 状态栏「连点已拦截，还需 Nms」）。且关键反馈不能被高频更新覆盖——状态栏曾把指针坐标与拦截提示混在一行，坐标每物理帧刷新把「还需 Nms」冲掉，拆成反馈线/指针线两行才保住。
+
+时间注入是机判前提：`try_count(now_ms)` 不读时钟 → 无头冒烟可用合成时间戳逐毫秒断言（完全确定、与帧率零耦合）；只有真实点击路径才走 `Time.get_ticks_msec()`。
+
+## 二、单源单相：三个入口汇一个判定点，防「一次触碰计两次」
+
+Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`（调研已核实）→ 移动端一次触碰可能产生 touch/mouse 双事件，再加键盘空格/回车，同一「点击」有四个来源。game-12 的收敛方式：
+- `CountButton.pressed`（鼠标/触摸）与 `_unhandled_input("confirm")`（键盘/动作）都只调唯一入口 `_attempt_count()` → `GameState.try_count(...)`。防重判定只在 GameState 一处，不可能被绕过。
+- `TouchConfirmButton`（TouchScreenButton）**不直接调游戏逻辑**，而是 `Input.parse_input_event(InputEventAction("confirm"))` 注入动作 → 触摸与键盘走完全相同路径（顺带获得桌面端自动不响应的免费屏蔽）。热区用 shape 圆（半径 44）而非位图。
+
+## 三、把「防重」机判成确定性断言（附负例验证纪律）
+
+冒烟相位设计（`games/game-12/tests/smoke.gd`）：
+- **合成时间戳断言防重**：t0 有效；t0+100/200/299ms 连点全拦、只发 click_rejected、count 不变；跨窗后再点正常 +1。
+- **真实路径另测**：真实点击受真窗口约束 → 相位间显式等真实时间跨窗，并设帧数上限守卫（60fps 约 2s，超限报 `Engine.max_fps` 异常而非挂死）。
+- **噪声后复位**：乱键相位可能真触发计数/拦截，且末次乱键可能贴着 confirm 注入点不足 300ms → 进断言前 `GameState.reset()` 清锚点，消灭偶发失败。
+- **每条断言做负例验证**（证明会真 FAIL，不是永真）：热区 44→10、宽高比 keep→expand、脉冲阈值抬到 1.0，三次均如预期 FAIL。
+
+两个「静默漏判」陷阱（负例不触发才发现）：
+1. 静态几何断言放 `_ready()`：此时 `Control.size` 恒为 0，整段断言被静默跳过 → 移到第一物理帧再读。
+2. Button 有主题最小尺寸保护：`offset_right=110` 实际 size 被钳到 115，44px 负例测不出来 → 换 TouchScreenButton 圆形热区做负例。
+
+极简静止页的门禁特异问题：mobile 门禁「画面在动」检查会把完全静止的页面误判为渲染冻结。解法：+1 按钮加待机呼吸脉冲（scale 1.00→1.06 / 0.9s，实测极差 0.060 ≥ 阈值 0.02），一举两得——既是移动端可点示能，又是确定性的非零帧差证据。缩放绕 `pivot_offset`（控件中心），否则动画往右下飘。
+
+画布口径：调研建议设计宽 375 + Adaptive；实现落成 720×1280 竖屏 + `canvas_items`+`keep`（+1 按钮 560×240，375 宽实机约 291px），同样满足无横滚与 ≥44px。机判锚点是**宽高比策略必须 keep**（expand 会被冒烟断言拦，负例已验证）。
+
+## 四、Godot Web 双门禁：分工、顺序与标记辨析
+
+| 门禁 | 判定链 | 拦什么 | game-12 实测 |
+| --- | --- | --- | --- |
+| **godot-smoke** | resolve-godot → preflight.py（13 类静态一致性）→ headless smoke（`GODOT_SMOKE_FRAMES=240`，断言退出码 0 + `GODOT_SMOKE: PASS` 标记 + 日志无 SCRIPT ERROR）→ input-fuzz（seed=20260913，6 批/239 帧） | 游戏本体「跑得动且玩得动」（含防重/恢复/胜负/重开/触控目标/拉伸契约断言） | 四步全 exit 0 |
+| **mobile-web-smoke** | mobile-web-smoke.mjs --url <liveUrl>（headless Chrome 390×844 iPhone 仿真）10 项：网络全通/console 零错/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约（__audioDebug）/无横溢（scrollWidth=390）/FPS≥8（实测 39） | 部署后真实链路上的移动端可玩性 | PASS 10/10 |
+
+三条纪律：
+1. **mobile-web-smoke 必须打部署后的 liveUrl**——本地静态伺服 export/web 只能当预检（implement 棒做过 10 项预检），不能替代正式门禁：M1 网关、对象存储资产通道、壳契约只在真实链路暴露。所以它位于 deploy 之后，是产物验证而非 implement 棒门禁。
+2. **标记辨析**：判定脚本 stdout 是小写 `godot-smoke: PASS`，引擎日志里才是大写 `GODOT_SMOKE: PASS`（smoke.sh 内部 grep 大写标记后才自产小写行）。只 tail 游戏日志看不到大写标记不等于失败——先分清两层标记再下结论。
+3. **证据随仓库归档**：`games/game-12/qa/mobile/report.json` + phase-load/tap/joystick 三张截图入库，供复跑比对。
+
+## 五、部署链五个真实踩坑（每个都在本目标发生过）
+
+1. **`.gitignore` 里 `/export/` 不删 = 部署后全 404**：apphost.toml 的 `assets_dir` 指向 `games/game-12/export/web`，导出产物不入库则 wasm/pck 上线即丢。导出产物必须入库（37MB wasm 走底座 A「资产出 bundle」+ 对象存储懒加载 + `/api/public/assets/` b64 文本通道，总论见 27407691）。
+2. **apphost.toml 沿用上一游戏**：原值指向 candy-crush 的 `games/game/export/web`；构建管线按 gitRef 读它，不改会打包错应用 → `name`/`assets_dir` 随游戏改是 deploy 棒第一查。
+3. **gitRef 必须是目标分支不是 main**：本次 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`。注意本地工作区克隆出的分支名可能与远端目标分支不同名同指针（`myrd/game-12-goal-…` vs `myrd/games-goal-…`）→ 部署前 fetch + 显式切到目标分支再读 apphost/导出。
+4. **壳页三件套缺一不可**（`server/src/game-page.ts` / `games/game-12/export/web-shell.html`）：品牌文案适配（曾残留糖果粉碎传奇文案）；§3C 调参桥（引擎加载前解析 `?tuning=` → `window.__GAME_TUNING__`，只认对象形态、非法 JSON 静默忽略——game-12 缺，补约 8 行）；音频手势解锁器 + `window.__audioDebug`（即 mobile 门禁「音频解锁契约」的机判对象）。壳页另配 `overflow:hidden + touch-action:none` + `user-scalable=no`：彻底禁双击缩放/滚动，快速二连点不被浏览器手势吞掉造成防重误判（比调研建议的 `touch-action: manipulation` 更强）。
+5. **PATCH 目标 artifacts 是整体替换数组**：回写产物必须 get→append→写回（playtest 棒 3→4 条、既有条目原样保留 + 回读校验），直接 put 会抹掉前序产物。
+
+调参语义澄清：`TUNING_META` 未声明时 `?tuning=1` 是**安全 no-op**（正常进游戏、忽略键）。game-12 有意不把 `DEBOUNCE_MS=300` 做成可调——它是需求验收项本身，spec 是唯一事实源。要开放浏览器内调参需下一轮：spec.numeric 声明键 → TUNING_META + tuning_panel.gd + 冒烟断言 → 重导出重部署重跑 mobile 门禁。
+
+## 六、macOS 自带 bash 3.2 的全角括号坑
+
+`verify.sh` 里 `$FRAMES）`（全角右括号紧贴变量名）在 macOS bash 3.2 某些 locale 下把多字节字符并入变量名 → `FRAMES: unbound variable`，而上一行 echo 还能正常展开，极难定位。写法统一 `${FRAMES}`，用 `bash -x` 抓现行。game-12 修复后 verify.sh 端到端全绿（preflight/smoke/fuzz 全 exit 0）。
+
+## 七、如实上报的缺口（未绕过、未伪造）
+
+1. **playtest.sh 不在模板仓库**（`std-skills/godot-game-dev/scripts/` 同目录 9 个判定/驱动脚本中独缺它）：各节点均未自造等价判定器、未伪造 `GODOT_PLAYTEST: PASS`；`.myrd/routines.yaml` 两条 routine（godot-smoke / mobile-web-smoke）均不引用它 → 不阻塞双门禁，缺口随产物 detail 上报运维补资产。
+2. **真机抽查未做**（本环境建不了 iOS 会话）：mobile-web-smoke 是 headless Chrome 仿真，触摸结论的边界是仿真环境；真机验证留待用户试玩回填。
+3. **试玩结论只能来自用户**：playtest_kit 已交付（`games/game-12/qa/playtest-kit.md`，试玩指引 + 反馈对照表 + 四问量表），量表待回填，未代填任何「好玩/通过」结论；未收到用户调参 URL 前，无 spec revisions/approve 调用。
+
+## 八、复用清单（后续点击类小游戏直接抄）
+
+1. 防重抄 `try_count(now_ms)` 签名：时间注入纯函数 + 初值 `-DEBOUNCE_MS` + 拦截不动锚点 + reset 清锚点 + 拦截发 remaining_ms。
+2. 输入抄「单源单相」：所有入口 → 唯一 `_attempt_count()`；TouchScreenButton 注入 InputEventAction 而非直调逻辑。
+3. 断言抄四件套：合成时间断言 + 真实路径跨窗等待 + 噪声后 reset + 每条断言负例验证；几何断言放第一物理帧，44px 负例用 TouchScreenButton 热区。
+4. 静止页记得待机脉冲（≥0.02 极差同时换「画面在动」绿与可点示能）。
+5. 部署抄「五查」：gitignore 的 /export/、apphost.toml 指向、gitRef=目标分支、壳三件套（文案/调参桥/音频解锁）、artifacts 回写 get→append→写回。
+
+关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
+
+## 沉淀 game-14 Godot Web 导出与移动端门禁经验
+
+> 来源：goal cmusp1rab0028ic7q9shcdzyl（项目 cmusp1ra00022ic7qnk18nofm）「小游戏工坊 · game-14」工作流执行沉淀。上游输入：需求《game-14 太空飞船躲陨石捡金币》（cmusphfbp0062ic7qrxlt2nk4）、GameDesignSpec v1（cmuspm7sm006uic7qzrbqyilp，approved）。工作流 run cmuspmlex0072ic7qnjiqxmpc **真实结局 = failed，且失败于工作区准备阶段，四个节点全部 pending**。本卡如实记录本轮真实结论（失败模式与补救路径），并把 game-14 真正进入开发后要带上的导出/门禁契约收拢成清单（引用既有基线、不重复）。**本轮没有产生任何 game-14 代码、导出产物、门禁判定或部署事实——请勿把本卡第 4~6 节的复用清单误读为 game-14 实测数据。**
+
+## 一、本轮真实结局：准备阶段 git clone 失败，门禁与导出根本未执行
+
+- 时间线：run 创建 2026-10-03T18:12:57Z → failed 2026-10-03T18:15:25Z（存活 2 分 28 秒）；prepSteps 仅「解析模型配置 3ms」；失败点 = preparationPhase「正在准备代码工作区（克隆仓库、拉取最新代码）」。
+- run.result.error 逐字：`git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmusp1ra00022ic7qnk18nofm/run-cmuspmlex0072ic7qnjiqxmpc'... fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75009 ms: Couldn't connect to server`。
+- 节点状态：脚手架 / 实现玩法 / 导出并部署 / 试玩验收 全部 pending；implement 与 deploy 的 godot-smoke preHook、playtest 的 mobile-web-smoke preHook 也均 pending——**门禁一次都没跑过，不存在「门禁打回」**。
+- 复盘纪律：「已启动 ≠ 已成功」在本轮的具体形态就是「run 状态 failed + 节点全 pending」；判定真实结局唯一依据 run 状态与 run.result.error，禁止凭预期脑补「门禁打到第几轮」。
+
+## 二、根因分类与补救：环境不可用 ≠ 代码缺陷，正确动作是重跑而非改代码
+
+- 根因：github.com:443 连接 75 秒超时（connect 阶段即失败，非认证/仓库问题），属瞬时网络故障——与 godot-smoke 退出码 2「环境不可用」同层语义：**禁止为它改游戏代码，更不允许宣称门禁失败**。
+- 恢复复核（2026-10-04）：`curl https://github.com` → 200（0.59s）；`git ls-remote https://github.com/hl3w22bupt/myrd-playground.git` 正常返回分支列表 → 复跑条件已具备。
+- 补救动作：`POST /api/v1/workflows/runs/cmuspmlex0072ic7qnjiqxmpc/rerun`（平台手册 rerun 入口）。DAG 输入不变：需求 cmusphfbp0062ic7qrxlt2nk4 + spec cmuspm7sm006uic7qzrbqyilp（v1 approved）仍是唯一权威。
+- 若同签名（clone exit 128 / 443 connect timeout）复现：先做宿主机连通性探针（curl github.com + git ls-remote），如实按「环境不可用」上报等待恢复；不得降级为纸面交付，也不得空转烧修复预算。
+
+## 三、game-14 工坊流水线契约（经本轮 run 定义实测核实）
+
+- 四棒 DAG：脚手架 scaffold → 实现玩法 implement → 导出并部署 deploy → 试玩验收 playtest；仓库 github.com/hl3w22bupt/myrd-playground（game-14 预期落位 `games/game-14`，以 scaffold 实际产物为准）。
+- 门禁挂点：**implement、deploy 两棒都挂 godot-smoke；playtest 挂 mobile-web-smoke**。routine 均 gate:false、由 preHook 显式引用；`{{liveUrl}}` 无默认值 = fail-closed（不传就报错，不会静默跳过门禁）；`{{gamePath}}` 必须经 preHookParams 显式传参（默认值指向不存在工程的坑见 27407691 §1.3）。
+- 判定资产唯一来源：仓库 `std-skills/godot-game-dev/scripts/`（mobile-web-smoke 判定脚本 mobile-web-smoke.mjs + 负例自测 mobile_smoke_selftest.mjs + routine 片段模板已随 commit 4a8e4b76 落地）；被检工程不得自造判定器，scaffold 只校验不自造。
+
+## 四、game-14 验收标准 → 门禁断言映射（approved spec v1 的可机判数值）
+
+| 验收项 | spec v1 锚点 | 机判断言落法 |
+| --- | --- | --- |
+| 难度阶梯 | 陨石生成间隔 950ms 逐档递减至封顶 430ms、下落速度 130px/s 逐档递增至封顶 270px/s，共 5 档（每 100 分一档） | 冒烟分相位读各档生成间隔/单位位移帧数，断言逐档单调变化且封顶后不再变化；档位边界按得分 100/200/300/400 推导写进断言注释 |
+| 状态机与持久化 | 开始（含操作说明）/进行中/暂停恢复/游戏结束/一键重开五状态；最高分 localStorage 键 `game14.highScore` | 状态标志断言；重开后断言分数清零而最高分保留；localStorage 属线上行为，由 mobile-web-smoke 打 liveUrl 验证 |
+| 操控与边界 | 键盘 ←→/A/D（含上下）+ 触摸拖动，飞船不可越出画布 | E-08 纪律：按住方向键测位移与动作注入分帧做；越界 clamp 断言；触摸拖动必须真实改变飞船目标位置（mobile 门禁 touch-response 预修，见 §六） |
+| 计分与生命 | 拾金币 +10 实时显示；撞陨石 −1 命（共 3 命），命尽进游戏结束页并展示本局得分 + 历史最高分 | 拾取/碰撞事件计数断言；连续碰撞或生命归零路径必须可达并断言 GAME_OVER |
+| 视听契约 | 三层星空视差滚动；碰撞爆炸闪烁 + 300ms 震屏 + 1.2s 无敌闪烁；+10 飘分 | 事件标志/帧差断言；无敌期 = 「碰撞不再扣命」的断言窗口 |
+| 音频契约 | coin-pickup / meteor-explosion / game-over 三 SFX 可编程触发；M 键静音且不影响逻辑 | headless 侧编程触发断言；AudioContext 解锁契约（__audioDebug）归 mobile-web-smoke 第 8 项 |
+| 性能 | 连续游玩 60s 帧率 ≥ 30fps；页面无控制台报错 | **阈值辨析：mobile-web-smoke 的 FPS≥8 是底线门禁，≥30fps 是需求验收线——门禁全绿 ≠ 验收达标，验收仍按 spec 执行** |
+
+## 五、复用基线指针（执行时直接带上，本卡不重复其内容）
+
+- **27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 总论）**：Godot 4.3 Web 导出参数基线（`variant/thread_support=false` 免 COOP/COEP、`canvas_resize_policy=2`、中文必须 theme/custom_font=P13、导出 7 件套与 wasm≈35MB 量级）；AppHost 部署契约（**一游戏一清单**——game-14 必须 `name="game-14"`、`assets_dir="games/game-14/export/web"`，绝不沿用他游戏 apphost.toml；部署 gitRef 必须是部署分支 `myrd/games-goal-<goalId>` 不是 main；`/export/` 产物必须入库否则上线全 404；M1 网关拦二进制 → gzip+b64 文本回传；壳内资源全走相对路径）；godot-smoke 三层门禁与退出码语义 0/1/2/3；error-signatures 修复循环纪律；部署终态独立复核四步。
+- **00314649-c4d2-407c-871b-62f7de91b07d（game-12）**：mobile-web-smoke 10 项明细（网络/console/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约/无横溢/FPS≥8）与「必须打部署后 liveUrl」纪律（本地静态伺服只能当预检）；标记辨析（判定脚本 stdout 小写 `godot-smoke: PASS` vs 引擎日志大写 `GODOT_SMOKE: PASS`）；证据随仓归档（`games/<game>/qa/mobile/report.json` + phase 截图）。
+- **82e419bb-b641-4b5e-bb58-d8b9633169ca**：移动端触屏虚拟摇杆与 AudioContext 解锁三件套（首手势解锁 + 解锁前记账 + 退后台回来再解锁），壳页与游戏侧都要进。
+- **36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）/ 78180e88-6486-404e-9265-e315e0da3c66（hello）**：同系列工程结构、模板与门禁增量结论。
+
+## 六、mobile-web-smoke 已知失败图谱（5 款游戏实测 → game-14 预修清单）
+
+仓库 mobile-gate 系列实测 verdict（commits 11957bd3~585db60c）：game-3 疾风忍者跑 **PASS**（十项全绿，tap 触发跳跃实证触摸驱动玩法）；game-2 星尘收集者 FAIL（console Godot 缺 cfg 告警 + tap 后零帧差）；game-4 光路谜阵 FAIL（tap 落空格零帧差，探针坐标与 letterbox 棋盘错位）；game-9 推箱子 FAIL（探针落点错位，摇杆实际 CSS(44,502)）；game-10 天天酷跑 FAIL（tap 落横带无响应，尚需探针区分「点按开始未实现」与「落点错位」）。
+
+- 主失败源集中在 **touch-response**，两类根因：①游戏触摸未真正接入玩法状态（UI 自称支持触摸但点按无效）；②探针坐标与画布 letterbox/控件 CSS 实际位置错位（屏幕坐标 ≠ 游戏坐标）。
+- game-14 预修清单：触摸拖动直接改飞船目标位置并与键盘同路径（game-12「单源单相」范式：多输入源汇一个判定入口）；可交互热区 ≥44px，避免依赖 letterbox 偏移的绝对坐标；开始页不要做成纯静止层（会触发「画面在动」误判，game-12 用待机呼吸脉冲拿到确定性非零帧差）；音频解锁契约随壳页一并实现。
+- 证据纪律：verdict 逐字进 commit message + report.json + phase-load/tap/joystick 三截图入库，供复跑比对。
+
+## 七、关联知识与权威来源
+
+- 知识卡：27407691-bcf8-4e73-b686-1bb8df684e5c（导出+门禁+AppHost 总论）、00314649-c4d2-407c-871b-62f7de91b07d（双门禁与 mobile-web-smoke 10 项）、82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏/音频解锁）、36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）、78180e88-6486-404e-9265-e315e0da3c66（hello 工坊）、b07a928a-414b-4d48-9535-5b6d6cc859ae（平台仓库结构与路径陷阱）。
+- 仓库权威文件：`std-skills/godot-game-dev/scripts/{smoke.sh,preflight.py,input-fuzz.sh,resolve-godot.sh,mobile-web-smoke.mjs,mobile_smoke_selftest.mjs}`、`std-skills/godot-game-dev/references/{godot-smoke-routine.md,mobile-smoke-routine.md,error-signatures.md}`、`.myrd/routines.yaml`。
+- 平台事实源：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`（rerun 入口、「已启动 ≠ 已成功」纪律）；工作流 spec 与需求以平台登记产物为准。
+
+
+## 沉淀知识：Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+# Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+> 来源：目标「森林收集水果限时赛」（goal=cmuspb558003tic7qwgyd02c2）的小游戏工坊流水线（workflow=cmuspb55m003xic7q9o18vjk2 v1，scaffold→implement→deploy→playtest）首轮执行（run=cmuspld10006ric7qup55soew，2026-10-03T18:12:00Z 起、18:14:30Z 判 failed）。固定参数：工程 games/60-2，功能分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2，AppHost cmuspb3xg003ric7q1ksya6c3（slug 60-2），liveUrl https://leomac-studio.tail49399e.ts.net/apps/60-2/（部署前即确定）。本文只写本轮实测增量：①双门禁在 60-2 的挂点与分工；②本次 run 的真实卡点——双门禁之前的第一堵墙；③一次「参数漂移」疑云的证伪过程；④知识沉淀节点自身的 API 事实。godot-smoke 三层门禁体系、打回修复签名表、AppHost 部署总论见关联知识（§八），不重复。
+
+## 一、结论速览
+
+| # | 要点 | 结论 | 依据 |
+| --- | --- | --- | --- |
+| 1 | 双门禁分工 | 工程门（godot-smoke，挂 implement 与 deploy 之前，判工程本体）×线上门（mobile-web-smoke，只挂 playtest 之前，判公网 liveUrl）——判定对象、执行环境、证据落点都不同，不可合并为一道 | 工作流定义逐节点核对 |
+| 2 | 本次失败层级 | run 级失败发生在**门禁之前**：工作区 git clone 连不上 github.com（443 端口 75s 连接超时），四个节点全部 pending，双门禁一次都没执行 | run.result.error 原文 |
+| 3 | 根因定性 | 环境阻塞，非代码/配置缺陷：github.com 从执行机**持续性**不可达（2026-10-03 run 失败 + 2026-10-04 复测 `curl -m 10 https://github.com` 仍超时，连接建立不了） | run 错误 + 本机复测 |
+| 4 | 重跑纪律 | 网络不通时重跑 run = 空烧：先 `curl -m 10 https://github.com` 验连通（10 秒成本），通了自己重跑（工作流定义无需改动），持续不通按「blocked 比空烧有用」上报运维（代理/镜像），禁止为绕过网络改仓库来源 | 本轮 2.5 分钟烧掉一次 run 的直接教训 |
+| 5 | 工作流定义健康度 | 60-2 四节点参数已逐一核对**全部正确**指向 games/60-2 / 60-2 分支 / 60-2 AppHost / 60-2 liveUrl，不存在「模板实例化只替换了首个节点」的漂移 | 8 个关键词 × 4 节点计数复核 |
+| 6 | 沉淀 API 事实 | 本部署**没有** `/api/v1/knowledge/search`（404）；等效做法与写入契约见 §七 | 本次实测 + 平台源码 src/routes/knowledge.ts |
+
+## 二、60-2 双门禁挂点与分工（逐节点实例核对）
+
+| 节点 | preHook | preHookParams | 判定对象 | 证据落点 |
+| --- | --- | --- | --- | --- |
+| scaffold | 无 | — | 资产存在性自检（门禁脚本/routines.yaml/模板，缺失→blocked） | 节点 detail |
+| implement | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（静态一致性 + 无头运行） | 门禁日志 |
+| deploy | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（部署前再拦一次，防止部署带病产物） | 门禁日志 |
+| playtest | mobile-web-smoke | gamePath=games/60-2, liveUrl=https://leomac-studio.tail49399e.ts.net/apps/60-2/ | **线上公网 liveUrl**（headless Chrome 移动仿真） | games/60-2/qa/mobile/（report.json + 分阶段截图） |
+
+要点展开：
+
+1. **工程门挂两道、线上门只挂一道，是有意设计**：godot-smoke 的判定对象是仓库内工程（preflight 静态 + headless 运行），所以在写代码（implement）和出产物（deploy）两处都要拦；mobile-web-smoke 的判定对象是已部署的线上地址，只有 playtest（试玩验收）消费它，且 liveUrl 在部署前就已锁定，preHook 可以在节点启动前先跑门禁、节点启动后直接读证据。
+2. **判定协议（与门禁同源，agent 本地自检命令完全一致）**：退出码 `0` 且日志含标记才算通过——`GODOT_SMOKE: PASS`（冒烟）/ `GODOT_FUZZ: PASS`（fuzz）/ `GODOT_PLAYTEST: PASS`（机器人试玩）；退出码 `2` = 环境不可用（装环境/上报，**禁止为过门禁改判定脚本或改松断言**）。
+3. **判定器独立性**：`preflight.py / smoke.sh / input-fuzz.sh / playtest.sh / resolve-godot.sh / mobile-web-smoke.mjs` 唯一合法来源是仓库 `std-skills/godot-game-dev/scripts/`（模板仓库预置）；平台注入的 `.myrd-platform/.claude/skills/godot-game-dev/` 只是阅读副本，不得当判定来源、不得现场改写、不得自造等价脚本——被检方自己写判定器，PASS 一文不值。缺任何一个 → status=blocked 上报（「模板仓库未预置门禁脚本：<文件名>；请运维补模板仓库」），**不要现场补**。
+4. **参数化必须显式传**：`.myrd/routines.yaml` 中 `godot-smoke` 与 `mobile-web-smoke` 的 `{{gamePath}}`/`{{liveUrl}}` 由工作流节点 preHookParams 按工程覆盖。仓库默认值指向别的工程——不传参要么报错、要么（更糟）静默测错工程给出假 PASS（坑实录见关联知识 27407691 §1.3）。
+5. **中文字体是 preflight P13 的拦截项**：Web 导出跑在浏览器沙箱里拿不到系统字体，模板自带 `assets/fonts/` 全局中文字体与 `project.godot` 的 `[gui] theme/custom_font` 配置必须原样保留；「有中文文案但无字体」直接被 P13 拦下。禁止为躲缺字把文案英化——那是字体缺失的症状，不是修复。
+
+## 三、本次 run 的真实卡点：双门禁之前的第一堵墙
+
+**时间线**：18:12:00 run 启动 → 引导阶段执行工作区 `git clone https://github.com/hl3w22bupt/myrd-playground.git` → 75 秒连接超时 → 18:14:30 run 判 failed。错误原文：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspb3xd003nic7qm25pu8si/run-cmuspld10006ric7qup55soew'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75003 ms: Couldn't connect to server
+```
+
+**为什么门禁体系没接住**：门禁全部挂在**节点**上（preHook），而 clone 是 run 引导步骤，发生在第一个节点之前。clone 失败的后果是：①直接置 run=failed（result.error），②四个节点永远 pending，③没有 reject 打回循环、没有 blocked 语义、没有证据落点——门禁体系（preflight/smoke/fuzz/playtest/mobile-web-smoke 六个判定器）覆盖的是「工程与线上」，不覆盖「工作区引导」这第 0 步。
+
+**连锁依赖链**（为什么这一断全断）：clone 可用 → 功能分支可推送 → AppHost 按 gitRef 拉取构建 → liveUrl 可访问 → mobile-web-smoke 有东西可测 → 试玩验收有地方可玩。第 0 依赖断了，双门禁与验收全部空转。
+
+**恢复路径（给下一轮执行，按序）**：
+
+1. 先验连通（成本 10 秒，避免空烧一次 2.5 分钟的 run）：`curl -s -o /dev/null -m 10 -w "%{http_code}" https://github.com`；
+2. 通了 → 直接重跑工作流，**定义无需任何改动**（四节点参数已核对全部正确，见 §四）；
+3. 持续不通 → 不要重跑，回写 status=blocked 上报运维（网络代理 / GitHub 镜像 / 出网白名单），写清「clone github.com:443 连接超时，全链被第 0 依赖阻塞」——与门禁「退出码 2 = 环境不可用，禁止为过门禁改代码」是同一条纪律的 run 级推广：**环境不通时，重跑是空烧，先修环境或如实上报**；
+4. 禁止为绕过网络私自换镜像仓库/改 remote——仓库来源是部署与门禁的信任锚，变更必须走运维。
+
+## 四、诊断方法论：一次「模板参数漂移」疑云的证伪
+
+**现象**：核对工作流定义时，scaffold 节点参数正确指向 games/60-2，而读到的 implement/deploy/playtest 节点 prompt 里满是上一个游戏 app-2 的固定参数（gamePath=games/app-2、分支 cmuspfeyw…、AppHost cmuspfdr…、liveUrl /apps/app-2/）→ 一度形成高价值假设：「工作流模板实例化只替换了首个节点的参数」。
+
+**证伪过程**：换独立文件名重新拉取同一工作流，对 8 个关键词（games/60-2、games/app-2、两个 goal id、两个 liveUrl、两个 AppHost id）× 4 节点逐一计数——**四节点全部正确指向 60-2**。真因：诊断用的 `/tmp` 共享临时文件被本机并发进程覆盖，中间那几步读到的其实是另一个工作流（app-2）的同名缓存文件。
+
+**沉淀三条**：
+
+1. 结论必须落在「重新独立取证」上，不落在「上一次读到的内容」上——尤其对「上游模板缺陷」这类会被写进知识、触发他人返工的高价值指控，先证伪再落笔；
+2. 诊断脚本对临时文件用唯一文件名（本次 `/tmp/wf.json` 与并发工作流进程撞名），或直接管道内消费不落盘；
+3. 证伪本身也是产出：本文档差点把一个不存在的平台缺陷写成结论，§一第 5 条的「定义健康度」结论就是证伪的成果，它让下一轮可以放心直接重跑。
+
+## 五、Web 导出与 AppHost 部署：60-2 落位值与硬约束清单
+
+机制细节与打回修复总论见关联知识 27407691（oak-key 全链路）与 82e419bb（触屏/音频），本节只列 60-2 的具体落位值和逐项易错点：
+
+| 项 | 60-2 落位值 | 易错点（违反后果） |
+| --- | --- | --- |
+| 部署来源分支 | myrd/games-goal-cmuspb558003tic7qwgyd02c2 | gitRef 传 main → main 上没有本游戏的 apphost.toml/导出产物，构建失败或把别的壳部署出去 |
+| 部署 API | POST /api/v1/apphost/apps/cmuspb3xg003ric7q1ksya6c3/deployments，mode=bundle | sourceId 必须是 goal id cmuspb558003tic7qwgyd02c2；带别的应用 id → 403 APP_BOUND_TO_OTHER_SOURCE（选错坑，回来核对 hostedAppId，不要换坑硬试） |
+| 导出预设 | games/60-2/export_presets.cfg 配 Web(HTML5)，产物落 games/60-2/export/web/（必须含 index.html） | 缺 index.html → 壳无入口页 |
+| 资产出 bundle | apphost.toml 声明 `assets_dir = "games/60-2/export/web"`，平台把该目录上传对象存储，25MB 上限不再约束资产体积 | 不声明 assets_dir → 产物挤进 bundle，体积立刻顶 25MB 上限 |
+| 壳资产路由 | asset-store `getAsset` 懒加载，路由 `/api/public/assets/:name`；`gzip+b64` → 回 text/plain 的 base64（壳端 DecompressionStream 解压）；`raw` → 按 contentType 回原文 | M1 网关**只透传文本响应**：octet-stream/gzip/图片/音视频 → 502 UNSUPPORTED_BINARY；资产一律 base64 文本回传 |
+| 路径口径 | 壳页面拉资源**一律相对路径**（`api/public/assets/index.wasm`）；`?p=` 是网关保留 query | 绝对路径 `/assets/...` 或 `?p=` 手拼 → 404/被登录墙拦 → 黑屏 |
+| wasm 初始化 | `WebAssembly.instantiate(bytes)`（base64 → Uint8Array → 解压） | instantiateStreaming 要求 application/wasm MIME，本链路不满足 |
+| b64 内联降级 | 仅当 asset-store 不可用；原始产物 ≤ 18MB（b64 膨胀 1.33×，bundle 上限 25MB） | 超限 → 降级「说明页 + 下载指引」，不得声称可玩 |
+| 音频手势解锁 | 壳页面在引擎加载**之前**：①包 AudioContext 构造器捕获引擎实例；②document 级 `touchstart/touchend/pointerdown/keydown/click`（capture+passive，不消费事件）同步 `ctx.resume()`；③暴露 `window.__audioDebug()` | 缺任一 → 移动端全部音效静默且控制台零报错（WebKit 创建即 suspended、切后台变 interrupted、引擎只在输入回调 resume）；有音效的游戏壳缺解锁器 = 验收不通过 |
+| 调参桥 | 壳页面引擎加载前解析 `?tuning=<JSON>` 进 `window.__GAME_TUNING__`，游戏侧 GameState 启动按 TUNING_META 声明的键钳制覆盖 | 缺 → 试玩调好的参数无法用 URL 复现，调参回写流程断裂 |
+| 部署后自测 | /health 与 / 都 200 只是起点，**必须**跑 mobile-web-smoke | 只 curl 200 就宣称部署成功 = 跳过移动端硬门槛 |
+
+## 六、mobile-web-smoke 移动端模拟门禁要点
+
+- **机判方式与维度**：headless Chrome 移动仿真打开线上 liveUrl，机判六项——网络（资源可达）、console（无报错）、渲染（画面在动）、触摸（可交互）、音频契约（解锁层在位）、视口（移动端尺寸正确）。
+- **证据落点**：`games/60-2/qa/mobile/`（report.json + 分阶段截图）。试玩节点（playtest）据此写试玩指引；若发现证据缺失或与 preHook 结论矛盾，如实回写 detail，不替门禁背书。
+- **已知边界一：静止页会被误判渲染冻结**。完全静止的页面「画面在动」检查会 FAIL——解法是给核心按钮加待机呼吸脉冲（game-12 实测：scale 1.00→1.06 / 0.9s，极差 0.060 ≥ 阈值 0.02），既是门禁过检又是移动端可点示能（关联知识 00314649）。
+- **已知边界二：门禁全绿 ≠ 真机可用**。触摸事件分发顺序（E-18：`mouse_filter=STOP` 的 Control 在 GUI 命中阶段吃掉触摸，永远到不了 `_unhandled_input`）与 InputEventAction 互踩（E-19）都属于「headless 门禁全绿、真机必挂」型，机判之后仍需真人真机过一次「开局可动、摇杆不误触」（关联知识 82e419bb）。
+- **与试玩验收的衔接**：mobile-web-smoke 全绿只是准入，试玩节点产出「试玩验收包」（试玩指引 + 四问量表 + 调参工作台入口 `<liveUrl>?tuning=1`）；试玩结论只能来自用户，量表未回填就如实标「待回填」，detail 里不得出现没有出处的「试玩通过」。
+
+## 七、知识沉淀节点自身的 API 事实（本次实测，供后续沉淀节点直接复用）
+
+- **本部署不存在 `GET /api/v1/knowledge/search`**（返回 404）。等效「先搜后写」：`GET /api/v1/knowledge?scope=global&limit=200` 拉全量后客户端按 title/内容过滤（服务端源码 src/routes/knowledge.ts 的 GET 只支持 scope/category/projectId 过滤，无全文检索；列表默认只返回 parentId=null 且 isPublished=true 的文档）。
+- **新增**：`POST /api/v1/knowledge`，必填 `title` + `scope`（'global'|'project'）；`title+scope` 重复 → 409 CONFLICT（先搜后写可顺便避开）；`tags` 必须是字符串数组；`category` 建议对齐既有口径（本文用「技术方案」，与同类游戏知识一致）；创建即 isPublished=true 并自动生成 v1 版本快照。
+- **更新**：`PATCH /api/v1/knowledge/doc?id=<docId>`，支持部分更新 title/content/category/tags/icon/scope/projectIds；平台自动做版本化（更新前快照旧版 → version+1 → parentVersion=`id@vN`），不需要调用方自己处理版本。
+- **单篇读取**：`GET /api/v1/knowledge/doc?id=<docId>`（返回 doc + associatedProjectIds；已删除文档也能读到，便于历史链接）。
+- **写入姿势**：JSON body 直接 PUT 不便时，用 python3 `json.dumps` 构造 payload 再交 curl 发送，避免 shell 转义事故。
+
+## 八、关联知识（互为补充，不重复）
+
+- `27407691-bcf8-4e73-b686-1bb8df684e5c`：Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路实战（oak-key）——三层门禁体系、退出码语义、routine 参数化、GODOT_BIN 单一实现、error-signatures 打回修复表。
+- `00314649-c4d2-407c-871b-62f7de91b07d`：game-12 双门禁通过路径——mobile-web-smoke PASS 10/10 实测、静止页呼吸脉冲、负例验证纪律。
+- `82e419bb-b641-4b5e-bb58-d8b9633169ca`：game-5 触屏虚拟摇杆与 AudioContext 解锁规范——E-18/E-19 机制、统一移动向量出口、音频门控三件套。
+- `6e91a11d-3632-4721-a3ea-d433e9622f9b`：game-5 玩法设计要点——与 60-2 同属「森林收集水果限时赛」玩法族（60 秒限时收集），数值基准可对照。
+- 设计 spec（platform）：`cmuspl1bw006lic7qkcplv73e`——60-2 的水果分值表（+1/+3/+10）、生成节奏与 60 秒结算契约及契约测试清单，实现与验收以此为准。
+
+## 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+# 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+> 来源：需求《《森林收集水果限时赛》游戏需求》（id=cmusp9cd00035ic7qxi8c4il3，验收节点 completed）→ GameDesignSpec《水果分值表与收集循环》（id=cmuspeqza004uic7qusqyn7gr）→ 小游戏工坊两次工作流运行皆 failed → 主策划验收指派（id=cmtn5fhk8000hjqckrib9i3bb，completed）。全部平台终态于 2026-10-04 经 API 与线上 URL 实测取证（见 §一）。
+>
+> 本文写三件事：① 可复用的「分值分档点按收集」玩法模板（+1/+2/+5 三档）；② Web 导出 + 双门禁的复用要点；③ 本 goal 双跑皆败的流程复盘教训。**不重复**总论：门禁三层体系与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key）；工程结构最小契约与帧预算推导见 78180e88-6486-404e-9265-e315e0da3c66（hello）；时间注入机判与单源单相见 00314649-c4d2-407c-871b-62f7de91b07d（game-12）；触屏适配与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca；**同名 IP 的另一机制变体**（松鼠移动+原木躲避+连击）见 6e91a11d-3632-4721-a3ea-d433e9622f9b（game-5 老版）。
+
+## 一、事实基线（本 goal 真实终态，先看这个再谈复用）
+
+| 对象 | 标识 | 终态 | 取证方式 |
+| --- | --- | --- | --- |
+| 需求 | cmusp9cd00035ic7qxi8c4il3 | completed | goal DAG 记录 |
+| GameDesignSpec（分值表与收集循环） | cmuspeqza004uic7qusqyn7gr | completed | goal DAG 记录 |
+| 工坊运行 #1 | workflow=cmusp1yao002pic7q384xxfse，run=cmuspf4oo0050ic7qfjj0azwh（工程 games/60，分支 myrd/games-goal-cmusp1ya8002lic7qk39zog9o） | **failed** | GET /api/v1/workflows/{id} 的 runs 字段 |
+| 工坊运行 #2（换 slug 重试） | workflow=cmuspb55m003xic7q9o18vjk2，run=cmuspld10006ric7qup55soew（工程 games/60-2，分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2） | **failed** | 同上 |
+| AppHost 记录 | 60=cmusp1ya6002jic7qz3dhps7r；60-2=cmuspb3xg003ric7q1ksya6c3 | 均卡在 status=creating，publicUrl=null，publishedAt=null | GET /api/v1/apps |
+| 线上地址 | https://leomac-studio.tail49399e.ts.net/apps/60 与 /apps/60-2（含 /gw 变体） | **404「应用不存在」** | curl -L 实测 2026-10-04 |
+| 主策划验收指派 | cmtn5fhk8000hjqckrib9i3bb（标题「验收复核线上版并回写产物标识」） | completed（节点完成；其结论正文经多个 API 路由探测不可回读） | goal DAG 记录 |
+| 同名老变体 game-5 | AppHost=cmuipis4f0063m9l6hagvvvd4，goal=cmuipis4g0065m9l69hew4nng，需求=cmuipol63006rm9l6cp2ww5r5 | ready，publicUrl=/apps/game-5，3 次工坊 run 全 completed | GET /api/v1/apps、/api/v1/workflows |
+
+结论一句话：**本 goal 的「点按分档版」截至 2026-10-04 没有可玩的线上版**；平台里唯一在线的「森林收集水果限时赛」是老变体 game-5（玩法口径完全不同）。后续任何验收、试玩、传播链接都必须先对照本表，别拿老 game-5 顶数。
+
+## 二、分值驱动收集玩法模板（+1/+2/+5 三档 · 点按拾取）
+
+### 2.1 分值表与频率反相关（需求硬性口径 + 建议校准值）
+
+| 档位 | 分值（需求硬性） | 出现权重（建议起点） | 期望得分贡献占比（建议） | 视觉要求 |
+| --- | --- | --- | --- | --- |
+| 低（苹果） | +1 | ~70% | ~45% | 常规色调 |
+| 中（橙子） | +2 | ~25% | ~35% | 提亮一档 |
+| 高（稀有水果） | +5 | ~5% | ~20% | 高对比 + 特效标识 |
+
+- **分值与频率必须反相关**且两者解耦配置（权重表与分值表分开两张常量表）——需求只锁「高分水果出现频率更低」，斜率是实现自由度；但三档贡献占比是手感核心，建议按上表起步、用冒烟统计实测校准（240 帧冒烟里统计三类生成次数的比例，替代人工目测）。
+- **期望值校准法**：单局期望总分 = 60s × 刷新速率 × Σ(权重ᵢ × 分值ᵢ)。先定「单局期望分」这一产品目标，再反推刷新速率，不要拍脑袋调刷新率。
+- **计分唯一入口**：所有得分变更走同一个 `add_score(points)`，分值查表发生在水果节点持有 `tier` 字段 → 入口处查表，禁止 UI 层或触摸回调里散落 `score += 1` 字面量。这是「+1/+2/+5 各自累加正确」能被机判断言的前提（同 game-12 的单源纪律）。
+
+### 2.2 60 秒计时的 ±1 秒验收实现口径
+
+- 用 `float` 剩余时间在 `_process(delta)` 里累积递减，显示层取 `ceil()`；归零判定用 `time_left <= 0.0` 触发结算，**不要**用「Timer 节点每 1 秒 tick 一次、tick 里 -1」的实现——tick 计数在暂停/掉帧/场景切换时会漂移，±1 秒容差经不起移动端浏览器节流（切后台回来一次就能漂 1~2 秒）。
+- 冒烟断言：读 UI 计时文本两次间隔 1~2 秒断言递减；用引擎时间注入（同 game-12 `try_count(now_ms)` 模式）把 `time_left` 直接压到 0，断言进入结算场景。显示值与内部值分离，断言内部值。
+
+### 2.3 点按拾取：单源单相 + 热区（移动端唯一操作）
+
+- Godot 4 默认 `emulate_mouse_from_touch=true` → 一次触摸可能产生 touch + mouse 双事件，再加 `_unhandled_input` 的动作路径，同一「点击」多来源。收敛方式与 game-12 相同：所有来源只调唯一入口 `attempt_collect(fruit)`，判定收口在 GameState 一处。
+- 触摸热区按「水果视觉半径 + 容差」配置，最小可点直径 ≥ 44~48 逻辑 px，且注意 DPR 换算（引 82e419bb）；相邻水果刷新点最小间距 ≥ 1.5 个水果直径，防误触串档（点到低档实际想点中档）。
+- 高分水果「稀有」也必须**可点**：特效动画不要吃掉点击区（动画节点 `mouse_filter=IGNORE`），否则会出现「看得见点不中」的体感灾难——美术动效是 Area2D 之外的子节点，别挂在碰撞体上。
+
+### 2.4 供给节奏与场上管理（点按版的补货口径）
+
+- 两段式供给（引 6e91a11d §二并适配）：开局铺场 8~12 个 → 场上存量低于下限（建议 6）时按 0.8~1.5 秒补 1 个。60 秒点按版的失败模式比躲避版更隐蔽：**可收目标耗尽 = 玩家空转**，补货下限是硬保障。
+- 三档各自独立掷骰，不共用计时器；高档（稀有）另加「场上同屏最多 1 个」约束，防止稀有权重 5% 在随机聚类下同屏堆 3 个、破坏「稀有」体感。
+- 场景边界内边距 ≥ 半个水果直径，保证边缘刷新可点；不做与障碍物的路径重叠问题（本变体无移动障碍），但要避免刷新点落在 UI 计时条/得分条下方。
+
+### 2.5 一键重开的完整重置清单（验收 5 的坑点）
+
+结算界面「重新开始」必须复位**全部**运行态，逐项列出防漏：倒计时回 60、得分清零、场上水果全部回收、三档刷新计时器重置、稀有水果在场标记清除、飘分/特效节点队列清空、结算面板隐藏。重开入口双通道（触摸可点 + 键盘 Enter/Space），坑源见 ed31081f-82be-4a76-a28b-476f7e18a00b（game-3 只有触摸入口导致桌面端无法重开）。冒烟断言：先打完一局（注入 time 归零）→ 点/按重开 → 断言计时==60 且得分==0 且场上水果数==铺场数。
+
+### 2.6 森林主题的可机判底线（验收 3）
+
+美术质量不进门禁，但结构可以机判：断言主场景节点树中存在 ≥ 2 类森林装饰元素组（如 Trees/Grass 两个 Node2D 组各自子节点数 > 0）；水果节点与背景装饰分属不同层级（水果层 z_index 更高且不被装饰遮罩覆盖）。preflight 不查这些，要写进工程内 `tests/smoke.gd` 的玩法断言段。
+
+### 2.7 验收 → 冒烟断言映射（写进 verify.sh 的建议）
+
+| 需求验收条目 | 冒烟断言建议 |
+| --- | --- |
+| 1. 60 秒递减、归零自动结算、偏差 ≤ ±1s | 两次读计时文本断言递减；注入 time_left=0 断言进结算 |
+| 2. ≥3 种分值（+1/+2/+5）各自累加、实时显示 | 依次对三档水果坐标注入触摸，断言得分序列 +1/+2/+5；断言 UI 总分文本同步 |
+| 3. 森林主题 ≥2 类元素、水果不遮挡 | 断言装饰节点组存在且子节点 >0；断言水果层在装饰层之上 |
+| 4. 移动端触屏可完整跑一局、无明显卡顿 | mobile-web-smoke 门禁（双门禁第二道）跑 FPS 采样，参照 game-12 实测 FPS 39 的基线口径 |
+| 5. 一键重开、倒计时与得分重置 | 跑完一局 → 触发重开 → 断言 60/0/铺场数三值（见 §2.5） |
+
+## 三、Web 导出与双门禁复用要点
+
+本 goal 两次工作流的 scaffold 节点 prompt（工坊流水线模板实文）把门禁资产判据钉死为**四件套**：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, resolve-godot.sh, mobile-web-smoke.mjs}` 全部在仓库内且不被 .gitignore 排除，缺任一 → blocked 上报，禁止从平台注入的 `.myrd-platform/.claude/skills/` 阅读副本里复制脚本充当判定器，也禁止自造等价脚本。对比老 game-5 工作流只要求三件套——**mobile-web-smoke.mjs 是后来加入的第四件**，新工程照四件套验收。
+
+- **双门禁分工**：godot-smoke（preflight 静态 + headless 冒烟 + input-fuzz）证明「能跑能玩」，mobile-web-smoke 证明「移动端模拟下可玩且不掉帧」。两道各自独立出退出码，任何一道非 0 都不该进入 deploy。
+- **退出码语义**（与总论同源）：0 通过 / 1 冒烟失败→打回修复循环 / 2 环境不可用→装环境、禁止为过门禁改代码 / 3 静态不一致（verify.sh 单独编码）。存在性守卫先行判 2，防「脚本缺失」被误判成 3 诱导修游戏代码。
+- **Web 导出配置五要点**（引 78180e88 实测，不再展开）：渲染器钉死 gl_compatibility 且 `.mobile` 双写；`thread_support=false`；中文必须内置 NotoSansSC 等字体（preflight P13 拦 Web 中文缺字）；导出产物落 `games/<工程>/export/web/` 并 .gitignore 豁免入库；UI 挂独立 CanvasLayer 与游戏世界分离。
+- **AppHost 部署口径**：部署 gitRef 必须是 goal 功能分支（`myrd/games-goal-<goalId>`），绝不能用 main；liveUrl 在部署完成前即由工坊确定（本 goal 为 /apps/60、/apps/60-2），移动端门禁与试玩都以它为准。
+
+## 四、流程复盘：为什么本 goal 没有线上版（双跑皆败实录）
+
+时间线（全部平台记录）：17:56:54 创建 AppHost「60」+ 工作流 #1 → run cmuspf4oo0050ic7qfjj0azwh **failed** → 18:04:01 换 slug 重试，创建 AppHost「60-2」+ 工作流 #2 → run cmuspld10006ric7qup55soew **再 failed** → 验收指派节点 completed 回写产物标识 → 2026-10-04 实测线上 404。
+
+- **教训 A：节点完成态 ≠ 线上可玩。** 验收指派节点 completed，但平台记录里不存在任何可访问的线上版本。「验收复核」类节点的完成前置必须是硬证据：liveUrl 返回 200 且真实浏览器跑通「开始→拾取→结算→重开」闭环，产物标识回写附上 deployment/gitRef；否则完成态与线上态脱节，下游（频道播报、试玩通知、知识沉淀）全部建立在幻觉上。
+- **教训 B：同名变体串场是本 IP 的特有陷阱。**「森林收集水果限时赛」在仓库里有两个机制完全不同的变体：老 game-5（松鼠移动+原木躲避+连击，已上线）与本版（点按拾取+分值分档，未上线）。两者需求 id、goal id、工程目录（games/game-5 vs games/60、60-2）、分支、slug 全不同。**一切定位以产物 id + 分支名 + 工程目录为准，禁止按游戏名搜索**——按名搜必然把老 game-5 的「已上线、3 run 全绿」误当成新版的现状。
+- **教训 C：换 slug 重试会留下孤儿 AppHost 空壳。** 60 失败后换 60-2 重试，AppHost 表留下两条 status=creating 的壳，publicUrl 均为 null。重试前应优先复用原 AppHost 记录；若必须换 slug，重试启动时把旧壳置为废弃态。排查「游戏上线了没」的正确顺序：先查 AppHost status（creating/ready/failed），再 curl liveUrl 实测——本 goal 的 404 就是这么确认的，不能只信工作流状态或节点状态。
+- **教训 D：复盘入口与取证边界。** 工作流 API 只回 run id + status，不回失败日志；复盘具体卡点需持 run id（cmuspf4oo0050ic7qfjj0azwh、cmuspld10006ric7qup55soew）到执行日志/workflow 详情页查。本机环境 GitHub 443 不通，`git ls-remote` 无法核实两条 goal 分支是否推上远端——分支存在性复核必须在能连 GitHub 的环境做，不要在本机下「分支不存在」的结论。
+
+## 五、给下一个同类小游戏的复用清单
+
+1. 玩法骨架直接抄 §二：三档分值表 + 反相关权重表 + `add_score` 单入口 + float 计时 + 两段式补货 + 完整重置清单，改数值不改结构。
+2. 工程起点抄 78180e88 §二的最小契约（project.godot 三类必接线、TUNING_META 白名单、tests/smoke.gd、verify.sh、export_presets.cfg）。
+3. 门禁四件套齐全性检查放在 scaffold 第一步（本 goal 工作流模板已内置该判据），双门禁全绿才允许 deploy。
+4. 验收断言按 §2.7 映射表逐条落进 smoke.gd，每条断言做负例验证（证明会真 FAIL）。
+5. 上线判定只认三件套：AppHost status=ready + liveUrl 200 + 实机操作闭环截图/录像；验收节点回写产物标识时必须附 deployment/gitRef。
+6. 涉及「森林收集水果限时赛」名字的一切操作，先对 §一事实基线表确认自己在操作哪个变体。
+
+## 六、关联知识
+
+- 门禁三层体系 + AppHost 部署总论：27407691-bcf8-4e73-b686-1bb8df684e5c
+- 工程结构最小契约 + 帧预算推导 + playtest blocked 实录：78180e88-6486-404e-9265-e315e0da3c66
+- 双门禁（godot-smoke + mobile-web-smoke）+ 时间注入机判 + 单源单相：00314649-c4d2-407c-871b-62f7de91b07d
+- 移动端触屏虚拟摇杆 + AudioContext 解锁：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- 同名 IP 老变体（松鼠+原木+连击）玩法口径：6e91a11d-3632-4721-a3ea-d433e9622f9b
+- game-9 单游戏部署先例：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 对抗性探索与机判方法论（QA 复用）：437f8129-89b5-4f46-95c0-2d475c3cead8
+
+## 沉淀 app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单（太空飞船躲陨石捡金币）
+
+# app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单
+
+> 来源：目标《创建小游戏应用：太空飞船躲陨石捡金币》（goal=cmuspfeyw0058ic7qrmh6qebm）首轮执行（2026-10-03 18:11~18:23 UTC）+ 次日（2026-10-04）知识沉淀时的时点复核。需求 id=cmuspmumf007cic7qlt6uwieo，GameDesignSpec id=cmuspqwhe007ric7qp0465dvk，工坊工作流 id=cmuspfez9005cic7q93j4fk74，失败运行 id=cmuspr5v7007xic7q5ng1aqqo。
+>
+> 本文只写本例增量：**工坊流水线在门禁一启动之前就整体失败**这一反面样本的取证、归类、复核方法论与重跑前置清单。godot-smoke 三层门禁体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-12 双门禁通过路径见 id=00314649-c4d2-407c-871b-62f7de91b07d；移动端触屏/音频规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；game-9 见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be。本文与它们互补：前面几篇讲「门禁怎么过」，本篇讲「门禁根本没来得及跑」时怎么定位、怎么复核、重跑前还要先解决什么。
+
+## 一、一手事实时间线（全部库内取证，非转述）
+
+| 时刻（UTC） | 事件 | 证据 |
+| --- | --- | --- |
+| 10-03 18:07:22 | hosted_apps 记录 app-2 创建（id=cmuspfdr20056ic7qm2ebhvwv，slug=app-2），status=creating | hosted_apps 行；updated_at 至 10-04 仍冻结在该时刻 |
+| 18:11~18:13 | 需求录入完成（含双门禁 + HostedApp 约束 + 4 条验收标准） | 需求 id=cmuspmumf007cic7qlt6uwieo |
+| 18:13~18:16 | GameDesignSpec v0 落账（八段、10 实体、数值写死） | spec id=cmuspqwhe007ric7qp0465dvk |
+| 18:16:30 → 18:17:36 | 工坊工作流运行启动后 **66 秒即 failed** | workflow_runs.status=failed |
+| 18:17:40 → 18:23:07 | express_lane 独立复核完成：app-2 未上线、验收 0/4、双门禁均未启动 | 复核结论（goal 会话） |
+| 10-04（本文写作时） | app-2 仍 status=creating、live_url 空、app_deployments **0 行**；该工作流**仅 1 次运行且为 failed，未重跑**；github.com 从 agent 环境再次 20s 超时不可达 | hosted_apps / app_deployments / workflow_runs 实查 + curl 探针 |
+
+失败报错原文（复现用）：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspfdqy0052ic7qnkimp4n5/run-cmuspr5v7007xic7q5ng1aqqo'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/':
+Failed to connect to github.com port 443 after 32655 ms: Couldn't connect to server
+```
+
+## 二、失败模式归类：不是「门禁失败」，是「门禁前基础设施失败」
+
+工坊四棒为 scaffold → implement → deploy → playtest（实现/部署两棒挂 godot-smoke preHook 240 帧，试玩棒挂 mobile-web-smoke）。本例失败的关键特征：
+
+1. **死在第 0 棒之前**：4 个节点状态全部 pending，工作流主体逻辑一行都没执行——失败发生在为运行准备 worktree 的 `git clone` 阶段。
+2. **零产物可判**：goal 分支 `myrd/games-goal-cmuspfeyw0058ic7qrmh6qebm` 在复核时不存在（`git ls-remote` 无此分支）→ 无任何代码/工程/导出物落库，不存在「半成品需要清理」的问题。
+3. **网络是间歇抖动，不是持久封锁**：复核时点（10-03 18:23）github.com HTTPS 200、`git ls-remote` 成功（HEAD=a592ea2）；次日（10-04）从 agent 环境又 20s 超时。两个时点结论相反，证明是**间歇性连接抖动**。
+4. **归类的处置含义**：门禁失败（godot-smoke 红、smoke 帧内崩溃）→ 修代码再过门禁；门禁前基础设施失败 → **不改任何代码，探针确认外网恢复后直接重跑**。两者处置路径完全不同，先归类再动手。
+
+## 三、独立复核方法论（本例实证有效，可整体复用）
+
+复核在「工作流已 failed」的背景下展开，五步证据链闭环：
+
+1. **不信状态字段，实测入口**：`status=creating` 不代表「正在部署中马上就好」——对内网 `$PLATFORM_API_URL/apps/app-2/gw` 与公网 `https://leomac-studio.tail49399e.ts.net/apps/app-2/` 双探测，均 404 `APP_NOT_FOUND`。应用记录侧 `publicUrl/publishedAt/version` 全空，项目侧 `resources=[]`、prodUrl/stagingUrl 空，app_deployments 0 行，四面证据一致。
+2. **对照实验排除平台故障**：同一 host 上其余 13 个 `status=ready` 应用（game-5/6/8/9/10/11/12、hello、app 等）全部 200 → 托管能力正常，是 app-2 自身从未部署的个案，不是平台级事故。
+3. **排他性核查防「张冠李戴」**：已上线 13 应用中无一款《太空飞船躲陨石捡金币》；题材相近的 `/apps/app/gw`「星云飞船收集」收集的是能量水晶、slug 与标题均不同，**不能冒充 app-2 交付物**。同类小游戏大量复用同套躲陨石玩法，验收时必须按 slug+标题+机制三重匹配认定交付物。
+4. **对账流程合规性**：需求 status=in-progress、close_reason 空 → 无人违规关闭需求，门禁二「未回填」是因「无入口」而非「被跳过」，流程无腐化。
+5. **失败棒位定位**：直接查 workflow_runs 的 result.error 与 nodes 状态数组，一眼定位「死在 scaffold 之前」，避免把失败误归因给某一棒的实现质量。
+
+## 四、⚠️ 规格冲突（重跑前必须拍板，否则白跑）
+
+工坊管线是 **Godot 4 → Web(HTML5) 导出**（工程 `games/app-2`、`export_presets.cfg` Web 预设、`--headless export` 构建步、godot-game-dev 技能包），而需求验收标准 4 明文要求「**纯前端 HTML/CSS/JS、无构建步骤、静态资源可直接打开运行**」。Godot 导出必然含构建步骤，两者直接冲突。
+
+- **不处理的后果**：即使部署成功、门禁一全绿，AC4 仍会判不达标——整条流水线白跑一轮。
+- **方案 A（推荐）**：把 AC4 措辞修订为「**导出产物为纯静态托管、无运行时后端、无外部 CDN 依赖**」。保留 Godot 管线，同时保住需求真正想约束的东西（免后端、免 CDN、双端可玩），且与既有门禁体系（27407691 总论）兼容。
+- **方案 B**：放弃 Godot 管线，改手写单文件 HTML/JS。仅当主人明确要求「字面意义无构建」时选它，代价是失去 godot-smoke 三层门禁与工坊流水线的既有能力。
+- **教训**：验收标准与管线能力要在**需求录入时**对齐。「无构建步骤」这类措辞对 Godot 管线应用天然不可满足，录入阶段就该识别。
+
+## 五、重跑修复路径（有序清单，供下一轮直接执行）
+
+1. **先探针再重跑**：从 runner 环境 `curl --max-time 20 https://github.com` + `git ls-remote <仓库>` 双探针确认恢复。网络是间歇抖动，盲目重跑可能再次 66 秒失败并空耗一轮。
+2. **先拍板第四节冲突**并回写需求措辞（方案 A 或 B），再触发重跑。
+3. **重跑即可，无需清理**：分支不存在、零产物，直接重跑工作流，从 scaffold 全新开始；不要试图「续跑」失败运行。
+4. **部署成功后先补门禁一**：由独立 agent 重做一轮线上可玩性复核（按第三节方法论），留证「全流程走通 + 控制台无报错」，之后才轮到 owner。
+5. **门禁二最后**：owner 桌面 + 移动各试玩一次并回填「试玩通过/不通过」，回填通过后需求方可关闭。当前门禁状态：**门禁一未启动（不可执行）、门禁二未启动（无入口）——注意是「未达」而非「失败」，回填话术要区分。**
+
+## 六、供后续 app 复用的教训清单
+
+1. **工作流失败 ≠ 游戏缺陷**：先查失败棒位。scaffold 之前死 = 基础设施层（网络/仓库可达性），与代码质量无关，处置是重跑而不是返工。
+2. **外网 git clone 是工坊流水线的第一单点**：仓库在 github.com，第一棒之前就要整仓克隆；网络抖动直接零产物。建议重跑前置「探针 + 失败自动退避重试」的习惯，并把「github 间歇不可达」记为平台环境的已知抖动源。
+3. **hosted_apps.status 不可单独作为「已上线」判据**：本例 status=creating 停滞超过 24h 且无任何部署行。判活必须「liveUrl 实测（内网+公网双探测）+ deployments 计数」双条件。
+4. **需求录入时做一次「AC × 管线」对齐检查**：把验收标准逐条对照工作流管线的既有能力（构建方式、导出形态、依赖服务），措辞冲突当场改，不要留到部署后才发现。
+5. **同题材应用排认**：平台同 slug 命名空间下有多款躲陨石/收集类小游戏，验收复核必须 slug+标题+核心机制三重匹配，防止把兄弟应用的 200 当成本应用的交付证据。
+
+---
+**一句话总结**：app-2 首轮执行是「门禁前基础设施失败」的完整样本——工坊四棒尚未启动即在 git clone 阶段遭遇 github.com 间歇性连接失败（66 秒即败、零产物、app-2 停在 creating），独立复核以五步证据链确认验收 0/4、双门禁均未达但流程未被违规绕过；修复路径 = 探针确认网络恢复 + 先拍板「Godot 构建管线 vs 无构建步骤」的规格冲突 + 直接重跑，重跑成功后再补门禁一自测与门禁二试玩回填。
+
 
 ---
 
@@ -13995,6 +19413,780 @@ Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`�
 
 关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
 
+## 沉淀 game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战经验（推箱子点亮方块解谜 · 全四棒工作流）
+
+# game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战沉淀（推箱子点亮方块解谜 · 全四棒工作流）
+
+> 来源：需求《推箱子点亮方块解谜（game-9）》（id=cmupsx443003om9dh5dwd5w9u，goal=cmupsrc19002sm9dhp5su0zaj）走完「前置体检 → scaffold → implement → deploy → playtest」全流程后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-9`（Godot 4.3.stable.official）。线上：liveUrl https://leomac-studio.tail49399e.ts.net/apps/game-9/（deploymentId=cmupxibnn0087m9dhz3cfhap4，commit 19a6d59，838ms 上线，app.status=ready）。工作流运行 /workflows/cmupsrc1v002wm9dh68sljxoq/runs/cmuputtey006dm9dht78nbbtm。
+>
+> 本文只写 game-9 新踩的坑与增量打法。门禁三层体系总论（preflight/smoke/fuzz 分工、E-16 带病绿灯）与 AppHost 部署总论见《沉淀 Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路实战经验》（id=27407691-bcf8-4e73-b686-1bb8df684e5c，oak-key 实测）；移动端触屏摇杆与音频解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca。三篇互为补充、不重复。
+
+## 一、事实基线：四棒各留下什么（审计入口）
+
+| 棒 | 提交 | 内容 | 结果 |
+| --- | --- | --- | --- |
+| scaffold | d297996 | 以 templates/minimal-2d 初始化 games/game-9：推箱骨架（推动/点亮/Undo/Restart/换关）+ 5 关关卡册 + tools/level_solver.py + tests/smoke.gd + verify.sh | ✅ |
+| implement | 4bfdb00 | 见证解回放 / 死锁反馈 / touch_swipe / AC5 响应断言；is_solved 口径修复；.myrd/spec/design-spec.json 落盘 | ✅ |
+| deploy | 19a6d59 | export_presets.cfg + 导出产物入库 + apphost 壳切 game-9 + §3C 调参桥 + 移除 candy-crush 残留 | ✅ 已部署 |
+| playtest | 0103b33 | docs：playtest blocked 报告（缺 playtest.sh） | ⛔ blocked |
+
+- **部署形态**：底座 A「资产出 bundle」——`apphost.toml` 里 `assets_dir="games/game-9/export/web"`，37MB 导出经对象存储懒加载，bundle 本体不含游戏资源（25MB bundle 上限不再约束资产体积）。
+- **导出产物形态**：index.wasm 33.7MB / index.pck 2.4MB / index.js 331KB / index.html 4.9KB / index.audio.worklet.js 7.3KB。线上资产通道 `/api/public/assets/`：index.js 原文直出，wasm/pck 走 `*.gz.b64` 文本（10.7MB / 3.3MB），端到端解码验证过（b64→gzip→`WebAssembly.validate()=true`、pck 魔数 `GDPC`）。
+- **部署记录层 status=running 与应用已 ready 并存**：判断游戏死活以 /health 与实际可达为准，别拿 deployment.status 当真。
+
+### 分支审计坑：同一目标两条远端分支并存
+
+- `myrd/game-9-goal-<goalId>`：前置体检节点首次推送建立，停在 implement 棒（4bfdb00）。
+- `myrd/games-goal-<goalId>`：工作流四棒实际跑的分支，tip=0103b33（多出 deploy/playtest 两棒）。
+- 结论：**复现/审计认 goal artifacts 里的 `gitRef` 与 `app_deployments.commit_hash`（本次 = 19a6d59）**，别按「目标 id 搜分支」想当然——两条分支都能搜到且不同步。另：线上部署的是 19a6d59，其后 playtest 棒只追加 docs（0103b33）未重新部署，属 docs-only 差异，游戏本体无差。
+
+## 二、Godot Web 导出：模板不含预设，从零补齐的六个决策
+
+1. **模板仓库不含 `export_presets.cfg`**。games/game-9 的 README 在 scaffold 棒就记了：「export_presets.cfg 尚未配置（模板不含），部署节点需按 games/game/ 的 web 导出先例补齐」。每个新游戏都要从上一个游戏的先例抄一份再改，别等部署节点现场发明。
+2. **必须用单线程变体：`variant/thread_support=false`**。M1 网关不发 COOP/COEP 头，SharedArrayBuffer 不可用，线程版直接白屏。这是 Web 导出第一坑：配错不报错、上线才白屏。
+3. **导出产物必须入库，`.gitignore` 加 `!/export/web/` 豁免**。`assets_dir` 是平台构建输入，产物不在仓库里平台打包 bundle 就缺资产。Godot 工程 .gitignore 默认把 export/ 排掉，这里要反着来。
+4. **全局中文字体是 Web 导出的底线**（preflight P13 机判）。浏览器沙箱拿不到系统字体，引擎内置字体只有拉丁字形；`[gui] theme/custom_font` 必须指向子集化中文字体（本工程用 Noto Sans CJK SC：GB2312 全集 + ASCII + 常用符号，OFL 1.1），删了所有中文变缺字方块。字体约 2.9MB，是 pck 体积大头，但属中文游戏必要成本。
+5. **渲染器钉死 `gl_compatibility`**（`renderer/rendering_method` 与 `.mobile` 双写）。Forward+ 在 Web 上不可用。
+6. **接手模板仓库先清上一个游戏的残留**。deploy 棒移除了基线残留的 candy-crush 工程 `games/game/`（39MB 导出）——模板仓库是「单游戏位」惯例，根壳一次只服务一个游戏；残留工程还会污染门禁参照（前置体检时 gate-selftest 拿 games/game 当参照，因 player.gd 缺 `moved.emit`/`const SPEED` 模板契约锚点，D4/D5 注入失败，换官方参照 `templates/minimal-2d` 后 D1–D5 全拦）。
+
+**壳侧三件套 + 调参桥**（沿用 oak-key 先例并加一层）：相对路径资产路由；移动端音频手势解锁器（AudioContext 包装 / 手势 resume / `__audioDebug` 取证口）；worklet 防御；新增 **§3C 调参桥**：
+
+- 壳把 URL `?tuning=<json>` 解析成 `window.__GAME_TUNING__`；
+- 游戏侧 `GameState._apply_tuning_overrides()` 仅 `OS.has_feature("web")` 时经 `JavaScriptBridge.eval("JSON.stringify(window.__GAME_TUNING__ || null)")` 读取；
+- `TUNING_META` 白名单四键 + min/max 钳制 + round 取整：`move_anim_ms` 0–400、`push_anim_ms` 0–400、`key_repeat_interval_ms` 50–600、`win_overlay_delay_ms` 0–1000。
+- 价值：试玩期调手感不用改代码重导出——「试玩调好的参数用 URL 复现」，试玩入口直接发 `?tuning=1` 工作台链接。无头冒烟/桌面自动跳过，门禁行为不受影响。
+
+## 三、冒烟门禁：game-9 的四个增量打法
+
+四步 routine 不变（`.myrd/routines.yaml` id=godot-smoke：resolve-godot → preflight 13 类 → `GODOT_SMOKE_FRAMES=240` headless-smoke → input-fuzz，seed=20260913），`games/game-9/verify.sh` 只调用 std-skills 判定脚本、不重实现。本次实测：preflight PASS / `GODOT_SMOKE: PASS`（240 帧，exit 0）/ `GODOT_FUZZ: PASS`。增量全在冒烟断言本身（tests/smoke.gd，628 行，11 项断言清单）：
+
+### 3.1 见证解回放：把 AC4「关卡可解」变成引擎内机判
+
+离线求解器说「可解」只是一句话结论；game-9 把它做成冒烟断言：
+
+- `tools/level_solver.py --paths` 生成每关见证解（U/D/L/R 移动串，长度 == par），Python 侧重放自证后落盘进 `sokoban_levels.gd` 的 `solution` 字段（与 layout 同处，单一事实源，防两处数据漂移）；
+- 冒烟逐关回放见证解，断言三条：**必须通关、步数 == par、回放全程不得误报死锁**；
+- solver 直接解析 `sokoban_levels.gd`（不复制关卡数据），「策划案 → 关卡册 → 求解器 → 冒烟」四层数据同源，par 漂移会在冒烟里直接爆。
+
+### 3.2 通关判据口径：常亮 ≠ 通关（冒烟实测拦下的真 bug）
+
+点亮目标格是 `onceLitStaysLit`（入场常亮、永不熄灭），但 `is_solved` 不能跟着用「全部点亮」口径——**常亮口径会把 level-05 最优路径第 35 步误判通关、提前停走**（冒烟回放见证解时实测拦下）。修复：`is_solved` = 「全部接线槽有方块驻留」，与求解器 / spec parMoves 同口径；点亮只作视觉态。
+
+教训：**「视觉状态」与「胜负判据」是两个变量。凡有常亮/累计态的玩法，胜负判据必须与求解器同口径，并让冒烟回放最优解来兜底。**
+
+### 3.3 死锁反馈机判：报与不报都要有断言
+
+角死锁检测 + `deadlock_changed` 信号 + HUD 卡死警示 + 死锁方块变红。冒烟断言四条：角死锁必报、在槽角不报（在槽角是合法终态）、开阔局面不报（防假阳性）、真实关卡把方块顶进角后信号通知 UI 且 **Undo 可脱离死锁态**。「无假阳性」的论证写在检测函数注释里供复核。
+
+### 3.4 AC5 量化成帧预算断言
+
+- 响应延迟：spec 200ms ≈ 60FPS 下 12 帧 → 断言「注入输入 → 首次步进 + HUD 同步刷新」≤ `RESPONSE_BUDGET_FRAMES=12` 帧，验收口径直接写进门禁；
+- 触屏滑动：越过 24px 阈值（`spec.numeric.input.touchSwipeThresholdPx`）的一次滑动**恰好步进 1 格**；冒烟注入 48px 拖拽验证（`SWIPE_DRAG_PX=48`）。
+
+### 3.5 headless 输入注入的坑（error-signatures E-08 的 game-9 变体）
+
+- headless 下 `Input.parse_input_event()` 的缓冲冲刷会清掉 `Input.action_press()` 的按下状态，**同帧混用两种注入方式会让「移动断言」假失败** → 冒烟分 7 相位（噪声/移动/滑动/逻辑/等弹层/下一关/收尾）互不重叠；
+- 触点下标隔离：噪声相位用触点 0/1，滑动断言用触点 7，防互相回收；
+- 滑动起点 (500,280) 刻意避开左下摇杆热区（24..160 × 400..536）与右下按钮排，否则手势被控件吃掉；
+- 噪声相位（30 帧悬挂手势/孤儿释放/乱键）放在一切正式断言之前——上一游戏（糖果三消，commit bbb872f4「致胜滑动后指针脏状态吞掉下一关第一次手势」）就是靠这类对抗注入防回归的。
+
+### 3.6 verify.sh 退出码四态（给修复方向做机器路由）
+
+0=通过；1=smoke/fuzz 运行期未过（改游戏代码）；2=环境不可用（缺 Godot/技能脚本/python3，装环境而非改代码）；3=preflight 静态未过（先修静态，不必跑冒烟）。关键设计：技能脚本存在性守卫放在一切判定之前，缺脚本必须报 2——否则会掉进下游非零退出码被误判成 3，诱导修复节点去改游戏代码。
+
+## 四、关卡求解器：三段演进与两个真 bug（策划案阶段就要做）
+
+固化策划案（create_design_spec）时就要求每关机器可解、par 机器可算——这步做了，实现、冒烟、验收全链路都有基准。求解器三段演进：
+
+1. **BFS**：前三关（状态空间小）够用；
+2. **A* + 拉拽距离启发 + 死格剪枝**：大关用（启发值 = 每方块到最近接线槽的拉拽距离下界，可采纳；死格 = 角死锁 / 墙边不可拉出格）；
+3. **精确状态 A\***：修掉「区域归一化」bug 后的最终形态。
+
+两个真 bug（都在求解器侧，不在游戏侧）：
+
+- **区域归一化把玩家站位合并掉**：对「推动数」精确，对「玩家步数」只是松弛下界——level-02 手推最少 10 步，求解器报 5。修复：玩家坐标显式入状态；修复后 A* 与纯 BFS 交叉验证一致（2/10/18）。
+- **开阔房间 + 5 方块状态空间爆炸**：单关搜索超时。解法不是更强的剪枝，而是**改关卡布局**——level-05 换成更紧凑、隔断更多的「总控机房」，对人更难、对求解器更小，验证 3.8s，par=58 > level-04 的 40，难度曲线反而更成立。
+
+工程参数：`EXPANSION_CAP=4_000_000`、`MAX_DEPTH=200`；par 不一致只告警（布局或 par 漂移），可解性才是硬判据（exit 0/1）。最终 par 曲线 2/10/18/40/58，方块数 1→5 严格递增（AC4），策划案 `numeric.difficulty.parMoves`、关卡册、冒烟断言三方一致。
+
+## 五、playtest blocked：判定器独立性纪律的一次实战
+
+playtest 节点硬约束：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 五个判定脚本**全部由模板仓库预置**，缺任何一个 → 立即 blocked，**严禁现场自造、拷贝注入副本、或用等价命令替代**——它们是判定器，被检方自己写门禁即失去独立性。
+
+本次实测缺 `playtest.sh`（及 `playtest_driver.gd`），按纪律停止：
+
+- **证据链五步**：① 工作区分支 scripts 目录实清（仅 7 个文件）→ ② origin/main fetch 后核对同样缺失（排除本地落后）→ ③ `git log --all` 该路径从未存在 → ④ 全仓库 find 仅命中 `.myrd-platform/.claude/skills/`（平台注入阅读副本，被 .gitignore 排除不入库，按硬约束不得作判定来源）→ ⑤ 前序 deploy 产物旁证。
+- **根因**：平台注入技能包（新版，含机器人试玩门禁：协议 `GODOT_PLAYTEST: PASS/FAIL` 退出码 0/1、2=环境不可用；`GODOT_PLAYTEST_METRICS: <JSON>`；bot 多局输出节奏代理指标——首次奖励/无反馈窗口/反馈密度/局间方差；阈值由工程内 `tests/playtest.json` 覆盖）**领先于模板仓库预置基线**（v1 仅四脚本，godot-smoke routine 也只有四步）。属模板仓库技能资产滞后，需运维补模板仓库，非 agent 现场可修。
+- **没做的事同样重要**：不交付试玩验收包、不拷贝注入副本、不自造判定器；四问量表标「待用户试玩」；spec 数值回写跳过（未收到用户结论，严禁编造）。
+- **影响面切割**：deploy 产物不受影响（游戏仍可访问），godot-smoke 四步门禁此前已全过——blocked 只挡 playtest 这一段。
+- **修复路径**：运维补模板仓库 `playtest.sh` + `playtest_driver.gd`（连同 SKILL.md 章节与 godot-smoke-routine.md 模板同步，脚本/文档/routine 三者一致）→ 经模板预置链路同步进项目仓库（不得手抄注入副本）→ 重跑 playtest 节点交付 `op=playtest_kit`（含 `<liveUrl>?tuning=1` 调参工作台入口）。取证报告在仓库 `docs/game-9-playtest-blocked-report.md`。
+
+## 六、下一个游戏直接抄的清单
+
+```bash
+# 1. 门禁入口（四步；退出码 0/1/2/3 见 §3.6）
+bash games/<game>/verify.sh
+
+# 2. 关卡可解性证据（--paths 生成见证解 → 落盘 solution 字段 → 冒烟回放）
+python3 games/<game>/tools/level_solver.py games/<game> --paths
+```
+
+Web 导出预设必查四项：
+
+| 项 | 值 | 不守的后果 |
+| --- | --- | --- |
+| `variant/thread_support` | `false`（单线程） | M1 网关无 COOP/COEP，SharedArrayBuffer 不可用 → 线程版上线白屏 |
+| `[gui] theme/custom_font` | 子集化中文字体 | 浏览器无系统字体 → 中文全部缺字方块（preflight P13 拦） |
+| `renderer/rendering_method` | `gl_compatibility`（desktop+mobile 双写） | Forward+ 在 Web 不可用 |
+| `.gitignore` | 加 `!/export/web/` 豁免 | assets_dir 构建输入缺资产，bundle 打包失败 |
+
+复用分工：门禁三层总论 / E-16 带病绿灯 / AppHost 部署总论 → id=27407691-bcf8-4e73-b686-1bb8df684e5c；移动端触屏摇杆 / 音频解锁规范 → id=82e419bb-b641-4b5e-bb58-d8b9633169ca；本文 = game-9 增量（导出预设从零补齐、见证解回放机判 AC4、通关判据口径、死锁反馈机判、AC5 帧预算断言、E-08 分相位注入、求解器演进、playtest blocked 纪律、双分支审计口径）。
+
+
+## 沉淀《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+# 《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+> 来源：需求《《hello》休闲收集小游戏》（id=cmuqk7luz002am9bfmmkouw9v，goal=cmuqk3j2o001mm9bfptrztaj1）走完「scaffold → implement → deploy → playtest」工坊主通道后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/hello`（std-skills minimal-2d 模板起步，Godot 4.3.stable，gl_compatibility）。线上终态：liveUrl `https://leomac-studio.tail49399e.ts.net/apps/hello`（HostedApp id=cmuqk3huq001km9bf5ejp7tdg，deployment v2=cmuqlxz2v001km9bxc0w5pspp，gitRef=`myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1@dfd20d1`，/health 200、线上标题《hello》 · 休闲收集）。**playtest 节点 status=blocked**（模板仓库未预置 playtest.sh），线上版经独立 assign_agent 复核确认可玩。本文只写 hello 的增量事实与新坑；门禁三层体系总论与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key），单游戏部署先例见 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9），触屏摇杆与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca。四篇互为补充、不重复。
+
+## 一、事实基线：提交链与四棒产出（审计入口）
+
+`origin/myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1` 提交链（逐字核实）：
+
+| commit | 内容 | 结果 |
+| --- | --- | --- |
+| f9bc9d65 | 模板起步：std-skills minimal-2d 脚手架建 `games/hello` | ✅ |
+| 1bc8fa24 | 收集玩法与胜利/重开闭环 + README 玩法说明 | ✅ |
+| a8b5fd09 | Web 导出可托管形态：export_presets.cfg + `.gitignore` 豁免 + 导出产物入库 | ✅ |
+| 16249412 | 关卡梯度 + 限时失败反馈 + 冒烟断言同步升级 | ✅ |
+| dfd20d1b | 根壳与 apphost.toml 切到 hello + 接通调参桥（=部署 commit） | ✅ 已部署 |
+
+- `myrd/hello-game-goal-cmuqk3j2o001mm9bfptrztaj1` 分支另含 508dcc6b（assign_agent 线上复核取证），与 games-goal 分支**不同步**——复核/审计一律认 goal artifacts 里的 `gitRef`（games-goal@dfd20d1），别按「目标 id 搜分支」。
+- 门禁终态：preflight 13 类 PASS / `GODOT_SMOKE: PASS`（240 帧）/ `GODOT_FUZZ: PASS`（seed=20260913，6 批次无崩溃无脚本错误）；`bash games/hello/verify.sh` 全链路 PASS。
+- 导出 11 文件落 `games/hello/export/web/`：index.wasm 35,376,909B / index.pck 2,497,520B / index.js 331,495B / index.html 4,848B / index.audio.worklet.js 7,298B。
+
+## 二、Godot4 工程结构：hello 的最小可玩模板契约（可复制起点）
+
+```
+games/hello/
+├── project.godot          # 三类必接线：run/main_scene、[autoload] GameState、[input]
+├── autoload/game_state.gd # 单例 + TUNING_META 白名单（调参唯一入口清单）
+├── scenes/{main,player,collectible}.tscn
+├── scripts/{main,player,collectible,virtual_joystick,touch_confirm_button}.gd
+├── assets/fonts/NotoSansSC-Regular.otf + OFL.txt   # Web 中文底线
+├── tests/{smoke.gd,smoke.tscn}                     # 相位状态机冒烟场景
+├── verify.sh               # 工程门禁入口（退出码 0/1/2/3）
+└── export_presets.cfg      # Web 导出预设（thread_support=false）
+```
+
+- **三类必接线是 preflight 静态机判对象**：主场景、autoload、input 映射缺任何一项就是「黑屏/无响应」。hello 实测：`config/name="hello"`、`run/main_scene="res://scenes/main.tscn"`、`GameState="*res://autoload/game_state.gd"`。
+- **渲染器钉死 gl_compatibility 且 `.mobile` 双写**；viewport 640×360；`[gui] theme/custom_font` 指向 NotoSansSC（OFL 1.1）——删了中文全变缺字方块（preflight P13 拦）。
+- **UI 挂独立 CanvasLayer（UI/TouchUI）**，与游戏世界分离；触屏端用 `virtual_joystick.gd` + `touch_confirm_button.gd` 承载移动与确认，桌面/触屏同一工程不加分叉构建。
+- **收集玩法碰撞口径写进代码注释**：Player 矩形 24×24（半宽 12）、Collectible 圆 r=22，可达判定=玩家中心进入收集物中心 34px 内；摆点相对 clamp 边界 (12..628, 12..348) 全可达不卡死角——**碰撞余量要在摆新点时先算再摆**，否则冒烟传送收集断言假失败。
+
+## 三、门禁增量：帧预算推导注释 + 键位契约断言
+
+- **帧推导写进 verify.sh 注释**：「噪声 30 帧 → 移动 10 帧 → 4 次传送收集（各 4 帧）→ 过关断言 → confirm 进第 2 关断言（梯度）→ 时限压 0 触发失败断言 → confirm 重来断言」约 94 物理帧，预算取 240 对齐 `.myrd/routines.yaml` 的 smokeFrames 默认值（两边同值不各说各话）。**推导过程留在门禁入口文件里**，后续调速度的人不必重推。
+- 冒烟 9 项玩法断言：噪声输入后仍能移动、收集计数累加、过关判定、难度梯度（4→5 目标、30→26s 时限）、超时失败反馈、失败重来复位，外加键位契约 `_check_key_bindings`（逐键 AND 判定）。
+- verify.sh 退出码语义与 oak-key 同源：0 通过 / 1 冒烟失败 / 2 环境不可用（**存在性守卫先行**：preflight.py、smoke.sh、resolve-godot.sh 缺一即 2，防「脚本缺失」被误判成 3 诱导改游戏代码）/ 3 静态不一致。
+- **复发坑（连续两作）**：`.myrd/routines.yaml` 默认 `gamePath: games/godot-coin-rush` 至今未修。oak-key 轮已记录，hello 轮依旧要靠 preHookParams 显式覆盖成 `games/hello` 才测对工程。**建议运维直接改模板默认值或置空强制必填**，别再指望每作自觉覆盖。
+
+## 四、playtest blocked 实录：模板仓库技能资产落后于平台注入副本（本轮最大增量）
+
+- **触发**：判定脚本五清单 `{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 要求全部由项目仓库预置，hello 实测唯独 `std-skills/godot-game-dev/scripts/playtest.sh` MISSING → 节点按硬约束立即 blocked（不产试玩验收包、不回填量表、不调参回写）。
+- **根因（版本分裂）**：仓库内 `std-skills/godot-game-dev/` 是**旧版**（SKILL.md 无 playtest，routines.yaml 4 步）；平台注入阅读副本 `.myrd-platform/.claude/skills/godot-game-dev/` 是**新版**（SKILL.md §4.5 机器人试玩门禁 + `playtest_driver.gd` + 5 步 routine，新增 `playtestFrames: "900"`）。即：**模板仓库落后于平台注入副本**。
+- **纪律（为什么 blocked 而不是补一个）**：判定器唯一来源是模板仓库预置；被检方自写判定脚本，门禁不再独立，PASS 一文不值；注入副本是阅读用，不得复制/改写/等价替代。
+- **运维待办（精确到文件）**：把 `WORKSHOP_GAME_TEMPLATE_REPO` 的 godot-game-dev 技能资产同步到含 `scripts/playtest.sh` + `scripts/playtest_driver.gd` 的版本，并让仓库 `.myrd/routines.yaml` 的 godot-smoke 升到 5 步。报告已落盘 `docs/playtest/hello-playtest-blocked.md`（commit 283773e）。
+- **教训泛化**：工坊每接入新模板资产前，先 diff「模板仓库 vs `.myrd-platform/` 注入副本」的技能版本，发现落后先报运维，别等跑到最后一棒才 blocked。
+
+## 五、Web 导出与部署：hello 的三个增量打法
+
+1. **导出配置前置到 scaffold 棒**（前两作是 deploy 棒现场补 preset）：scaffold 按 `games/game` 既有先例补齐 `export_presets.cfg`（`platform="Web"`、`export_path="export/web/index.html"`、`variant/thread_support=false`、`html/canvas_resize_policy=2`）+ `.gitignore` 加 `!/export/web/` 豁免 + 导出产物入库（a8b5fd09）。deploy 棒零决策复用重导出——**「可托管形态」应该在脚手架棒就建成，别留到部署棒现场发明**。
+2. **根壳单游戏位切换要核对三处**：`apphost.toml`（name=hello / assets_dir=games/hello/export/web / health=/health / runtime=node20）、server 壳的资产路由、调参桥全局注入。hello 轮根壳原指向 candy-crush-legend（games/game/export/web），已整体切到 hello。**每次上新游戏，部署前 grep 根壳里旧游戏名清残留**。
+3. **部署重发坑：v1 因 504 重发被 superseded，v2 才是终态**（两笔同 gitRef）。判断游戏死活以 `/health` + app status + liveUrl 实测为准，**别拿 deployment 列表第一笔当真**。另：`/` 会 308 重定向到 `/apps/hello`（尾斜杠归一化），curl 复核记得 `-L` 跟随。
+
+线上复核（assign_agent 独立完成，不复用 deploy 自测结论）：部署 gitRef 远端 HEAD 与 dfd20d1 逐字一致；资产通道全文本（wasm/pck 走 `*.gz.b64`），本地解码还原 wasm 35,376,909 字节与本地导出逐字一致、magic `\0asm` v1 有效，pck magic `GDPC`；壳契约四件（相对路径拉资产、移动端音频手势解锁器、`__audioDebug` 取证口、tuning 调参桥）逐项在位。
+
+## 六、调参桥 hello 实例：spec 数值与实现默认值的口径漂移（真实发生，值得记录）
+
+- `game_state.gd` 的 `TUNING_META` 白名单四键：`base_target` 1–6、`base_time` 10–90、`time_step` 0–10、`min_time` 5–90；键不在名单=拒绝（防 URL 乱注入）；缺壳层时全局 undefined 属预期，门禁行为不受影响。
+- **口径漂移**：GameDesignSpec v1（id=cmuqkaypy002hm9bf3wnk1k26，approved）写的是 3 关 10/15/25 件、30/45/60s、连击窗口 1.5s；实现默认值是 `BASE_TARGET=4 / BASE_TIME=30 / MIN_TIME=18 / TIME_STEP=4`（每关目标 4→5、时限 30→26s）。spec 数值**没有**作为默认值落地，而是寄望试玩期经调参桥回填——playtest blocked 后未回填，两者至今不一致。
+- **结论**：工坊「spec → 实现」的数值对齐不能靠默认值拍脑袋。两条路二选一：① 实现前把 spec 数值直接落成常量默认值；② spec 数值作为 TUNING_META 默认初值，并在工程 README 记「spec 口径 = 默认值」。否则验收对不上、复盘对不齐。
+
+## 七、坑位速查表（hello 新增/复发，出问题先对号）
+
+| # | 坑 | 一句话修法 |
+| --- | --- | --- |
+| 1 | 双分支并存：工作区实际建 `hello-game-goal-*`，任务指定 `games-goal-*` | scaffold 棒把同一 commit 推两条分支保证 gitRef 存在；审计认 goal artifacts 的 gitRef |
+| 2 | routines.yaml 默认 gamePath=games/godot-coin-rush（复发） | preHookParams 显式覆盖；运维改模板默认值根治 |
+| 3 | 模板仓库技能资产落后于平台注入副本 → playtest blocked | 接入前先 diff 两份技能版本；落后先报运维 |
+| 4 | 部署 504 重发 → v1 superseded / v2 running | 判终态看 /health + app status + liveUrl 实测 |
+| 5 | `/` 308 到 `/apps/hello` 尾斜杠归一化 | curl 复核加 `-L` |
+| 6 | github.com:443 从工作区不可达（3 次重试 75s 超时） | commit 留本地分支不丢；先走平台 API（localhost）回写再补推 |
+| 7 | 碰撞余量不算就摆点 → 传送收集断言假失败 | 半宽+半径先算可达包络，摆点落在 clamp 边界内 |
+| 8 | spec 数值与实现默认值漂移 | spec 数值落成默认值或 TUNING 初值，README 记口径 |
+| 9 | 导出配置留到部署棒现场发明 | scaffold 棒按上一作先例补 preset + .gitignore 豁免 + 产物入库 |
+| 10 | 根壳残留上一游戏（单游戏位惯例） | 部署前 grep 旧游戏名清残留，apphost.toml 三键核对 |
+
+## 八、关联知识与权威来源
+
+- Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路总论（oak-key）：27407691-bcf8-4e73-b686-1bb8df684e5c
+- game-9 单游戏部署先例与调参桥 §3C：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 移动端触屏虚拟摇杆与 AudioContext 解锁规范：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- MyRD 平台真实仓库结构地图：b07a928a-414b-4d48-9535-5b6d6cc859ae
+- 仓库内权威文件（本仓可直接复用）：`games/hello/{verify.sh,export_presets.cfg,tests/smoke.gd,autoload/game_state.gd}`、`docs/playtest/hello-playtest-blocked.md`、`std-skills/godot-game-dev/scripts/`、`.myrd/routines.yaml`
+- 平台产物链：requirement=cmuqk7luz002am9bfmmkouw9v → design_spec=cmuqkaypy002hm9bf3wnk1k26 → hosted_app=cmuqk3huq001km9bf5ejp7tdg → workflow run=cmuqkb8xl002nm9bf9pz8hw61（/workflows/cmuqk3j35001qm9bfsdw4xn8d/runs/cmuqkb8xl002nm9bf9pz8hw61）→ 线上复核 assign_agent=cmto42pg60004m9aq7jczszhy
+
+## 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+# 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+> **文档定位**：固化 game-8 v2 轮手感调优的**具体数值（前后对照）**、godot-smoke 门禁表现、线上链路诊断结论与**可照抄的复测方法**，形成「手感类反馈（再大一点 / 再慢一点）」的**可复用增量调参基线**——后续同类反馈直接对照本文 §五 playbook 执行，不必重新勘探。
+> **权威基准**：需求《牛牛打游戏 game-8 · v2 手感调优：牛牛体型放大、移动速度下调》（`cmuqmej89000ym9gg6mom93o0`）；策划案 v1 设计唯一来源（doc `80b9c193-6807-43e4-b2b0-5789f2d9e35b`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）；收口依赖清单（doc `943eb5eb-0949-43fe-b939-83cf171af2a3`）。
+> **实现基线**：部署分支 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`；数值提交 `3a396355`（feat v2 手感调优）→ 产物重导出 `1089e4b` → 诊断报告 `1afec443`（`games/game-8/docs/v2-liveurl-diagnosis.md`，docs-only）；线上部署 = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`。
+> **本文数字全部为一手实测值**（git diff 实录 / curl 取证 / 线上 pck 自跑门禁），非估算。
+
+## 一、v2 数值基线（前后对照，唯一落账）
+
+| 声明键 | v1 默认 | v2 落账 | 需求量化区间 | 实际占比 | TUNING_META 钳制 |
+|---|---|---|---|---|---|
+| `PLAYER_SCALE` | 1.0 | **1.4** | 1.3~1.5× 整体放大 | 1.4× | min 0.5 / max 2.0 / step 0.05 |
+| `PLAYER_SPEED` | 220.0 px/s | **145.0 px/s** | v1 的 60~70% | **65.9%** | min 60 / max 300 / step 5 |
+
+- **唯一落账位置**：`games/game-8/autoload/game_state.gd` 数值区（v2 HEAD 实测：`var PLAYER_SCALE: float = 1.4` / `var PLAYER_SPEED: float = 145.0`）。⚠️ 策划案 v1 写的路径是 `scripts/game_state.gd`，**实际权威路径是 `autoload/game_state.gd`**（scripts/ 下并无此文件），后续引用以本文为准。
+- **接线方式**（`scripts/player.gd`）：`_apply_tuned_scale()` 把 `PLAYER_SCALE` 以**根节点 uniform scale** 应用（`is_equal_approx` 脏检查，滑杆改动下一物理帧生效），同步作用于视觉精灵、`CollisionShape2D` 碰撞体与 `PickupArea/PickupShape` 判定体；`velocity = direction * GameState.PLAYER_SPEED` 每物理帧读声明键。
+- **判定几何联动（容易算错的口径，钉死）**：`player.tscn` PickupShape 本体半径 22px → v2 缩放后 **30.8px**；收集物本体半径 14px（`collectible.tscn`）；**触发距离（圆心距）= 30.8 + 14 = 44.8px**（v1 为 22+14=36px）。刷点安全间距常量 96px 未动 → 余量从 96/36 ≈ **2.67×** 收窄到 96/44.8 ≈ **2.14×**，仍满足「重开不贴脸白捡」。commit `3a396355` 提交信息里的「判定半径 44.8px」即此**触发距离**口径，不是 PickupShape 本体半径，别混淆。
+
+## 二、godot-smoke 门禁表现（v2 断言三件套 + 全链路复跑）
+
+### 2.1 门禁复跑结果（本地与 preHook 同源，全绿）
+| 门禁步 | 结果 |
+|---|---|
+| resolve-godot.sh | exit 0，Godot **4.3.stable.official.77dcf97d8** |
+| preflight.py | **PREFLIGHT: PASS**（13 类前置一致性检查、40 个工程文件，exit 0） |
+| smoke.sh（240 帧预算） | **GODOT_SMOKE: PASS**（exit 0、零 SCRIPT ERROR） |
+| input-fuzz.sh | **GODOT_FUZZ: PASS**（seed=20260913，6 批次 239 帧，exit 0） |
+| playtest.sh | **脚本缺失**（模板仓库未预置，D2 依赖 / bug `cmuktchmy000km97z6kj3r2ro` Bug1），维持 blocked、不代写不伪造 |
+
+### 2.2 smoke.gd 新增 v2 手感断言三件套（真实机判，含 FAIL 路径，约 L423-435 `_assert_v2_tuning`）
+1. **倍率区间**：`PLAYER_SCALE ∈ [V2_SCALE_MIN=1.3, V2_SCALE_MAX=1.5]`，违例 FAIL 签名「v2 手感断言 FAIL：体型倍率 %.2f 不在 %.1f~%.1f 区间」；
+2. **移速区间**：`PLAYER_SPEED ∈ [V2_SPEED_MIN=V1_SPEED×0.6=132.0, V2_SPEED_MAX=V1_SPEED×0.7=154.0]`，FAIL 签名「移速 %.1fpx/s 不在 v1 默认 %.0f 的 60%%~70%% 区间」；
+3. **接线集成断言** `_assert_node_scaled`：Player 根节点、`CollisionShape2D`、`PickupArea/PickupShape` 三节点的全局缩放必须都等于数值区 `PLAYER_SCALE`（与难度梯度 SpawnTimer 断言同口径，防「数值键写了但没接上」）。
+
+方向符号断言（A/← 后 position.x 减小、D/→ 后增大）与 50 连击判定一致性、难度梯度、过期回收、胜负四分支、一键重开、持久化等既有契约**全部保留不动且继续通过**——玩法零回退。
+
+### 2.3 可复用结论：断言区间与需求区间硬耦合
+smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的。后续若要把数值调**跨出**这个区间，必须**三处同步**：smoke.gd 常量、需求区间条款、策划案 revisions 数值区——否则门禁会以清晰签名 FAIL（这是门禁在强制「数值变更须先改需求基线」的设计行为，**不是误报，不许放松断言来绕**）。
+
+## 三、线上链路诊断结论（liveUrl 端到端实测，2026-10-02）
+
+**结论先行**：✅ v2 已在线上生效且量化达标——部署产物自跑门禁全绿（含 v2 手感基线机判），线上资产与仓库导出逐字节一致，**无需修复、无需回滚**。
+
+1. **部署元数据**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`）；当前部署 **version 5 `cmuqny37h001ficf0mpmr71mv` status=running**；gitRef=`myrd/games-goal-cmujpml1e006rm99i9hc33huu`（未落 main ✓）；commit `1089e4b`（其上仅 1 个 docs 提交，代码零差异）；v4=`cmuqnx9v6001dicf0fmfryxcz` superseded（重试冗余但无害）。
+2. **公网链路**：`GET /apps/game-8/health` → 200 `{"ok":true,"app":"game-8","game":"牛牛打游戏","assets":"lazy/object-storage"}`；`/apps/game-8/` → 308 规范化跳转 → 200；`/gw/health` → 200（网关透传正常）；壳页 11,626B，`__GAME_TUNING__` 调参桥 ×2、`__audioDebug` 音频手势解锁器、资产全走相对路径 `fetch(BASE_PATH + 'api/public/assets/' + name)` 三契约在位。
+3. **资产文本通道**：`index.pck` base64 3,333,340B → 解码 gzip 2,513,040B；`index.wasm` base64 **10,696,408B** → 解码 35,376,909B（与门禁经验 v6 一手实测值一致）。
+4. **逐字节一致（无版本漂移）**：本地导出（部署 commit 工作树）与线上对象存储拉回解码产物 sha256 完全一致——pck `5f556ad9adf47579cb38a1fd8f7549e33b478b56cd4b3b5f112346281d699e25`；wasm `fe5cebc590758c10bc4469be5a591e28edbde5ec8f458f21baeb83db50d028b9`。
+5. **最高等级证据——部署产物自跑门禁**：`godot --headless --main-pack <线上pck> --quit-after 240 res://tests/smoke.tscn` → exit 0、零 SCRIPT ERROR、`GODOT_SMOKE: PASS`，v2 手感基线机判全过（1.4∈[1.3,1.5]，145∈[132,154]）——「牛牛变大变慢」是**产物运行期实测**，不是代码推断。
+
+## 四、复测方法（照抄即用）
+
+1. **公网探测**：`curl -s <liveUrl>/apps/game-8/health`（期望 200 + ok:true）；`curl -sI <liveUrl>/apps/game-8/`（期望 308→200）；壳页 HTML grep `__GAME_TUNING__` / `__audioDebug`。
+2. **资产一致性**：`GET /api/public/assets/index.pck`（和 index.wasm）→ base64 解码 → gunzip → `shasum -a 256`，对照 §三.4 的两个哈希；不一致即版本漂移，先查部署 commit 再谈手感。
+3. **手感数值机判**：`godot --headless --main-pack <线上或本地 index.pck> --quit-after 240 res://tests/smoke.tscn`，判定三条件（`GODOT_SMOKE: PASS` + exit 0 + 零 SCRIPT ERROR），签名中应含「v2手感基线(体型1.3~1.5x·移速60~70%)」字样。
+4. **数值速查**：游戏内调参面板或壳页 `?tuning=1` URL 直接查看当前声明键值；或读 `games/game-8/autoload/game_state.gd` 数值区。
+5. **环境备注**：诊断沙箱对 github.com:443 直连超时（`Recv failure`），推送改走 `ssh.github.com:443` 通道——后续同环境取证直接用此通道，别反复试直连。
+
+## 五、「再大一点 / 再慢一点」类反馈的增量调参 playbook（可复用基线）
+
+**标准链路（全七步，禁止散点改代码对数值）**：
+调参入口（游戏内面板滑杆即时生效 / 壳页 `?tuning=` URL）→ 确定目标声明键与新值 → **经策划案 revisions 回写 `spec.numeric`**（doc `80b9c193-…`，spec 载体即该知识文档）→ 改 `autoload/game_state.gd` 数值区 → 复跑 godot-smoke 门禁 → 重导出 Web 产物并部署（gitRef 必须是 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`）→ 按本文 §四产物自跑门禁复测。
+
+**建议步长与边界**：
+| 反馈 | 动作 | 步长建议 | 边界 |
+|---|---|---|---|
+| 再大一点 | `PLAYER_SCALE` ↑ | +0.05~0.1 / 档 | 钳制 [0.5, 2.0]；跨出 [1.3,1.5] 须按 §2.3 三处同步 |
+| 再小一点 | `PLAYER_SCALE` ↓ | −0.05~0.1 / 档 | 同上；低于 1.3 同样触发门禁 FAIL |
+| 再慢一点 | `PLAYER_SPEED` ↓ | −5~15 / 档 | 钳制 [60, 300]；跨出 [132,154] 须三处同步 |
+| 再快一点 | `PLAYER_SPEED` ↑ | +5~15 / 档 | 同上 |
+
+**每次调整必做的三项联动复核**：
+1. **断言区间一致性**（§2.3）：数值是否跨出 smoke 常量带；
+2. **判定几何余量**：体型↑ → 触发距离 = 22×scale + 14 线性放大 → 96px 刷点间距余量 = 96/触发距离 收窄；低于 2× 时须复核刷点安全间距常量是否要同步上调（公平性属门禁议题，不许靠放松断言解决）；
+3. **达成余量**：移速↓ → 单位时间可达刷点数↓ → 60s/20 目标的通关可达性须复核（跑 50 连击一致性 + 全链路一条龙断言兜底；v2 @145px/s 已实测可通关）。
+
+**回滚口径**：v1 = `PLAYER_SCALE 1.0` / `PLAYER_SPEED 220.0`，两键均可在调参面板或 `?tuning=` URL 直接调回，代码零改动。
+
+**主观手感的最终裁决**：数值区间内「像不像用户要的手感」机器判不了，仍以 D3 用户试玩结论为准（入口 `…/apps/game-8?tuning=1` 已可用）；未决依赖 D1（iOS Safari 真机）/ D2（playtest.sh 模板资产）见收口清单 doc `943eb5eb-…`。
+
+**来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
+
+
+## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+# game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+> 来源：需求《测试连点防重的极简计数页（game-12）》（id=cmur8x93r0016icbsd90s6e60，goal=cmur8pnhn000kicbsvl0eoqx6）走完「录入需求 → 判定规则调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-12`（Godot 4.3.stable），分支 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`（scaffold e055e4f → implement ff779d0 → deploy c54fcc9/078f761/e5b292e → playtest 1f7a4a3）。线上：https://leomac-studio.tail49399e.ts.net/apps/game-12/（/health 200 `{"ok":true,"app":"game-12"}`，deploymentId=cmurba8yd001vicbsfdl79x8l，部署 commit c54fcc9）。门禁终态：**godot-smoke 全绿 + mobile-web-smoke PASS 10/10（实测 FPS 39）**，playtest 棒复跑双门禁结论一致。
+>
+> 本文只写 game-12 的增量结论：防重语义选型与实现契约、双门禁通过路径、踩坑清单与复用清单。门禁三层体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-9 增量见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be；移动端触屏摇杆与 AudioContext 解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；防重判定规则 R1–R6 / 事件契约 C1–C4 调研全文见项目文档库 id=8345388c-cf30-4d7c-8413-39ccd7e65887。互为补充、不重复。
+
+## 一、防重语义选型：只有「固定节流（采纳即锚定、拦截不延窗）」能同时过验收 2 和 3
+
+| 方案 | 机制 | 300ms 内连点 5 次 | 窗口后恢复累加 | 结论 |
+| --- | --- | --- | --- | --- |
+| **固定节流（首击入窗）** | 首击计数并锚定窗口；窗口内后续点击全拦且**不更新锚点** | 仅 +1 | 正常 | 采用 |
+| 防抖（末击重启窗口） | 每次点击都重置窗口，静默期满才计 | 0 次 | — | 违背验收 2 |
+| 首尾折叠 | 窗口首末各计一次 | +2 | — | 违背验收 2 |
+
+**最易写错的一行**：被拦截的点击不得触碰窗口锚点 `_last_count_ms`。一旦拦截分支也更新它，节流就退化成防抖——持续点击下计数永远不涨，验收 3 永远不过。
+
+实现（`games/game-12/autoload/game_state.gd`，时间注入纯函数，核心约 15 行）：
+
+```gdscript
+const TARGET_COUNT: int = 10
+const DEBOUNCE_MS: int = 300
+var _last_count_ms: int = -DEBOUNCE_MS   # 初值 = -窗口 → 开局首击立即有效
+
+func try_count(now_ms: int) -> bool:
+    if state != State.PLAYING:
+        return false                      # 已胜：忽略，不报错
+    if now_ms - _last_count_ms < DEBOUNCE_MS:
+        click_rejected.emit(DEBOUNCE_MS - (now_ms - _last_count_ms))
+        return false                      # 拦截：只发反馈信号，不动锚点
+    _last_count_ms = now_ms
+    count += 1
+    count_changed.emit(count)
+    if count >= TARGET_COUNT:
+        state = State.WON
+        state_changed.emit(state)
+    return true
+
+func reset() -> void:
+    count = 0
+    state = State.PLAYING
+    _last_count_ms = -DEBOUNCE_MS         # 重开同步清防重锚点 → 首击立即有效
+```
+
+三个不能省的细节：
+1. `_last_count_ms` 初值取 `-DEBOUNCE_MS`，否则开局第一击被吞（验收 1 首点即错）。
+2. `reset()` 必须同时清防重锚点——「刷新/重开无残留」包含防重状态本身。
+3. 拦截不静默：`click_rejected(remaining_ms)` 把「被吞的点击」变成可感知反馈（按钮闪红 + 状态栏「连点已拦截，还需 Nms」）。且关键反馈不能被高频更新覆盖——状态栏曾把指针坐标与拦截提示混在一行，坐标每物理帧刷新把「还需 Nms」冲掉，拆成反馈线/指针线两行才保住。
+
+时间注入是机判前提：`try_count(now_ms)` 不读时钟 → 无头冒烟可用合成时间戳逐毫秒断言（完全确定、与帧率零耦合）；只有真实点击路径才走 `Time.get_ticks_msec()`。
+
+## 二、单源单相：三个入口汇一个判定点，防「一次触碰计两次」
+
+Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`（调研已核实）→ 移动端一次触碰可能产生 touch/mouse 双事件，再加键盘空格/回车，同一「点击」有四个来源。game-12 的收敛方式：
+- `CountButton.pressed`（鼠标/触摸）与 `_unhandled_input("confirm")`（键盘/动作）都只调唯一入口 `_attempt_count()` → `GameState.try_count(...)`。防重判定只在 GameState 一处，不可能被绕过。
+- `TouchConfirmButton`（TouchScreenButton）**不直接调游戏逻辑**，而是 `Input.parse_input_event(InputEventAction("confirm"))` 注入动作 → 触摸与键盘走完全相同路径（顺带获得桌面端自动不响应的免费屏蔽）。热区用 shape 圆（半径 44）而非位图。
+
+## 三、把「防重」机判成确定性断言（附负例验证纪律）
+
+冒烟相位设计（`games/game-12/tests/smoke.gd`）：
+- **合成时间戳断言防重**：t0 有效；t0+100/200/299ms 连点全拦、只发 click_rejected、count 不变；跨窗后再点正常 +1。
+- **真实路径另测**：真实点击受真窗口约束 → 相位间显式等真实时间跨窗，并设帧数上限守卫（60fps 约 2s，超限报 `Engine.max_fps` 异常而非挂死）。
+- **噪声后复位**：乱键相位可能真触发计数/拦截，且末次乱键可能贴着 confirm 注入点不足 300ms → 进断言前 `GameState.reset()` 清锚点，消灭偶发失败。
+- **每条断言做负例验证**（证明会真 FAIL，不是永真）：热区 44→10、宽高比 keep→expand、脉冲阈值抬到 1.0，三次均如预期 FAIL。
+
+两个「静默漏判」陷阱（负例不触发才发现）：
+1. 静态几何断言放 `_ready()`：此时 `Control.size` 恒为 0，整段断言被静默跳过 → 移到第一物理帧再读。
+2. Button 有主题最小尺寸保护：`offset_right=110` 实际 size 被钳到 115，44px 负例测不出来 → 换 TouchScreenButton 圆形热区做负例。
+
+极简静止页的门禁特异问题：mobile 门禁「画面在动」检查会把完全静止的页面误判为渲染冻结。解法：+1 按钮加待机呼吸脉冲（scale 1.00→1.06 / 0.9s，实测极差 0.060 ≥ 阈值 0.02），一举两得——既是移动端可点示能，又是确定性的非零帧差证据。缩放绕 `pivot_offset`（控件中心），否则动画往右下飘。
+
+画布口径：调研建议设计宽 375 + Adaptive；实现落成 720×1280 竖屏 + `canvas_items`+`keep`（+1 按钮 560×240，375 宽实机约 291px），同样满足无横滚与 ≥44px。机判锚点是**宽高比策略必须 keep**（expand 会被冒烟断言拦，负例已验证）。
+
+## 四、Godot Web 双门禁：分工、顺序与标记辨析
+
+| 门禁 | 判定链 | 拦什么 | game-12 实测 |
+| --- | --- | --- | --- |
+| **godot-smoke** | resolve-godot → preflight.py（13 类静态一致性）→ headless smoke（`GODOT_SMOKE_FRAMES=240`，断言退出码 0 + `GODOT_SMOKE: PASS` 标记 + 日志无 SCRIPT ERROR）→ input-fuzz（seed=20260913，6 批/239 帧） | 游戏本体「跑得动且玩得动」（含防重/恢复/胜负/重开/触控目标/拉伸契约断言） | 四步全 exit 0 |
+| **mobile-web-smoke** | mobile-web-smoke.mjs --url <liveUrl>（headless Chrome 390×844 iPhone 仿真）10 项：网络全通/console 零错/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约（__audioDebug）/无横溢（scrollWidth=390）/FPS≥8（实测 39） | 部署后真实链路上的移动端可玩性 | PASS 10/10 |
+
+三条纪律：
+1. **mobile-web-smoke 必须打部署后的 liveUrl**——本地静态伺服 export/web 只能当预检（implement 棒做过 10 项预检），不能替代正式门禁：M1 网关、对象存储资产通道、壳契约只在真实链路暴露。所以它位于 deploy 之后，是产物验证而非 implement 棒门禁。
+2. **标记辨析**：判定脚本 stdout 是小写 `godot-smoke: PASS`，引擎日志里才是大写 `GODOT_SMOKE: PASS`（smoke.sh 内部 grep 大写标记后才自产小写行）。只 tail 游戏日志看不到大写标记不等于失败——先分清两层标记再下结论。
+3. **证据随仓库归档**：`games/game-12/qa/mobile/report.json` + phase-load/tap/joystick 三张截图入库，供复跑比对。
+
+## 五、部署链五个真实踩坑（每个都在本目标发生过）
+
+1. **`.gitignore` 里 `/export/` 不删 = 部署后全 404**：apphost.toml 的 `assets_dir` 指向 `games/game-12/export/web`，导出产物不入库则 wasm/pck 上线即丢。导出产物必须入库（37MB wasm 走底座 A「资产出 bundle」+ 对象存储懒加载 + `/api/public/assets/` b64 文本通道，总论见 27407691）。
+2. **apphost.toml 沿用上一游戏**：原值指向 candy-crush 的 `games/game/export/web`；构建管线按 gitRef 读它，不改会打包错应用 → `name`/`assets_dir` 随游戏改是 deploy 棒第一查。
+3. **gitRef 必须是目标分支不是 main**：本次 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`。注意本地工作区克隆出的分支名可能与远端目标分支不同名同指针（`myrd/game-12-goal-…` vs `myrd/games-goal-…`）→ 部署前 fetch + 显式切到目标分支再读 apphost/导出。
+4. **壳页三件套缺一不可**（`server/src/game-page.ts` / `games/game-12/export/web-shell.html`）：品牌文案适配（曾残留糖果粉碎传奇文案）；§3C 调参桥（引擎加载前解析 `?tuning=` → `window.__GAME_TUNING__`，只认对象形态、非法 JSON 静默忽略——game-12 缺，补约 8 行）；音频手势解锁器 + `window.__audioDebug`（即 mobile 门禁「音频解锁契约」的机判对象）。壳页另配 `overflow:hidden + touch-action:none` + `user-scalable=no`：彻底禁双击缩放/滚动，快速二连点不被浏览器手势吞掉造成防重误判（比调研建议的 `touch-action: manipulation` 更强）。
+5. **PATCH 目标 artifacts 是整体替换数组**：回写产物必须 get→append→写回（playtest 棒 3→4 条、既有条目原样保留 + 回读校验），直接 put 会抹掉前序产物。
+
+调参语义澄清：`TUNING_META` 未声明时 `?tuning=1` 是**安全 no-op**（正常进游戏、忽略键）。game-12 有意不把 `DEBOUNCE_MS=300` 做成可调——它是需求验收项本身，spec 是唯一事实源。要开放浏览器内调参需下一轮：spec.numeric 声明键 → TUNING_META + tuning_panel.gd + 冒烟断言 → 重导出重部署重跑 mobile 门禁。
+
+## 六、macOS 自带 bash 3.2 的全角括号坑
+
+`verify.sh` 里 `$FRAMES）`（全角右括号紧贴变量名）在 macOS bash 3.2 某些 locale 下把多字节字符并入变量名 → `FRAMES: unbound variable`，而上一行 echo 还能正常展开，极难定位。写法统一 `${FRAMES}`，用 `bash -x` 抓现行。game-12 修复后 verify.sh 端到端全绿（preflight/smoke/fuzz 全 exit 0）。
+
+## 七、如实上报的缺口（未绕过、未伪造）
+
+1. **playtest.sh 不在模板仓库**（`std-skills/godot-game-dev/scripts/` 同目录 9 个判定/驱动脚本中独缺它）：各节点均未自造等价判定器、未伪造 `GODOT_PLAYTEST: PASS`；`.myrd/routines.yaml` 两条 routine（godot-smoke / mobile-web-smoke）均不引用它 → 不阻塞双门禁，缺口随产物 detail 上报运维补资产。
+2. **真机抽查未做**（本环境建不了 iOS 会话）：mobile-web-smoke 是 headless Chrome 仿真，触摸结论的边界是仿真环境；真机验证留待用户试玩回填。
+3. **试玩结论只能来自用户**：playtest_kit 已交付（`games/game-12/qa/playtest-kit.md`，试玩指引 + 反馈对照表 + 四问量表），量表待回填，未代填任何「好玩/通过」结论；未收到用户调参 URL 前，无 spec revisions/approve 调用。
+
+## 八、复用清单（后续点击类小游戏直接抄）
+
+1. 防重抄 `try_count(now_ms)` 签名：时间注入纯函数 + 初值 `-DEBOUNCE_MS` + 拦截不动锚点 + reset 清锚点 + 拦截发 remaining_ms。
+2. 输入抄「单源单相」：所有入口 → 唯一 `_attempt_count()`；TouchScreenButton 注入 InputEventAction 而非直调逻辑。
+3. 断言抄四件套：合成时间断言 + 真实路径跨窗等待 + 噪声后 reset + 每条断言负例验证；几何断言放第一物理帧，44px 负例用 TouchScreenButton 热区。
+4. 静止页记得待机脉冲（≥0.02 极差同时换「画面在动」绿与可点示能）。
+5. 部署抄「五查」：gitignore 的 /export/、apphost.toml 指向、gitRef=目标分支、壳三件套（文案/调参桥/音频解锁）、artifacts 回写 get→append→写回。
+
+关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
+
+## 沉淀 game-14 Godot Web 导出与移动端门禁经验
+
+> 来源：goal cmusp1rab0028ic7q9shcdzyl（项目 cmusp1ra00022ic7qnk18nofm）「小游戏工坊 · game-14」工作流执行沉淀。上游输入：需求《game-14 太空飞船躲陨石捡金币》（cmusphfbp0062ic7qrxlt2nk4）、GameDesignSpec v1（cmuspm7sm006uic7qzrbqyilp，approved）。工作流 run cmuspmlex0072ic7qnjiqxmpc **真实结局 = failed，且失败于工作区准备阶段，四个节点全部 pending**。本卡如实记录本轮真实结论（失败模式与补救路径），并把 game-14 真正进入开发后要带上的导出/门禁契约收拢成清单（引用既有基线、不重复）。**本轮没有产生任何 game-14 代码、导出产物、门禁判定或部署事实——请勿把本卡第 4~6 节的复用清单误读为 game-14 实测数据。**
+
+## 一、本轮真实结局：准备阶段 git clone 失败，门禁与导出根本未执行
+
+- 时间线：run 创建 2026-10-03T18:12:57Z → failed 2026-10-03T18:15:25Z（存活 2 分 28 秒）；prepSteps 仅「解析模型配置 3ms」；失败点 = preparationPhase「正在准备代码工作区（克隆仓库、拉取最新代码）」。
+- run.result.error 逐字：`git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmusp1ra00022ic7qnk18nofm/run-cmuspmlex0072ic7qnjiqxmpc'... fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75009 ms: Couldn't connect to server`。
+- 节点状态：脚手架 / 实现玩法 / 导出并部署 / 试玩验收 全部 pending；implement 与 deploy 的 godot-smoke preHook、playtest 的 mobile-web-smoke preHook 也均 pending——**门禁一次都没跑过，不存在「门禁打回」**。
+- 复盘纪律：「已启动 ≠ 已成功」在本轮的具体形态就是「run 状态 failed + 节点全 pending」；判定真实结局唯一依据 run 状态与 run.result.error，禁止凭预期脑补「门禁打到第几轮」。
+
+## 二、根因分类与补救：环境不可用 ≠ 代码缺陷，正确动作是重跑而非改代码
+
+- 根因：github.com:443 连接 75 秒超时（connect 阶段即失败，非认证/仓库问题），属瞬时网络故障——与 godot-smoke 退出码 2「环境不可用」同层语义：**禁止为它改游戏代码，更不允许宣称门禁失败**。
+- 恢复复核（2026-10-04）：`curl https://github.com` → 200（0.59s）；`git ls-remote https://github.com/hl3w22bupt/myrd-playground.git` 正常返回分支列表 → 复跑条件已具备。
+- 补救动作：`POST /api/v1/workflows/runs/cmuspmlex0072ic7qnjiqxmpc/rerun`（平台手册 rerun 入口）。DAG 输入不变：需求 cmusphfbp0062ic7qrxlt2nk4 + spec cmuspm7sm006uic7qzrbqyilp（v1 approved）仍是唯一权威。
+- 若同签名（clone exit 128 / 443 connect timeout）复现：先做宿主机连通性探针（curl github.com + git ls-remote），如实按「环境不可用」上报等待恢复；不得降级为纸面交付，也不得空转烧修复预算。
+
+## 三、game-14 工坊流水线契约（经本轮 run 定义实测核实）
+
+- 四棒 DAG：脚手架 scaffold → 实现玩法 implement → 导出并部署 deploy → 试玩验收 playtest；仓库 github.com/hl3w22bupt/myrd-playground（game-14 预期落位 `games/game-14`，以 scaffold 实际产物为准）。
+- 门禁挂点：**implement、deploy 两棒都挂 godot-smoke；playtest 挂 mobile-web-smoke**。routine 均 gate:false、由 preHook 显式引用；`{{liveUrl}}` 无默认值 = fail-closed（不传就报错，不会静默跳过门禁）；`{{gamePath}}` 必须经 preHookParams 显式传参（默认值指向不存在工程的坑见 27407691 §1.3）。
+- 判定资产唯一来源：仓库 `std-skills/godot-game-dev/scripts/`（mobile-web-smoke 判定脚本 mobile-web-smoke.mjs + 负例自测 mobile_smoke_selftest.mjs + routine 片段模板已随 commit 4a8e4b76 落地）；被检工程不得自造判定器，scaffold 只校验不自造。
+
+## 四、game-14 验收标准 → 门禁断言映射（approved spec v1 的可机判数值）
+
+| 验收项 | spec v1 锚点 | 机判断言落法 |
+| --- | --- | --- |
+| 难度阶梯 | 陨石生成间隔 950ms 逐档递减至封顶 430ms、下落速度 130px/s 逐档递增至封顶 270px/s，共 5 档（每 100 分一档） | 冒烟分相位读各档生成间隔/单位位移帧数，断言逐档单调变化且封顶后不再变化；档位边界按得分 100/200/300/400 推导写进断言注释 |
+| 状态机与持久化 | 开始（含操作说明）/进行中/暂停恢复/游戏结束/一键重开五状态；最高分 localStorage 键 `game14.highScore` | 状态标志断言；重开后断言分数清零而最高分保留；localStorage 属线上行为，由 mobile-web-smoke 打 liveUrl 验证 |
+| 操控与边界 | 键盘 ←→/A/D（含上下）+ 触摸拖动，飞船不可越出画布 | E-08 纪律：按住方向键测位移与动作注入分帧做；越界 clamp 断言；触摸拖动必须真实改变飞船目标位置（mobile 门禁 touch-response 预修，见 §六） |
+| 计分与生命 | 拾金币 +10 实时显示；撞陨石 −1 命（共 3 命），命尽进游戏结束页并展示本局得分 + 历史最高分 | 拾取/碰撞事件计数断言；连续碰撞或生命归零路径必须可达并断言 GAME_OVER |
+| 视听契约 | 三层星空视差滚动；碰撞爆炸闪烁 + 300ms 震屏 + 1.2s 无敌闪烁；+10 飘分 | 事件标志/帧差断言；无敌期 = 「碰撞不再扣命」的断言窗口 |
+| 音频契约 | coin-pickup / meteor-explosion / game-over 三 SFX 可编程触发；M 键静音且不影响逻辑 | headless 侧编程触发断言；AudioContext 解锁契约（__audioDebug）归 mobile-web-smoke 第 8 项 |
+| 性能 | 连续游玩 60s 帧率 ≥ 30fps；页面无控制台报错 | **阈值辨析：mobile-web-smoke 的 FPS≥8 是底线门禁，≥30fps 是需求验收线——门禁全绿 ≠ 验收达标，验收仍按 spec 执行** |
+
+## 五、复用基线指针（执行时直接带上，本卡不重复其内容）
+
+- **27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 总论）**：Godot 4.3 Web 导出参数基线（`variant/thread_support=false` 免 COOP/COEP、`canvas_resize_policy=2`、中文必须 theme/custom_font=P13、导出 7 件套与 wasm≈35MB 量级）；AppHost 部署契约（**一游戏一清单**——game-14 必须 `name="game-14"`、`assets_dir="games/game-14/export/web"`，绝不沿用他游戏 apphost.toml；部署 gitRef 必须是部署分支 `myrd/games-goal-<goalId>` 不是 main；`/export/` 产物必须入库否则上线全 404；M1 网关拦二进制 → gzip+b64 文本回传；壳内资源全走相对路径）；godot-smoke 三层门禁与退出码语义 0/1/2/3；error-signatures 修复循环纪律；部署终态独立复核四步。
+- **00314649-c4d2-407c-871b-62f7de91b07d（game-12）**：mobile-web-smoke 10 项明细（网络/console/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约/无横溢/FPS≥8）与「必须打部署后 liveUrl」纪律（本地静态伺服只能当预检）；标记辨析（判定脚本 stdout 小写 `godot-smoke: PASS` vs 引擎日志大写 `GODOT_SMOKE: PASS`）；证据随仓归档（`games/<game>/qa/mobile/report.json` + phase 截图）。
+- **82e419bb-b641-4b5e-bb58-d8b9633169ca**：移动端触屏虚拟摇杆与 AudioContext 解锁三件套（首手势解锁 + 解锁前记账 + 退后台回来再解锁），壳页与游戏侧都要进。
+- **36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）/ 78180e88-6486-404e-9265-e315e0da3c66（hello）**：同系列工程结构、模板与门禁增量结论。
+
+## 六、mobile-web-smoke 已知失败图谱（5 款游戏实测 → game-14 预修清单）
+
+仓库 mobile-gate 系列实测 verdict（commits 11957bd3~585db60c）：game-3 疾风忍者跑 **PASS**（十项全绿，tap 触发跳跃实证触摸驱动玩法）；game-2 星尘收集者 FAIL（console Godot 缺 cfg 告警 + tap 后零帧差）；game-4 光路谜阵 FAIL（tap 落空格零帧差，探针坐标与 letterbox 棋盘错位）；game-9 推箱子 FAIL（探针落点错位，摇杆实际 CSS(44,502)）；game-10 天天酷跑 FAIL（tap 落横带无响应，尚需探针区分「点按开始未实现」与「落点错位」）。
+
+- 主失败源集中在 **touch-response**，两类根因：①游戏触摸未真正接入玩法状态（UI 自称支持触摸但点按无效）；②探针坐标与画布 letterbox/控件 CSS 实际位置错位（屏幕坐标 ≠ 游戏坐标）。
+- game-14 预修清单：触摸拖动直接改飞船目标位置并与键盘同路径（game-12「单源单相」范式：多输入源汇一个判定入口）；可交互热区 ≥44px，避免依赖 letterbox 偏移的绝对坐标；开始页不要做成纯静止层（会触发「画面在动」误判，game-12 用待机呼吸脉冲拿到确定性非零帧差）；音频解锁契约随壳页一并实现。
+- 证据纪律：verdict 逐字进 commit message + report.json + phase-load/tap/joystick 三截图入库，供复跑比对。
+
+## 七、关联知识与权威来源
+
+- 知识卡：27407691-bcf8-4e73-b686-1bb8df684e5c（导出+门禁+AppHost 总论）、00314649-c4d2-407c-871b-62f7de91b07d（双门禁与 mobile-web-smoke 10 项）、82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏/音频解锁）、36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）、78180e88-6486-404e-9265-e315e0da3c66（hello 工坊）、b07a928a-414b-4d48-9535-5b6d6cc859ae（平台仓库结构与路径陷阱）。
+- 仓库权威文件：`std-skills/godot-game-dev/scripts/{smoke.sh,preflight.py,input-fuzz.sh,resolve-godot.sh,mobile-web-smoke.mjs,mobile_smoke_selftest.mjs}`、`std-skills/godot-game-dev/references/{godot-smoke-routine.md,mobile-smoke-routine.md,error-signatures.md}`、`.myrd/routines.yaml`。
+- 平台事实源：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`（rerun 入口、「已启动 ≠ 已成功」纪律）；工作流 spec 与需求以平台登记产物为准。
+
+
+## 沉淀知识：Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+# Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+> 来源：目标「森林收集水果限时赛」（goal=cmuspb558003tic7qwgyd02c2）的小游戏工坊流水线（workflow=cmuspb55m003xic7q9o18vjk2 v1，scaffold→implement→deploy→playtest）首轮执行（run=cmuspld10006ric7qup55soew，2026-10-03T18:12:00Z 起、18:14:30Z 判 failed）。固定参数：工程 games/60-2，功能分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2，AppHost cmuspb3xg003ric7q1ksya6c3（slug 60-2），liveUrl https://leomac-studio.tail49399e.ts.net/apps/60-2/（部署前即确定）。本文只写本轮实测增量：①双门禁在 60-2 的挂点与分工；②本次 run 的真实卡点——双门禁之前的第一堵墙；③一次「参数漂移」疑云的证伪过程；④知识沉淀节点自身的 API 事实。godot-smoke 三层门禁体系、打回修复签名表、AppHost 部署总论见关联知识（§八），不重复。
+
+## 一、结论速览
+
+| # | 要点 | 结论 | 依据 |
+| --- | --- | --- | --- |
+| 1 | 双门禁分工 | 工程门（godot-smoke，挂 implement 与 deploy 之前，判工程本体）×线上门（mobile-web-smoke，只挂 playtest 之前，判公网 liveUrl）——判定对象、执行环境、证据落点都不同，不可合并为一道 | 工作流定义逐节点核对 |
+| 2 | 本次失败层级 | run 级失败发生在**门禁之前**：工作区 git clone 连不上 github.com（443 端口 75s 连接超时），四个节点全部 pending，双门禁一次都没执行 | run.result.error 原文 |
+| 3 | 根因定性 | 环境阻塞，非代码/配置缺陷：github.com 从执行机**持续性**不可达（2026-10-03 run 失败 + 2026-10-04 复测 `curl -m 10 https://github.com` 仍超时，连接建立不了） | run 错误 + 本机复测 |
+| 4 | 重跑纪律 | 网络不通时重跑 run = 空烧：先 `curl -m 10 https://github.com` 验连通（10 秒成本），通了自己重跑（工作流定义无需改动），持续不通按「blocked 比空烧有用」上报运维（代理/镜像），禁止为绕过网络改仓库来源 | 本轮 2.5 分钟烧掉一次 run 的直接教训 |
+| 5 | 工作流定义健康度 | 60-2 四节点参数已逐一核对**全部正确**指向 games/60-2 / 60-2 分支 / 60-2 AppHost / 60-2 liveUrl，不存在「模板实例化只替换了首个节点」的漂移 | 8 个关键词 × 4 节点计数复核 |
+| 6 | 沉淀 API 事实 | 本部署**没有** `/api/v1/knowledge/search`（404）；等效做法与写入契约见 §七 | 本次实测 + 平台源码 src/routes/knowledge.ts |
+
+## 二、60-2 双门禁挂点与分工（逐节点实例核对）
+
+| 节点 | preHook | preHookParams | 判定对象 | 证据落点 |
+| --- | --- | --- | --- | --- |
+| scaffold | 无 | — | 资产存在性自检（门禁脚本/routines.yaml/模板，缺失→blocked） | 节点 detail |
+| implement | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（静态一致性 + 无头运行） | 门禁日志 |
+| deploy | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（部署前再拦一次，防止部署带病产物） | 门禁日志 |
+| playtest | mobile-web-smoke | gamePath=games/60-2, liveUrl=https://leomac-studio.tail49399e.ts.net/apps/60-2/ | **线上公网 liveUrl**（headless Chrome 移动仿真） | games/60-2/qa/mobile/（report.json + 分阶段截图） |
+
+要点展开：
+
+1. **工程门挂两道、线上门只挂一道，是有意设计**：godot-smoke 的判定对象是仓库内工程（preflight 静态 + headless 运行），所以在写代码（implement）和出产物（deploy）两处都要拦；mobile-web-smoke 的判定对象是已部署的线上地址，只有 playtest（试玩验收）消费它，且 liveUrl 在部署前就已锁定，preHook 可以在节点启动前先跑门禁、节点启动后直接读证据。
+2. **判定协议（与门禁同源，agent 本地自检命令完全一致）**：退出码 `0` 且日志含标记才算通过——`GODOT_SMOKE: PASS`（冒烟）/ `GODOT_FUZZ: PASS`（fuzz）/ `GODOT_PLAYTEST: PASS`（机器人试玩）；退出码 `2` = 环境不可用（装环境/上报，**禁止为过门禁改判定脚本或改松断言**）。
+3. **判定器独立性**：`preflight.py / smoke.sh / input-fuzz.sh / playtest.sh / resolve-godot.sh / mobile-web-smoke.mjs` 唯一合法来源是仓库 `std-skills/godot-game-dev/scripts/`（模板仓库预置）；平台注入的 `.myrd-platform/.claude/skills/godot-game-dev/` 只是阅读副本，不得当判定来源、不得现场改写、不得自造等价脚本——被检方自己写判定器，PASS 一文不值。缺任何一个 → status=blocked 上报（「模板仓库未预置门禁脚本：<文件名>；请运维补模板仓库」），**不要现场补**。
+4. **参数化必须显式传**：`.myrd/routines.yaml` 中 `godot-smoke` 与 `mobile-web-smoke` 的 `{{gamePath}}`/`{{liveUrl}}` 由工作流节点 preHookParams 按工程覆盖。仓库默认值指向别的工程——不传参要么报错、要么（更糟）静默测错工程给出假 PASS（坑实录见关联知识 27407691 §1.3）。
+5. **中文字体是 preflight P13 的拦截项**：Web 导出跑在浏览器沙箱里拿不到系统字体，模板自带 `assets/fonts/` 全局中文字体与 `project.godot` 的 `[gui] theme/custom_font` 配置必须原样保留；「有中文文案但无字体」直接被 P13 拦下。禁止为躲缺字把文案英化——那是字体缺失的症状，不是修复。
+
+## 三、本次 run 的真实卡点：双门禁之前的第一堵墙
+
+**时间线**：18:12:00 run 启动 → 引导阶段执行工作区 `git clone https://github.com/hl3w22bupt/myrd-playground.git` → 75 秒连接超时 → 18:14:30 run 判 failed。错误原文：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspb3xd003nic7qm25pu8si/run-cmuspld10006ric7qup55soew'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75003 ms: Couldn't connect to server
+```
+
+**为什么门禁体系没接住**：门禁全部挂在**节点**上（preHook），而 clone 是 run 引导步骤，发生在第一个节点之前。clone 失败的后果是：①直接置 run=failed（result.error），②四个节点永远 pending，③没有 reject 打回循环、没有 blocked 语义、没有证据落点——门禁体系（preflight/smoke/fuzz/playtest/mobile-web-smoke 六个判定器）覆盖的是「工程与线上」，不覆盖「工作区引导」这第 0 步。
+
+**连锁依赖链**（为什么这一断全断）：clone 可用 → 功能分支可推送 → AppHost 按 gitRef 拉取构建 → liveUrl 可访问 → mobile-web-smoke 有东西可测 → 试玩验收有地方可玩。第 0 依赖断了，双门禁与验收全部空转。
+
+**恢复路径（给下一轮执行，按序）**：
+
+1. 先验连通（成本 10 秒，避免空烧一次 2.5 分钟的 run）：`curl -s -o /dev/null -m 10 -w "%{http_code}" https://github.com`；
+2. 通了 → 直接重跑工作流，**定义无需任何改动**（四节点参数已核对全部正确，见 §四）；
+3. 持续不通 → 不要重跑，回写 status=blocked 上报运维（网络代理 / GitHub 镜像 / 出网白名单），写清「clone github.com:443 连接超时，全链被第 0 依赖阻塞」——与门禁「退出码 2 = 环境不可用，禁止为过门禁改代码」是同一条纪律的 run 级推广：**环境不通时，重跑是空烧，先修环境或如实上报**；
+4. 禁止为绕过网络私自换镜像仓库/改 remote——仓库来源是部署与门禁的信任锚，变更必须走运维。
+
+## 四、诊断方法论：一次「模板参数漂移」疑云的证伪
+
+**现象**：核对工作流定义时，scaffold 节点参数正确指向 games/60-2，而读到的 implement/deploy/playtest 节点 prompt 里满是上一个游戏 app-2 的固定参数（gamePath=games/app-2、分支 cmuspfeyw…、AppHost cmuspfdr…、liveUrl /apps/app-2/）→ 一度形成高价值假设：「工作流模板实例化只替换了首个节点的参数」。
+
+**证伪过程**：换独立文件名重新拉取同一工作流，对 8 个关键词（games/60-2、games/app-2、两个 goal id、两个 liveUrl、两个 AppHost id）× 4 节点逐一计数——**四节点全部正确指向 60-2**。真因：诊断用的 `/tmp` 共享临时文件被本机并发进程覆盖，中间那几步读到的其实是另一个工作流（app-2）的同名缓存文件。
+
+**沉淀三条**：
+
+1. 结论必须落在「重新独立取证」上，不落在「上一次读到的内容」上——尤其对「上游模板缺陷」这类会被写进知识、触发他人返工的高价值指控，先证伪再落笔；
+2. 诊断脚本对临时文件用唯一文件名（本次 `/tmp/wf.json` 与并发工作流进程撞名），或直接管道内消费不落盘；
+3. 证伪本身也是产出：本文档差点把一个不存在的平台缺陷写成结论，§一第 5 条的「定义健康度」结论就是证伪的成果，它让下一轮可以放心直接重跑。
+
+## 五、Web 导出与 AppHost 部署：60-2 落位值与硬约束清单
+
+机制细节与打回修复总论见关联知识 27407691（oak-key 全链路）与 82e419bb（触屏/音频），本节只列 60-2 的具体落位值和逐项易错点：
+
+| 项 | 60-2 落位值 | 易错点（违反后果） |
+| --- | --- | --- |
+| 部署来源分支 | myrd/games-goal-cmuspb558003tic7qwgyd02c2 | gitRef 传 main → main 上没有本游戏的 apphost.toml/导出产物，构建失败或把别的壳部署出去 |
+| 部署 API | POST /api/v1/apphost/apps/cmuspb3xg003ric7q1ksya6c3/deployments，mode=bundle | sourceId 必须是 goal id cmuspb558003tic7qwgyd02c2；带别的应用 id → 403 APP_BOUND_TO_OTHER_SOURCE（选错坑，回来核对 hostedAppId，不要换坑硬试） |
+| 导出预设 | games/60-2/export_presets.cfg 配 Web(HTML5)，产物落 games/60-2/export/web/（必须含 index.html） | 缺 index.html → 壳无入口页 |
+| 资产出 bundle | apphost.toml 声明 `assets_dir = "games/60-2/export/web"`，平台把该目录上传对象存储，25MB 上限不再约束资产体积 | 不声明 assets_dir → 产物挤进 bundle，体积立刻顶 25MB 上限 |
+| 壳资产路由 | asset-store `getAsset` 懒加载，路由 `/api/public/assets/:name`；`gzip+b64` → 回 text/plain 的 base64（壳端 DecompressionStream 解压）；`raw` → 按 contentType 回原文 | M1 网关**只透传文本响应**：octet-stream/gzip/图片/音视频 → 502 UNSUPPORTED_BINARY；资产一律 base64 文本回传 |
+| 路径口径 | 壳页面拉资源**一律相对路径**（`api/public/assets/index.wasm`）；`?p=` 是网关保留 query | 绝对路径 `/assets/...` 或 `?p=` 手拼 → 404/被登录墙拦 → 黑屏 |
+| wasm 初始化 | `WebAssembly.instantiate(bytes)`（base64 → Uint8Array → 解压） | instantiateStreaming 要求 application/wasm MIME，本链路不满足 |
+| b64 内联降级 | 仅当 asset-store 不可用；原始产物 ≤ 18MB（b64 膨胀 1.33×，bundle 上限 25MB） | 超限 → 降级「说明页 + 下载指引」，不得声称可玩 |
+| 音频手势解锁 | 壳页面在引擎加载**之前**：①包 AudioContext 构造器捕获引擎实例；②document 级 `touchstart/touchend/pointerdown/keydown/click`（capture+passive，不消费事件）同步 `ctx.resume()`；③暴露 `window.__audioDebug()` | 缺任一 → 移动端全部音效静默且控制台零报错（WebKit 创建即 suspended、切后台变 interrupted、引擎只在输入回调 resume）；有音效的游戏壳缺解锁器 = 验收不通过 |
+| 调参桥 | 壳页面引擎加载前解析 `?tuning=<JSON>` 进 `window.__GAME_TUNING__`，游戏侧 GameState 启动按 TUNING_META 声明的键钳制覆盖 | 缺 → 试玩调好的参数无法用 URL 复现，调参回写流程断裂 |
+| 部署后自测 | /health 与 / 都 200 只是起点，**必须**跑 mobile-web-smoke | 只 curl 200 就宣称部署成功 = 跳过移动端硬门槛 |
+
+## 六、mobile-web-smoke 移动端模拟门禁要点
+
+- **机判方式与维度**：headless Chrome 移动仿真打开线上 liveUrl，机判六项——网络（资源可达）、console（无报错）、渲染（画面在动）、触摸（可交互）、音频契约（解锁层在位）、视口（移动端尺寸正确）。
+- **证据落点**：`games/60-2/qa/mobile/`（report.json + 分阶段截图）。试玩节点（playtest）据此写试玩指引；若发现证据缺失或与 preHook 结论矛盾，如实回写 detail，不替门禁背书。
+- **已知边界一：静止页会被误判渲染冻结**。完全静止的页面「画面在动」检查会 FAIL——解法是给核心按钮加待机呼吸脉冲（game-12 实测：scale 1.00→1.06 / 0.9s，极差 0.060 ≥ 阈值 0.02），既是门禁过检又是移动端可点示能（关联知识 00314649）。
+- **已知边界二：门禁全绿 ≠ 真机可用**。触摸事件分发顺序（E-18：`mouse_filter=STOP` 的 Control 在 GUI 命中阶段吃掉触摸，永远到不了 `_unhandled_input`）与 InputEventAction 互踩（E-19）都属于「headless 门禁全绿、真机必挂」型，机判之后仍需真人真机过一次「开局可动、摇杆不误触」（关联知识 82e419bb）。
+- **与试玩验收的衔接**：mobile-web-smoke 全绿只是准入，试玩节点产出「试玩验收包」（试玩指引 + 四问量表 + 调参工作台入口 `<liveUrl>?tuning=1`）；试玩结论只能来自用户，量表未回填就如实标「待回填」，detail 里不得出现没有出处的「试玩通过」。
+
+## 七、知识沉淀节点自身的 API 事实（本次实测，供后续沉淀节点直接复用）
+
+- **本部署不存在 `GET /api/v1/knowledge/search`**（返回 404）。等效「先搜后写」：`GET /api/v1/knowledge?scope=global&limit=200` 拉全量后客户端按 title/内容过滤（服务端源码 src/routes/knowledge.ts 的 GET 只支持 scope/category/projectId 过滤，无全文检索；列表默认只返回 parentId=null 且 isPublished=true 的文档）。
+- **新增**：`POST /api/v1/knowledge`，必填 `title` + `scope`（'global'|'project'）；`title+scope` 重复 → 409 CONFLICT（先搜后写可顺便避开）；`tags` 必须是字符串数组；`category` 建议对齐既有口径（本文用「技术方案」，与同类游戏知识一致）；创建即 isPublished=true 并自动生成 v1 版本快照。
+- **更新**：`PATCH /api/v1/knowledge/doc?id=<docId>`，支持部分更新 title/content/category/tags/icon/scope/projectIds；平台自动做版本化（更新前快照旧版 → version+1 → parentVersion=`id@vN`），不需要调用方自己处理版本。
+- **单篇读取**：`GET /api/v1/knowledge/doc?id=<docId>`（返回 doc + associatedProjectIds；已删除文档也能读到，便于历史链接）。
+- **写入姿势**：JSON body 直接 PUT 不便时，用 python3 `json.dumps` 构造 payload 再交 curl 发送，避免 shell 转义事故。
+
+## 八、关联知识（互为补充，不重复）
+
+- `27407691-bcf8-4e73-b686-1bb8df684e5c`：Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路实战（oak-key）——三层门禁体系、退出码语义、routine 参数化、GODOT_BIN 单一实现、error-signatures 打回修复表。
+- `00314649-c4d2-407c-871b-62f7de91b07d`：game-12 双门禁通过路径——mobile-web-smoke PASS 10/10 实测、静止页呼吸脉冲、负例验证纪律。
+- `82e419bb-b641-4b5e-bb58-d8b9633169ca`：game-5 触屏虚拟摇杆与 AudioContext 解锁规范——E-18/E-19 机制、统一移动向量出口、音频门控三件套。
+- `6e91a11d-3632-4721-a3ea-d433e9622f9b`：game-5 玩法设计要点——与 60-2 同属「森林收集水果限时赛」玩法族（60 秒限时收集），数值基准可对照。
+- 设计 spec（platform）：`cmuspl1bw006lic7qkcplv73e`——60-2 的水果分值表（+1/+3/+10）、生成节奏与 60 秒结算契约及契约测试清单，实现与验收以此为准。
+
+## 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+# 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+> 来源：需求《《森林收集水果限时赛》游戏需求》（id=cmusp9cd00035ic7qxi8c4il3，验收节点 completed）→ GameDesignSpec《水果分值表与收集循环》（id=cmuspeqza004uic7qusqyn7gr）→ 小游戏工坊两次工作流运行皆 failed → 主策划验收指派（id=cmtn5fhk8000hjqckrib9i3bb，completed）。全部平台终态于 2026-10-04 经 API 与线上 URL 实测取证（见 §一）。
+>
+> 本文写三件事：① 可复用的「分值分档点按收集」玩法模板（+1/+2/+5 三档）；② Web 导出 + 双门禁的复用要点；③ 本 goal 双跑皆败的流程复盘教训。**不重复**总论：门禁三层体系与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key）；工程结构最小契约与帧预算推导见 78180e88-6486-404e-9265-e315e0da3c66（hello）；时间注入机判与单源单相见 00314649-c4d2-407c-871b-62f7de91b07d（game-12）；触屏适配与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca；**同名 IP 的另一机制变体**（松鼠移动+原木躲避+连击）见 6e91a11d-3632-4721-a3ea-d433e9622f9b（game-5 老版）。
+
+## 一、事实基线（本 goal 真实终态，先看这个再谈复用）
+
+| 对象 | 标识 | 终态 | 取证方式 |
+| --- | --- | --- | --- |
+| 需求 | cmusp9cd00035ic7qxi8c4il3 | completed | goal DAG 记录 |
+| GameDesignSpec（分值表与收集循环） | cmuspeqza004uic7qusqyn7gr | completed | goal DAG 记录 |
+| 工坊运行 #1 | workflow=cmusp1yao002pic7q384xxfse，run=cmuspf4oo0050ic7qfjj0azwh（工程 games/60，分支 myrd/games-goal-cmusp1ya8002lic7qk39zog9o） | **failed** | GET /api/v1/workflows/{id} 的 runs 字段 |
+| 工坊运行 #2（换 slug 重试） | workflow=cmuspb55m003xic7q9o18vjk2，run=cmuspld10006ric7qup55soew（工程 games/60-2，分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2） | **failed** | 同上 |
+| AppHost 记录 | 60=cmusp1ya6002jic7qz3dhps7r；60-2=cmuspb3xg003ric7q1ksya6c3 | 均卡在 status=creating，publicUrl=null，publishedAt=null | GET /api/v1/apps |
+| 线上地址 | https://leomac-studio.tail49399e.ts.net/apps/60 与 /apps/60-2（含 /gw 变体） | **404「应用不存在」** | curl -L 实测 2026-10-04 |
+| 主策划验收指派 | cmtn5fhk8000hjqckrib9i3bb（标题「验收复核线上版并回写产物标识」） | completed（节点完成；其结论正文经多个 API 路由探测不可回读） | goal DAG 记录 |
+| 同名老变体 game-5 | AppHost=cmuipis4f0063m9l6hagvvvd4，goal=cmuipis4g0065m9l69hew4nng，需求=cmuipol63006rm9l6cp2ww5r5 | ready，publicUrl=/apps/game-5，3 次工坊 run 全 completed | GET /api/v1/apps、/api/v1/workflows |
+
+结论一句话：**本 goal 的「点按分档版」截至 2026-10-04 没有可玩的线上版**；平台里唯一在线的「森林收集水果限时赛」是老变体 game-5（玩法口径完全不同）。后续任何验收、试玩、传播链接都必须先对照本表，别拿老 game-5 顶数。
+
+## 二、分值驱动收集玩法模板（+1/+2/+5 三档 · 点按拾取）
+
+### 2.1 分值表与频率反相关（需求硬性口径 + 建议校准值）
+
+| 档位 | 分值（需求硬性） | 出现权重（建议起点） | 期望得分贡献占比（建议） | 视觉要求 |
+| --- | --- | --- | --- | --- |
+| 低（苹果） | +1 | ~70% | ~45% | 常规色调 |
+| 中（橙子） | +2 | ~25% | ~35% | 提亮一档 |
+| 高（稀有水果） | +5 | ~5% | ~20% | 高对比 + 特效标识 |
+
+- **分值与频率必须反相关**且两者解耦配置（权重表与分值表分开两张常量表）——需求只锁「高分水果出现频率更低」，斜率是实现自由度；但三档贡献占比是手感核心，建议按上表起步、用冒烟统计实测校准（240 帧冒烟里统计三类生成次数的比例，替代人工目测）。
+- **期望值校准法**：单局期望总分 = 60s × 刷新速率 × Σ(权重ᵢ × 分值ᵢ)。先定「单局期望分」这一产品目标，再反推刷新速率，不要拍脑袋调刷新率。
+- **计分唯一入口**：所有得分变更走同一个 `add_score(points)`，分值查表发生在水果节点持有 `tier` 字段 → 入口处查表，禁止 UI 层或触摸回调里散落 `score += 1` 字面量。这是「+1/+2/+5 各自累加正确」能被机判断言的前提（同 game-12 的单源纪律）。
+
+### 2.2 60 秒计时的 ±1 秒验收实现口径
+
+- 用 `float` 剩余时间在 `_process(delta)` 里累积递减，显示层取 `ceil()`；归零判定用 `time_left <= 0.0` 触发结算，**不要**用「Timer 节点每 1 秒 tick 一次、tick 里 -1」的实现——tick 计数在暂停/掉帧/场景切换时会漂移，±1 秒容差经不起移动端浏览器节流（切后台回来一次就能漂 1~2 秒）。
+- 冒烟断言：读 UI 计时文本两次间隔 1~2 秒断言递减；用引擎时间注入（同 game-12 `try_count(now_ms)` 模式）把 `time_left` 直接压到 0，断言进入结算场景。显示值与内部值分离，断言内部值。
+
+### 2.3 点按拾取：单源单相 + 热区（移动端唯一操作）
+
+- Godot 4 默认 `emulate_mouse_from_touch=true` → 一次触摸可能产生 touch + mouse 双事件，再加 `_unhandled_input` 的动作路径，同一「点击」多来源。收敛方式与 game-12 相同：所有来源只调唯一入口 `attempt_collect(fruit)`，判定收口在 GameState 一处。
+- 触摸热区按「水果视觉半径 + 容差」配置，最小可点直径 ≥ 44~48 逻辑 px，且注意 DPR 换算（引 82e419bb）；相邻水果刷新点最小间距 ≥ 1.5 个水果直径，防误触串档（点到低档实际想点中档）。
+- 高分水果「稀有」也必须**可点**：特效动画不要吃掉点击区（动画节点 `mouse_filter=IGNORE`），否则会出现「看得见点不中」的体感灾难——美术动效是 Area2D 之外的子节点，别挂在碰撞体上。
+
+### 2.4 供给节奏与场上管理（点按版的补货口径）
+
+- 两段式供给（引 6e91a11d §二并适配）：开局铺场 8~12 个 → 场上存量低于下限（建议 6）时按 0.8~1.5 秒补 1 个。60 秒点按版的失败模式比躲避版更隐蔽：**可收目标耗尽 = 玩家空转**，补货下限是硬保障。
+- 三档各自独立掷骰，不共用计时器；高档（稀有）另加「场上同屏最多 1 个」约束，防止稀有权重 5% 在随机聚类下同屏堆 3 个、破坏「稀有」体感。
+- 场景边界内边距 ≥ 半个水果直径，保证边缘刷新可点；不做与障碍物的路径重叠问题（本变体无移动障碍），但要避免刷新点落在 UI 计时条/得分条下方。
+
+### 2.5 一键重开的完整重置清单（验收 5 的坑点）
+
+结算界面「重新开始」必须复位**全部**运行态，逐项列出防漏：倒计时回 60、得分清零、场上水果全部回收、三档刷新计时器重置、稀有水果在场标记清除、飘分/特效节点队列清空、结算面板隐藏。重开入口双通道（触摸可点 + 键盘 Enter/Space），坑源见 ed31081f-82be-4a76-a28b-476f7e18a00b（game-3 只有触摸入口导致桌面端无法重开）。冒烟断言：先打完一局（注入 time 归零）→ 点/按重开 → 断言计时==60 且得分==0 且场上水果数==铺场数。
+
+### 2.6 森林主题的可机判底线（验收 3）
+
+美术质量不进门禁，但结构可以机判：断言主场景节点树中存在 ≥ 2 类森林装饰元素组（如 Trees/Grass 两个 Node2D 组各自子节点数 > 0）；水果节点与背景装饰分属不同层级（水果层 z_index 更高且不被装饰遮罩覆盖）。preflight 不查这些，要写进工程内 `tests/smoke.gd` 的玩法断言段。
+
+### 2.7 验收 → 冒烟断言映射（写进 verify.sh 的建议）
+
+| 需求验收条目 | 冒烟断言建议 |
+| --- | --- |
+| 1. 60 秒递减、归零自动结算、偏差 ≤ ±1s | 两次读计时文本断言递减；注入 time_left=0 断言进结算 |
+| 2. ≥3 种分值（+1/+2/+5）各自累加、实时显示 | 依次对三档水果坐标注入触摸，断言得分序列 +1/+2/+5；断言 UI 总分文本同步 |
+| 3. 森林主题 ≥2 类元素、水果不遮挡 | 断言装饰节点组存在且子节点 >0；断言水果层在装饰层之上 |
+| 4. 移动端触屏可完整跑一局、无明显卡顿 | mobile-web-smoke 门禁（双门禁第二道）跑 FPS 采样，参照 game-12 实测 FPS 39 的基线口径 |
+| 5. 一键重开、倒计时与得分重置 | 跑完一局 → 触发重开 → 断言 60/0/铺场数三值（见 §2.5） |
+
+## 三、Web 导出与双门禁复用要点
+
+本 goal 两次工作流的 scaffold 节点 prompt（工坊流水线模板实文）把门禁资产判据钉死为**四件套**：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, resolve-godot.sh, mobile-web-smoke.mjs}` 全部在仓库内且不被 .gitignore 排除，缺任一 → blocked 上报，禁止从平台注入的 `.myrd-platform/.claude/skills/` 阅读副本里复制脚本充当判定器，也禁止自造等价脚本。对比老 game-5 工作流只要求三件套——**mobile-web-smoke.mjs 是后来加入的第四件**，新工程照四件套验收。
+
+- **双门禁分工**：godot-smoke（preflight 静态 + headless 冒烟 + input-fuzz）证明「能跑能玩」，mobile-web-smoke 证明「移动端模拟下可玩且不掉帧」。两道各自独立出退出码，任何一道非 0 都不该进入 deploy。
+- **退出码语义**（与总论同源）：0 通过 / 1 冒烟失败→打回修复循环 / 2 环境不可用→装环境、禁止为过门禁改代码 / 3 静态不一致（verify.sh 单独编码）。存在性守卫先行判 2，防「脚本缺失」被误判成 3 诱导修游戏代码。
+- **Web 导出配置五要点**（引 78180e88 实测，不再展开）：渲染器钉死 gl_compatibility 且 `.mobile` 双写；`thread_support=false`；中文必须内置 NotoSansSC 等字体（preflight P13 拦 Web 中文缺字）；导出产物落 `games/<工程>/export/web/` 并 .gitignore 豁免入库；UI 挂独立 CanvasLayer 与游戏世界分离。
+- **AppHost 部署口径**：部署 gitRef 必须是 goal 功能分支（`myrd/games-goal-<goalId>`），绝不能用 main；liveUrl 在部署完成前即由工坊确定（本 goal 为 /apps/60、/apps/60-2），移动端门禁与试玩都以它为准。
+
+## 四、流程复盘：为什么本 goal 没有线上版（双跑皆败实录）
+
+时间线（全部平台记录）：17:56:54 创建 AppHost「60」+ 工作流 #1 → run cmuspf4oo0050ic7qfjj0azwh **failed** → 18:04:01 换 slug 重试，创建 AppHost「60-2」+ 工作流 #2 → run cmuspld10006ric7qup55soew **再 failed** → 验收指派节点 completed 回写产物标识 → 2026-10-04 实测线上 404。
+
+- **教训 A：节点完成态 ≠ 线上可玩。** 验收指派节点 completed，但平台记录里不存在任何可访问的线上版本。「验收复核」类节点的完成前置必须是硬证据：liveUrl 返回 200 且真实浏览器跑通「开始→拾取→结算→重开」闭环，产物标识回写附上 deployment/gitRef；否则完成态与线上态脱节，下游（频道播报、试玩通知、知识沉淀）全部建立在幻觉上。
+- **教训 B：同名变体串场是本 IP 的特有陷阱。**「森林收集水果限时赛」在仓库里有两个机制完全不同的变体：老 game-5（松鼠移动+原木躲避+连击，已上线）与本版（点按拾取+分值分档，未上线）。两者需求 id、goal id、工程目录（games/game-5 vs games/60、60-2）、分支、slug 全不同。**一切定位以产物 id + 分支名 + 工程目录为准，禁止按游戏名搜索**——按名搜必然把老 game-5 的「已上线、3 run 全绿」误当成新版的现状。
+- **教训 C：换 slug 重试会留下孤儿 AppHost 空壳。** 60 失败后换 60-2 重试，AppHost 表留下两条 status=creating 的壳，publicUrl 均为 null。重试前应优先复用原 AppHost 记录；若必须换 slug，重试启动时把旧壳置为废弃态。排查「游戏上线了没」的正确顺序：先查 AppHost status（creating/ready/failed），再 curl liveUrl 实测——本 goal 的 404 就是这么确认的，不能只信工作流状态或节点状态。
+- **教训 D：复盘入口与取证边界。** 工作流 API 只回 run id + status，不回失败日志；复盘具体卡点需持 run id（cmuspf4oo0050ic7qfjj0azwh、cmuspld10006ric7qup55soew）到执行日志/workflow 详情页查。本机环境 GitHub 443 不通，`git ls-remote` 无法核实两条 goal 分支是否推上远端——分支存在性复核必须在能连 GitHub 的环境做，不要在本机下「分支不存在」的结论。
+
+## 五、给下一个同类小游戏的复用清单
+
+1. 玩法骨架直接抄 §二：三档分值表 + 反相关权重表 + `add_score` 单入口 + float 计时 + 两段式补货 + 完整重置清单，改数值不改结构。
+2. 工程起点抄 78180e88 §二的最小契约（project.godot 三类必接线、TUNING_META 白名单、tests/smoke.gd、verify.sh、export_presets.cfg）。
+3. 门禁四件套齐全性检查放在 scaffold 第一步（本 goal 工作流模板已内置该判据），双门禁全绿才允许 deploy。
+4. 验收断言按 §2.7 映射表逐条落进 smoke.gd，每条断言做负例验证（证明会真 FAIL）。
+5. 上线判定只认三件套：AppHost status=ready + liveUrl 200 + 实机操作闭环截图/录像；验收节点回写产物标识时必须附 deployment/gitRef。
+6. 涉及「森林收集水果限时赛」名字的一切操作，先对 §一事实基线表确认自己在操作哪个变体。
+
+## 六、关联知识
+
+- 门禁三层体系 + AppHost 部署总论：27407691-bcf8-4e73-b686-1bb8df684e5c
+- 工程结构最小契约 + 帧预算推导 + playtest blocked 实录：78180e88-6486-404e-9265-e315e0da3c66
+- 双门禁（godot-smoke + mobile-web-smoke）+ 时间注入机判 + 单源单相：00314649-c4d2-407c-871b-62f7de91b07d
+- 移动端触屏虚拟摇杆 + AudioContext 解锁：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- 同名 IP 老变体（松鼠+原木+连击）玩法口径：6e91a11d-3632-4721-a3ea-d433e9622f9b
+- game-9 单游戏部署先例：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 对抗性探索与机判方法论（QA 复用）：437f8129-89b5-4f46-95c0-2d475c3cead8
+
+## 沉淀 app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单（太空飞船躲陨石捡金币）
+
+# app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单
+
+> 来源：目标《创建小游戏应用：太空飞船躲陨石捡金币》（goal=cmuspfeyw0058ic7qrmh6qebm）首轮执行（2026-10-03 18:11~18:23 UTC）+ 次日（2026-10-04）知识沉淀时的时点复核。需求 id=cmuspmumf007cic7qlt6uwieo，GameDesignSpec id=cmuspqwhe007ric7qp0465dvk，工坊工作流 id=cmuspfez9005cic7q93j4fk74，失败运行 id=cmuspr5v7007xic7q5ng1aqqo。
+>
+> 本文只写本例增量：**工坊流水线在门禁一启动之前就整体失败**这一反面样本的取证、归类、复核方法论与重跑前置清单。godot-smoke 三层门禁体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-12 双门禁通过路径见 id=00314649-c4d2-407c-871b-62f7de91b07d；移动端触屏/音频规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；game-9 见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be。本文与它们互补：前面几篇讲「门禁怎么过」，本篇讲「门禁根本没来得及跑」时怎么定位、怎么复核、重跑前还要先解决什么。
+
+## 一、一手事实时间线（全部库内取证，非转述）
+
+| 时刻（UTC） | 事件 | 证据 |
+| --- | --- | --- |
+| 10-03 18:07:22 | hosted_apps 记录 app-2 创建（id=cmuspfdr20056ic7qm2ebhvwv，slug=app-2），status=creating | hosted_apps 行；updated_at 至 10-04 仍冻结在该时刻 |
+| 18:11~18:13 | 需求录入完成（含双门禁 + HostedApp 约束 + 4 条验收标准） | 需求 id=cmuspmumf007cic7qlt6uwieo |
+| 18:13~18:16 | GameDesignSpec v0 落账（八段、10 实体、数值写死） | spec id=cmuspqwhe007ric7qp0465dvk |
+| 18:16:30 → 18:17:36 | 工坊工作流运行启动后 **66 秒即 failed** | workflow_runs.status=failed |
+| 18:17:40 → 18:23:07 | express_lane 独立复核完成：app-2 未上线、验收 0/4、双门禁均未启动 | 复核结论（goal 会话） |
+| 10-04（本文写作时） | app-2 仍 status=creating、live_url 空、app_deployments **0 行**；该工作流**仅 1 次运行且为 failed，未重跑**；github.com 从 agent 环境再次 20s 超时不可达 | hosted_apps / app_deployments / workflow_runs 实查 + curl 探针 |
+
+失败报错原文（复现用）：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspfdqy0052ic7qnkimp4n5/run-cmuspr5v7007xic7q5ng1aqqo'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/':
+Failed to connect to github.com port 443 after 32655 ms: Couldn't connect to server
+```
+
+## 二、失败模式归类：不是「门禁失败」，是「门禁前基础设施失败」
+
+工坊四棒为 scaffold → implement → deploy → playtest（实现/部署两棒挂 godot-smoke preHook 240 帧，试玩棒挂 mobile-web-smoke）。本例失败的关键特征：
+
+1. **死在第 0 棒之前**：4 个节点状态全部 pending，工作流主体逻辑一行都没执行——失败发生在为运行准备 worktree 的 `git clone` 阶段。
+2. **零产物可判**：goal 分支 `myrd/games-goal-cmuspfeyw0058ic7qrmh6qebm` 在复核时不存在（`git ls-remote` 无此分支）→ 无任何代码/工程/导出物落库，不存在「半成品需要清理」的问题。
+3. **网络是间歇抖动，不是持久封锁**：复核时点（10-03 18:23）github.com HTTPS 200、`git ls-remote` 成功（HEAD=a592ea2）；次日（10-04）从 agent 环境又 20s 超时。两个时点结论相反，证明是**间歇性连接抖动**。
+4. **归类的处置含义**：门禁失败（godot-smoke 红、smoke 帧内崩溃）→ 修代码再过门禁；门禁前基础设施失败 → **不改任何代码，探针确认外网恢复后直接重跑**。两者处置路径完全不同，先归类再动手。
+
+## 三、独立复核方法论（本例实证有效，可整体复用）
+
+复核在「工作流已 failed」的背景下展开，五步证据链闭环：
+
+1. **不信状态字段，实测入口**：`status=creating` 不代表「正在部署中马上就好」——对内网 `$PLATFORM_API_URL/apps/app-2/gw` 与公网 `https://leomac-studio.tail49399e.ts.net/apps/app-2/` 双探测，均 404 `APP_NOT_FOUND`。应用记录侧 `publicUrl/publishedAt/version` 全空，项目侧 `resources=[]`、prodUrl/stagingUrl 空，app_deployments 0 行，四面证据一致。
+2. **对照实验排除平台故障**：同一 host 上其余 13 个 `status=ready` 应用（game-5/6/8/9/10/11/12、hello、app 等）全部 200 → 托管能力正常，是 app-2 自身从未部署的个案，不是平台级事故。
+3. **排他性核查防「张冠李戴」**：已上线 13 应用中无一款《太空飞船躲陨石捡金币》；题材相近的 `/apps/app/gw`「星云飞船收集」收集的是能量水晶、slug 与标题均不同，**不能冒充 app-2 交付物**。同类小游戏大量复用同套躲陨石玩法，验收时必须按 slug+标题+机制三重匹配认定交付物。
+4. **对账流程合规性**：需求 status=in-progress、close_reason 空 → 无人违规关闭需求，门禁二「未回填」是因「无入口」而非「被跳过」，流程无腐化。
+5. **失败棒位定位**：直接查 workflow_runs 的 result.error 与 nodes 状态数组，一眼定位「死在 scaffold 之前」，避免把失败误归因给某一棒的实现质量。
+
+## 四、⚠️ 规格冲突（重跑前必须拍板，否则白跑）
+
+工坊管线是 **Godot 4 → Web(HTML5) 导出**（工程 `games/app-2`、`export_presets.cfg` Web 预设、`--headless export` 构建步、godot-game-dev 技能包），而需求验收标准 4 明文要求「**纯前端 HTML/CSS/JS、无构建步骤、静态资源可直接打开运行**」。Godot 导出必然含构建步骤，两者直接冲突。
+
+- **不处理的后果**：即使部署成功、门禁一全绿，AC4 仍会判不达标——整条流水线白跑一轮。
+- **方案 A（推荐）**：把 AC4 措辞修订为「**导出产物为纯静态托管、无运行时后端、无外部 CDN 依赖**」。保留 Godot 管线，同时保住需求真正想约束的东西（免后端、免 CDN、双端可玩），且与既有门禁体系（27407691 总论）兼容。
+- **方案 B**：放弃 Godot 管线，改手写单文件 HTML/JS。仅当主人明确要求「字面意义无构建」时选它，代价是失去 godot-smoke 三层门禁与工坊流水线的既有能力。
+- **教训**：验收标准与管线能力要在**需求录入时**对齐。「无构建步骤」这类措辞对 Godot 管线应用天然不可满足，录入阶段就该识别。
+
+## 五、重跑修复路径（有序清单，供下一轮直接执行）
+
+1. **先探针再重跑**：从 runner 环境 `curl --max-time 20 https://github.com` + `git ls-remote <仓库>` 双探针确认恢复。网络是间歇抖动，盲目重跑可能再次 66 秒失败并空耗一轮。
+2. **先拍板第四节冲突**并回写需求措辞（方案 A 或 B），再触发重跑。
+3. **重跑即可，无需清理**：分支不存在、零产物，直接重跑工作流，从 scaffold 全新开始；不要试图「续跑」失败运行。
+4. **部署成功后先补门禁一**：由独立 agent 重做一轮线上可玩性复核（按第三节方法论），留证「全流程走通 + 控制台无报错」，之后才轮到 owner。
+5. **门禁二最后**：owner 桌面 + 移动各试玩一次并回填「试玩通过/不通过」，回填通过后需求方可关闭。当前门禁状态：**门禁一未启动（不可执行）、门禁二未启动（无入口）——注意是「未达」而非「失败」，回填话术要区分。**
+
+## 六、供后续 app 复用的教训清单
+
+1. **工作流失败 ≠ 游戏缺陷**：先查失败棒位。scaffold 之前死 = 基础设施层（网络/仓库可达性），与代码质量无关，处置是重跑而不是返工。
+2. **外网 git clone 是工坊流水线的第一单点**：仓库在 github.com，第一棒之前就要整仓克隆；网络抖动直接零产物。建议重跑前置「探针 + 失败自动退避重试」的习惯，并把「github 间歇不可达」记为平台环境的已知抖动源。
+3. **hosted_apps.status 不可单独作为「已上线」判据**：本例 status=creating 停滞超过 24h 且无任何部署行。判活必须「liveUrl 实测（内网+公网双探测）+ deployments 计数」双条件。
+4. **需求录入时做一次「AC × 管线」对齐检查**：把验收标准逐条对照工作流管线的既有能力（构建方式、导出形态、依赖服务），措辞冲突当场改，不要留到部署后才发现。
+5. **同题材应用排认**：平台同 slug 命名空间下有多款躲陨石/收集类小游戏，验收复核必须 slug+标题+核心机制三重匹配，防止把兄弟应用的 200 当成本应用的交付证据。
+
+---
+**一句话总结**：app-2 首轮执行是「门禁前基础设施失败」的完整样本——工坊四棒尚未启动即在 git clone 阶段遭遇 github.com 间歇性连接失败（66 秒即败、零产物、app-2 停在 creating），独立复核以五步证据链确认验收 0/4、双门禁均未达但流程未被违规绕过；修复路径 = 探针确认网络恢复 + 先拍板「Godot 构建管线 vs 无构建步骤」的规格冲突 + 直接重跑，重跑成功后再补门禁一自测与门禁二试玩回填。
+
+
 ---
 
 # logo位置验证
@@ -15304,6 +21496,780 @@ scaffold/implement 的工作区分支 `myrd/oak-key-goal-<goalId>` 与部署分�
 8. 结论落库四件套：`ADVERSARIAL_FINDINGS.md`（主档）+ 复跑脚本 + `*-run-results.json` + `shots-*/` 截图；零缺陷走 §七降级收口（四门禁 + 零漂移 + 复认轮）。
 
 > **术语与规范回归**：本文所有门禁术语（preflight/smoke 帧预算/input-fuzz/playtest）、部署红线（wasm Content-Type、COOP/COEP、gzip+b64 通道）、仓库纪律以基准文档 `189a580e-5cdb-4837-a5fa-38e0c12ceb88` 为准；两文冲突时以基准文档为准。
+
+
+## 沉淀 game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战经验（推箱子点亮方块解谜 · 全四棒工作流）
+
+# game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战沉淀（推箱子点亮方块解谜 · 全四棒工作流）
+
+> 来源：需求《推箱子点亮方块解谜（game-9）》（id=cmupsx443003om9dh5dwd5w9u，goal=cmupsrc19002sm9dhp5su0zaj）走完「前置体检 → scaffold → implement → deploy → playtest」全流程后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-9`（Godot 4.3.stable.official）。线上：liveUrl https://leomac-studio.tail49399e.ts.net/apps/game-9/（deploymentId=cmupxibnn0087m9dhz3cfhap4，commit 19a6d59，838ms 上线，app.status=ready）。工作流运行 /workflows/cmupsrc1v002wm9dh68sljxoq/runs/cmuputtey006dm9dht78nbbtm。
+>
+> 本文只写 game-9 新踩的坑与增量打法。门禁三层体系总论（preflight/smoke/fuzz 分工、E-16 带病绿灯）与 AppHost 部署总论见《沉淀 Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路实战经验》（id=27407691-bcf8-4e73-b686-1bb8df684e5c，oak-key 实测）；移动端触屏摇杆与音频解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca。三篇互为补充、不重复。
+
+## 一、事实基线：四棒各留下什么（审计入口）
+
+| 棒 | 提交 | 内容 | 结果 |
+| --- | --- | --- | --- |
+| scaffold | d297996 | 以 templates/minimal-2d 初始化 games/game-9：推箱骨架（推动/点亮/Undo/Restart/换关）+ 5 关关卡册 + tools/level_solver.py + tests/smoke.gd + verify.sh | ✅ |
+| implement | 4bfdb00 | 见证解回放 / 死锁反馈 / touch_swipe / AC5 响应断言；is_solved 口径修复；.myrd/spec/design-spec.json 落盘 | ✅ |
+| deploy | 19a6d59 | export_presets.cfg + 导出产物入库 + apphost 壳切 game-9 + §3C 调参桥 + 移除 candy-crush 残留 | ✅ 已部署 |
+| playtest | 0103b33 | docs：playtest blocked 报告（缺 playtest.sh） | ⛔ blocked |
+
+- **部署形态**：底座 A「资产出 bundle」——`apphost.toml` 里 `assets_dir="games/game-9/export/web"`，37MB 导出经对象存储懒加载，bundle 本体不含游戏资源（25MB bundle 上限不再约束资产体积）。
+- **导出产物形态**：index.wasm 33.7MB / index.pck 2.4MB / index.js 331KB / index.html 4.9KB / index.audio.worklet.js 7.3KB。线上资产通道 `/api/public/assets/`：index.js 原文直出，wasm/pck 走 `*.gz.b64` 文本（10.7MB / 3.3MB），端到端解码验证过（b64→gzip→`WebAssembly.validate()=true`、pck 魔数 `GDPC`）。
+- **部署记录层 status=running 与应用已 ready 并存**：判断游戏死活以 /health 与实际可达为准，别拿 deployment.status 当真。
+
+### 分支审计坑：同一目标两条远端分支并存
+
+- `myrd/game-9-goal-<goalId>`：前置体检节点首次推送建立，停在 implement 棒（4bfdb00）。
+- `myrd/games-goal-<goalId>`：工作流四棒实际跑的分支，tip=0103b33（多出 deploy/playtest 两棒）。
+- 结论：**复现/审计认 goal artifacts 里的 `gitRef` 与 `app_deployments.commit_hash`（本次 = 19a6d59）**，别按「目标 id 搜分支」想当然——两条分支都能搜到且不同步。另：线上部署的是 19a6d59，其后 playtest 棒只追加 docs（0103b33）未重新部署，属 docs-only 差异，游戏本体无差。
+
+## 二、Godot Web 导出：模板不含预设，从零补齐的六个决策
+
+1. **模板仓库不含 `export_presets.cfg`**。games/game-9 的 README 在 scaffold 棒就记了：「export_presets.cfg 尚未配置（模板不含），部署节点需按 games/game/ 的 web 导出先例补齐」。每个新游戏都要从上一个游戏的先例抄一份再改，别等部署节点现场发明。
+2. **必须用单线程变体：`variant/thread_support=false`**。M1 网关不发 COOP/COEP 头，SharedArrayBuffer 不可用，线程版直接白屏。这是 Web 导出第一坑：配错不报错、上线才白屏。
+3. **导出产物必须入库，`.gitignore` 加 `!/export/web/` 豁免**。`assets_dir` 是平台构建输入，产物不在仓库里平台打包 bundle 就缺资产。Godot 工程 .gitignore 默认把 export/ 排掉，这里要反着来。
+4. **全局中文字体是 Web 导出的底线**（preflight P13 机判）。浏览器沙箱拿不到系统字体，引擎内置字体只有拉丁字形；`[gui] theme/custom_font` 必须指向子集化中文字体（本工程用 Noto Sans CJK SC：GB2312 全集 + ASCII + 常用符号，OFL 1.1），删了所有中文变缺字方块。字体约 2.9MB，是 pck 体积大头，但属中文游戏必要成本。
+5. **渲染器钉死 `gl_compatibility`**（`renderer/rendering_method` 与 `.mobile` 双写）。Forward+ 在 Web 上不可用。
+6. **接手模板仓库先清上一个游戏的残留**。deploy 棒移除了基线残留的 candy-crush 工程 `games/game/`（39MB 导出）——模板仓库是「单游戏位」惯例，根壳一次只服务一个游戏；残留工程还会污染门禁参照（前置体检时 gate-selftest 拿 games/game 当参照，因 player.gd 缺 `moved.emit`/`const SPEED` 模板契约锚点，D4/D5 注入失败，换官方参照 `templates/minimal-2d` 后 D1–D5 全拦）。
+
+**壳侧三件套 + 调参桥**（沿用 oak-key 先例并加一层）：相对路径资产路由；移动端音频手势解锁器（AudioContext 包装 / 手势 resume / `__audioDebug` 取证口）；worklet 防御；新增 **§3C 调参桥**：
+
+- 壳把 URL `?tuning=<json>` 解析成 `window.__GAME_TUNING__`；
+- 游戏侧 `GameState._apply_tuning_overrides()` 仅 `OS.has_feature("web")` 时经 `JavaScriptBridge.eval("JSON.stringify(window.__GAME_TUNING__ || null)")` 读取；
+- `TUNING_META` 白名单四键 + min/max 钳制 + round 取整：`move_anim_ms` 0–400、`push_anim_ms` 0–400、`key_repeat_interval_ms` 50–600、`win_overlay_delay_ms` 0–1000。
+- 价值：试玩期调手感不用改代码重导出——「试玩调好的参数用 URL 复现」，试玩入口直接发 `?tuning=1` 工作台链接。无头冒烟/桌面自动跳过，门禁行为不受影响。
+
+## 三、冒烟门禁：game-9 的四个增量打法
+
+四步 routine 不变（`.myrd/routines.yaml` id=godot-smoke：resolve-godot → preflight 13 类 → `GODOT_SMOKE_FRAMES=240` headless-smoke → input-fuzz，seed=20260913），`games/game-9/verify.sh` 只调用 std-skills 判定脚本、不重实现。本次实测：preflight PASS / `GODOT_SMOKE: PASS`（240 帧，exit 0）/ `GODOT_FUZZ: PASS`。增量全在冒烟断言本身（tests/smoke.gd，628 行，11 项断言清单）：
+
+### 3.1 见证解回放：把 AC4「关卡可解」变成引擎内机判
+
+离线求解器说「可解」只是一句话结论；game-9 把它做成冒烟断言：
+
+- `tools/level_solver.py --paths` 生成每关见证解（U/D/L/R 移动串，长度 == par），Python 侧重放自证后落盘进 `sokoban_levels.gd` 的 `solution` 字段（与 layout 同处，单一事实源，防两处数据漂移）；
+- 冒烟逐关回放见证解，断言三条：**必须通关、步数 == par、回放全程不得误报死锁**；
+- solver 直接解析 `sokoban_levels.gd`（不复制关卡数据），「策划案 → 关卡册 → 求解器 → 冒烟」四层数据同源，par 漂移会在冒烟里直接爆。
+
+### 3.2 通关判据口径：常亮 ≠ 通关（冒烟实测拦下的真 bug）
+
+点亮目标格是 `onceLitStaysLit`（入场常亮、永不熄灭），但 `is_solved` 不能跟着用「全部点亮」口径——**常亮口径会把 level-05 最优路径第 35 步误判通关、提前停走**（冒烟回放见证解时实测拦下）。修复：`is_solved` = 「全部接线槽有方块驻留」，与求解器 / spec parMoves 同口径；点亮只作视觉态。
+
+教训：**「视觉状态」与「胜负判据」是两个变量。凡有常亮/累计态的玩法，胜负判据必须与求解器同口径，并让冒烟回放最优解来兜底。**
+
+### 3.3 死锁反馈机判：报与不报都要有断言
+
+角死锁检测 + `deadlock_changed` 信号 + HUD 卡死警示 + 死锁方块变红。冒烟断言四条：角死锁必报、在槽角不报（在槽角是合法终态）、开阔局面不报（防假阳性）、真实关卡把方块顶进角后信号通知 UI 且 **Undo 可脱离死锁态**。「无假阳性」的论证写在检测函数注释里供复核。
+
+### 3.4 AC5 量化成帧预算断言
+
+- 响应延迟：spec 200ms ≈ 60FPS 下 12 帧 → 断言「注入输入 → 首次步进 + HUD 同步刷新」≤ `RESPONSE_BUDGET_FRAMES=12` 帧，验收口径直接写进门禁；
+- 触屏滑动：越过 24px 阈值（`spec.numeric.input.touchSwipeThresholdPx`）的一次滑动**恰好步进 1 格**；冒烟注入 48px 拖拽验证（`SWIPE_DRAG_PX=48`）。
+
+### 3.5 headless 输入注入的坑（error-signatures E-08 的 game-9 变体）
+
+- headless 下 `Input.parse_input_event()` 的缓冲冲刷会清掉 `Input.action_press()` 的按下状态，**同帧混用两种注入方式会让「移动断言」假失败** → 冒烟分 7 相位（噪声/移动/滑动/逻辑/等弹层/下一关/收尾）互不重叠；
+- 触点下标隔离：噪声相位用触点 0/1，滑动断言用触点 7，防互相回收；
+- 滑动起点 (500,280) 刻意避开左下摇杆热区（24..160 × 400..536）与右下按钮排，否则手势被控件吃掉；
+- 噪声相位（30 帧悬挂手势/孤儿释放/乱键）放在一切正式断言之前——上一游戏（糖果三消，commit bbb872f4「致胜滑动后指针脏状态吞掉下一关第一次手势」）就是靠这类对抗注入防回归的。
+
+### 3.6 verify.sh 退出码四态（给修复方向做机器路由）
+
+0=通过；1=smoke/fuzz 运行期未过（改游戏代码）；2=环境不可用（缺 Godot/技能脚本/python3，装环境而非改代码）；3=preflight 静态未过（先修静态，不必跑冒烟）。关键设计：技能脚本存在性守卫放在一切判定之前，缺脚本必须报 2——否则会掉进下游非零退出码被误判成 3，诱导修复节点去改游戏代码。
+
+## 四、关卡求解器：三段演进与两个真 bug（策划案阶段就要做）
+
+固化策划案（create_design_spec）时就要求每关机器可解、par 机器可算——这步做了，实现、冒烟、验收全链路都有基准。求解器三段演进：
+
+1. **BFS**：前三关（状态空间小）够用；
+2. **A* + 拉拽距离启发 + 死格剪枝**：大关用（启发值 = 每方块到最近接线槽的拉拽距离下界，可采纳；死格 = 角死锁 / 墙边不可拉出格）；
+3. **精确状态 A\***：修掉「区域归一化」bug 后的最终形态。
+
+两个真 bug（都在求解器侧，不在游戏侧）：
+
+- **区域归一化把玩家站位合并掉**：对「推动数」精确，对「玩家步数」只是松弛下界——level-02 手推最少 10 步，求解器报 5。修复：玩家坐标显式入状态；修复后 A* 与纯 BFS 交叉验证一致（2/10/18）。
+- **开阔房间 + 5 方块状态空间爆炸**：单关搜索超时。解法不是更强的剪枝，而是**改关卡布局**——level-05 换成更紧凑、隔断更多的「总控机房」，对人更难、对求解器更小，验证 3.8s，par=58 > level-04 的 40，难度曲线反而更成立。
+
+工程参数：`EXPANSION_CAP=4_000_000`、`MAX_DEPTH=200`；par 不一致只告警（布局或 par 漂移），可解性才是硬判据（exit 0/1）。最终 par 曲线 2/10/18/40/58，方块数 1→5 严格递增（AC4），策划案 `numeric.difficulty.parMoves`、关卡册、冒烟断言三方一致。
+
+## 五、playtest blocked：判定器独立性纪律的一次实战
+
+playtest 节点硬约束：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 五个判定脚本**全部由模板仓库预置**，缺任何一个 → 立即 blocked，**严禁现场自造、拷贝注入副本、或用等价命令替代**——它们是判定器，被检方自己写门禁即失去独立性。
+
+本次实测缺 `playtest.sh`（及 `playtest_driver.gd`），按纪律停止：
+
+- **证据链五步**：① 工作区分支 scripts 目录实清（仅 7 个文件）→ ② origin/main fetch 后核对同样缺失（排除本地落后）→ ③ `git log --all` 该路径从未存在 → ④ 全仓库 find 仅命中 `.myrd-platform/.claude/skills/`（平台注入阅读副本，被 .gitignore 排除不入库，按硬约束不得作判定来源）→ ⑤ 前序 deploy 产物旁证。
+- **根因**：平台注入技能包（新版，含机器人试玩门禁：协议 `GODOT_PLAYTEST: PASS/FAIL` 退出码 0/1、2=环境不可用；`GODOT_PLAYTEST_METRICS: <JSON>`；bot 多局输出节奏代理指标——首次奖励/无反馈窗口/反馈密度/局间方差；阈值由工程内 `tests/playtest.json` 覆盖）**领先于模板仓库预置基线**（v1 仅四脚本，godot-smoke routine 也只有四步）。属模板仓库技能资产滞后，需运维补模板仓库，非 agent 现场可修。
+- **没做的事同样重要**：不交付试玩验收包、不拷贝注入副本、不自造判定器；四问量表标「待用户试玩」；spec 数值回写跳过（未收到用户结论，严禁编造）。
+- **影响面切割**：deploy 产物不受影响（游戏仍可访问），godot-smoke 四步门禁此前已全过——blocked 只挡 playtest 这一段。
+- **修复路径**：运维补模板仓库 `playtest.sh` + `playtest_driver.gd`（连同 SKILL.md 章节与 godot-smoke-routine.md 模板同步，脚本/文档/routine 三者一致）→ 经模板预置链路同步进项目仓库（不得手抄注入副本）→ 重跑 playtest 节点交付 `op=playtest_kit`（含 `<liveUrl>?tuning=1` 调参工作台入口）。取证报告在仓库 `docs/game-9-playtest-blocked-report.md`。
+
+## 六、下一个游戏直接抄的清单
+
+```bash
+# 1. 门禁入口（四步；退出码 0/1/2/3 见 §3.6）
+bash games/<game>/verify.sh
+
+# 2. 关卡可解性证据（--paths 生成见证解 → 落盘 solution 字段 → 冒烟回放）
+python3 games/<game>/tools/level_solver.py games/<game> --paths
+```
+
+Web 导出预设必查四项：
+
+| 项 | 值 | 不守的后果 |
+| --- | --- | --- |
+| `variant/thread_support` | `false`（单线程） | M1 网关无 COOP/COEP，SharedArrayBuffer 不可用 → 线程版上线白屏 |
+| `[gui] theme/custom_font` | 子集化中文字体 | 浏览器无系统字体 → 中文全部缺字方块（preflight P13 拦） |
+| `renderer/rendering_method` | `gl_compatibility`（desktop+mobile 双写） | Forward+ 在 Web 不可用 |
+| `.gitignore` | 加 `!/export/web/` 豁免 | assets_dir 构建输入缺资产，bundle 打包失败 |
+
+复用分工：门禁三层总论 / E-16 带病绿灯 / AppHost 部署总论 → id=27407691-bcf8-4e73-b686-1bb8df684e5c；移动端触屏摇杆 / 音频解锁规范 → id=82e419bb-b641-4b5e-bb58-d8b9633169ca；本文 = game-9 增量（导出预设从零补齐、见证解回放机判 AC4、通关判据口径、死锁反馈机判、AC5 帧预算断言、E-08 分相位注入、求解器演进、playtest blocked 纪律、双分支审计口径）。
+
+
+## 沉淀《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+# 《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+> 来源：需求《《hello》休闲收集小游戏》（id=cmuqk7luz002am9bfmmkouw9v，goal=cmuqk3j2o001mm9bfptrztaj1）走完「scaffold → implement → deploy → playtest」工坊主通道后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/hello`（std-skills minimal-2d 模板起步，Godot 4.3.stable，gl_compatibility）。线上终态：liveUrl `https://leomac-studio.tail49399e.ts.net/apps/hello`（HostedApp id=cmuqk3huq001km9bf5ejp7tdg，deployment v2=cmuqlxz2v001km9bxc0w5pspp，gitRef=`myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1@dfd20d1`，/health 200、线上标题《hello》 · 休闲收集）。**playtest 节点 status=blocked**（模板仓库未预置 playtest.sh），线上版经独立 assign_agent 复核确认可玩。本文只写 hello 的增量事实与新坑；门禁三层体系总论与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key），单游戏部署先例见 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9），触屏摇杆与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca。四篇互为补充、不重复。
+
+## 一、事实基线：提交链与四棒产出（审计入口）
+
+`origin/myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1` 提交链（逐字核实）：
+
+| commit | 内容 | 结果 |
+| --- | --- | --- |
+| f9bc9d65 | 模板起步：std-skills minimal-2d 脚手架建 `games/hello` | ✅ |
+| 1bc8fa24 | 收集玩法与胜利/重开闭环 + README 玩法说明 | ✅ |
+| a8b5fd09 | Web 导出可托管形态：export_presets.cfg + `.gitignore` 豁免 + 导出产物入库 | ✅ |
+| 16249412 | 关卡梯度 + 限时失败反馈 + 冒烟断言同步升级 | ✅ |
+| dfd20d1b | 根壳与 apphost.toml 切到 hello + 接通调参桥（=部署 commit） | ✅ 已部署 |
+
+- `myrd/hello-game-goal-cmuqk3j2o001mm9bfptrztaj1` 分支另含 508dcc6b（assign_agent 线上复核取证），与 games-goal 分支**不同步**——复核/审计一律认 goal artifacts 里的 `gitRef`（games-goal@dfd20d1），别按「目标 id 搜分支」。
+- 门禁终态：preflight 13 类 PASS / `GODOT_SMOKE: PASS`（240 帧）/ `GODOT_FUZZ: PASS`（seed=20260913，6 批次无崩溃无脚本错误）；`bash games/hello/verify.sh` 全链路 PASS。
+- 导出 11 文件落 `games/hello/export/web/`：index.wasm 35,376,909B / index.pck 2,497,520B / index.js 331,495B / index.html 4,848B / index.audio.worklet.js 7,298B。
+
+## 二、Godot4 工程结构：hello 的最小可玩模板契约（可复制起点）
+
+```
+games/hello/
+├── project.godot          # 三类必接线：run/main_scene、[autoload] GameState、[input]
+├── autoload/game_state.gd # 单例 + TUNING_META 白名单（调参唯一入口清单）
+├── scenes/{main,player,collectible}.tscn
+├── scripts/{main,player,collectible,virtual_joystick,touch_confirm_button}.gd
+├── assets/fonts/NotoSansSC-Regular.otf + OFL.txt   # Web 中文底线
+├── tests/{smoke.gd,smoke.tscn}                     # 相位状态机冒烟场景
+├── verify.sh               # 工程门禁入口（退出码 0/1/2/3）
+└── export_presets.cfg      # Web 导出预设（thread_support=false）
+```
+
+- **三类必接线是 preflight 静态机判对象**：主场景、autoload、input 映射缺任何一项就是「黑屏/无响应」。hello 实测：`config/name="hello"`、`run/main_scene="res://scenes/main.tscn"`、`GameState="*res://autoload/game_state.gd"`。
+- **渲染器钉死 gl_compatibility 且 `.mobile` 双写**；viewport 640×360；`[gui] theme/custom_font` 指向 NotoSansSC（OFL 1.1）——删了中文全变缺字方块（preflight P13 拦）。
+- **UI 挂独立 CanvasLayer（UI/TouchUI）**，与游戏世界分离；触屏端用 `virtual_joystick.gd` + `touch_confirm_button.gd` 承载移动与确认，桌面/触屏同一工程不加分叉构建。
+- **收集玩法碰撞口径写进代码注释**：Player 矩形 24×24（半宽 12）、Collectible 圆 r=22，可达判定=玩家中心进入收集物中心 34px 内；摆点相对 clamp 边界 (12..628, 12..348) 全可达不卡死角——**碰撞余量要在摆新点时先算再摆**，否则冒烟传送收集断言假失败。
+
+## 三、门禁增量：帧预算推导注释 + 键位契约断言
+
+- **帧推导写进 verify.sh 注释**：「噪声 30 帧 → 移动 10 帧 → 4 次传送收集（各 4 帧）→ 过关断言 → confirm 进第 2 关断言（梯度）→ 时限压 0 触发失败断言 → confirm 重来断言」约 94 物理帧，预算取 240 对齐 `.myrd/routines.yaml` 的 smokeFrames 默认值（两边同值不各说各话）。**推导过程留在门禁入口文件里**，后续调速度的人不必重推。
+- 冒烟 9 项玩法断言：噪声输入后仍能移动、收集计数累加、过关判定、难度梯度（4→5 目标、30→26s 时限）、超时失败反馈、失败重来复位，外加键位契约 `_check_key_bindings`（逐键 AND 判定）。
+- verify.sh 退出码语义与 oak-key 同源：0 通过 / 1 冒烟失败 / 2 环境不可用（**存在性守卫先行**：preflight.py、smoke.sh、resolve-godot.sh 缺一即 2，防「脚本缺失」被误判成 3 诱导改游戏代码）/ 3 静态不一致。
+- **复发坑（连续两作）**：`.myrd/routines.yaml` 默认 `gamePath: games/godot-coin-rush` 至今未修。oak-key 轮已记录，hello 轮依旧要靠 preHookParams 显式覆盖成 `games/hello` 才测对工程。**建议运维直接改模板默认值或置空强制必填**，别再指望每作自觉覆盖。
+
+## 四、playtest blocked 实录：模板仓库技能资产落后于平台注入副本（本轮最大增量）
+
+- **触发**：判定脚本五清单 `{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 要求全部由项目仓库预置，hello 实测唯独 `std-skills/godot-game-dev/scripts/playtest.sh` MISSING → 节点按硬约束立即 blocked（不产试玩验收包、不回填量表、不调参回写）。
+- **根因（版本分裂）**：仓库内 `std-skills/godot-game-dev/` 是**旧版**（SKILL.md 无 playtest，routines.yaml 4 步）；平台注入阅读副本 `.myrd-platform/.claude/skills/godot-game-dev/` 是**新版**（SKILL.md §4.5 机器人试玩门禁 + `playtest_driver.gd` + 5 步 routine，新增 `playtestFrames: "900"`）。即：**模板仓库落后于平台注入副本**。
+- **纪律（为什么 blocked 而不是补一个）**：判定器唯一来源是模板仓库预置；被检方自写判定脚本，门禁不再独立，PASS 一文不值；注入副本是阅读用，不得复制/改写/等价替代。
+- **运维待办（精确到文件）**：把 `WORKSHOP_GAME_TEMPLATE_REPO` 的 godot-game-dev 技能资产同步到含 `scripts/playtest.sh` + `scripts/playtest_driver.gd` 的版本，并让仓库 `.myrd/routines.yaml` 的 godot-smoke 升到 5 步。报告已落盘 `docs/playtest/hello-playtest-blocked.md`（commit 283773e）。
+- **教训泛化**：工坊每接入新模板资产前，先 diff「模板仓库 vs `.myrd-platform/` 注入副本」的技能版本，发现落后先报运维，别等跑到最后一棒才 blocked。
+
+## 五、Web 导出与部署：hello 的三个增量打法
+
+1. **导出配置前置到 scaffold 棒**（前两作是 deploy 棒现场补 preset）：scaffold 按 `games/game` 既有先例补齐 `export_presets.cfg`（`platform="Web"`、`export_path="export/web/index.html"`、`variant/thread_support=false`、`html/canvas_resize_policy=2`）+ `.gitignore` 加 `!/export/web/` 豁免 + 导出产物入库（a8b5fd09）。deploy 棒零决策复用重导出——**「可托管形态」应该在脚手架棒就建成，别留到部署棒现场发明**。
+2. **根壳单游戏位切换要核对三处**：`apphost.toml`（name=hello / assets_dir=games/hello/export/web / health=/health / runtime=node20）、server 壳的资产路由、调参桥全局注入。hello 轮根壳原指向 candy-crush-legend（games/game/export/web），已整体切到 hello。**每次上新游戏，部署前 grep 根壳里旧游戏名清残留**。
+3. **部署重发坑：v1 因 504 重发被 superseded，v2 才是终态**（两笔同 gitRef）。判断游戏死活以 `/health` + app status + liveUrl 实测为准，**别拿 deployment 列表第一笔当真**。另：`/` 会 308 重定向到 `/apps/hello`（尾斜杠归一化），curl 复核记得 `-L` 跟随。
+
+线上复核（assign_agent 独立完成，不复用 deploy 自测结论）：部署 gitRef 远端 HEAD 与 dfd20d1 逐字一致；资产通道全文本（wasm/pck 走 `*.gz.b64`），本地解码还原 wasm 35,376,909 字节与本地导出逐字一致、magic `\0asm` v1 有效，pck magic `GDPC`；壳契约四件（相对路径拉资产、移动端音频手势解锁器、`__audioDebug` 取证口、tuning 调参桥）逐项在位。
+
+## 六、调参桥 hello 实例：spec 数值与实现默认值的口径漂移（真实发生，值得记录）
+
+- `game_state.gd` 的 `TUNING_META` 白名单四键：`base_target` 1–6、`base_time` 10–90、`time_step` 0–10、`min_time` 5–90；键不在名单=拒绝（防 URL 乱注入）；缺壳层时全局 undefined 属预期，门禁行为不受影响。
+- **口径漂移**：GameDesignSpec v1（id=cmuqkaypy002hm9bf3wnk1k26，approved）写的是 3 关 10/15/25 件、30/45/60s、连击窗口 1.5s；实现默认值是 `BASE_TARGET=4 / BASE_TIME=30 / MIN_TIME=18 / TIME_STEP=4`（每关目标 4→5、时限 30→26s）。spec 数值**没有**作为默认值落地，而是寄望试玩期经调参桥回填——playtest blocked 后未回填，两者至今不一致。
+- **结论**：工坊「spec → 实现」的数值对齐不能靠默认值拍脑袋。两条路二选一：① 实现前把 spec 数值直接落成常量默认值；② spec 数值作为 TUNING_META 默认初值，并在工程 README 记「spec 口径 = 默认值」。否则验收对不上、复盘对不齐。
+
+## 七、坑位速查表（hello 新增/复发，出问题先对号）
+
+| # | 坑 | 一句话修法 |
+| --- | --- | --- |
+| 1 | 双分支并存：工作区实际建 `hello-game-goal-*`，任务指定 `games-goal-*` | scaffold 棒把同一 commit 推两条分支保证 gitRef 存在；审计认 goal artifacts 的 gitRef |
+| 2 | routines.yaml 默认 gamePath=games/godot-coin-rush（复发） | preHookParams 显式覆盖；运维改模板默认值根治 |
+| 3 | 模板仓库技能资产落后于平台注入副本 → playtest blocked | 接入前先 diff 两份技能版本；落后先报运维 |
+| 4 | 部署 504 重发 → v1 superseded / v2 running | 判终态看 /health + app status + liveUrl 实测 |
+| 5 | `/` 308 到 `/apps/hello` 尾斜杠归一化 | curl 复核加 `-L` |
+| 6 | github.com:443 从工作区不可达（3 次重试 75s 超时） | commit 留本地分支不丢；先走平台 API（localhost）回写再补推 |
+| 7 | 碰撞余量不算就摆点 → 传送收集断言假失败 | 半宽+半径先算可达包络，摆点落在 clamp 边界内 |
+| 8 | spec 数值与实现默认值漂移 | spec 数值落成默认值或 TUNING 初值，README 记口径 |
+| 9 | 导出配置留到部署棒现场发明 | scaffold 棒按上一作先例补 preset + .gitignore 豁免 + 产物入库 |
+| 10 | 根壳残留上一游戏（单游戏位惯例） | 部署前 grep 旧游戏名清残留，apphost.toml 三键核对 |
+
+## 八、关联知识与权威来源
+
+- Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路总论（oak-key）：27407691-bcf8-4e73-b686-1bb8df684e5c
+- game-9 单游戏部署先例与调参桥 §3C：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 移动端触屏虚拟摇杆与 AudioContext 解锁规范：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- MyRD 平台真实仓库结构地图：b07a928a-414b-4d48-9535-5b6d6cc859ae
+- 仓库内权威文件（本仓可直接复用）：`games/hello/{verify.sh,export_presets.cfg,tests/smoke.gd,autoload/game_state.gd}`、`docs/playtest/hello-playtest-blocked.md`、`std-skills/godot-game-dev/scripts/`、`.myrd/routines.yaml`
+- 平台产物链：requirement=cmuqk7luz002am9bfmmkouw9v → design_spec=cmuqkaypy002hm9bf3wnk1k26 → hosted_app=cmuqk3huq001km9bf5ejp7tdg → workflow run=cmuqkb8xl002nm9bf9pz8hw61（/workflows/cmuqk3j35001qm9bfsdw4xn8d/runs/cmuqkb8xl002nm9bf9pz8hw61）→ 线上复核 assign_agent=cmto42pg60004m9aq7jczszhy
+
+## 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+# 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+> **文档定位**：固化 game-8 v2 轮手感调优的**具体数值（前后对照）**、godot-smoke 门禁表现、线上链路诊断结论与**可照抄的复测方法**，形成「手感类反馈（再大一点 / 再慢一点）」的**可复用增量调参基线**——后续同类反馈直接对照本文 §五 playbook 执行，不必重新勘探。
+> **权威基准**：需求《牛牛打游戏 game-8 · v2 手感调优：牛牛体型放大、移动速度下调》（`cmuqmej89000ym9gg6mom93o0`）；策划案 v1 设计唯一来源（doc `80b9c193-6807-43e4-b2b0-5789f2d9e35b`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）；收口依赖清单（doc `943eb5eb-0949-43fe-b939-83cf171af2a3`）。
+> **实现基线**：部署分支 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`；数值提交 `3a396355`（feat v2 手感调优）→ 产物重导出 `1089e4b` → 诊断报告 `1afec443`（`games/game-8/docs/v2-liveurl-diagnosis.md`，docs-only）；线上部署 = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`。
+> **本文数字全部为一手实测值**（git diff 实录 / curl 取证 / 线上 pck 自跑门禁），非估算。
+
+## 一、v2 数值基线（前后对照，唯一落账）
+
+| 声明键 | v1 默认 | v2 落账 | 需求量化区间 | 实际占比 | TUNING_META 钳制 |
+|---|---|---|---|---|---|
+| `PLAYER_SCALE` | 1.0 | **1.4** | 1.3~1.5× 整体放大 | 1.4× | min 0.5 / max 2.0 / step 0.05 |
+| `PLAYER_SPEED` | 220.0 px/s | **145.0 px/s** | v1 的 60~70% | **65.9%** | min 60 / max 300 / step 5 |
+
+- **唯一落账位置**：`games/game-8/autoload/game_state.gd` 数值区（v2 HEAD 实测：`var PLAYER_SCALE: float = 1.4` / `var PLAYER_SPEED: float = 145.0`）。⚠️ 策划案 v1 写的路径是 `scripts/game_state.gd`，**实际权威路径是 `autoload/game_state.gd`**（scripts/ 下并无此文件），后续引用以本文为准。
+- **接线方式**（`scripts/player.gd`）：`_apply_tuned_scale()` 把 `PLAYER_SCALE` 以**根节点 uniform scale** 应用（`is_equal_approx` 脏检查，滑杆改动下一物理帧生效），同步作用于视觉精灵、`CollisionShape2D` 碰撞体与 `PickupArea/PickupShape` 判定体；`velocity = direction * GameState.PLAYER_SPEED` 每物理帧读声明键。
+- **判定几何联动（容易算错的口径，钉死）**：`player.tscn` PickupShape 本体半径 22px → v2 缩放后 **30.8px**；收集物本体半径 14px（`collectible.tscn`）；**触发距离（圆心距）= 30.8 + 14 = 44.8px**（v1 为 22+14=36px）。刷点安全间距常量 96px 未动 → 余量从 96/36 ≈ **2.67×** 收窄到 96/44.8 ≈ **2.14×**，仍满足「重开不贴脸白捡」。commit `3a396355` 提交信息里的「判定半径 44.8px」即此**触发距离**口径，不是 PickupShape 本体半径，别混淆。
+
+## 二、godot-smoke 门禁表现（v2 断言三件套 + 全链路复跑）
+
+### 2.1 门禁复跑结果（本地与 preHook 同源，全绿）
+| 门禁步 | 结果 |
+|---|---|
+| resolve-godot.sh | exit 0，Godot **4.3.stable.official.77dcf97d8** |
+| preflight.py | **PREFLIGHT: PASS**（13 类前置一致性检查、40 个工程文件，exit 0） |
+| smoke.sh（240 帧预算） | **GODOT_SMOKE: PASS**（exit 0、零 SCRIPT ERROR） |
+| input-fuzz.sh | **GODOT_FUZZ: PASS**（seed=20260913，6 批次 239 帧，exit 0） |
+| playtest.sh | **脚本缺失**（模板仓库未预置，D2 依赖 / bug `cmuktchmy000km97z6kj3r2ro` Bug1），维持 blocked、不代写不伪造 |
+
+### 2.2 smoke.gd 新增 v2 手感断言三件套（真实机判，含 FAIL 路径，约 L423-435 `_assert_v2_tuning`）
+1. **倍率区间**：`PLAYER_SCALE ∈ [V2_SCALE_MIN=1.3, V2_SCALE_MAX=1.5]`，违例 FAIL 签名「v2 手感断言 FAIL：体型倍率 %.2f 不在 %.1f~%.1f 区间」；
+2. **移速区间**：`PLAYER_SPEED ∈ [V2_SPEED_MIN=V1_SPEED×0.6=132.0, V2_SPEED_MAX=V1_SPEED×0.7=154.0]`，FAIL 签名「移速 %.1fpx/s 不在 v1 默认 %.0f 的 60%%~70%% 区间」；
+3. **接线集成断言** `_assert_node_scaled`：Player 根节点、`CollisionShape2D`、`PickupArea/PickupShape` 三节点的全局缩放必须都等于数值区 `PLAYER_SCALE`（与难度梯度 SpawnTimer 断言同口径，防「数值键写了但没接上」）。
+
+方向符号断言（A/← 后 position.x 减小、D/→ 后增大）与 50 连击判定一致性、难度梯度、过期回收、胜负四分支、一键重开、持久化等既有契约**全部保留不动且继续通过**——玩法零回退。
+
+### 2.3 可复用结论：断言区间与需求区间硬耦合
+smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的。后续若要把数值调**跨出**这个区间，必须**三处同步**：smoke.gd 常量、需求区间条款、策划案 revisions 数值区——否则门禁会以清晰签名 FAIL（这是门禁在强制「数值变更须先改需求基线」的设计行为，**不是误报，不许放松断言来绕**）。
+
+## 三、线上链路诊断结论（liveUrl 端到端实测，2026-10-02）
+
+**结论先行**：✅ v2 已在线上生效且量化达标——部署产物自跑门禁全绿（含 v2 手感基线机判），线上资产与仓库导出逐字节一致，**无需修复、无需回滚**。
+
+1. **部署元数据**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`）；当前部署 **version 5 `cmuqny37h001ficf0mpmr71mv` status=running**；gitRef=`myrd/games-goal-cmujpml1e006rm99i9hc33huu`（未落 main ✓）；commit `1089e4b`（其上仅 1 个 docs 提交，代码零差异）；v4=`cmuqnx9v6001dicf0fmfryxcz` superseded（重试冗余但无害）。
+2. **公网链路**：`GET /apps/game-8/health` → 200 `{"ok":true,"app":"game-8","game":"牛牛打游戏","assets":"lazy/object-storage"}`；`/apps/game-8/` → 308 规范化跳转 → 200；`/gw/health` → 200（网关透传正常）；壳页 11,626B，`__GAME_TUNING__` 调参桥 ×2、`__audioDebug` 音频手势解锁器、资产全走相对路径 `fetch(BASE_PATH + 'api/public/assets/' + name)` 三契约在位。
+3. **资产文本通道**：`index.pck` base64 3,333,340B → 解码 gzip 2,513,040B；`index.wasm` base64 **10,696,408B** → 解码 35,376,909B（与门禁经验 v6 一手实测值一致）。
+4. **逐字节一致（无版本漂移）**：本地导出（部署 commit 工作树）与线上对象存储拉回解码产物 sha256 完全一致——pck `5f556ad9adf47579cb38a1fd8f7549e33b478b56cd4b3b5f112346281d699e25`；wasm `fe5cebc590758c10bc4469be5a591e28edbde5ec8f458f21baeb83db50d028b9`。
+5. **最高等级证据——部署产物自跑门禁**：`godot --headless --main-pack <线上pck> --quit-after 240 res://tests/smoke.tscn` → exit 0、零 SCRIPT ERROR、`GODOT_SMOKE: PASS`，v2 手感基线机判全过（1.4∈[1.3,1.5]，145∈[132,154]）——「牛牛变大变慢」是**产物运行期实测**，不是代码推断。
+
+## 四、复测方法（照抄即用）
+
+1. **公网探测**：`curl -s <liveUrl>/apps/game-8/health`（期望 200 + ok:true）；`curl -sI <liveUrl>/apps/game-8/`（期望 308→200）；壳页 HTML grep `__GAME_TUNING__` / `__audioDebug`。
+2. **资产一致性**：`GET /api/public/assets/index.pck`（和 index.wasm）→ base64 解码 → gunzip → `shasum -a 256`，对照 §三.4 的两个哈希；不一致即版本漂移，先查部署 commit 再谈手感。
+3. **手感数值机判**：`godot --headless --main-pack <线上或本地 index.pck> --quit-after 240 res://tests/smoke.tscn`，判定三条件（`GODOT_SMOKE: PASS` + exit 0 + 零 SCRIPT ERROR），签名中应含「v2手感基线(体型1.3~1.5x·移速60~70%)」字样。
+4. **数值速查**：游戏内调参面板或壳页 `?tuning=1` URL 直接查看当前声明键值；或读 `games/game-8/autoload/game_state.gd` 数值区。
+5. **环境备注**：诊断沙箱对 github.com:443 直连超时（`Recv failure`），推送改走 `ssh.github.com:443` 通道——后续同环境取证直接用此通道，别反复试直连。
+
+## 五、「再大一点 / 再慢一点」类反馈的增量调参 playbook（可复用基线）
+
+**标准链路（全七步，禁止散点改代码对数值）**：
+调参入口（游戏内面板滑杆即时生效 / 壳页 `?tuning=` URL）→ 确定目标声明键与新值 → **经策划案 revisions 回写 `spec.numeric`**（doc `80b9c193-…`，spec 载体即该知识文档）→ 改 `autoload/game_state.gd` 数值区 → 复跑 godot-smoke 门禁 → 重导出 Web 产物并部署（gitRef 必须是 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`）→ 按本文 §四产物自跑门禁复测。
+
+**建议步长与边界**：
+| 反馈 | 动作 | 步长建议 | 边界 |
+|---|---|---|---|
+| 再大一点 | `PLAYER_SCALE` ↑ | +0.05~0.1 / 档 | 钳制 [0.5, 2.0]；跨出 [1.3,1.5] 须按 §2.3 三处同步 |
+| 再小一点 | `PLAYER_SCALE` ↓ | −0.05~0.1 / 档 | 同上；低于 1.3 同样触发门禁 FAIL |
+| 再慢一点 | `PLAYER_SPEED` ↓ | −5~15 / 档 | 钳制 [60, 300]；跨出 [132,154] 须三处同步 |
+| 再快一点 | `PLAYER_SPEED` ↑ | +5~15 / 档 | 同上 |
+
+**每次调整必做的三项联动复核**：
+1. **断言区间一致性**（§2.3）：数值是否跨出 smoke 常量带；
+2. **判定几何余量**：体型↑ → 触发距离 = 22×scale + 14 线性放大 → 96px 刷点间距余量 = 96/触发距离 收窄；低于 2× 时须复核刷点安全间距常量是否要同步上调（公平性属门禁议题，不许靠放松断言解决）；
+3. **达成余量**：移速↓ → 单位时间可达刷点数↓ → 60s/20 目标的通关可达性须复核（跑 50 连击一致性 + 全链路一条龙断言兜底；v2 @145px/s 已实测可通关）。
+
+**回滚口径**：v1 = `PLAYER_SCALE 1.0` / `PLAYER_SPEED 220.0`，两键均可在调参面板或 `?tuning=` URL 直接调回，代码零改动。
+
+**主观手感的最终裁决**：数值区间内「像不像用户要的手感」机器判不了，仍以 D3 用户试玩结论为准（入口 `…/apps/game-8?tuning=1` 已可用）；未决依赖 D1（iOS Safari 真机）/ D2（playtest.sh 模板资产）见收口清单 doc `943eb5eb-…`。
+
+**来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
+
+
+## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+# game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+> 来源：需求《测试连点防重的极简计数页（game-12）》（id=cmur8x93r0016icbsd90s6e60，goal=cmur8pnhn000kicbsvl0eoqx6）走完「录入需求 → 判定规则调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-12`（Godot 4.3.stable），分支 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`（scaffold e055e4f → implement ff779d0 → deploy c54fcc9/078f761/e5b292e → playtest 1f7a4a3）。线上：https://leomac-studio.tail49399e.ts.net/apps/game-12/（/health 200 `{"ok":true,"app":"game-12"}`，deploymentId=cmurba8yd001vicbsfdl79x8l，部署 commit c54fcc9）。门禁终态：**godot-smoke 全绿 + mobile-web-smoke PASS 10/10（实测 FPS 39）**，playtest 棒复跑双门禁结论一致。
+>
+> 本文只写 game-12 的增量结论：防重语义选型与实现契约、双门禁通过路径、踩坑清单与复用清单。门禁三层体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-9 增量见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be；移动端触屏摇杆与 AudioContext 解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；防重判定规则 R1–R6 / 事件契约 C1–C4 调研全文见项目文档库 id=8345388c-cf30-4d7c-8413-39ccd7e65887。互为补充、不重复。
+
+## 一、防重语义选型：只有「固定节流（采纳即锚定、拦截不延窗）」能同时过验收 2 和 3
+
+| 方案 | 机制 | 300ms 内连点 5 次 | 窗口后恢复累加 | 结论 |
+| --- | --- | --- | --- | --- |
+| **固定节流（首击入窗）** | 首击计数并锚定窗口；窗口内后续点击全拦且**不更新锚点** | 仅 +1 | 正常 | 采用 |
+| 防抖（末击重启窗口） | 每次点击都重置窗口，静默期满才计 | 0 次 | — | 违背验收 2 |
+| 首尾折叠 | 窗口首末各计一次 | +2 | — | 违背验收 2 |
+
+**最易写错的一行**：被拦截的点击不得触碰窗口锚点 `_last_count_ms`。一旦拦截分支也更新它，节流就退化成防抖——持续点击下计数永远不涨，验收 3 永远不过。
+
+实现（`games/game-12/autoload/game_state.gd`，时间注入纯函数，核心约 15 行）：
+
+```gdscript
+const TARGET_COUNT: int = 10
+const DEBOUNCE_MS: int = 300
+var _last_count_ms: int = -DEBOUNCE_MS   # 初值 = -窗口 → 开局首击立即有效
+
+func try_count(now_ms: int) -> bool:
+    if state != State.PLAYING:
+        return false                      # 已胜：忽略，不报错
+    if now_ms - _last_count_ms < DEBOUNCE_MS:
+        click_rejected.emit(DEBOUNCE_MS - (now_ms - _last_count_ms))
+        return false                      # 拦截：只发反馈信号，不动锚点
+    _last_count_ms = now_ms
+    count += 1
+    count_changed.emit(count)
+    if count >= TARGET_COUNT:
+        state = State.WON
+        state_changed.emit(state)
+    return true
+
+func reset() -> void:
+    count = 0
+    state = State.PLAYING
+    _last_count_ms = -DEBOUNCE_MS         # 重开同步清防重锚点 → 首击立即有效
+```
+
+三个不能省的细节：
+1. `_last_count_ms` 初值取 `-DEBOUNCE_MS`，否则开局第一击被吞（验收 1 首点即错）。
+2. `reset()` 必须同时清防重锚点——「刷新/重开无残留」包含防重状态本身。
+3. 拦截不静默：`click_rejected(remaining_ms)` 把「被吞的点击」变成可感知反馈（按钮闪红 + 状态栏「连点已拦截，还需 Nms」）。且关键反馈不能被高频更新覆盖——状态栏曾把指针坐标与拦截提示混在一行，坐标每物理帧刷新把「还需 Nms」冲掉，拆成反馈线/指针线两行才保住。
+
+时间注入是机判前提：`try_count(now_ms)` 不读时钟 → 无头冒烟可用合成时间戳逐毫秒断言（完全确定、与帧率零耦合）；只有真实点击路径才走 `Time.get_ticks_msec()`。
+
+## 二、单源单相：三个入口汇一个判定点，防「一次触碰计两次」
+
+Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`（调研已核实）→ 移动端一次触碰可能产生 touch/mouse 双事件，再加键盘空格/回车，同一「点击」有四个来源。game-12 的收敛方式：
+- `CountButton.pressed`（鼠标/触摸）与 `_unhandled_input("confirm")`（键盘/动作）都只调唯一入口 `_attempt_count()` → `GameState.try_count(...)`。防重判定只在 GameState 一处，不可能被绕过。
+- `TouchConfirmButton`（TouchScreenButton）**不直接调游戏逻辑**，而是 `Input.parse_input_event(InputEventAction("confirm"))` 注入动作 → 触摸与键盘走完全相同路径（顺带获得桌面端自动不响应的免费屏蔽）。热区用 shape 圆（半径 44）而非位图。
+
+## 三、把「防重」机判成确定性断言（附负例验证纪律）
+
+冒烟相位设计（`games/game-12/tests/smoke.gd`）：
+- **合成时间戳断言防重**：t0 有效；t0+100/200/299ms 连点全拦、只发 click_rejected、count 不变；跨窗后再点正常 +1。
+- **真实路径另测**：真实点击受真窗口约束 → 相位间显式等真实时间跨窗，并设帧数上限守卫（60fps 约 2s，超限报 `Engine.max_fps` 异常而非挂死）。
+- **噪声后复位**：乱键相位可能真触发计数/拦截，且末次乱键可能贴着 confirm 注入点不足 300ms → 进断言前 `GameState.reset()` 清锚点，消灭偶发失败。
+- **每条断言做负例验证**（证明会真 FAIL，不是永真）：热区 44→10、宽高比 keep→expand、脉冲阈值抬到 1.0，三次均如预期 FAIL。
+
+两个「静默漏判」陷阱（负例不触发才发现）：
+1. 静态几何断言放 `_ready()`：此时 `Control.size` 恒为 0，整段断言被静默跳过 → 移到第一物理帧再读。
+2. Button 有主题最小尺寸保护：`offset_right=110` 实际 size 被钳到 115，44px 负例测不出来 → 换 TouchScreenButton 圆形热区做负例。
+
+极简静止页的门禁特异问题：mobile 门禁「画面在动」检查会把完全静止的页面误判为渲染冻结。解法：+1 按钮加待机呼吸脉冲（scale 1.00→1.06 / 0.9s，实测极差 0.060 ≥ 阈值 0.02），一举两得——既是移动端可点示能，又是确定性的非零帧差证据。缩放绕 `pivot_offset`（控件中心），否则动画往右下飘。
+
+画布口径：调研建议设计宽 375 + Adaptive；实现落成 720×1280 竖屏 + `canvas_items`+`keep`（+1 按钮 560×240，375 宽实机约 291px），同样满足无横滚与 ≥44px。机判锚点是**宽高比策略必须 keep**（expand 会被冒烟断言拦，负例已验证）。
+
+## 四、Godot Web 双门禁：分工、顺序与标记辨析
+
+| 门禁 | 判定链 | 拦什么 | game-12 实测 |
+| --- | --- | --- | --- |
+| **godot-smoke** | resolve-godot → preflight.py（13 类静态一致性）→ headless smoke（`GODOT_SMOKE_FRAMES=240`，断言退出码 0 + `GODOT_SMOKE: PASS` 标记 + 日志无 SCRIPT ERROR）→ input-fuzz（seed=20260913，6 批/239 帧） | 游戏本体「跑得动且玩得动」（含防重/恢复/胜负/重开/触控目标/拉伸契约断言） | 四步全 exit 0 |
+| **mobile-web-smoke** | mobile-web-smoke.mjs --url <liveUrl>（headless Chrome 390×844 iPhone 仿真）10 项：网络全通/console 零错/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约（__audioDebug）/无横溢（scrollWidth=390）/FPS≥8（实测 39） | 部署后真实链路上的移动端可玩性 | PASS 10/10 |
+
+三条纪律：
+1. **mobile-web-smoke 必须打部署后的 liveUrl**——本地静态伺服 export/web 只能当预检（implement 棒做过 10 项预检），不能替代正式门禁：M1 网关、对象存储资产通道、壳契约只在真实链路暴露。所以它位于 deploy 之后，是产物验证而非 implement 棒门禁。
+2. **标记辨析**：判定脚本 stdout 是小写 `godot-smoke: PASS`，引擎日志里才是大写 `GODOT_SMOKE: PASS`（smoke.sh 内部 grep 大写标记后才自产小写行）。只 tail 游戏日志看不到大写标记不等于失败——先分清两层标记再下结论。
+3. **证据随仓库归档**：`games/game-12/qa/mobile/report.json` + phase-load/tap/joystick 三张截图入库，供复跑比对。
+
+## 五、部署链五个真实踩坑（每个都在本目标发生过）
+
+1. **`.gitignore` 里 `/export/` 不删 = 部署后全 404**：apphost.toml 的 `assets_dir` 指向 `games/game-12/export/web`，导出产物不入库则 wasm/pck 上线即丢。导出产物必须入库（37MB wasm 走底座 A「资产出 bundle」+ 对象存储懒加载 + `/api/public/assets/` b64 文本通道，总论见 27407691）。
+2. **apphost.toml 沿用上一游戏**：原值指向 candy-crush 的 `games/game/export/web`；构建管线按 gitRef 读它，不改会打包错应用 → `name`/`assets_dir` 随游戏改是 deploy 棒第一查。
+3. **gitRef 必须是目标分支不是 main**：本次 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`。注意本地工作区克隆出的分支名可能与远端目标分支不同名同指针（`myrd/game-12-goal-…` vs `myrd/games-goal-…`）→ 部署前 fetch + 显式切到目标分支再读 apphost/导出。
+4. **壳页三件套缺一不可**（`server/src/game-page.ts` / `games/game-12/export/web-shell.html`）：品牌文案适配（曾残留糖果粉碎传奇文案）；§3C 调参桥（引擎加载前解析 `?tuning=` → `window.__GAME_TUNING__`，只认对象形态、非法 JSON 静默忽略——game-12 缺，补约 8 行）；音频手势解锁器 + `window.__audioDebug`（即 mobile 门禁「音频解锁契约」的机判对象）。壳页另配 `overflow:hidden + touch-action:none` + `user-scalable=no`：彻底禁双击缩放/滚动，快速二连点不被浏览器手势吞掉造成防重误判（比调研建议的 `touch-action: manipulation` 更强）。
+5. **PATCH 目标 artifacts 是整体替换数组**：回写产物必须 get→append→写回（playtest 棒 3→4 条、既有条目原样保留 + 回读校验），直接 put 会抹掉前序产物。
+
+调参语义澄清：`TUNING_META` 未声明时 `?tuning=1` 是**安全 no-op**（正常进游戏、忽略键）。game-12 有意不把 `DEBOUNCE_MS=300` 做成可调——它是需求验收项本身，spec 是唯一事实源。要开放浏览器内调参需下一轮：spec.numeric 声明键 → TUNING_META + tuning_panel.gd + 冒烟断言 → 重导出重部署重跑 mobile 门禁。
+
+## 六、macOS 自带 bash 3.2 的全角括号坑
+
+`verify.sh` 里 `$FRAMES）`（全角右括号紧贴变量名）在 macOS bash 3.2 某些 locale 下把多字节字符并入变量名 → `FRAMES: unbound variable`，而上一行 echo 还能正常展开，极难定位。写法统一 `${FRAMES}`，用 `bash -x` 抓现行。game-12 修复后 verify.sh 端到端全绿（preflight/smoke/fuzz 全 exit 0）。
+
+## 七、如实上报的缺口（未绕过、未伪造）
+
+1. **playtest.sh 不在模板仓库**（`std-skills/godot-game-dev/scripts/` 同目录 9 个判定/驱动脚本中独缺它）：各节点均未自造等价判定器、未伪造 `GODOT_PLAYTEST: PASS`；`.myrd/routines.yaml` 两条 routine（godot-smoke / mobile-web-smoke）均不引用它 → 不阻塞双门禁，缺口随产物 detail 上报运维补资产。
+2. **真机抽查未做**（本环境建不了 iOS 会话）：mobile-web-smoke 是 headless Chrome 仿真，触摸结论的边界是仿真环境；真机验证留待用户试玩回填。
+3. **试玩结论只能来自用户**：playtest_kit 已交付（`games/game-12/qa/playtest-kit.md`，试玩指引 + 反馈对照表 + 四问量表），量表待回填，未代填任何「好玩/通过」结论；未收到用户调参 URL 前，无 spec revisions/approve 调用。
+
+## 八、复用清单（后续点击类小游戏直接抄）
+
+1. 防重抄 `try_count(now_ms)` 签名：时间注入纯函数 + 初值 `-DEBOUNCE_MS` + 拦截不动锚点 + reset 清锚点 + 拦截发 remaining_ms。
+2. 输入抄「单源单相」：所有入口 → 唯一 `_attempt_count()`；TouchScreenButton 注入 InputEventAction 而非直调逻辑。
+3. 断言抄四件套：合成时间断言 + 真实路径跨窗等待 + 噪声后 reset + 每条断言负例验证；几何断言放第一物理帧，44px 负例用 TouchScreenButton 热区。
+4. 静止页记得待机脉冲（≥0.02 极差同时换「画面在动」绿与可点示能）。
+5. 部署抄「五查」：gitignore 的 /export/、apphost.toml 指向、gitRef=目标分支、壳三件套（文案/调参桥/音频解锁）、artifacts 回写 get→append→写回。
+
+关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
+
+## 沉淀 game-14 Godot Web 导出与移动端门禁经验
+
+> 来源：goal cmusp1rab0028ic7q9shcdzyl（项目 cmusp1ra00022ic7qnk18nofm）「小游戏工坊 · game-14」工作流执行沉淀。上游输入：需求《game-14 太空飞船躲陨石捡金币》（cmusphfbp0062ic7qrxlt2nk4）、GameDesignSpec v1（cmuspm7sm006uic7qzrbqyilp，approved）。工作流 run cmuspmlex0072ic7qnjiqxmpc **真实结局 = failed，且失败于工作区准备阶段，四个节点全部 pending**。本卡如实记录本轮真实结论（失败模式与补救路径），并把 game-14 真正进入开发后要带上的导出/门禁契约收拢成清单（引用既有基线、不重复）。**本轮没有产生任何 game-14 代码、导出产物、门禁判定或部署事实——请勿把本卡第 4~6 节的复用清单误读为 game-14 实测数据。**
+
+## 一、本轮真实结局：准备阶段 git clone 失败，门禁与导出根本未执行
+
+- 时间线：run 创建 2026-10-03T18:12:57Z → failed 2026-10-03T18:15:25Z（存活 2 分 28 秒）；prepSteps 仅「解析模型配置 3ms」；失败点 = preparationPhase「正在准备代码工作区（克隆仓库、拉取最新代码）」。
+- run.result.error 逐字：`git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmusp1ra00022ic7qnk18nofm/run-cmuspmlex0072ic7qnjiqxmpc'... fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75009 ms: Couldn't connect to server`。
+- 节点状态：脚手架 / 实现玩法 / 导出并部署 / 试玩验收 全部 pending；implement 与 deploy 的 godot-smoke preHook、playtest 的 mobile-web-smoke preHook 也均 pending——**门禁一次都没跑过，不存在「门禁打回」**。
+- 复盘纪律：「已启动 ≠ 已成功」在本轮的具体形态就是「run 状态 failed + 节点全 pending」；判定真实结局唯一依据 run 状态与 run.result.error，禁止凭预期脑补「门禁打到第几轮」。
+
+## 二、根因分类与补救：环境不可用 ≠ 代码缺陷，正确动作是重跑而非改代码
+
+- 根因：github.com:443 连接 75 秒超时（connect 阶段即失败，非认证/仓库问题），属瞬时网络故障——与 godot-smoke 退出码 2「环境不可用」同层语义：**禁止为它改游戏代码，更不允许宣称门禁失败**。
+- 恢复复核（2026-10-04）：`curl https://github.com` → 200（0.59s）；`git ls-remote https://github.com/hl3w22bupt/myrd-playground.git` 正常返回分支列表 → 复跑条件已具备。
+- 补救动作：`POST /api/v1/workflows/runs/cmuspmlex0072ic7qnjiqxmpc/rerun`（平台手册 rerun 入口）。DAG 输入不变：需求 cmusphfbp0062ic7qrxlt2nk4 + spec cmuspm7sm006uic7qzrbqyilp（v1 approved）仍是唯一权威。
+- 若同签名（clone exit 128 / 443 connect timeout）复现：先做宿主机连通性探针（curl github.com + git ls-remote），如实按「环境不可用」上报等待恢复；不得降级为纸面交付，也不得空转烧修复预算。
+
+## 三、game-14 工坊流水线契约（经本轮 run 定义实测核实）
+
+- 四棒 DAG：脚手架 scaffold → 实现玩法 implement → 导出并部署 deploy → 试玩验收 playtest；仓库 github.com/hl3w22bupt/myrd-playground（game-14 预期落位 `games/game-14`，以 scaffold 实际产物为准）。
+- 门禁挂点：**implement、deploy 两棒都挂 godot-smoke；playtest 挂 mobile-web-smoke**。routine 均 gate:false、由 preHook 显式引用；`{{liveUrl}}` 无默认值 = fail-closed（不传就报错，不会静默跳过门禁）；`{{gamePath}}` 必须经 preHookParams 显式传参（默认值指向不存在工程的坑见 27407691 §1.3）。
+- 判定资产唯一来源：仓库 `std-skills/godot-game-dev/scripts/`（mobile-web-smoke 判定脚本 mobile-web-smoke.mjs + 负例自测 mobile_smoke_selftest.mjs + routine 片段模板已随 commit 4a8e4b76 落地）；被检工程不得自造判定器，scaffold 只校验不自造。
+
+## 四、game-14 验收标准 → 门禁断言映射（approved spec v1 的可机判数值）
+
+| 验收项 | spec v1 锚点 | 机判断言落法 |
+| --- | --- | --- |
+| 难度阶梯 | 陨石生成间隔 950ms 逐档递减至封顶 430ms、下落速度 130px/s 逐档递增至封顶 270px/s，共 5 档（每 100 分一档） | 冒烟分相位读各档生成间隔/单位位移帧数，断言逐档单调变化且封顶后不再变化；档位边界按得分 100/200/300/400 推导写进断言注释 |
+| 状态机与持久化 | 开始（含操作说明）/进行中/暂停恢复/游戏结束/一键重开五状态；最高分 localStorage 键 `game14.highScore` | 状态标志断言；重开后断言分数清零而最高分保留；localStorage 属线上行为，由 mobile-web-smoke 打 liveUrl 验证 |
+| 操控与边界 | 键盘 ←→/A/D（含上下）+ 触摸拖动，飞船不可越出画布 | E-08 纪律：按住方向键测位移与动作注入分帧做；越界 clamp 断言；触摸拖动必须真实改变飞船目标位置（mobile 门禁 touch-response 预修，见 §六） |
+| 计分与生命 | 拾金币 +10 实时显示；撞陨石 −1 命（共 3 命），命尽进游戏结束页并展示本局得分 + 历史最高分 | 拾取/碰撞事件计数断言；连续碰撞或生命归零路径必须可达并断言 GAME_OVER |
+| 视听契约 | 三层星空视差滚动；碰撞爆炸闪烁 + 300ms 震屏 + 1.2s 无敌闪烁；+10 飘分 | 事件标志/帧差断言；无敌期 = 「碰撞不再扣命」的断言窗口 |
+| 音频契约 | coin-pickup / meteor-explosion / game-over 三 SFX 可编程触发；M 键静音且不影响逻辑 | headless 侧编程触发断言；AudioContext 解锁契约（__audioDebug）归 mobile-web-smoke 第 8 项 |
+| 性能 | 连续游玩 60s 帧率 ≥ 30fps；页面无控制台报错 | **阈值辨析：mobile-web-smoke 的 FPS≥8 是底线门禁，≥30fps 是需求验收线——门禁全绿 ≠ 验收达标，验收仍按 spec 执行** |
+
+## 五、复用基线指针（执行时直接带上，本卡不重复其内容）
+
+- **27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 总论）**：Godot 4.3 Web 导出参数基线（`variant/thread_support=false` 免 COOP/COEP、`canvas_resize_policy=2`、中文必须 theme/custom_font=P13、导出 7 件套与 wasm≈35MB 量级）；AppHost 部署契约（**一游戏一清单**——game-14 必须 `name="game-14"`、`assets_dir="games/game-14/export/web"`，绝不沿用他游戏 apphost.toml；部署 gitRef 必须是部署分支 `myrd/games-goal-<goalId>` 不是 main；`/export/` 产物必须入库否则上线全 404；M1 网关拦二进制 → gzip+b64 文本回传；壳内资源全走相对路径）；godot-smoke 三层门禁与退出码语义 0/1/2/3；error-signatures 修复循环纪律；部署终态独立复核四步。
+- **00314649-c4d2-407c-871b-62f7de91b07d（game-12）**：mobile-web-smoke 10 项明细（网络/console/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约/无横溢/FPS≥8）与「必须打部署后 liveUrl」纪律（本地静态伺服只能当预检）；标记辨析（判定脚本 stdout 小写 `godot-smoke: PASS` vs 引擎日志大写 `GODOT_SMOKE: PASS`）；证据随仓归档（`games/<game>/qa/mobile/report.json` + phase 截图）。
+- **82e419bb-b641-4b5e-bb58-d8b9633169ca**：移动端触屏虚拟摇杆与 AudioContext 解锁三件套（首手势解锁 + 解锁前记账 + 退后台回来再解锁），壳页与游戏侧都要进。
+- **36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）/ 78180e88-6486-404e-9265-e315e0da3c66（hello）**：同系列工程结构、模板与门禁增量结论。
+
+## 六、mobile-web-smoke 已知失败图谱（5 款游戏实测 → game-14 预修清单）
+
+仓库 mobile-gate 系列实测 verdict（commits 11957bd3~585db60c）：game-3 疾风忍者跑 **PASS**（十项全绿，tap 触发跳跃实证触摸驱动玩法）；game-2 星尘收集者 FAIL（console Godot 缺 cfg 告警 + tap 后零帧差）；game-4 光路谜阵 FAIL（tap 落空格零帧差，探针坐标与 letterbox 棋盘错位）；game-9 推箱子 FAIL（探针落点错位，摇杆实际 CSS(44,502)）；game-10 天天酷跑 FAIL（tap 落横带无响应，尚需探针区分「点按开始未实现」与「落点错位」）。
+
+- 主失败源集中在 **touch-response**，两类根因：①游戏触摸未真正接入玩法状态（UI 自称支持触摸但点按无效）；②探针坐标与画布 letterbox/控件 CSS 实际位置错位（屏幕坐标 ≠ 游戏坐标）。
+- game-14 预修清单：触摸拖动直接改飞船目标位置并与键盘同路径（game-12「单源单相」范式：多输入源汇一个判定入口）；可交互热区 ≥44px，避免依赖 letterbox 偏移的绝对坐标；开始页不要做成纯静止层（会触发「画面在动」误判，game-12 用待机呼吸脉冲拿到确定性非零帧差）；音频解锁契约随壳页一并实现。
+- 证据纪律：verdict 逐字进 commit message + report.json + phase-load/tap/joystick 三截图入库，供复跑比对。
+
+## 七、关联知识与权威来源
+
+- 知识卡：27407691-bcf8-4e73-b686-1bb8df684e5c（导出+门禁+AppHost 总论）、00314649-c4d2-407c-871b-62f7de91b07d（双门禁与 mobile-web-smoke 10 项）、82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏/音频解锁）、36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）、78180e88-6486-404e-9265-e315e0da3c66（hello 工坊）、b07a928a-414b-4d48-9535-5b6d6cc859ae（平台仓库结构与路径陷阱）。
+- 仓库权威文件：`std-skills/godot-game-dev/scripts/{smoke.sh,preflight.py,input-fuzz.sh,resolve-godot.sh,mobile-web-smoke.mjs,mobile_smoke_selftest.mjs}`、`std-skills/godot-game-dev/references/{godot-smoke-routine.md,mobile-smoke-routine.md,error-signatures.md}`、`.myrd/routines.yaml`。
+- 平台事实源：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`（rerun 入口、「已启动 ≠ 已成功」纪律）；工作流 spec 与需求以平台登记产物为准。
+
+
+## 沉淀知识：Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+# Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+> 来源：目标「森林收集水果限时赛」（goal=cmuspb558003tic7qwgyd02c2）的小游戏工坊流水线（workflow=cmuspb55m003xic7q9o18vjk2 v1，scaffold→implement→deploy→playtest）首轮执行（run=cmuspld10006ric7qup55soew，2026-10-03T18:12:00Z 起、18:14:30Z 判 failed）。固定参数：工程 games/60-2，功能分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2，AppHost cmuspb3xg003ric7q1ksya6c3（slug 60-2），liveUrl https://leomac-studio.tail49399e.ts.net/apps/60-2/（部署前即确定）。本文只写本轮实测增量：①双门禁在 60-2 的挂点与分工；②本次 run 的真实卡点——双门禁之前的第一堵墙；③一次「参数漂移」疑云的证伪过程；④知识沉淀节点自身的 API 事实。godot-smoke 三层门禁体系、打回修复签名表、AppHost 部署总论见关联知识（§八），不重复。
+
+## 一、结论速览
+
+| # | 要点 | 结论 | 依据 |
+| --- | --- | --- | --- |
+| 1 | 双门禁分工 | 工程门（godot-smoke，挂 implement 与 deploy 之前，判工程本体）×线上门（mobile-web-smoke，只挂 playtest 之前，判公网 liveUrl）——判定对象、执行环境、证据落点都不同，不可合并为一道 | 工作流定义逐节点核对 |
+| 2 | 本次失败层级 | run 级失败发生在**门禁之前**：工作区 git clone 连不上 github.com（443 端口 75s 连接超时），四个节点全部 pending，双门禁一次都没执行 | run.result.error 原文 |
+| 3 | 根因定性 | 环境阻塞，非代码/配置缺陷：github.com 从执行机**持续性**不可达（2026-10-03 run 失败 + 2026-10-04 复测 `curl -m 10 https://github.com` 仍超时，连接建立不了） | run 错误 + 本机复测 |
+| 4 | 重跑纪律 | 网络不通时重跑 run = 空烧：先 `curl -m 10 https://github.com` 验连通（10 秒成本），通了自己重跑（工作流定义无需改动），持续不通按「blocked 比空烧有用」上报运维（代理/镜像），禁止为绕过网络改仓库来源 | 本轮 2.5 分钟烧掉一次 run 的直接教训 |
+| 5 | 工作流定义健康度 | 60-2 四节点参数已逐一核对**全部正确**指向 games/60-2 / 60-2 分支 / 60-2 AppHost / 60-2 liveUrl，不存在「模板实例化只替换了首个节点」的漂移 | 8 个关键词 × 4 节点计数复核 |
+| 6 | 沉淀 API 事实 | 本部署**没有** `/api/v1/knowledge/search`（404）；等效做法与写入契约见 §七 | 本次实测 + 平台源码 src/routes/knowledge.ts |
+
+## 二、60-2 双门禁挂点与分工（逐节点实例核对）
+
+| 节点 | preHook | preHookParams | 判定对象 | 证据落点 |
+| --- | --- | --- | --- | --- |
+| scaffold | 无 | — | 资产存在性自检（门禁脚本/routines.yaml/模板，缺失→blocked） | 节点 detail |
+| implement | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（静态一致性 + 无头运行） | 门禁日志 |
+| deploy | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（部署前再拦一次，防止部署带病产物） | 门禁日志 |
+| playtest | mobile-web-smoke | gamePath=games/60-2, liveUrl=https://leomac-studio.tail49399e.ts.net/apps/60-2/ | **线上公网 liveUrl**（headless Chrome 移动仿真） | games/60-2/qa/mobile/（report.json + 分阶段截图） |
+
+要点展开：
+
+1. **工程门挂两道、线上门只挂一道，是有意设计**：godot-smoke 的判定对象是仓库内工程（preflight 静态 + headless 运行），所以在写代码（implement）和出产物（deploy）两处都要拦；mobile-web-smoke 的判定对象是已部署的线上地址，只有 playtest（试玩验收）消费它，且 liveUrl 在部署前就已锁定，preHook 可以在节点启动前先跑门禁、节点启动后直接读证据。
+2. **判定协议（与门禁同源，agent 本地自检命令完全一致）**：退出码 `0` 且日志含标记才算通过——`GODOT_SMOKE: PASS`（冒烟）/ `GODOT_FUZZ: PASS`（fuzz）/ `GODOT_PLAYTEST: PASS`（机器人试玩）；退出码 `2` = 环境不可用（装环境/上报，**禁止为过门禁改判定脚本或改松断言**）。
+3. **判定器独立性**：`preflight.py / smoke.sh / input-fuzz.sh / playtest.sh / resolve-godot.sh / mobile-web-smoke.mjs` 唯一合法来源是仓库 `std-skills/godot-game-dev/scripts/`（模板仓库预置）；平台注入的 `.myrd-platform/.claude/skills/godot-game-dev/` 只是阅读副本，不得当判定来源、不得现场改写、不得自造等价脚本——被检方自己写判定器，PASS 一文不值。缺任何一个 → status=blocked 上报（「模板仓库未预置门禁脚本：<文件名>；请运维补模板仓库」），**不要现场补**。
+4. **参数化必须显式传**：`.myrd/routines.yaml` 中 `godot-smoke` 与 `mobile-web-smoke` 的 `{{gamePath}}`/`{{liveUrl}}` 由工作流节点 preHookParams 按工程覆盖。仓库默认值指向别的工程——不传参要么报错、要么（更糟）静默测错工程给出假 PASS（坑实录见关联知识 27407691 §1.3）。
+5. **中文字体是 preflight P13 的拦截项**：Web 导出跑在浏览器沙箱里拿不到系统字体，模板自带 `assets/fonts/` 全局中文字体与 `project.godot` 的 `[gui] theme/custom_font` 配置必须原样保留；「有中文文案但无字体」直接被 P13 拦下。禁止为躲缺字把文案英化——那是字体缺失的症状，不是修复。
+
+## 三、本次 run 的真实卡点：双门禁之前的第一堵墙
+
+**时间线**：18:12:00 run 启动 → 引导阶段执行工作区 `git clone https://github.com/hl3w22bupt/myrd-playground.git` → 75 秒连接超时 → 18:14:30 run 判 failed。错误原文：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspb3xd003nic7qm25pu8si/run-cmuspld10006ric7qup55soew'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75003 ms: Couldn't connect to server
+```
+
+**为什么门禁体系没接住**：门禁全部挂在**节点**上（preHook），而 clone 是 run 引导步骤，发生在第一个节点之前。clone 失败的后果是：①直接置 run=failed（result.error），②四个节点永远 pending，③没有 reject 打回循环、没有 blocked 语义、没有证据落点——门禁体系（preflight/smoke/fuzz/playtest/mobile-web-smoke 六个判定器）覆盖的是「工程与线上」，不覆盖「工作区引导」这第 0 步。
+
+**连锁依赖链**（为什么这一断全断）：clone 可用 → 功能分支可推送 → AppHost 按 gitRef 拉取构建 → liveUrl 可访问 → mobile-web-smoke 有东西可测 → 试玩验收有地方可玩。第 0 依赖断了，双门禁与验收全部空转。
+
+**恢复路径（给下一轮执行，按序）**：
+
+1. 先验连通（成本 10 秒，避免空烧一次 2.5 分钟的 run）：`curl -s -o /dev/null -m 10 -w "%{http_code}" https://github.com`；
+2. 通了 → 直接重跑工作流，**定义无需任何改动**（四节点参数已核对全部正确，见 §四）；
+3. 持续不通 → 不要重跑，回写 status=blocked 上报运维（网络代理 / GitHub 镜像 / 出网白名单），写清「clone github.com:443 连接超时，全链被第 0 依赖阻塞」——与门禁「退出码 2 = 环境不可用，禁止为过门禁改代码」是同一条纪律的 run 级推广：**环境不通时，重跑是空烧，先修环境或如实上报**；
+4. 禁止为绕过网络私自换镜像仓库/改 remote——仓库来源是部署与门禁的信任锚，变更必须走运维。
+
+## 四、诊断方法论：一次「模板参数漂移」疑云的证伪
+
+**现象**：核对工作流定义时，scaffold 节点参数正确指向 games/60-2，而读到的 implement/deploy/playtest 节点 prompt 里满是上一个游戏 app-2 的固定参数（gamePath=games/app-2、分支 cmuspfeyw…、AppHost cmuspfdr…、liveUrl /apps/app-2/）→ 一度形成高价值假设：「工作流模板实例化只替换了首个节点的参数」。
+
+**证伪过程**：换独立文件名重新拉取同一工作流，对 8 个关键词（games/60-2、games/app-2、两个 goal id、两个 liveUrl、两个 AppHost id）× 4 节点逐一计数——**四节点全部正确指向 60-2**。真因：诊断用的 `/tmp` 共享临时文件被本机并发进程覆盖，中间那几步读到的其实是另一个工作流（app-2）的同名缓存文件。
+
+**沉淀三条**：
+
+1. 结论必须落在「重新独立取证」上，不落在「上一次读到的内容」上——尤其对「上游模板缺陷」这类会被写进知识、触发他人返工的高价值指控，先证伪再落笔；
+2. 诊断脚本对临时文件用唯一文件名（本次 `/tmp/wf.json` 与并发工作流进程撞名），或直接管道内消费不落盘；
+3. 证伪本身也是产出：本文档差点把一个不存在的平台缺陷写成结论，§一第 5 条的「定义健康度」结论就是证伪的成果，它让下一轮可以放心直接重跑。
+
+## 五、Web 导出与 AppHost 部署：60-2 落位值与硬约束清单
+
+机制细节与打回修复总论见关联知识 27407691（oak-key 全链路）与 82e419bb（触屏/音频），本节只列 60-2 的具体落位值和逐项易错点：
+
+| 项 | 60-2 落位值 | 易错点（违反后果） |
+| --- | --- | --- |
+| 部署来源分支 | myrd/games-goal-cmuspb558003tic7qwgyd02c2 | gitRef 传 main → main 上没有本游戏的 apphost.toml/导出产物，构建失败或把别的壳部署出去 |
+| 部署 API | POST /api/v1/apphost/apps/cmuspb3xg003ric7q1ksya6c3/deployments，mode=bundle | sourceId 必须是 goal id cmuspb558003tic7qwgyd02c2；带别的应用 id → 403 APP_BOUND_TO_OTHER_SOURCE（选错坑，回来核对 hostedAppId，不要换坑硬试） |
+| 导出预设 | games/60-2/export_presets.cfg 配 Web(HTML5)，产物落 games/60-2/export/web/（必须含 index.html） | 缺 index.html → 壳无入口页 |
+| 资产出 bundle | apphost.toml 声明 `assets_dir = "games/60-2/export/web"`，平台把该目录上传对象存储，25MB 上限不再约束资产体积 | 不声明 assets_dir → 产物挤进 bundle，体积立刻顶 25MB 上限 |
+| 壳资产路由 | asset-store `getAsset` 懒加载，路由 `/api/public/assets/:name`；`gzip+b64` → 回 text/plain 的 base64（壳端 DecompressionStream 解压）；`raw` → 按 contentType 回原文 | M1 网关**只透传文本响应**：octet-stream/gzip/图片/音视频 → 502 UNSUPPORTED_BINARY；资产一律 base64 文本回传 |
+| 路径口径 | 壳页面拉资源**一律相对路径**（`api/public/assets/index.wasm`）；`?p=` 是网关保留 query | 绝对路径 `/assets/...` 或 `?p=` 手拼 → 404/被登录墙拦 → 黑屏 |
+| wasm 初始化 | `WebAssembly.instantiate(bytes)`（base64 → Uint8Array → 解压） | instantiateStreaming 要求 application/wasm MIME，本链路不满足 |
+| b64 内联降级 | 仅当 asset-store 不可用；原始产物 ≤ 18MB（b64 膨胀 1.33×，bundle 上限 25MB） | 超限 → 降级「说明页 + 下载指引」，不得声称可玩 |
+| 音频手势解锁 | 壳页面在引擎加载**之前**：①包 AudioContext 构造器捕获引擎实例；②document 级 `touchstart/touchend/pointerdown/keydown/click`（capture+passive，不消费事件）同步 `ctx.resume()`；③暴露 `window.__audioDebug()` | 缺任一 → 移动端全部音效静默且控制台零报错（WebKit 创建即 suspended、切后台变 interrupted、引擎只在输入回调 resume）；有音效的游戏壳缺解锁器 = 验收不通过 |
+| 调参桥 | 壳页面引擎加载前解析 `?tuning=<JSON>` 进 `window.__GAME_TUNING__`，游戏侧 GameState 启动按 TUNING_META 声明的键钳制覆盖 | 缺 → 试玩调好的参数无法用 URL 复现，调参回写流程断裂 |
+| 部署后自测 | /health 与 / 都 200 只是起点，**必须**跑 mobile-web-smoke | 只 curl 200 就宣称部署成功 = 跳过移动端硬门槛 |
+
+## 六、mobile-web-smoke 移动端模拟门禁要点
+
+- **机判方式与维度**：headless Chrome 移动仿真打开线上 liveUrl，机判六项——网络（资源可达）、console（无报错）、渲染（画面在动）、触摸（可交互）、音频契约（解锁层在位）、视口（移动端尺寸正确）。
+- **证据落点**：`games/60-2/qa/mobile/`（report.json + 分阶段截图）。试玩节点（playtest）据此写试玩指引；若发现证据缺失或与 preHook 结论矛盾，如实回写 detail，不替门禁背书。
+- **已知边界一：静止页会被误判渲染冻结**。完全静止的页面「画面在动」检查会 FAIL——解法是给核心按钮加待机呼吸脉冲（game-12 实测：scale 1.00→1.06 / 0.9s，极差 0.060 ≥ 阈值 0.02），既是门禁过检又是移动端可点示能（关联知识 00314649）。
+- **已知边界二：门禁全绿 ≠ 真机可用**。触摸事件分发顺序（E-18：`mouse_filter=STOP` 的 Control 在 GUI 命中阶段吃掉触摸，永远到不了 `_unhandled_input`）与 InputEventAction 互踩（E-19）都属于「headless 门禁全绿、真机必挂」型，机判之后仍需真人真机过一次「开局可动、摇杆不误触」（关联知识 82e419bb）。
+- **与试玩验收的衔接**：mobile-web-smoke 全绿只是准入，试玩节点产出「试玩验收包」（试玩指引 + 四问量表 + 调参工作台入口 `<liveUrl>?tuning=1`）；试玩结论只能来自用户，量表未回填就如实标「待回填」，detail 里不得出现没有出处的「试玩通过」。
+
+## 七、知识沉淀节点自身的 API 事实（本次实测，供后续沉淀节点直接复用）
+
+- **本部署不存在 `GET /api/v1/knowledge/search`**（返回 404）。等效「先搜后写」：`GET /api/v1/knowledge?scope=global&limit=200` 拉全量后客户端按 title/内容过滤（服务端源码 src/routes/knowledge.ts 的 GET 只支持 scope/category/projectId 过滤，无全文检索；列表默认只返回 parentId=null 且 isPublished=true 的文档）。
+- **新增**：`POST /api/v1/knowledge`，必填 `title` + `scope`（'global'|'project'）；`title+scope` 重复 → 409 CONFLICT（先搜后写可顺便避开）；`tags` 必须是字符串数组；`category` 建议对齐既有口径（本文用「技术方案」，与同类游戏知识一致）；创建即 isPublished=true 并自动生成 v1 版本快照。
+- **更新**：`PATCH /api/v1/knowledge/doc?id=<docId>`，支持部分更新 title/content/category/tags/icon/scope/projectIds；平台自动做版本化（更新前快照旧版 → version+1 → parentVersion=`id@vN`），不需要调用方自己处理版本。
+- **单篇读取**：`GET /api/v1/knowledge/doc?id=<docId>`（返回 doc + associatedProjectIds；已删除文档也能读到，便于历史链接）。
+- **写入姿势**：JSON body 直接 PUT 不便时，用 python3 `json.dumps` 构造 payload 再交 curl 发送，避免 shell 转义事故。
+
+## 八、关联知识（互为补充，不重复）
+
+- `27407691-bcf8-4e73-b686-1bb8df684e5c`：Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路实战（oak-key）——三层门禁体系、退出码语义、routine 参数化、GODOT_BIN 单一实现、error-signatures 打回修复表。
+- `00314649-c4d2-407c-871b-62f7de91b07d`：game-12 双门禁通过路径——mobile-web-smoke PASS 10/10 实测、静止页呼吸脉冲、负例验证纪律。
+- `82e419bb-b641-4b5e-bb58-d8b9633169ca`：game-5 触屏虚拟摇杆与 AudioContext 解锁规范——E-18/E-19 机制、统一移动向量出口、音频门控三件套。
+- `6e91a11d-3632-4721-a3ea-d433e9622f9b`：game-5 玩法设计要点——与 60-2 同属「森林收集水果限时赛」玩法族（60 秒限时收集），数值基准可对照。
+- 设计 spec（platform）：`cmuspl1bw006lic7qkcplv73e`——60-2 的水果分值表（+1/+3/+10）、生成节奏与 60 秒结算契约及契约测试清单，实现与验收以此为准。
+
+## 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+# 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+> 来源：需求《《森林收集水果限时赛》游戏需求》（id=cmusp9cd00035ic7qxi8c4il3，验收节点 completed）→ GameDesignSpec《水果分值表与收集循环》（id=cmuspeqza004uic7qusqyn7gr）→ 小游戏工坊两次工作流运行皆 failed → 主策划验收指派（id=cmtn5fhk8000hjqckrib9i3bb，completed）。全部平台终态于 2026-10-04 经 API 与线上 URL 实测取证（见 §一）。
+>
+> 本文写三件事：① 可复用的「分值分档点按收集」玩法模板（+1/+2/+5 三档）；② Web 导出 + 双门禁的复用要点；③ 本 goal 双跑皆败的流程复盘教训。**不重复**总论：门禁三层体系与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key）；工程结构最小契约与帧预算推导见 78180e88-6486-404e-9265-e315e0da3c66（hello）；时间注入机判与单源单相见 00314649-c4d2-407c-871b-62f7de91b07d（game-12）；触屏适配与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca；**同名 IP 的另一机制变体**（松鼠移动+原木躲避+连击）见 6e91a11d-3632-4721-a3ea-d433e9622f9b（game-5 老版）。
+
+## 一、事实基线（本 goal 真实终态，先看这个再谈复用）
+
+| 对象 | 标识 | 终态 | 取证方式 |
+| --- | --- | --- | --- |
+| 需求 | cmusp9cd00035ic7qxi8c4il3 | completed | goal DAG 记录 |
+| GameDesignSpec（分值表与收集循环） | cmuspeqza004uic7qusqyn7gr | completed | goal DAG 记录 |
+| 工坊运行 #1 | workflow=cmusp1yao002pic7q384xxfse，run=cmuspf4oo0050ic7qfjj0azwh（工程 games/60，分支 myrd/games-goal-cmusp1ya8002lic7qk39zog9o） | **failed** | GET /api/v1/workflows/{id} 的 runs 字段 |
+| 工坊运行 #2（换 slug 重试） | workflow=cmuspb55m003xic7q9o18vjk2，run=cmuspld10006ric7qup55soew（工程 games/60-2，分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2） | **failed** | 同上 |
+| AppHost 记录 | 60=cmusp1ya6002jic7qz3dhps7r；60-2=cmuspb3xg003ric7q1ksya6c3 | 均卡在 status=creating，publicUrl=null，publishedAt=null | GET /api/v1/apps |
+| 线上地址 | https://leomac-studio.tail49399e.ts.net/apps/60 与 /apps/60-2（含 /gw 变体） | **404「应用不存在」** | curl -L 实测 2026-10-04 |
+| 主策划验收指派 | cmtn5fhk8000hjqckrib9i3bb（标题「验收复核线上版并回写产物标识」） | completed（节点完成；其结论正文经多个 API 路由探测不可回读） | goal DAG 记录 |
+| 同名老变体 game-5 | AppHost=cmuipis4f0063m9l6hagvvvd4，goal=cmuipis4g0065m9l69hew4nng，需求=cmuipol63006rm9l6cp2ww5r5 | ready，publicUrl=/apps/game-5，3 次工坊 run 全 completed | GET /api/v1/apps、/api/v1/workflows |
+
+结论一句话：**本 goal 的「点按分档版」截至 2026-10-04 没有可玩的线上版**；平台里唯一在线的「森林收集水果限时赛」是老变体 game-5（玩法口径完全不同）。后续任何验收、试玩、传播链接都必须先对照本表，别拿老 game-5 顶数。
+
+## 二、分值驱动收集玩法模板（+1/+2/+5 三档 · 点按拾取）
+
+### 2.1 分值表与频率反相关（需求硬性口径 + 建议校准值）
+
+| 档位 | 分值（需求硬性） | 出现权重（建议起点） | 期望得分贡献占比（建议） | 视觉要求 |
+| --- | --- | --- | --- | --- |
+| 低（苹果） | +1 | ~70% | ~45% | 常规色调 |
+| 中（橙子） | +2 | ~25% | ~35% | 提亮一档 |
+| 高（稀有水果） | +5 | ~5% | ~20% | 高对比 + 特效标识 |
+
+- **分值与频率必须反相关**且两者解耦配置（权重表与分值表分开两张常量表）——需求只锁「高分水果出现频率更低」，斜率是实现自由度；但三档贡献占比是手感核心，建议按上表起步、用冒烟统计实测校准（240 帧冒烟里统计三类生成次数的比例，替代人工目测）。
+- **期望值校准法**：单局期望总分 = 60s × 刷新速率 × Σ(权重ᵢ × 分值ᵢ)。先定「单局期望分」这一产品目标，再反推刷新速率，不要拍脑袋调刷新率。
+- **计分唯一入口**：所有得分变更走同一个 `add_score(points)`，分值查表发生在水果节点持有 `tier` 字段 → 入口处查表，禁止 UI 层或触摸回调里散落 `score += 1` 字面量。这是「+1/+2/+5 各自累加正确」能被机判断言的前提（同 game-12 的单源纪律）。
+
+### 2.2 60 秒计时的 ±1 秒验收实现口径
+
+- 用 `float` 剩余时间在 `_process(delta)` 里累积递减，显示层取 `ceil()`；归零判定用 `time_left <= 0.0` 触发结算，**不要**用「Timer 节点每 1 秒 tick 一次、tick 里 -1」的实现——tick 计数在暂停/掉帧/场景切换时会漂移，±1 秒容差经不起移动端浏览器节流（切后台回来一次就能漂 1~2 秒）。
+- 冒烟断言：读 UI 计时文本两次间隔 1~2 秒断言递减；用引擎时间注入（同 game-12 `try_count(now_ms)` 模式）把 `time_left` 直接压到 0，断言进入结算场景。显示值与内部值分离，断言内部值。
+
+### 2.3 点按拾取：单源单相 + 热区（移动端唯一操作）
+
+- Godot 4 默认 `emulate_mouse_from_touch=true` → 一次触摸可能产生 touch + mouse 双事件，再加 `_unhandled_input` 的动作路径，同一「点击」多来源。收敛方式与 game-12 相同：所有来源只调唯一入口 `attempt_collect(fruit)`，判定收口在 GameState 一处。
+- 触摸热区按「水果视觉半径 + 容差」配置，最小可点直径 ≥ 44~48 逻辑 px，且注意 DPR 换算（引 82e419bb）；相邻水果刷新点最小间距 ≥ 1.5 个水果直径，防误触串档（点到低档实际想点中档）。
+- 高分水果「稀有」也必须**可点**：特效动画不要吃掉点击区（动画节点 `mouse_filter=IGNORE`），否则会出现「看得见点不中」的体感灾难——美术动效是 Area2D 之外的子节点，别挂在碰撞体上。
+
+### 2.4 供给节奏与场上管理（点按版的补货口径）
+
+- 两段式供给（引 6e91a11d §二并适配）：开局铺场 8~12 个 → 场上存量低于下限（建议 6）时按 0.8~1.5 秒补 1 个。60 秒点按版的失败模式比躲避版更隐蔽：**可收目标耗尽 = 玩家空转**，补货下限是硬保障。
+- 三档各自独立掷骰，不共用计时器；高档（稀有）另加「场上同屏最多 1 个」约束，防止稀有权重 5% 在随机聚类下同屏堆 3 个、破坏「稀有」体感。
+- 场景边界内边距 ≥ 半个水果直径，保证边缘刷新可点；不做与障碍物的路径重叠问题（本变体无移动障碍），但要避免刷新点落在 UI 计时条/得分条下方。
+
+### 2.5 一键重开的完整重置清单（验收 5 的坑点）
+
+结算界面「重新开始」必须复位**全部**运行态，逐项列出防漏：倒计时回 60、得分清零、场上水果全部回收、三档刷新计时器重置、稀有水果在场标记清除、飘分/特效节点队列清空、结算面板隐藏。重开入口双通道（触摸可点 + 键盘 Enter/Space），坑源见 ed31081f-82be-4a76-a28b-476f7e18a00b（game-3 只有触摸入口导致桌面端无法重开）。冒烟断言：先打完一局（注入 time 归零）→ 点/按重开 → 断言计时==60 且得分==0 且场上水果数==铺场数。
+
+### 2.6 森林主题的可机判底线（验收 3）
+
+美术质量不进门禁，但结构可以机判：断言主场景节点树中存在 ≥ 2 类森林装饰元素组（如 Trees/Grass 两个 Node2D 组各自子节点数 > 0）；水果节点与背景装饰分属不同层级（水果层 z_index 更高且不被装饰遮罩覆盖）。preflight 不查这些，要写进工程内 `tests/smoke.gd` 的玩法断言段。
+
+### 2.7 验收 → 冒烟断言映射（写进 verify.sh 的建议）
+
+| 需求验收条目 | 冒烟断言建议 |
+| --- | --- |
+| 1. 60 秒递减、归零自动结算、偏差 ≤ ±1s | 两次读计时文本断言递减；注入 time_left=0 断言进结算 |
+| 2. ≥3 种分值（+1/+2/+5）各自累加、实时显示 | 依次对三档水果坐标注入触摸，断言得分序列 +1/+2/+5；断言 UI 总分文本同步 |
+| 3. 森林主题 ≥2 类元素、水果不遮挡 | 断言装饰节点组存在且子节点 >0；断言水果层在装饰层之上 |
+| 4. 移动端触屏可完整跑一局、无明显卡顿 | mobile-web-smoke 门禁（双门禁第二道）跑 FPS 采样，参照 game-12 实测 FPS 39 的基线口径 |
+| 5. 一键重开、倒计时与得分重置 | 跑完一局 → 触发重开 → 断言 60/0/铺场数三值（见 §2.5） |
+
+## 三、Web 导出与双门禁复用要点
+
+本 goal 两次工作流的 scaffold 节点 prompt（工坊流水线模板实文）把门禁资产判据钉死为**四件套**：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, resolve-godot.sh, mobile-web-smoke.mjs}` 全部在仓库内且不被 .gitignore 排除，缺任一 → blocked 上报，禁止从平台注入的 `.myrd-platform/.claude/skills/` 阅读副本里复制脚本充当判定器，也禁止自造等价脚本。对比老 game-5 工作流只要求三件套——**mobile-web-smoke.mjs 是后来加入的第四件**，新工程照四件套验收。
+
+- **双门禁分工**：godot-smoke（preflight 静态 + headless 冒烟 + input-fuzz）证明「能跑能玩」，mobile-web-smoke 证明「移动端模拟下可玩且不掉帧」。两道各自独立出退出码，任何一道非 0 都不该进入 deploy。
+- **退出码语义**（与总论同源）：0 通过 / 1 冒烟失败→打回修复循环 / 2 环境不可用→装环境、禁止为过门禁改代码 / 3 静态不一致（verify.sh 单独编码）。存在性守卫先行判 2，防「脚本缺失」被误判成 3 诱导修游戏代码。
+- **Web 导出配置五要点**（引 78180e88 实测，不再展开）：渲染器钉死 gl_compatibility 且 `.mobile` 双写；`thread_support=false`；中文必须内置 NotoSansSC 等字体（preflight P13 拦 Web 中文缺字）；导出产物落 `games/<工程>/export/web/` 并 .gitignore 豁免入库；UI 挂独立 CanvasLayer 与游戏世界分离。
+- **AppHost 部署口径**：部署 gitRef 必须是 goal 功能分支（`myrd/games-goal-<goalId>`），绝不能用 main；liveUrl 在部署完成前即由工坊确定（本 goal 为 /apps/60、/apps/60-2），移动端门禁与试玩都以它为准。
+
+## 四、流程复盘：为什么本 goal 没有线上版（双跑皆败实录）
+
+时间线（全部平台记录）：17:56:54 创建 AppHost「60」+ 工作流 #1 → run cmuspf4oo0050ic7qfjj0azwh **failed** → 18:04:01 换 slug 重试，创建 AppHost「60-2」+ 工作流 #2 → run cmuspld10006ric7qup55soew **再 failed** → 验收指派节点 completed 回写产物标识 → 2026-10-04 实测线上 404。
+
+- **教训 A：节点完成态 ≠ 线上可玩。** 验收指派节点 completed，但平台记录里不存在任何可访问的线上版本。「验收复核」类节点的完成前置必须是硬证据：liveUrl 返回 200 且真实浏览器跑通「开始→拾取→结算→重开」闭环，产物标识回写附上 deployment/gitRef；否则完成态与线上态脱节，下游（频道播报、试玩通知、知识沉淀）全部建立在幻觉上。
+- **教训 B：同名变体串场是本 IP 的特有陷阱。**「森林收集水果限时赛」在仓库里有两个机制完全不同的变体：老 game-5（松鼠移动+原木躲避+连击，已上线）与本版（点按拾取+分值分档，未上线）。两者需求 id、goal id、工程目录（games/game-5 vs games/60、60-2）、分支、slug 全不同。**一切定位以产物 id + 分支名 + 工程目录为准，禁止按游戏名搜索**——按名搜必然把老 game-5 的「已上线、3 run 全绿」误当成新版的现状。
+- **教训 C：换 slug 重试会留下孤儿 AppHost 空壳。** 60 失败后换 60-2 重试，AppHost 表留下两条 status=creating 的壳，publicUrl 均为 null。重试前应优先复用原 AppHost 记录；若必须换 slug，重试启动时把旧壳置为废弃态。排查「游戏上线了没」的正确顺序：先查 AppHost status（creating/ready/failed），再 curl liveUrl 实测——本 goal 的 404 就是这么确认的，不能只信工作流状态或节点状态。
+- **教训 D：复盘入口与取证边界。** 工作流 API 只回 run id + status，不回失败日志；复盘具体卡点需持 run id（cmuspf4oo0050ic7qfjj0azwh、cmuspld10006ric7qup55soew）到执行日志/workflow 详情页查。本机环境 GitHub 443 不通，`git ls-remote` 无法核实两条 goal 分支是否推上远端——分支存在性复核必须在能连 GitHub 的环境做，不要在本机下「分支不存在」的结论。
+
+## 五、给下一个同类小游戏的复用清单
+
+1. 玩法骨架直接抄 §二：三档分值表 + 反相关权重表 + `add_score` 单入口 + float 计时 + 两段式补货 + 完整重置清单，改数值不改结构。
+2. 工程起点抄 78180e88 §二的最小契约（project.godot 三类必接线、TUNING_META 白名单、tests/smoke.gd、verify.sh、export_presets.cfg）。
+3. 门禁四件套齐全性检查放在 scaffold 第一步（本 goal 工作流模板已内置该判据），双门禁全绿才允许 deploy。
+4. 验收断言按 §2.7 映射表逐条落进 smoke.gd，每条断言做负例验证（证明会真 FAIL）。
+5. 上线判定只认三件套：AppHost status=ready + liveUrl 200 + 实机操作闭环截图/录像；验收节点回写产物标识时必须附 deployment/gitRef。
+6. 涉及「森林收集水果限时赛」名字的一切操作，先对 §一事实基线表确认自己在操作哪个变体。
+
+## 六、关联知识
+
+- 门禁三层体系 + AppHost 部署总论：27407691-bcf8-4e73-b686-1bb8df684e5c
+- 工程结构最小契约 + 帧预算推导 + playtest blocked 实录：78180e88-6486-404e-9265-e315e0da3c66
+- 双门禁（godot-smoke + mobile-web-smoke）+ 时间注入机判 + 单源单相：00314649-c4d2-407c-871b-62f7de91b07d
+- 移动端触屏虚拟摇杆 + AudioContext 解锁：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- 同名 IP 老变体（松鼠+原木+连击）玩法口径：6e91a11d-3632-4721-a3ea-d433e9622f9b
+- game-9 单游戏部署先例：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 对抗性探索与机判方法论（QA 复用）：437f8129-89b5-4f46-95c0-2d475c3cead8
+
+## 沉淀 app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单（太空飞船躲陨石捡金币）
+
+# app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单
+
+> 来源：目标《创建小游戏应用：太空飞船躲陨石捡金币》（goal=cmuspfeyw0058ic7qrmh6qebm）首轮执行（2026-10-03 18:11~18:23 UTC）+ 次日（2026-10-04）知识沉淀时的时点复核。需求 id=cmuspmumf007cic7qlt6uwieo，GameDesignSpec id=cmuspqwhe007ric7qp0465dvk，工坊工作流 id=cmuspfez9005cic7q93j4fk74，失败运行 id=cmuspr5v7007xic7q5ng1aqqo。
+>
+> 本文只写本例增量：**工坊流水线在门禁一启动之前就整体失败**这一反面样本的取证、归类、复核方法论与重跑前置清单。godot-smoke 三层门禁体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-12 双门禁通过路径见 id=00314649-c4d2-407c-871b-62f7de91b07d；移动端触屏/音频规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；game-9 见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be。本文与它们互补：前面几篇讲「门禁怎么过」，本篇讲「门禁根本没来得及跑」时怎么定位、怎么复核、重跑前还要先解决什么。
+
+## 一、一手事实时间线（全部库内取证，非转述）
+
+| 时刻（UTC） | 事件 | 证据 |
+| --- | --- | --- |
+| 10-03 18:07:22 | hosted_apps 记录 app-2 创建（id=cmuspfdr20056ic7qm2ebhvwv，slug=app-2），status=creating | hosted_apps 行；updated_at 至 10-04 仍冻结在该时刻 |
+| 18:11~18:13 | 需求录入完成（含双门禁 + HostedApp 约束 + 4 条验收标准） | 需求 id=cmuspmumf007cic7qlt6uwieo |
+| 18:13~18:16 | GameDesignSpec v0 落账（八段、10 实体、数值写死） | spec id=cmuspqwhe007ric7qp0465dvk |
+| 18:16:30 → 18:17:36 | 工坊工作流运行启动后 **66 秒即 failed** | workflow_runs.status=failed |
+| 18:17:40 → 18:23:07 | express_lane 独立复核完成：app-2 未上线、验收 0/4、双门禁均未启动 | 复核结论（goal 会话） |
+| 10-04（本文写作时） | app-2 仍 status=creating、live_url 空、app_deployments **0 行**；该工作流**仅 1 次运行且为 failed，未重跑**；github.com 从 agent 环境再次 20s 超时不可达 | hosted_apps / app_deployments / workflow_runs 实查 + curl 探针 |
+
+失败报错原文（复现用）：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspfdqy0052ic7qnkimp4n5/run-cmuspr5v7007xic7q5ng1aqqo'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/':
+Failed to connect to github.com port 443 after 32655 ms: Couldn't connect to server
+```
+
+## 二、失败模式归类：不是「门禁失败」，是「门禁前基础设施失败」
+
+工坊四棒为 scaffold → implement → deploy → playtest（实现/部署两棒挂 godot-smoke preHook 240 帧，试玩棒挂 mobile-web-smoke）。本例失败的关键特征：
+
+1. **死在第 0 棒之前**：4 个节点状态全部 pending，工作流主体逻辑一行都没执行——失败发生在为运行准备 worktree 的 `git clone` 阶段。
+2. **零产物可判**：goal 分支 `myrd/games-goal-cmuspfeyw0058ic7qrmh6qebm` 在复核时不存在（`git ls-remote` 无此分支）→ 无任何代码/工程/导出物落库，不存在「半成品需要清理」的问题。
+3. **网络是间歇抖动，不是持久封锁**：复核时点（10-03 18:23）github.com HTTPS 200、`git ls-remote` 成功（HEAD=a592ea2）；次日（10-04）从 agent 环境又 20s 超时。两个时点结论相反，证明是**间歇性连接抖动**。
+4. **归类的处置含义**：门禁失败（godot-smoke 红、smoke 帧内崩溃）→ 修代码再过门禁；门禁前基础设施失败 → **不改任何代码，探针确认外网恢复后直接重跑**。两者处置路径完全不同，先归类再动手。
+
+## 三、独立复核方法论（本例实证有效，可整体复用）
+
+复核在「工作流已 failed」的背景下展开，五步证据链闭环：
+
+1. **不信状态字段，实测入口**：`status=creating` 不代表「正在部署中马上就好」——对内网 `$PLATFORM_API_URL/apps/app-2/gw` 与公网 `https://leomac-studio.tail49399e.ts.net/apps/app-2/` 双探测，均 404 `APP_NOT_FOUND`。应用记录侧 `publicUrl/publishedAt/version` 全空，项目侧 `resources=[]`、prodUrl/stagingUrl 空，app_deployments 0 行，四面证据一致。
+2. **对照实验排除平台故障**：同一 host 上其余 13 个 `status=ready` 应用（game-5/6/8/9/10/11/12、hello、app 等）全部 200 → 托管能力正常，是 app-2 自身从未部署的个案，不是平台级事故。
+3. **排他性核查防「张冠李戴」**：已上线 13 应用中无一款《太空飞船躲陨石捡金币》；题材相近的 `/apps/app/gw`「星云飞船收集」收集的是能量水晶、slug 与标题均不同，**不能冒充 app-2 交付物**。同类小游戏大量复用同套躲陨石玩法，验收时必须按 slug+标题+机制三重匹配认定交付物。
+4. **对账流程合规性**：需求 status=in-progress、close_reason 空 → 无人违规关闭需求，门禁二「未回填」是因「无入口」而非「被跳过」，流程无腐化。
+5. **失败棒位定位**：直接查 workflow_runs 的 result.error 与 nodes 状态数组，一眼定位「死在 scaffold 之前」，避免把失败误归因给某一棒的实现质量。
+
+## 四、⚠️ 规格冲突（重跑前必须拍板，否则白跑）
+
+工坊管线是 **Godot 4 → Web(HTML5) 导出**（工程 `games/app-2`、`export_presets.cfg` Web 预设、`--headless export` 构建步、godot-game-dev 技能包），而需求验收标准 4 明文要求「**纯前端 HTML/CSS/JS、无构建步骤、静态资源可直接打开运行**」。Godot 导出必然含构建步骤，两者直接冲突。
+
+- **不处理的后果**：即使部署成功、门禁一全绿，AC4 仍会判不达标——整条流水线白跑一轮。
+- **方案 A（推荐）**：把 AC4 措辞修订为「**导出产物为纯静态托管、无运行时后端、无外部 CDN 依赖**」。保留 Godot 管线，同时保住需求真正想约束的东西（免后端、免 CDN、双端可玩），且与既有门禁体系（27407691 总论）兼容。
+- **方案 B**：放弃 Godot 管线，改手写单文件 HTML/JS。仅当主人明确要求「字面意义无构建」时选它，代价是失去 godot-smoke 三层门禁与工坊流水线的既有能力。
+- **教训**：验收标准与管线能力要在**需求录入时**对齐。「无构建步骤」这类措辞对 Godot 管线应用天然不可满足，录入阶段就该识别。
+
+## 五、重跑修复路径（有序清单，供下一轮直接执行）
+
+1. **先探针再重跑**：从 runner 环境 `curl --max-time 20 https://github.com` + `git ls-remote <仓库>` 双探针确认恢复。网络是间歇抖动，盲目重跑可能再次 66 秒失败并空耗一轮。
+2. **先拍板第四节冲突**并回写需求措辞（方案 A 或 B），再触发重跑。
+3. **重跑即可，无需清理**：分支不存在、零产物，直接重跑工作流，从 scaffold 全新开始；不要试图「续跑」失败运行。
+4. **部署成功后先补门禁一**：由独立 agent 重做一轮线上可玩性复核（按第三节方法论），留证「全流程走通 + 控制台无报错」，之后才轮到 owner。
+5. **门禁二最后**：owner 桌面 + 移动各试玩一次并回填「试玩通过/不通过」，回填通过后需求方可关闭。当前门禁状态：**门禁一未启动（不可执行）、门禁二未启动（无入口）——注意是「未达」而非「失败」，回填话术要区分。**
+
+## 六、供后续 app 复用的教训清单
+
+1. **工作流失败 ≠ 游戏缺陷**：先查失败棒位。scaffold 之前死 = 基础设施层（网络/仓库可达性），与代码质量无关，处置是重跑而不是返工。
+2. **外网 git clone 是工坊流水线的第一单点**：仓库在 github.com，第一棒之前就要整仓克隆；网络抖动直接零产物。建议重跑前置「探针 + 失败自动退避重试」的习惯，并把「github 间歇不可达」记为平台环境的已知抖动源。
+3. **hosted_apps.status 不可单独作为「已上线」判据**：本例 status=creating 停滞超过 24h 且无任何部署行。判活必须「liveUrl 实测（内网+公网双探测）+ deployments 计数」双条件。
+4. **需求录入时做一次「AC × 管线」对齐检查**：把验收标准逐条对照工作流管线的既有能力（构建方式、导出形态、依赖服务），措辞冲突当场改，不要留到部署后才发现。
+5. **同题材应用排认**：平台同 slug 命名空间下有多款躲陨石/收集类小游戏，验收复核必须 slug+标题+核心机制三重匹配，防止把兄弟应用的 200 当成本应用的交付证据。
+
+---
+**一句话总结**：app-2 首轮执行是「门禁前基础设施失败」的完整样本——工坊四棒尚未启动即在 git clone 阶段遭遇 github.com 间歇性连接失败（66 秒即败、零产物、app-2 停在 creating），独立复核以五步证据链确认验收 0/4、双门禁均未达但流程未被违规绕过；修复路径 = 探针确认网络恢复 + 先拍板「Godot 构建管线 vs 无构建步骤」的规格冲突 + 直接重跑，重跑成功后再补门禁一自测与门禁二试玩回填。
 
 
 ## 沉淀 game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战经验（推箱子点亮方块解谜 · 全四棒工作流）
@@ -17047,6 +24013,780 @@ scaffold/implement 的工作区分支 `myrd/oak-key-goal-<goalId>` 与部署分�
 8. 结论落库四件套：`ADVERSARIAL_FINDINGS.md`（主档）+ 复跑脚本 + `*-run-results.json` + `shots-*/` 截图；零缺陷走 §七降级收口（四门禁 + 零漂移 + 复认轮）。
 
 > **术语与规范回归**：本文所有门禁术语（preflight/smoke 帧预算/input-fuzz/playtest）、部署红线（wasm Content-Type、COOP/COEP、gzip+b64 通道）、仓库纪律以基准文档 `189a580e-5cdb-4837-a5fa-38e0c12ceb88` 为准；两文冲突时以基准文档为准。
+
+
+## 沉淀 game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战经验（推箱子点亮方块解谜 · 全四棒工作流）
+
+# game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战沉淀（推箱子点亮方块解谜 · 全四棒工作流）
+
+> 来源：需求《推箱子点亮方块解谜（game-9）》（id=cmupsx443003om9dh5dwd5w9u，goal=cmupsrc19002sm9dhp5su0zaj）走完「前置体检 → scaffold → implement → deploy → playtest」全流程后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-9`（Godot 4.3.stable.official）。线上：liveUrl https://leomac-studio.tail49399e.ts.net/apps/game-9/（deploymentId=cmupxibnn0087m9dhz3cfhap4，commit 19a6d59，838ms 上线，app.status=ready）。工作流运行 /workflows/cmupsrc1v002wm9dh68sljxoq/runs/cmuputtey006dm9dht78nbbtm。
+>
+> 本文只写 game-9 新踩的坑与增量打法。门禁三层体系总论（preflight/smoke/fuzz 分工、E-16 带病绿灯）与 AppHost 部署总论见《沉淀 Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路实战经验》（id=27407691-bcf8-4e73-b686-1bb8df684e5c，oak-key 实测）；移动端触屏摇杆与音频解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca。三篇互为补充、不重复。
+
+## 一、事实基线：四棒各留下什么（审计入口）
+
+| 棒 | 提交 | 内容 | 结果 |
+| --- | --- | --- | --- |
+| scaffold | d297996 | 以 templates/minimal-2d 初始化 games/game-9：推箱骨架（推动/点亮/Undo/Restart/换关）+ 5 关关卡册 + tools/level_solver.py + tests/smoke.gd + verify.sh | ✅ |
+| implement | 4bfdb00 | 见证解回放 / 死锁反馈 / touch_swipe / AC5 响应断言；is_solved 口径修复；.myrd/spec/design-spec.json 落盘 | ✅ |
+| deploy | 19a6d59 | export_presets.cfg + 导出产物入库 + apphost 壳切 game-9 + §3C 调参桥 + 移除 candy-crush 残留 | ✅ 已部署 |
+| playtest | 0103b33 | docs：playtest blocked 报告（缺 playtest.sh） | ⛔ blocked |
+
+- **部署形态**：底座 A「资产出 bundle」——`apphost.toml` 里 `assets_dir="games/game-9/export/web"`，37MB 导出经对象存储懒加载，bundle 本体不含游戏资源（25MB bundle 上限不再约束资产体积）。
+- **导出产物形态**：index.wasm 33.7MB / index.pck 2.4MB / index.js 331KB / index.html 4.9KB / index.audio.worklet.js 7.3KB。线上资产通道 `/api/public/assets/`：index.js 原文直出，wasm/pck 走 `*.gz.b64` 文本（10.7MB / 3.3MB），端到端解码验证过（b64→gzip→`WebAssembly.validate()=true`、pck 魔数 `GDPC`）。
+- **部署记录层 status=running 与应用已 ready 并存**：判断游戏死活以 /health 与实际可达为准，别拿 deployment.status 当真。
+
+### 分支审计坑：同一目标两条远端分支并存
+
+- `myrd/game-9-goal-<goalId>`：前置体检节点首次推送建立，停在 implement 棒（4bfdb00）。
+- `myrd/games-goal-<goalId>`：工作流四棒实际跑的分支，tip=0103b33（多出 deploy/playtest 两棒）。
+- 结论：**复现/审计认 goal artifacts 里的 `gitRef` 与 `app_deployments.commit_hash`（本次 = 19a6d59）**，别按「目标 id 搜分支」想当然——两条分支都能搜到且不同步。另：线上部署的是 19a6d59，其后 playtest 棒只追加 docs（0103b33）未重新部署，属 docs-only 差异，游戏本体无差。
+
+## 二、Godot Web 导出：模板不含预设，从零补齐的六个决策
+
+1. **模板仓库不含 `export_presets.cfg`**。games/game-9 的 README 在 scaffold 棒就记了：「export_presets.cfg 尚未配置（模板不含），部署节点需按 games/game/ 的 web 导出先例补齐」。每个新游戏都要从上一个游戏的先例抄一份再改，别等部署节点现场发明。
+2. **必须用单线程变体：`variant/thread_support=false`**。M1 网关不发 COOP/COEP 头，SharedArrayBuffer 不可用，线程版直接白屏。这是 Web 导出第一坑：配错不报错、上线才白屏。
+3. **导出产物必须入库，`.gitignore` 加 `!/export/web/` 豁免**。`assets_dir` 是平台构建输入，产物不在仓库里平台打包 bundle 就缺资产。Godot 工程 .gitignore 默认把 export/ 排掉，这里要反着来。
+4. **全局中文字体是 Web 导出的底线**（preflight P13 机判）。浏览器沙箱拿不到系统字体，引擎内置字体只有拉丁字形；`[gui] theme/custom_font` 必须指向子集化中文字体（本工程用 Noto Sans CJK SC：GB2312 全集 + ASCII + 常用符号，OFL 1.1），删了所有中文变缺字方块。字体约 2.9MB，是 pck 体积大头，但属中文游戏必要成本。
+5. **渲染器钉死 `gl_compatibility`**（`renderer/rendering_method` 与 `.mobile` 双写）。Forward+ 在 Web 上不可用。
+6. **接手模板仓库先清上一个游戏的残留**。deploy 棒移除了基线残留的 candy-crush 工程 `games/game/`（39MB 导出）——模板仓库是「单游戏位」惯例，根壳一次只服务一个游戏；残留工程还会污染门禁参照（前置体检时 gate-selftest 拿 games/game 当参照，因 player.gd 缺 `moved.emit`/`const SPEED` 模板契约锚点，D4/D5 注入失败，换官方参照 `templates/minimal-2d` 后 D1–D5 全拦）。
+
+**壳侧三件套 + 调参桥**（沿用 oak-key 先例并加一层）：相对路径资产路由；移动端音频手势解锁器（AudioContext 包装 / 手势 resume / `__audioDebug` 取证口）；worklet 防御；新增 **§3C 调参桥**：
+
+- 壳把 URL `?tuning=<json>` 解析成 `window.__GAME_TUNING__`；
+- 游戏侧 `GameState._apply_tuning_overrides()` 仅 `OS.has_feature("web")` 时经 `JavaScriptBridge.eval("JSON.stringify(window.__GAME_TUNING__ || null)")` 读取；
+- `TUNING_META` 白名单四键 + min/max 钳制 + round 取整：`move_anim_ms` 0–400、`push_anim_ms` 0–400、`key_repeat_interval_ms` 50–600、`win_overlay_delay_ms` 0–1000。
+- 价值：试玩期调手感不用改代码重导出——「试玩调好的参数用 URL 复现」，试玩入口直接发 `?tuning=1` 工作台链接。无头冒烟/桌面自动跳过，门禁行为不受影响。
+
+## 三、冒烟门禁：game-9 的四个增量打法
+
+四步 routine 不变（`.myrd/routines.yaml` id=godot-smoke：resolve-godot → preflight 13 类 → `GODOT_SMOKE_FRAMES=240` headless-smoke → input-fuzz，seed=20260913），`games/game-9/verify.sh` 只调用 std-skills 判定脚本、不重实现。本次实测：preflight PASS / `GODOT_SMOKE: PASS`（240 帧，exit 0）/ `GODOT_FUZZ: PASS`。增量全在冒烟断言本身（tests/smoke.gd，628 行，11 项断言清单）：
+
+### 3.1 见证解回放：把 AC4「关卡可解」变成引擎内机判
+
+离线求解器说「可解」只是一句话结论；game-9 把它做成冒烟断言：
+
+- `tools/level_solver.py --paths` 生成每关见证解（U/D/L/R 移动串，长度 == par），Python 侧重放自证后落盘进 `sokoban_levels.gd` 的 `solution` 字段（与 layout 同处，单一事实源，防两处数据漂移）；
+- 冒烟逐关回放见证解，断言三条：**必须通关、步数 == par、回放全程不得误报死锁**；
+- solver 直接解析 `sokoban_levels.gd`（不复制关卡数据），「策划案 → 关卡册 → 求解器 → 冒烟」四层数据同源，par 漂移会在冒烟里直接爆。
+
+### 3.2 通关判据口径：常亮 ≠ 通关（冒烟实测拦下的真 bug）
+
+点亮目标格是 `onceLitStaysLit`（入场常亮、永不熄灭），但 `is_solved` 不能跟着用「全部点亮」口径——**常亮口径会把 level-05 最优路径第 35 步误判通关、提前停走**（冒烟回放见证解时实测拦下）。修复：`is_solved` = 「全部接线槽有方块驻留」，与求解器 / spec parMoves 同口径；点亮只作视觉态。
+
+教训：**「视觉状态」与「胜负判据」是两个变量。凡有常亮/累计态的玩法，胜负判据必须与求解器同口径，并让冒烟回放最优解来兜底。**
+
+### 3.3 死锁反馈机判：报与不报都要有断言
+
+角死锁检测 + `deadlock_changed` 信号 + HUD 卡死警示 + 死锁方块变红。冒烟断言四条：角死锁必报、在槽角不报（在槽角是合法终态）、开阔局面不报（防假阳性）、真实关卡把方块顶进角后信号通知 UI 且 **Undo 可脱离死锁态**。「无假阳性」的论证写在检测函数注释里供复核。
+
+### 3.4 AC5 量化成帧预算断言
+
+- 响应延迟：spec 200ms ≈ 60FPS 下 12 帧 → 断言「注入输入 → 首次步进 + HUD 同步刷新」≤ `RESPONSE_BUDGET_FRAMES=12` 帧，验收口径直接写进门禁；
+- 触屏滑动：越过 24px 阈值（`spec.numeric.input.touchSwipeThresholdPx`）的一次滑动**恰好步进 1 格**；冒烟注入 48px 拖拽验证（`SWIPE_DRAG_PX=48`）。
+
+### 3.5 headless 输入注入的坑（error-signatures E-08 的 game-9 变体）
+
+- headless 下 `Input.parse_input_event()` 的缓冲冲刷会清掉 `Input.action_press()` 的按下状态，**同帧混用两种注入方式会让「移动断言」假失败** → 冒烟分 7 相位（噪声/移动/滑动/逻辑/等弹层/下一关/收尾）互不重叠；
+- 触点下标隔离：噪声相位用触点 0/1，滑动断言用触点 7，防互相回收；
+- 滑动起点 (500,280) 刻意避开左下摇杆热区（24..160 × 400..536）与右下按钮排，否则手势被控件吃掉；
+- 噪声相位（30 帧悬挂手势/孤儿释放/乱键）放在一切正式断言之前——上一游戏（糖果三消，commit bbb872f4「致胜滑动后指针脏状态吞掉下一关第一次手势」）就是靠这类对抗注入防回归的。
+
+### 3.6 verify.sh 退出码四态（给修复方向做机器路由）
+
+0=通过；1=smoke/fuzz 运行期未过（改游戏代码）；2=环境不可用（缺 Godot/技能脚本/python3，装环境而非改代码）；3=preflight 静态未过（先修静态，不必跑冒烟）。关键设计：技能脚本存在性守卫放在一切判定之前，缺脚本必须报 2——否则会掉进下游非零退出码被误判成 3，诱导修复节点去改游戏代码。
+
+## 四、关卡求解器：三段演进与两个真 bug（策划案阶段就要做）
+
+固化策划案（create_design_spec）时就要求每关机器可解、par 机器可算——这步做了，实现、冒烟、验收全链路都有基准。求解器三段演进：
+
+1. **BFS**：前三关（状态空间小）够用；
+2. **A* + 拉拽距离启发 + 死格剪枝**：大关用（启发值 = 每方块到最近接线槽的拉拽距离下界，可采纳；死格 = 角死锁 / 墙边不可拉出格）；
+3. **精确状态 A\***：修掉「区域归一化」bug 后的最终形态。
+
+两个真 bug（都在求解器侧，不在游戏侧）：
+
+- **区域归一化把玩家站位合并掉**：对「推动数」精确，对「玩家步数」只是松弛下界——level-02 手推最少 10 步，求解器报 5。修复：玩家坐标显式入状态；修复后 A* 与纯 BFS 交叉验证一致（2/10/18）。
+- **开阔房间 + 5 方块状态空间爆炸**：单关搜索超时。解法不是更强的剪枝，而是**改关卡布局**——level-05 换成更紧凑、隔断更多的「总控机房」，对人更难、对求解器更小，验证 3.8s，par=58 > level-04 的 40，难度曲线反而更成立。
+
+工程参数：`EXPANSION_CAP=4_000_000`、`MAX_DEPTH=200`；par 不一致只告警（布局或 par 漂移），可解性才是硬判据（exit 0/1）。最终 par 曲线 2/10/18/40/58，方块数 1→5 严格递增（AC4），策划案 `numeric.difficulty.parMoves`、关卡册、冒烟断言三方一致。
+
+## 五、playtest blocked：判定器独立性纪律的一次实战
+
+playtest 节点硬约束：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 五个判定脚本**全部由模板仓库预置**，缺任何一个 → 立即 blocked，**严禁现场自造、拷贝注入副本、或用等价命令替代**——它们是判定器，被检方自己写门禁即失去独立性。
+
+本次实测缺 `playtest.sh`（及 `playtest_driver.gd`），按纪律停止：
+
+- **证据链五步**：① 工作区分支 scripts 目录实清（仅 7 个文件）→ ② origin/main fetch 后核对同样缺失（排除本地落后）→ ③ `git log --all` 该路径从未存在 → ④ 全仓库 find 仅命中 `.myrd-platform/.claude/skills/`（平台注入阅读副本，被 .gitignore 排除不入库，按硬约束不得作判定来源）→ ⑤ 前序 deploy 产物旁证。
+- **根因**：平台注入技能包（新版，含机器人试玩门禁：协议 `GODOT_PLAYTEST: PASS/FAIL` 退出码 0/1、2=环境不可用；`GODOT_PLAYTEST_METRICS: <JSON>`；bot 多局输出节奏代理指标——首次奖励/无反馈窗口/反馈密度/局间方差；阈值由工程内 `tests/playtest.json` 覆盖）**领先于模板仓库预置基线**（v1 仅四脚本，godot-smoke routine 也只有四步）。属模板仓库技能资产滞后，需运维补模板仓库，非 agent 现场可修。
+- **没做的事同样重要**：不交付试玩验收包、不拷贝注入副本、不自造判定器；四问量表标「待用户试玩」；spec 数值回写跳过（未收到用户结论，严禁编造）。
+- **影响面切割**：deploy 产物不受影响（游戏仍可访问），godot-smoke 四步门禁此前已全过——blocked 只挡 playtest 这一段。
+- **修复路径**：运维补模板仓库 `playtest.sh` + `playtest_driver.gd`（连同 SKILL.md 章节与 godot-smoke-routine.md 模板同步，脚本/文档/routine 三者一致）→ 经模板预置链路同步进项目仓库（不得手抄注入副本）→ 重跑 playtest 节点交付 `op=playtest_kit`（含 `<liveUrl>?tuning=1` 调参工作台入口）。取证报告在仓库 `docs/game-9-playtest-blocked-report.md`。
+
+## 六、下一个游戏直接抄的清单
+
+```bash
+# 1. 门禁入口（四步；退出码 0/1/2/3 见 §3.6）
+bash games/<game>/verify.sh
+
+# 2. 关卡可解性证据（--paths 生成见证解 → 落盘 solution 字段 → 冒烟回放）
+python3 games/<game>/tools/level_solver.py games/<game> --paths
+```
+
+Web 导出预设必查四项：
+
+| 项 | 值 | 不守的后果 |
+| --- | --- | --- |
+| `variant/thread_support` | `false`（单线程） | M1 网关无 COOP/COEP，SharedArrayBuffer 不可用 → 线程版上线白屏 |
+| `[gui] theme/custom_font` | 子集化中文字体 | 浏览器无系统字体 → 中文全部缺字方块（preflight P13 拦） |
+| `renderer/rendering_method` | `gl_compatibility`（desktop+mobile 双写） | Forward+ 在 Web 不可用 |
+| `.gitignore` | 加 `!/export/web/` 豁免 | assets_dir 构建输入缺资产，bundle 打包失败 |
+
+复用分工：门禁三层总论 / E-16 带病绿灯 / AppHost 部署总论 → id=27407691-bcf8-4e73-b686-1bb8df684e5c；移动端触屏摇杆 / 音频解锁规范 → id=82e419bb-b641-4b5e-bb58-d8b9633169ca；本文 = game-9 增量（导出预设从零补齐、见证解回放机判 AC4、通关判据口径、死锁反馈机判、AC5 帧预算断言、E-08 分相位注入、求解器演进、playtest blocked 纪律、双分支审计口径）。
+
+
+## 沉淀《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+# 《hello》Godot 工坊从需求到上线经验：Godot4 工程结构 · godot-smoke 门禁 · Web 导出部署（游戏工坊全四棒 · playtest blocked 实录）
+
+> 来源：需求《《hello》休闲收集小游戏》（id=cmuqk7luz002am9bfmmkouw9v，goal=cmuqk3j2o001mm9bfptrztaj1）走完「scaffold → implement → deploy → playtest」工坊主通道后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/hello`（std-skills minimal-2d 模板起步，Godot 4.3.stable，gl_compatibility）。线上终态：liveUrl `https://leomac-studio.tail49399e.ts.net/apps/hello`（HostedApp id=cmuqk3huq001km9bf5ejp7tdg，deployment v2=cmuqlxz2v001km9bxc0w5pspp，gitRef=`myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1@dfd20d1`，/health 200、线上标题《hello》 · 休闲收集）。**playtest 节点 status=blocked**（模板仓库未预置 playtest.sh），线上版经独立 assign_agent 复核确认可玩。本文只写 hello 的增量事实与新坑；门禁三层体系总论与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key），单游戏部署先例见 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9），触屏摇杆与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca。四篇互为补充、不重复。
+
+## 一、事实基线：提交链与四棒产出（审计入口）
+
+`origin/myrd/games-goal-cmuqk3j2o001mm9bfptrztaj1` 提交链（逐字核实）：
+
+| commit | 内容 | 结果 |
+| --- | --- | --- |
+| f9bc9d65 | 模板起步：std-skills minimal-2d 脚手架建 `games/hello` | ✅ |
+| 1bc8fa24 | 收集玩法与胜利/重开闭环 + README 玩法说明 | ✅ |
+| a8b5fd09 | Web 导出可托管形态：export_presets.cfg + `.gitignore` 豁免 + 导出产物入库 | ✅ |
+| 16249412 | 关卡梯度 + 限时失败反馈 + 冒烟断言同步升级 | ✅ |
+| dfd20d1b | 根壳与 apphost.toml 切到 hello + 接通调参桥（=部署 commit） | ✅ 已部署 |
+
+- `myrd/hello-game-goal-cmuqk3j2o001mm9bfptrztaj1` 分支另含 508dcc6b（assign_agent 线上复核取证），与 games-goal 分支**不同步**——复核/审计一律认 goal artifacts 里的 `gitRef`（games-goal@dfd20d1），别按「目标 id 搜分支」。
+- 门禁终态：preflight 13 类 PASS / `GODOT_SMOKE: PASS`（240 帧）/ `GODOT_FUZZ: PASS`（seed=20260913，6 批次无崩溃无脚本错误）；`bash games/hello/verify.sh` 全链路 PASS。
+- 导出 11 文件落 `games/hello/export/web/`：index.wasm 35,376,909B / index.pck 2,497,520B / index.js 331,495B / index.html 4,848B / index.audio.worklet.js 7,298B。
+
+## 二、Godot4 工程结构：hello 的最小可玩模板契约（可复制起点）
+
+```
+games/hello/
+├── project.godot          # 三类必接线：run/main_scene、[autoload] GameState、[input]
+├── autoload/game_state.gd # 单例 + TUNING_META 白名单（调参唯一入口清单）
+├── scenes/{main,player,collectible}.tscn
+├── scripts/{main,player,collectible,virtual_joystick,touch_confirm_button}.gd
+├── assets/fonts/NotoSansSC-Regular.otf + OFL.txt   # Web 中文底线
+├── tests/{smoke.gd,smoke.tscn}                     # 相位状态机冒烟场景
+├── verify.sh               # 工程门禁入口（退出码 0/1/2/3）
+└── export_presets.cfg      # Web 导出预设（thread_support=false）
+```
+
+- **三类必接线是 preflight 静态机判对象**：主场景、autoload、input 映射缺任何一项就是「黑屏/无响应」。hello 实测：`config/name="hello"`、`run/main_scene="res://scenes/main.tscn"`、`GameState="*res://autoload/game_state.gd"`。
+- **渲染器钉死 gl_compatibility 且 `.mobile` 双写**；viewport 640×360；`[gui] theme/custom_font` 指向 NotoSansSC（OFL 1.1）——删了中文全变缺字方块（preflight P13 拦）。
+- **UI 挂独立 CanvasLayer（UI/TouchUI）**，与游戏世界分离；触屏端用 `virtual_joystick.gd` + `touch_confirm_button.gd` 承载移动与确认，桌面/触屏同一工程不加分叉构建。
+- **收集玩法碰撞口径写进代码注释**：Player 矩形 24×24（半宽 12）、Collectible 圆 r=22，可达判定=玩家中心进入收集物中心 34px 内；摆点相对 clamp 边界 (12..628, 12..348) 全可达不卡死角——**碰撞余量要在摆新点时先算再摆**，否则冒烟传送收集断言假失败。
+
+## 三、门禁增量：帧预算推导注释 + 键位契约断言
+
+- **帧推导写进 verify.sh 注释**：「噪声 30 帧 → 移动 10 帧 → 4 次传送收集（各 4 帧）→ 过关断言 → confirm 进第 2 关断言（梯度）→ 时限压 0 触发失败断言 → confirm 重来断言」约 94 物理帧，预算取 240 对齐 `.myrd/routines.yaml` 的 smokeFrames 默认值（两边同值不各说各话）。**推导过程留在门禁入口文件里**，后续调速度的人不必重推。
+- 冒烟 9 项玩法断言：噪声输入后仍能移动、收集计数累加、过关判定、难度梯度（4→5 目标、30→26s 时限）、超时失败反馈、失败重来复位，外加键位契约 `_check_key_bindings`（逐键 AND 判定）。
+- verify.sh 退出码语义与 oak-key 同源：0 通过 / 1 冒烟失败 / 2 环境不可用（**存在性守卫先行**：preflight.py、smoke.sh、resolve-godot.sh 缺一即 2，防「脚本缺失」被误判成 3 诱导改游戏代码）/ 3 静态不一致。
+- **复发坑（连续两作）**：`.myrd/routines.yaml` 默认 `gamePath: games/godot-coin-rush` 至今未修。oak-key 轮已记录，hello 轮依旧要靠 preHookParams 显式覆盖成 `games/hello` 才测对工程。**建议运维直接改模板默认值或置空强制必填**，别再指望每作自觉覆盖。
+
+## 四、playtest blocked 实录：模板仓库技能资产落后于平台注入副本（本轮最大增量）
+
+- **触发**：判定脚本五清单 `{preflight.py, smoke.sh, input-fuzz.sh, playtest.sh, resolve-godot.sh}` 要求全部由项目仓库预置，hello 实测唯独 `std-skills/godot-game-dev/scripts/playtest.sh` MISSING → 节点按硬约束立即 blocked（不产试玩验收包、不回填量表、不调参回写）。
+- **根因（版本分裂）**：仓库内 `std-skills/godot-game-dev/` 是**旧版**（SKILL.md 无 playtest，routines.yaml 4 步）；平台注入阅读副本 `.myrd-platform/.claude/skills/godot-game-dev/` 是**新版**（SKILL.md §4.5 机器人试玩门禁 + `playtest_driver.gd` + 5 步 routine，新增 `playtestFrames: "900"`）。即：**模板仓库落后于平台注入副本**。
+- **纪律（为什么 blocked 而不是补一个）**：判定器唯一来源是模板仓库预置；被检方自写判定脚本，门禁不再独立，PASS 一文不值；注入副本是阅读用，不得复制/改写/等价替代。
+- **运维待办（精确到文件）**：把 `WORKSHOP_GAME_TEMPLATE_REPO` 的 godot-game-dev 技能资产同步到含 `scripts/playtest.sh` + `scripts/playtest_driver.gd` 的版本，并让仓库 `.myrd/routines.yaml` 的 godot-smoke 升到 5 步。报告已落盘 `docs/playtest/hello-playtest-blocked.md`（commit 283773e）。
+- **教训泛化**：工坊每接入新模板资产前，先 diff「模板仓库 vs `.myrd-platform/` 注入副本」的技能版本，发现落后先报运维，别等跑到最后一棒才 blocked。
+
+## 五、Web 导出与部署：hello 的三个增量打法
+
+1. **导出配置前置到 scaffold 棒**（前两作是 deploy 棒现场补 preset）：scaffold 按 `games/game` 既有先例补齐 `export_presets.cfg`（`platform="Web"`、`export_path="export/web/index.html"`、`variant/thread_support=false`、`html/canvas_resize_policy=2`）+ `.gitignore` 加 `!/export/web/` 豁免 + 导出产物入库（a8b5fd09）。deploy 棒零决策复用重导出——**「可托管形态」应该在脚手架棒就建成，别留到部署棒现场发明**。
+2. **根壳单游戏位切换要核对三处**：`apphost.toml`（name=hello / assets_dir=games/hello/export/web / health=/health / runtime=node20）、server 壳的资产路由、调参桥全局注入。hello 轮根壳原指向 candy-crush-legend（games/game/export/web），已整体切到 hello。**每次上新游戏，部署前 grep 根壳里旧游戏名清残留**。
+3. **部署重发坑：v1 因 504 重发被 superseded，v2 才是终态**（两笔同 gitRef）。判断游戏死活以 `/health` + app status + liveUrl 实测为准，**别拿 deployment 列表第一笔当真**。另：`/` 会 308 重定向到 `/apps/hello`（尾斜杠归一化），curl 复核记得 `-L` 跟随。
+
+线上复核（assign_agent 独立完成，不复用 deploy 自测结论）：部署 gitRef 远端 HEAD 与 dfd20d1 逐字一致；资产通道全文本（wasm/pck 走 `*.gz.b64`），本地解码还原 wasm 35,376,909 字节与本地导出逐字一致、magic `\0asm` v1 有效，pck magic `GDPC`；壳契约四件（相对路径拉资产、移动端音频手势解锁器、`__audioDebug` 取证口、tuning 调参桥）逐项在位。
+
+## 六、调参桥 hello 实例：spec 数值与实现默认值的口径漂移（真实发生，值得记录）
+
+- `game_state.gd` 的 `TUNING_META` 白名单四键：`base_target` 1–6、`base_time` 10–90、`time_step` 0–10、`min_time` 5–90；键不在名单=拒绝（防 URL 乱注入）；缺壳层时全局 undefined 属预期，门禁行为不受影响。
+- **口径漂移**：GameDesignSpec v1（id=cmuqkaypy002hm9bf3wnk1k26，approved）写的是 3 关 10/15/25 件、30/45/60s、连击窗口 1.5s；实现默认值是 `BASE_TARGET=4 / BASE_TIME=30 / MIN_TIME=18 / TIME_STEP=4`（每关目标 4→5、时限 30→26s）。spec 数值**没有**作为默认值落地，而是寄望试玩期经调参桥回填——playtest blocked 后未回填，两者至今不一致。
+- **结论**：工坊「spec → 实现」的数值对齐不能靠默认值拍脑袋。两条路二选一：① 实现前把 spec 数值直接落成常量默认值；② spec 数值作为 TUNING_META 默认初值，并在工程 README 记「spec 口径 = 默认值」。否则验收对不上、复盘对不齐。
+
+## 七、坑位速查表（hello 新增/复发，出问题先对号）
+
+| # | 坑 | 一句话修法 |
+| --- | --- | --- |
+| 1 | 双分支并存：工作区实际建 `hello-game-goal-*`，任务指定 `games-goal-*` | scaffold 棒把同一 commit 推两条分支保证 gitRef 存在；审计认 goal artifacts 的 gitRef |
+| 2 | routines.yaml 默认 gamePath=games/godot-coin-rush（复发） | preHookParams 显式覆盖；运维改模板默认值根治 |
+| 3 | 模板仓库技能资产落后于平台注入副本 → playtest blocked | 接入前先 diff 两份技能版本；落后先报运维 |
+| 4 | 部署 504 重发 → v1 superseded / v2 running | 判终态看 /health + app status + liveUrl 实测 |
+| 5 | `/` 308 到 `/apps/hello` 尾斜杠归一化 | curl 复核加 `-L` |
+| 6 | github.com:443 从工作区不可达（3 次重试 75s 超时） | commit 留本地分支不丢；先走平台 API（localhost）回写再补推 |
+| 7 | 碰撞余量不算就摆点 → 传送收集断言假失败 | 半宽+半径先算可达包络，摆点落在 clamp 边界内 |
+| 8 | spec 数值与实现默认值漂移 | spec 数值落成默认值或 TUNING 初值，README 记口径 |
+| 9 | 导出配置留到部署棒现场发明 | scaffold 棒按上一作先例补 preset + .gitignore 豁免 + 产物入库 |
+| 10 | 根壳残留上一游戏（单游戏位惯例） | 部署前 grep 旧游戏名清残留，apphost.toml 三键核对 |
+
+## 八、关联知识与权威来源
+
+- Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路总论（oak-key）：27407691-bcf8-4e73-b686-1bb8df684e5c
+- game-9 单游戏部署先例与调参桥 §3C：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 移动端触屏虚拟摇杆与 AudioContext 解锁规范：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- MyRD 平台真实仓库结构地图：b07a928a-414b-4d48-9535-5b6d6cc859ae
+- 仓库内权威文件（本仓可直接复用）：`games/hello/{verify.sh,export_presets.cfg,tests/smoke.gd,autoload/game_state.gd}`、`docs/playtest/hello-playtest-blocked.md`、`std-skills/godot-game-dev/scripts/`、`.myrd/routines.yaml`
+- 平台产物链：requirement=cmuqk7luz002am9bfmmkouw9v → design_spec=cmuqkaypy002hm9bf3wnk1k26 → hosted_app=cmuqk3huq001km9bf5ejp7tdg → workflow run=cmuqkb8xl002nm9bf9pz8hw61（/workflows/cmuqk3j35001qm9bfsdw4xn8d/runs/cmuqkb8xl002nm9bf9pz8hw61）→ 线上复核 assign_agent=cmto42pg60004m9aq7jczszhy
+
+## 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+# 《牛牛打游戏》game-8 · v2 手感调优与链路诊断结论（体型/速度参数基线）
+
+> **文档定位**：固化 game-8 v2 轮手感调优的**具体数值（前后对照）**、godot-smoke 门禁表现、线上链路诊断结论与**可照抄的复测方法**，形成「手感类反馈（再大一点 / 再慢一点）」的**可复用增量调参基线**——后续同类反馈直接对照本文 §五 playbook 执行，不必重新勘探。
+> **权威基准**：需求《牛牛打游戏 game-8 · v2 手感调优：牛牛体型放大、移动速度下调》（`cmuqmej89000ym9gg6mom93o0`）；策划案 v1 设计唯一来源（doc `80b9c193-6807-43e4-b2b0-5789f2d9e35b`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）；收口依赖清单（doc `943eb5eb-0949-43fe-b939-83cf171af2a3`）。
+> **实现基线**：部署分支 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`；数值提交 `3a396355`（feat v2 手感调优）→ 产物重导出 `1089e4b` → 诊断报告 `1afec443`（`games/game-8/docs/v2-liveurl-diagnosis.md`，docs-only）；线上部署 = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`。
+> **本文数字全部为一手实测值**（git diff 实录 / curl 取证 / 线上 pck 自跑门禁），非估算。
+
+## 一、v2 数值基线（前后对照，唯一落账）
+
+| 声明键 | v1 默认 | v2 落账 | 需求量化区间 | 实际占比 | TUNING_META 钳制 |
+|---|---|---|---|---|---|
+| `PLAYER_SCALE` | 1.0 | **1.4** | 1.3~1.5× 整体放大 | 1.4× | min 0.5 / max 2.0 / step 0.05 |
+| `PLAYER_SPEED` | 220.0 px/s | **145.0 px/s** | v1 的 60~70% | **65.9%** | min 60 / max 300 / step 5 |
+
+- **唯一落账位置**：`games/game-8/autoload/game_state.gd` 数值区（v2 HEAD 实测：`var PLAYER_SCALE: float = 1.4` / `var PLAYER_SPEED: float = 145.0`）。⚠️ 策划案 v1 写的路径是 `scripts/game_state.gd`，**实际权威路径是 `autoload/game_state.gd`**（scripts/ 下并无此文件），后续引用以本文为准。
+- **接线方式**（`scripts/player.gd`）：`_apply_tuned_scale()` 把 `PLAYER_SCALE` 以**根节点 uniform scale** 应用（`is_equal_approx` 脏检查，滑杆改动下一物理帧生效），同步作用于视觉精灵、`CollisionShape2D` 碰撞体与 `PickupArea/PickupShape` 判定体；`velocity = direction * GameState.PLAYER_SPEED` 每物理帧读声明键。
+- **判定几何联动（容易算错的口径，钉死）**：`player.tscn` PickupShape 本体半径 22px → v2 缩放后 **30.8px**；收集物本体半径 14px（`collectible.tscn`）；**触发距离（圆心距）= 30.8 + 14 = 44.8px**（v1 为 22+14=36px）。刷点安全间距常量 96px 未动 → 余量从 96/36 ≈ **2.67×** 收窄到 96/44.8 ≈ **2.14×**，仍满足「重开不贴脸白捡」。commit `3a396355` 提交信息里的「判定半径 44.8px」即此**触发距离**口径，不是 PickupShape 本体半径，别混淆。
+
+## 二、godot-smoke 门禁表现（v2 断言三件套 + 全链路复跑）
+
+### 2.1 门禁复跑结果（本地与 preHook 同源，全绿）
+| 门禁步 | 结果 |
+|---|---|
+| resolve-godot.sh | exit 0，Godot **4.3.stable.official.77dcf97d8** |
+| preflight.py | **PREFLIGHT: PASS**（13 类前置一致性检查、40 个工程文件，exit 0） |
+| smoke.sh（240 帧预算） | **GODOT_SMOKE: PASS**（exit 0、零 SCRIPT ERROR） |
+| input-fuzz.sh | **GODOT_FUZZ: PASS**（seed=20260913，6 批次 239 帧，exit 0） |
+| playtest.sh | **脚本缺失**（模板仓库未预置，D2 依赖 / bug `cmuktchmy000km97z6kj3r2ro` Bug1），维持 blocked、不代写不伪造 |
+
+### 2.2 smoke.gd 新增 v2 手感断言三件套（真实机判，含 FAIL 路径，约 L423-435 `_assert_v2_tuning`）
+1. **倍率区间**：`PLAYER_SCALE ∈ [V2_SCALE_MIN=1.3, V2_SCALE_MAX=1.5]`，违例 FAIL 签名「v2 手感断言 FAIL：体型倍率 %.2f 不在 %.1f~%.1f 区间」；
+2. **移速区间**：`PLAYER_SPEED ∈ [V2_SPEED_MIN=V1_SPEED×0.6=132.0, V2_SPEED_MAX=V1_SPEED×0.7=154.0]`，FAIL 签名「移速 %.1fpx/s 不在 v1 默认 %.0f 的 60%%~70%% 区间」；
+3. **接线集成断言** `_assert_node_scaled`：Player 根节点、`CollisionShape2D`、`PickupArea/PickupShape` 三节点的全局缩放必须都等于数值区 `PLAYER_SCALE`（与难度梯度 SpawnTimer 断言同口径，防「数值键写了但没接上」）。
+
+方向符号断言（A/← 后 position.x 减小、D/→ 后增大）与 50 连击判定一致性、难度梯度、过期回收、胜负四分支、一键重开、持久化等既有契约**全部保留不动且继续通过**——玩法零回退。
+
+### 2.3 可复用结论：断言区间与需求区间硬耦合
+smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的。后续若要把数值调**跨出**这个区间，必须**三处同步**：smoke.gd 常量、需求区间条款、策划案 revisions 数值区——否则门禁会以清晰签名 FAIL（这是门禁在强制「数值变更须先改需求基线」的设计行为，**不是误报，不许放松断言来绕**）。
+
+## 三、线上链路诊断结论（liveUrl 端到端实测，2026-10-02）
+
+**结论先行**：✅ v2 已在线上生效且量化达标——部署产物自跑门禁全绿（含 v2 手感基线机判），线上资产与仓库导出逐字节一致，**无需修复、无需回滚**。
+
+1. **部署元数据**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`）；当前部署 **version 5 `cmuqny37h001ficf0mpmr71mv` status=running**；gitRef=`myrd/games-goal-cmujpml1e006rm99i9hc33huu`（未落 main ✓）；commit `1089e4b`（其上仅 1 个 docs 提交，代码零差异）；v4=`cmuqnx9v6001dicf0fmfryxcz` superseded（重试冗余但无害）。
+2. **公网链路**：`GET /apps/game-8/health` → 200 `{"ok":true,"app":"game-8","game":"牛牛打游戏","assets":"lazy/object-storage"}`；`/apps/game-8/` → 308 规范化跳转 → 200；`/gw/health` → 200（网关透传正常）；壳页 11,626B，`__GAME_TUNING__` 调参桥 ×2、`__audioDebug` 音频手势解锁器、资产全走相对路径 `fetch(BASE_PATH + 'api/public/assets/' + name)` 三契约在位。
+3. **资产文本通道**：`index.pck` base64 3,333,340B → 解码 gzip 2,513,040B；`index.wasm` base64 **10,696,408B** → 解码 35,376,909B（与门禁经验 v6 一手实测值一致）。
+4. **逐字节一致（无版本漂移）**：本地导出（部署 commit 工作树）与线上对象存储拉回解码产物 sha256 完全一致——pck `5f556ad9adf47579cb38a1fd8f7549e33b478b56cd4b3b5f112346281d699e25`；wasm `fe5cebc590758c10bc4469be5a591e28edbde5ec8f458f21baeb83db50d028b9`。
+5. **最高等级证据——部署产物自跑门禁**：`godot --headless --main-pack <线上pck> --quit-after 240 res://tests/smoke.tscn` → exit 0、零 SCRIPT ERROR、`GODOT_SMOKE: PASS`，v2 手感基线机判全过（1.4∈[1.3,1.5]，145∈[132,154]）——「牛牛变大变慢」是**产物运行期实测**，不是代码推断。
+
+## 四、复测方法（照抄即用）
+
+1. **公网探测**：`curl -s <liveUrl>/apps/game-8/health`（期望 200 + ok:true）；`curl -sI <liveUrl>/apps/game-8/`（期望 308→200）；壳页 HTML grep `__GAME_TUNING__` / `__audioDebug`。
+2. **资产一致性**：`GET /api/public/assets/index.pck`（和 index.wasm）→ base64 解码 → gunzip → `shasum -a 256`，对照 §三.4 的两个哈希；不一致即版本漂移，先查部署 commit 再谈手感。
+3. **手感数值机判**：`godot --headless --main-pack <线上或本地 index.pck> --quit-after 240 res://tests/smoke.tscn`，判定三条件（`GODOT_SMOKE: PASS` + exit 0 + 零 SCRIPT ERROR），签名中应含「v2手感基线(体型1.3~1.5x·移速60~70%)」字样。
+4. **数值速查**：游戏内调参面板或壳页 `?tuning=1` URL 直接查看当前声明键值；或读 `games/game-8/autoload/game_state.gd` 数值区。
+5. **环境备注**：诊断沙箱对 github.com:443 直连超时（`Recv failure`），推送改走 `ssh.github.com:443` 通道——后续同环境取证直接用此通道，别反复试直连。
+
+## 五、「再大一点 / 再慢一点」类反馈的增量调参 playbook（可复用基线）
+
+**标准链路（全七步，禁止散点改代码对数值）**：
+调参入口（游戏内面板滑杆即时生效 / 壳页 `?tuning=` URL）→ 确定目标声明键与新值 → **经策划案 revisions 回写 `spec.numeric`**（doc `80b9c193-…`，spec 载体即该知识文档）→ 改 `autoload/game_state.gd` 数值区 → 复跑 godot-smoke 门禁 → 重导出 Web 产物并部署（gitRef 必须是 `myrd/games-goal-cmujpml1e006rm99i9hc33huu`）→ 按本文 §四产物自跑门禁复测。
+
+**建议步长与边界**：
+| 反馈 | 动作 | 步长建议 | 边界 |
+|---|---|---|---|
+| 再大一点 | `PLAYER_SCALE` ↑ | +0.05~0.1 / 档 | 钳制 [0.5, 2.0]；跨出 [1.3,1.5] 须按 §2.3 三处同步 |
+| 再小一点 | `PLAYER_SCALE` ↓ | −0.05~0.1 / 档 | 同上；低于 1.3 同样触发门禁 FAIL |
+| 再慢一点 | `PLAYER_SPEED` ↓ | −5~15 / 档 | 钳制 [60, 300]；跨出 [132,154] 须三处同步 |
+| 再快一点 | `PLAYER_SPEED` ↑ | +5~15 / 档 | 同上 |
+
+**每次调整必做的三项联动复核**：
+1. **断言区间一致性**（§2.3）：数值是否跨出 smoke 常量带；
+2. **判定几何余量**：体型↑ → 触发距离 = 22×scale + 14 线性放大 → 96px 刷点间距余量 = 96/触发距离 收窄；低于 2× 时须复核刷点安全间距常量是否要同步上调（公平性属门禁议题，不许靠放松断言解决）；
+3. **达成余量**：移速↓ → 单位时间可达刷点数↓ → 60s/20 目标的通关可达性须复核（跑 50 连击一致性 + 全链路一条龙断言兜底；v2 @145px/s 已实测可通关）。
+
+**回滚口径**：v1 = `PLAYER_SCALE 1.0` / `PLAYER_SPEED 220.0`，两键均可在调参面板或 `?tuning=` URL 直接调回，代码零改动。
+
+**主观手感的最终裁决**：数值区间内「像不像用户要的手感」机器判不了，仍以 D3 用户试玩结论为准（入口 `…/apps/game-8?tuning=1` 已可用）；未决依赖 D1（iOS Safari 真机）/ D2（playtest.sh 模板资产）见收口清单 doc `943eb5eb-…`。
+
+**来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
+
+
+## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+# game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
+
+> 来源：需求《测试连点防重的极简计数页（game-12）》（id=cmur8x93r0016icbsd90s6e60，goal=cmur8pnhn000kicbsvl0eoqx6）走完「录入需求 → 判定规则调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-12`（Godot 4.3.stable），分支 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`（scaffold e055e4f → implement ff779d0 → deploy c54fcc9/078f761/e5b292e → playtest 1f7a4a3）。线上：https://leomac-studio.tail49399e.ts.net/apps/game-12/（/health 200 `{"ok":true,"app":"game-12"}`，deploymentId=cmurba8yd001vicbsfdl79x8l，部署 commit c54fcc9）。门禁终态：**godot-smoke 全绿 + mobile-web-smoke PASS 10/10（实测 FPS 39）**，playtest 棒复跑双门禁结论一致。
+>
+> 本文只写 game-12 的增量结论：防重语义选型与实现契约、双门禁通过路径、踩坑清单与复用清单。门禁三层体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-9 增量见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be；移动端触屏摇杆与 AudioContext 解锁规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；防重判定规则 R1–R6 / 事件契约 C1–C4 调研全文见项目文档库 id=8345388c-cf30-4d7c-8413-39ccd7e65887。互为补充、不重复。
+
+## 一、防重语义选型：只有「固定节流（采纳即锚定、拦截不延窗）」能同时过验收 2 和 3
+
+| 方案 | 机制 | 300ms 内连点 5 次 | 窗口后恢复累加 | 结论 |
+| --- | --- | --- | --- | --- |
+| **固定节流（首击入窗）** | 首击计数并锚定窗口；窗口内后续点击全拦且**不更新锚点** | 仅 +1 | 正常 | 采用 |
+| 防抖（末击重启窗口） | 每次点击都重置窗口，静默期满才计 | 0 次 | — | 违背验收 2 |
+| 首尾折叠 | 窗口首末各计一次 | +2 | — | 违背验收 2 |
+
+**最易写错的一行**：被拦截的点击不得触碰窗口锚点 `_last_count_ms`。一旦拦截分支也更新它，节流就退化成防抖——持续点击下计数永远不涨，验收 3 永远不过。
+
+实现（`games/game-12/autoload/game_state.gd`，时间注入纯函数，核心约 15 行）：
+
+```gdscript
+const TARGET_COUNT: int = 10
+const DEBOUNCE_MS: int = 300
+var _last_count_ms: int = -DEBOUNCE_MS   # 初值 = -窗口 → 开局首击立即有效
+
+func try_count(now_ms: int) -> bool:
+    if state != State.PLAYING:
+        return false                      # 已胜：忽略，不报错
+    if now_ms - _last_count_ms < DEBOUNCE_MS:
+        click_rejected.emit(DEBOUNCE_MS - (now_ms - _last_count_ms))
+        return false                      # 拦截：只发反馈信号，不动锚点
+    _last_count_ms = now_ms
+    count += 1
+    count_changed.emit(count)
+    if count >= TARGET_COUNT:
+        state = State.WON
+        state_changed.emit(state)
+    return true
+
+func reset() -> void:
+    count = 0
+    state = State.PLAYING
+    _last_count_ms = -DEBOUNCE_MS         # 重开同步清防重锚点 → 首击立即有效
+```
+
+三个不能省的细节：
+1. `_last_count_ms` 初值取 `-DEBOUNCE_MS`，否则开局第一击被吞（验收 1 首点即错）。
+2. `reset()` 必须同时清防重锚点——「刷新/重开无残留」包含防重状态本身。
+3. 拦截不静默：`click_rejected(remaining_ms)` 把「被吞的点击」变成可感知反馈（按钮闪红 + 状态栏「连点已拦截，还需 Nms」）。且关键反馈不能被高频更新覆盖——状态栏曾把指针坐标与拦截提示混在一行，坐标每物理帧刷新把「还需 Nms」冲掉，拆成反馈线/指针线两行才保住。
+
+时间注入是机判前提：`try_count(now_ms)` 不读时钟 → 无头冒烟可用合成时间戳逐毫秒断言（完全确定、与帧率零耦合）；只有真实点击路径才走 `Time.get_ticks_msec()`。
+
+## 二、单源单相：三个入口汇一个判定点，防「一次触碰计两次」
+
+Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`（调研已核实）→ 移动端一次触碰可能产生 touch/mouse 双事件，再加键盘空格/回车，同一「点击」有四个来源。game-12 的收敛方式：
+- `CountButton.pressed`（鼠标/触摸）与 `_unhandled_input("confirm")`（键盘/动作）都只调唯一入口 `_attempt_count()` → `GameState.try_count(...)`。防重判定只在 GameState 一处，不可能被绕过。
+- `TouchConfirmButton`（TouchScreenButton）**不直接调游戏逻辑**，而是 `Input.parse_input_event(InputEventAction("confirm"))` 注入动作 → 触摸与键盘走完全相同路径（顺带获得桌面端自动不响应的免费屏蔽）。热区用 shape 圆（半径 44）而非位图。
+
+## 三、把「防重」机判成确定性断言（附负例验证纪律）
+
+冒烟相位设计（`games/game-12/tests/smoke.gd`）：
+- **合成时间戳断言防重**：t0 有效；t0+100/200/299ms 连点全拦、只发 click_rejected、count 不变；跨窗后再点正常 +1。
+- **真实路径另测**：真实点击受真窗口约束 → 相位间显式等真实时间跨窗，并设帧数上限守卫（60fps 约 2s，超限报 `Engine.max_fps` 异常而非挂死）。
+- **噪声后复位**：乱键相位可能真触发计数/拦截，且末次乱键可能贴着 confirm 注入点不足 300ms → 进断言前 `GameState.reset()` 清锚点，消灭偶发失败。
+- **每条断言做负例验证**（证明会真 FAIL，不是永真）：热区 44→10、宽高比 keep→expand、脉冲阈值抬到 1.0，三次均如预期 FAIL。
+
+两个「静默漏判」陷阱（负例不触发才发现）：
+1. 静态几何断言放 `_ready()`：此时 `Control.size` 恒为 0，整段断言被静默跳过 → 移到第一物理帧再读。
+2. Button 有主题最小尺寸保护：`offset_right=110` 实际 size 被钳到 115，44px 负例测不出来 → 换 TouchScreenButton 圆形热区做负例。
+
+极简静止页的门禁特异问题：mobile 门禁「画面在动」检查会把完全静止的页面误判为渲染冻结。解法：+1 按钮加待机呼吸脉冲（scale 1.00→1.06 / 0.9s，实测极差 0.060 ≥ 阈值 0.02），一举两得——既是移动端可点示能，又是确定性的非零帧差证据。缩放绕 `pivot_offset`（控件中心），否则动画往右下飘。
+
+画布口径：调研建议设计宽 375 + Adaptive；实现落成 720×1280 竖屏 + `canvas_items`+`keep`（+1 按钮 560×240，375 宽实机约 291px），同样满足无横滚与 ≥44px。机判锚点是**宽高比策略必须 keep**（expand 会被冒烟断言拦，负例已验证）。
+
+## 四、Godot Web 双门禁：分工、顺序与标记辨析
+
+| 门禁 | 判定链 | 拦什么 | game-12 实测 |
+| --- | --- | --- | --- |
+| **godot-smoke** | resolve-godot → preflight.py（13 类静态一致性）→ headless smoke（`GODOT_SMOKE_FRAMES=240`，断言退出码 0 + `GODOT_SMOKE: PASS` 标记 + 日志无 SCRIPT ERROR）→ input-fuzz（seed=20260913，6 批/239 帧） | 游戏本体「跑得动且玩得动」（含防重/恢复/胜负/重开/触控目标/拉伸契约断言） | 四步全 exit 0 |
+| **mobile-web-smoke** | mobile-web-smoke.mjs --url <liveUrl>（headless Chrome 390×844 iPhone 仿真）10 项：网络全通/console 零错/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约（__audioDebug）/无横溢（scrollWidth=390）/FPS≥8（实测 39） | 部署后真实链路上的移动端可玩性 | PASS 10/10 |
+
+三条纪律：
+1. **mobile-web-smoke 必须打部署后的 liveUrl**——本地静态伺服 export/web 只能当预检（implement 棒做过 10 项预检），不能替代正式门禁：M1 网关、对象存储资产通道、壳契约只在真实链路暴露。所以它位于 deploy 之后，是产物验证而非 implement 棒门禁。
+2. **标记辨析**：判定脚本 stdout 是小写 `godot-smoke: PASS`，引擎日志里才是大写 `GODOT_SMOKE: PASS`（smoke.sh 内部 grep 大写标记后才自产小写行）。只 tail 游戏日志看不到大写标记不等于失败——先分清两层标记再下结论。
+3. **证据随仓库归档**：`games/game-12/qa/mobile/report.json` + phase-load/tap/joystick 三张截图入库，供复跑比对。
+
+## 五、部署链五个真实踩坑（每个都在本目标发生过）
+
+1. **`.gitignore` 里 `/export/` 不删 = 部署后全 404**：apphost.toml 的 `assets_dir` 指向 `games/game-12/export/web`，导出产物不入库则 wasm/pck 上线即丢。导出产物必须入库（37MB wasm 走底座 A「资产出 bundle」+ 对象存储懒加载 + `/api/public/assets/` b64 文本通道，总论见 27407691）。
+2. **apphost.toml 沿用上一游戏**：原值指向 candy-crush 的 `games/game/export/web`；构建管线按 gitRef 读它，不改会打包错应用 → `name`/`assets_dir` 随游戏改是 deploy 棒第一查。
+3. **gitRef 必须是目标分支不是 main**：本次 `myrd/games-goal-cmur8pnhn000kicbsvl0eoqx6`。注意本地工作区克隆出的分支名可能与远端目标分支不同名同指针（`myrd/game-12-goal-…` vs `myrd/games-goal-…`）→ 部署前 fetch + 显式切到目标分支再读 apphost/导出。
+4. **壳页三件套缺一不可**（`server/src/game-page.ts` / `games/game-12/export/web-shell.html`）：品牌文案适配（曾残留糖果粉碎传奇文案）；§3C 调参桥（引擎加载前解析 `?tuning=` → `window.__GAME_TUNING__`，只认对象形态、非法 JSON 静默忽略——game-12 缺，补约 8 行）；音频手势解锁器 + `window.__audioDebug`（即 mobile 门禁「音频解锁契约」的机判对象）。壳页另配 `overflow:hidden + touch-action:none` + `user-scalable=no`：彻底禁双击缩放/滚动，快速二连点不被浏览器手势吞掉造成防重误判（比调研建议的 `touch-action: manipulation` 更强）。
+5. **PATCH 目标 artifacts 是整体替换数组**：回写产物必须 get→append→写回（playtest 棒 3→4 条、既有条目原样保留 + 回读校验），直接 put 会抹掉前序产物。
+
+调参语义澄清：`TUNING_META` 未声明时 `?tuning=1` 是**安全 no-op**（正常进游戏、忽略键）。game-12 有意不把 `DEBOUNCE_MS=300` 做成可调——它是需求验收项本身，spec 是唯一事实源。要开放浏览器内调参需下一轮：spec.numeric 声明键 → TUNING_META + tuning_panel.gd + 冒烟断言 → 重导出重部署重跑 mobile 门禁。
+
+## 六、macOS 自带 bash 3.2 的全角括号坑
+
+`verify.sh` 里 `$FRAMES）`（全角右括号紧贴变量名）在 macOS bash 3.2 某些 locale 下把多字节字符并入变量名 → `FRAMES: unbound variable`，而上一行 echo 还能正常展开，极难定位。写法统一 `${FRAMES}`，用 `bash -x` 抓现行。game-12 修复后 verify.sh 端到端全绿（preflight/smoke/fuzz 全 exit 0）。
+
+## 七、如实上报的缺口（未绕过、未伪造）
+
+1. **playtest.sh 不在模板仓库**（`std-skills/godot-game-dev/scripts/` 同目录 9 个判定/驱动脚本中独缺它）：各节点均未自造等价判定器、未伪造 `GODOT_PLAYTEST: PASS`；`.myrd/routines.yaml` 两条 routine（godot-smoke / mobile-web-smoke）均不引用它 → 不阻塞双门禁，缺口随产物 detail 上报运维补资产。
+2. **真机抽查未做**（本环境建不了 iOS 会话）：mobile-web-smoke 是 headless Chrome 仿真，触摸结论的边界是仿真环境；真机验证留待用户试玩回填。
+3. **试玩结论只能来自用户**：playtest_kit 已交付（`games/game-12/qa/playtest-kit.md`，试玩指引 + 反馈对照表 + 四问量表），量表待回填，未代填任何「好玩/通过」结论；未收到用户调参 URL 前，无 spec revisions/approve 调用。
+
+## 八、复用清单（后续点击类小游戏直接抄）
+
+1. 防重抄 `try_count(now_ms)` 签名：时间注入纯函数 + 初值 `-DEBOUNCE_MS` + 拦截不动锚点 + reset 清锚点 + 拦截发 remaining_ms。
+2. 输入抄「单源单相」：所有入口 → 唯一 `_attempt_count()`；TouchScreenButton 注入 InputEventAction 而非直调逻辑。
+3. 断言抄四件套：合成时间断言 + 真实路径跨窗等待 + 噪声后 reset + 每条断言负例验证；几何断言放第一物理帧，44px 负例用 TouchScreenButton 热区。
+4. 静止页记得待机脉冲（≥0.02 极差同时换「画面在动」绿与可点示能）。
+5. 部署抄「五查」：gitignore 的 /export/、apphost.toml 指向、gitRef=目标分支、壳三件套（文案/调参桥/音频解锁）、artifacts 回写 get→append→写回。
+
+关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
+
+## 沉淀 game-14 Godot Web 导出与移动端门禁经验
+
+> 来源：goal cmusp1rab0028ic7q9shcdzyl（项目 cmusp1ra00022ic7qnk18nofm）「小游戏工坊 · game-14」工作流执行沉淀。上游输入：需求《game-14 太空飞船躲陨石捡金币》（cmusphfbp0062ic7qrxlt2nk4）、GameDesignSpec v1（cmuspm7sm006uic7qzrbqyilp，approved）。工作流 run cmuspmlex0072ic7qnjiqxmpc **真实结局 = failed，且失败于工作区准备阶段，四个节点全部 pending**。本卡如实记录本轮真实结论（失败模式与补救路径），并把 game-14 真正进入开发后要带上的导出/门禁契约收拢成清单（引用既有基线、不重复）。**本轮没有产生任何 game-14 代码、导出产物、门禁判定或部署事实——请勿把本卡第 4~6 节的复用清单误读为 game-14 实测数据。**
+
+## 一、本轮真实结局：准备阶段 git clone 失败，门禁与导出根本未执行
+
+- 时间线：run 创建 2026-10-03T18:12:57Z → failed 2026-10-03T18:15:25Z（存活 2 分 28 秒）；prepSteps 仅「解析模型配置 3ms」；失败点 = preparationPhase「正在准备代码工作区（克隆仓库、拉取最新代码）」。
+- run.result.error 逐字：`git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmusp1ra00022ic7qnk18nofm/run-cmuspmlex0072ic7qnjiqxmpc'... fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75009 ms: Couldn't connect to server`。
+- 节点状态：脚手架 / 实现玩法 / 导出并部署 / 试玩验收 全部 pending；implement 与 deploy 的 godot-smoke preHook、playtest 的 mobile-web-smoke preHook 也均 pending——**门禁一次都没跑过，不存在「门禁打回」**。
+- 复盘纪律：「已启动 ≠ 已成功」在本轮的具体形态就是「run 状态 failed + 节点全 pending」；判定真实结局唯一依据 run 状态与 run.result.error，禁止凭预期脑补「门禁打到第几轮」。
+
+## 二、根因分类与补救：环境不可用 ≠ 代码缺陷，正确动作是重跑而非改代码
+
+- 根因：github.com:443 连接 75 秒超时（connect 阶段即失败，非认证/仓库问题），属瞬时网络故障——与 godot-smoke 退出码 2「环境不可用」同层语义：**禁止为它改游戏代码，更不允许宣称门禁失败**。
+- 恢复复核（2026-10-04）：`curl https://github.com` → 200（0.59s）；`git ls-remote https://github.com/hl3w22bupt/myrd-playground.git` 正常返回分支列表 → 复跑条件已具备。
+- 补救动作：`POST /api/v1/workflows/runs/cmuspmlex0072ic7qnjiqxmpc/rerun`（平台手册 rerun 入口）。DAG 输入不变：需求 cmusphfbp0062ic7qrxlt2nk4 + spec cmuspm7sm006uic7qzrbqyilp（v1 approved）仍是唯一权威。
+- 若同签名（clone exit 128 / 443 connect timeout）复现：先做宿主机连通性探针（curl github.com + git ls-remote），如实按「环境不可用」上报等待恢复；不得降级为纸面交付，也不得空转烧修复预算。
+
+## 三、game-14 工坊流水线契约（经本轮 run 定义实测核实）
+
+- 四棒 DAG：脚手架 scaffold → 实现玩法 implement → 导出并部署 deploy → 试玩验收 playtest；仓库 github.com/hl3w22bupt/myrd-playground（game-14 预期落位 `games/game-14`，以 scaffold 实际产物为准）。
+- 门禁挂点：**implement、deploy 两棒都挂 godot-smoke；playtest 挂 mobile-web-smoke**。routine 均 gate:false、由 preHook 显式引用；`{{liveUrl}}` 无默认值 = fail-closed（不传就报错，不会静默跳过门禁）；`{{gamePath}}` 必须经 preHookParams 显式传参（默认值指向不存在工程的坑见 27407691 §1.3）。
+- 判定资产唯一来源：仓库 `std-skills/godot-game-dev/scripts/`（mobile-web-smoke 判定脚本 mobile-web-smoke.mjs + 负例自测 mobile_smoke_selftest.mjs + routine 片段模板已随 commit 4a8e4b76 落地）；被检工程不得自造判定器，scaffold 只校验不自造。
+
+## 四、game-14 验收标准 → 门禁断言映射（approved spec v1 的可机判数值）
+
+| 验收项 | spec v1 锚点 | 机判断言落法 |
+| --- | --- | --- |
+| 难度阶梯 | 陨石生成间隔 950ms 逐档递减至封顶 430ms、下落速度 130px/s 逐档递增至封顶 270px/s，共 5 档（每 100 分一档） | 冒烟分相位读各档生成间隔/单位位移帧数，断言逐档单调变化且封顶后不再变化；档位边界按得分 100/200/300/400 推导写进断言注释 |
+| 状态机与持久化 | 开始（含操作说明）/进行中/暂停恢复/游戏结束/一键重开五状态；最高分 localStorage 键 `game14.highScore` | 状态标志断言；重开后断言分数清零而最高分保留；localStorage 属线上行为，由 mobile-web-smoke 打 liveUrl 验证 |
+| 操控与边界 | 键盘 ←→/A/D（含上下）+ 触摸拖动，飞船不可越出画布 | E-08 纪律：按住方向键测位移与动作注入分帧做；越界 clamp 断言；触摸拖动必须真实改变飞船目标位置（mobile 门禁 touch-response 预修，见 §六） |
+| 计分与生命 | 拾金币 +10 实时显示；撞陨石 −1 命（共 3 命），命尽进游戏结束页并展示本局得分 + 历史最高分 | 拾取/碰撞事件计数断言；连续碰撞或生命归零路径必须可达并断言 GAME_OVER |
+| 视听契约 | 三层星空视差滚动；碰撞爆炸闪烁 + 300ms 震屏 + 1.2s 无敌闪烁；+10 飘分 | 事件标志/帧差断言；无敌期 = 「碰撞不再扣命」的断言窗口 |
+| 音频契约 | coin-pickup / meteor-explosion / game-over 三 SFX 可编程触发；M 键静音且不影响逻辑 | headless 侧编程触发断言；AudioContext 解锁契约（__audioDebug）归 mobile-web-smoke 第 8 项 |
+| 性能 | 连续游玩 60s 帧率 ≥ 30fps；页面无控制台报错 | **阈值辨析：mobile-web-smoke 的 FPS≥8 是底线门禁，≥30fps 是需求验收线——门禁全绿 ≠ 验收达标，验收仍按 spec 执行** |
+
+## 五、复用基线指针（执行时直接带上，本卡不重复其内容）
+
+- **27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 总论）**：Godot 4.3 Web 导出参数基线（`variant/thread_support=false` 免 COOP/COEP、`canvas_resize_policy=2`、中文必须 theme/custom_font=P13、导出 7 件套与 wasm≈35MB 量级）；AppHost 部署契约（**一游戏一清单**——game-14 必须 `name="game-14"`、`assets_dir="games/game-14/export/web"`，绝不沿用他游戏 apphost.toml；部署 gitRef 必须是部署分支 `myrd/games-goal-<goalId>` 不是 main；`/export/` 产物必须入库否则上线全 404；M1 网关拦二进制 → gzip+b64 文本回传；壳内资源全走相对路径）；godot-smoke 三层门禁与退出码语义 0/1/2/3；error-signatures 修复循环纪律；部署终态独立复核四步。
+- **00314649-c4d2-407c-871b-62f7de91b07d（game-12）**：mobile-web-smoke 10 项明细（网络/console/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约/无横溢/FPS≥8）与「必须打部署后 liveUrl」纪律（本地静态伺服只能当预检）；标记辨析（判定脚本 stdout 小写 `godot-smoke: PASS` vs 引擎日志大写 `GODOT_SMOKE: PASS`）；证据随仓归档（`games/<game>/qa/mobile/report.json` + phase 截图）。
+- **82e419bb-b641-4b5e-bb58-d8b9633169ca**：移动端触屏虚拟摇杆与 AudioContext 解锁三件套（首手势解锁 + 解锁前记账 + 退后台回来再解锁），壳页与游戏侧都要进。
+- **36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）/ 78180e88-6486-404e-9265-e315e0da3c66（hello）**：同系列工程结构、模板与门禁增量结论。
+
+## 六、mobile-web-smoke 已知失败图谱（5 款游戏实测 → game-14 预修清单）
+
+仓库 mobile-gate 系列实测 verdict（commits 11957bd3~585db60c）：game-3 疾风忍者跑 **PASS**（十项全绿，tap 触发跳跃实证触摸驱动玩法）；game-2 星尘收集者 FAIL（console Godot 缺 cfg 告警 + tap 后零帧差）；game-4 光路谜阵 FAIL（tap 落空格零帧差，探针坐标与 letterbox 棋盘错位）；game-9 推箱子 FAIL（探针落点错位，摇杆实际 CSS(44,502)）；game-10 天天酷跑 FAIL（tap 落横带无响应，尚需探针区分「点按开始未实现」与「落点错位」）。
+
+- 主失败源集中在 **touch-response**，两类根因：①游戏触摸未真正接入玩法状态（UI 自称支持触摸但点按无效）；②探针坐标与画布 letterbox/控件 CSS 实际位置错位（屏幕坐标 ≠ 游戏坐标）。
+- game-14 预修清单：触摸拖动直接改飞船目标位置并与键盘同路径（game-12「单源单相」范式：多输入源汇一个判定入口）；可交互热区 ≥44px，避免依赖 letterbox 偏移的绝对坐标；开始页不要做成纯静止层（会触发「画面在动」误判，game-12 用待机呼吸脉冲拿到确定性非零帧差）；音频解锁契约随壳页一并实现。
+- 证据纪律：verdict 逐字进 commit message + report.json + phase-load/tap/joystick 三截图入库，供复跑比对。
+
+## 七、关联知识与权威来源
+
+- 知识卡：27407691-bcf8-4e73-b686-1bb8df684e5c（导出+门禁+AppHost 总论）、00314649-c4d2-407c-871b-62f7de91b07d（双门禁与 mobile-web-smoke 10 项）、82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏/音频解锁）、36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）、78180e88-6486-404e-9265-e315e0da3c66（hello 工坊）、b07a928a-414b-4d48-9535-5b6d6cc859ae（平台仓库结构与路径陷阱）。
+- 仓库权威文件：`std-skills/godot-game-dev/scripts/{smoke.sh,preflight.py,input-fuzz.sh,resolve-godot.sh,mobile-web-smoke.mjs,mobile_smoke_selftest.mjs}`、`std-skills/godot-game-dev/references/{godot-smoke-routine.md,mobile-smoke-routine.md,error-signatures.md}`、`.myrd/routines.yaml`。
+- 平台事实源：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`（rerun 入口、「已启动 ≠ 已成功」纪律）；工作流 spec 与需求以平台登记产物为准。
+
+
+## 沉淀知识：Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+# Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+> 来源：目标「森林收集水果限时赛」（goal=cmuspb558003tic7qwgyd02c2）的小游戏工坊流水线（workflow=cmuspb55m003xic7q9o18vjk2 v1，scaffold→implement→deploy→playtest）首轮执行（run=cmuspld10006ric7qup55soew，2026-10-03T18:12:00Z 起、18:14:30Z 判 failed）。固定参数：工程 games/60-2，功能分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2，AppHost cmuspb3xg003ric7q1ksya6c3（slug 60-2），liveUrl https://leomac-studio.tail49399e.ts.net/apps/60-2/（部署前即确定）。本文只写本轮实测增量：①双门禁在 60-2 的挂点与分工；②本次 run 的真实卡点——双门禁之前的第一堵墙；③一次「参数漂移」疑云的证伪过程；④知识沉淀节点自身的 API 事实。godot-smoke 三层门禁体系、打回修复签名表、AppHost 部署总论见关联知识（§八），不重复。
+
+## 一、结论速览
+
+| # | 要点 | 结论 | 依据 |
+| --- | --- | --- | --- |
+| 1 | 双门禁分工 | 工程门（godot-smoke，挂 implement 与 deploy 之前，判工程本体）×线上门（mobile-web-smoke，只挂 playtest 之前，判公网 liveUrl）——判定对象、执行环境、证据落点都不同，不可合并为一道 | 工作流定义逐节点核对 |
+| 2 | 本次失败层级 | run 级失败发生在**门禁之前**：工作区 git clone 连不上 github.com（443 端口 75s 连接超时），四个节点全部 pending，双门禁一次都没执行 | run.result.error 原文 |
+| 3 | 根因定性 | 环境阻塞，非代码/配置缺陷：github.com 从执行机**持续性**不可达（2026-10-03 run 失败 + 2026-10-04 复测 `curl -m 10 https://github.com` 仍超时，连接建立不了） | run 错误 + 本机复测 |
+| 4 | 重跑纪律 | 网络不通时重跑 run = 空烧：先 `curl -m 10 https://github.com` 验连通（10 秒成本），通了自己重跑（工作流定义无需改动），持续不通按「blocked 比空烧有用」上报运维（代理/镜像），禁止为绕过网络改仓库来源 | 本轮 2.5 分钟烧掉一次 run 的直接教训 |
+| 5 | 工作流定义健康度 | 60-2 四节点参数已逐一核对**全部正确**指向 games/60-2 / 60-2 分支 / 60-2 AppHost / 60-2 liveUrl，不存在「模板实例化只替换了首个节点」的漂移 | 8 个关键词 × 4 节点计数复核 |
+| 6 | 沉淀 API 事实 | 本部署**没有** `/api/v1/knowledge/search`（404）；等效做法与写入契约见 §七 | 本次实测 + 平台源码 src/routes/knowledge.ts |
+
+## 二、60-2 双门禁挂点与分工（逐节点实例核对）
+
+| 节点 | preHook | preHookParams | 判定对象 | 证据落点 |
+| --- | --- | --- | --- | --- |
+| scaffold | 无 | — | 资产存在性自检（门禁脚本/routines.yaml/模板，缺失→blocked） | 节点 detail |
+| implement | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（静态一致性 + 无头运行） | 门禁日志 |
+| deploy | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（部署前再拦一次，防止部署带病产物） | 门禁日志 |
+| playtest | mobile-web-smoke | gamePath=games/60-2, liveUrl=https://leomac-studio.tail49399e.ts.net/apps/60-2/ | **线上公网 liveUrl**（headless Chrome 移动仿真） | games/60-2/qa/mobile/（report.json + 分阶段截图） |
+
+要点展开：
+
+1. **工程门挂两道、线上门只挂一道，是有意设计**：godot-smoke 的判定对象是仓库内工程（preflight 静态 + headless 运行），所以在写代码（implement）和出产物（deploy）两处都要拦；mobile-web-smoke 的判定对象是已部署的线上地址，只有 playtest（试玩验收）消费它，且 liveUrl 在部署前就已锁定，preHook 可以在节点启动前先跑门禁、节点启动后直接读证据。
+2. **判定协议（与门禁同源，agent 本地自检命令完全一致）**：退出码 `0` 且日志含标记才算通过——`GODOT_SMOKE: PASS`（冒烟）/ `GODOT_FUZZ: PASS`（fuzz）/ `GODOT_PLAYTEST: PASS`（机器人试玩）；退出码 `2` = 环境不可用（装环境/上报，**禁止为过门禁改判定脚本或改松断言**）。
+3. **判定器独立性**：`preflight.py / smoke.sh / input-fuzz.sh / playtest.sh / resolve-godot.sh / mobile-web-smoke.mjs` 唯一合法来源是仓库 `std-skills/godot-game-dev/scripts/`（模板仓库预置）；平台注入的 `.myrd-platform/.claude/skills/godot-game-dev/` 只是阅读副本，不得当判定来源、不得现场改写、不得自造等价脚本——被检方自己写判定器，PASS 一文不值。缺任何一个 → status=blocked 上报（「模板仓库未预置门禁脚本：<文件名>；请运维补模板仓库」），**不要现场补**。
+4. **参数化必须显式传**：`.myrd/routines.yaml` 中 `godot-smoke` 与 `mobile-web-smoke` 的 `{{gamePath}}`/`{{liveUrl}}` 由工作流节点 preHookParams 按工程覆盖。仓库默认值指向别的工程——不传参要么报错、要么（更糟）静默测错工程给出假 PASS（坑实录见关联知识 27407691 §1.3）。
+5. **中文字体是 preflight P13 的拦截项**：Web 导出跑在浏览器沙箱里拿不到系统字体，模板自带 `assets/fonts/` 全局中文字体与 `project.godot` 的 `[gui] theme/custom_font` 配置必须原样保留；「有中文文案但无字体」直接被 P13 拦下。禁止为躲缺字把文案英化——那是字体缺失的症状，不是修复。
+
+## 三、本次 run 的真实卡点：双门禁之前的第一堵墙
+
+**时间线**：18:12:00 run 启动 → 引导阶段执行工作区 `git clone https://github.com/hl3w22bupt/myrd-playground.git` → 75 秒连接超时 → 18:14:30 run 判 failed。错误原文：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspb3xd003nic7qm25pu8si/run-cmuspld10006ric7qup55soew'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75003 ms: Couldn't connect to server
+```
+
+**为什么门禁体系没接住**：门禁全部挂在**节点**上（preHook），而 clone 是 run 引导步骤，发生在第一个节点之前。clone 失败的后果是：①直接置 run=failed（result.error），②四个节点永远 pending，③没有 reject 打回循环、没有 blocked 语义、没有证据落点——门禁体系（preflight/smoke/fuzz/playtest/mobile-web-smoke 六个判定器）覆盖的是「工程与线上」，不覆盖「工作区引导」这第 0 步。
+
+**连锁依赖链**（为什么这一断全断）：clone 可用 → 功能分支可推送 → AppHost 按 gitRef 拉取构建 → liveUrl 可访问 → mobile-web-smoke 有东西可测 → 试玩验收有地方可玩。第 0 依赖断了，双门禁与验收全部空转。
+
+**恢复路径（给下一轮执行，按序）**：
+
+1. 先验连通（成本 10 秒，避免空烧一次 2.5 分钟的 run）：`curl -s -o /dev/null -m 10 -w "%{http_code}" https://github.com`；
+2. 通了 → 直接重跑工作流，**定义无需任何改动**（四节点参数已核对全部正确，见 §四）；
+3. 持续不通 → 不要重跑，回写 status=blocked 上报运维（网络代理 / GitHub 镜像 / 出网白名单），写清「clone github.com:443 连接超时，全链被第 0 依赖阻塞」——与门禁「退出码 2 = 环境不可用，禁止为过门禁改代码」是同一条纪律的 run 级推广：**环境不通时，重跑是空烧，先修环境或如实上报**；
+4. 禁止为绕过网络私自换镜像仓库/改 remote——仓库来源是部署与门禁的信任锚，变更必须走运维。
+
+## 四、诊断方法论：一次「模板参数漂移」疑云的证伪
+
+**现象**：核对工作流定义时，scaffold 节点参数正确指向 games/60-2，而读到的 implement/deploy/playtest 节点 prompt 里满是上一个游戏 app-2 的固定参数（gamePath=games/app-2、分支 cmuspfeyw…、AppHost cmuspfdr…、liveUrl /apps/app-2/）→ 一度形成高价值假设：「工作流模板实例化只替换了首个节点的参数」。
+
+**证伪过程**：换独立文件名重新拉取同一工作流，对 8 个关键词（games/60-2、games/app-2、两个 goal id、两个 liveUrl、两个 AppHost id）× 4 节点逐一计数——**四节点全部正确指向 60-2**。真因：诊断用的 `/tmp` 共享临时文件被本机并发进程覆盖，中间那几步读到的其实是另一个工作流（app-2）的同名缓存文件。
+
+**沉淀三条**：
+
+1. 结论必须落在「重新独立取证」上，不落在「上一次读到的内容」上——尤其对「上游模板缺陷」这类会被写进知识、触发他人返工的高价值指控，先证伪再落笔；
+2. 诊断脚本对临时文件用唯一文件名（本次 `/tmp/wf.json` 与并发工作流进程撞名），或直接管道内消费不落盘；
+3. 证伪本身也是产出：本文档差点把一个不存在的平台缺陷写成结论，§一第 5 条的「定义健康度」结论就是证伪的成果，它让下一轮可以放心直接重跑。
+
+## 五、Web 导出与 AppHost 部署：60-2 落位值与硬约束清单
+
+机制细节与打回修复总论见关联知识 27407691（oak-key 全链路）与 82e419bb（触屏/音频），本节只列 60-2 的具体落位值和逐项易错点：
+
+| 项 | 60-2 落位值 | 易错点（违反后果） |
+| --- | --- | --- |
+| 部署来源分支 | myrd/games-goal-cmuspb558003tic7qwgyd02c2 | gitRef 传 main → main 上没有本游戏的 apphost.toml/导出产物，构建失败或把别的壳部署出去 |
+| 部署 API | POST /api/v1/apphost/apps/cmuspb3xg003ric7q1ksya6c3/deployments，mode=bundle | sourceId 必须是 goal id cmuspb558003tic7qwgyd02c2；带别的应用 id → 403 APP_BOUND_TO_OTHER_SOURCE（选错坑，回来核对 hostedAppId，不要换坑硬试） |
+| 导出预设 | games/60-2/export_presets.cfg 配 Web(HTML5)，产物落 games/60-2/export/web/（必须含 index.html） | 缺 index.html → 壳无入口页 |
+| 资产出 bundle | apphost.toml 声明 `assets_dir = "games/60-2/export/web"`，平台把该目录上传对象存储，25MB 上限不再约束资产体积 | 不声明 assets_dir → 产物挤进 bundle，体积立刻顶 25MB 上限 |
+| 壳资产路由 | asset-store `getAsset` 懒加载，路由 `/api/public/assets/:name`；`gzip+b64` → 回 text/plain 的 base64（壳端 DecompressionStream 解压）；`raw` → 按 contentType 回原文 | M1 网关**只透传文本响应**：octet-stream/gzip/图片/音视频 → 502 UNSUPPORTED_BINARY；资产一律 base64 文本回传 |
+| 路径口径 | 壳页面拉资源**一律相对路径**（`api/public/assets/index.wasm`）；`?p=` 是网关保留 query | 绝对路径 `/assets/...` 或 `?p=` 手拼 → 404/被登录墙拦 → 黑屏 |
+| wasm 初始化 | `WebAssembly.instantiate(bytes)`（base64 → Uint8Array → 解压） | instantiateStreaming 要求 application/wasm MIME，本链路不满足 |
+| b64 内联降级 | 仅当 asset-store 不可用；原始产物 ≤ 18MB（b64 膨胀 1.33×，bundle 上限 25MB） | 超限 → 降级「说明页 + 下载指引」，不得声称可玩 |
+| 音频手势解锁 | 壳页面在引擎加载**之前**：①包 AudioContext 构造器捕获引擎实例；②document 级 `touchstart/touchend/pointerdown/keydown/click`（capture+passive，不消费事件）同步 `ctx.resume()`；③暴露 `window.__audioDebug()` | 缺任一 → 移动端全部音效静默且控制台零报错（WebKit 创建即 suspended、切后台变 interrupted、引擎只在输入回调 resume）；有音效的游戏壳缺解锁器 = 验收不通过 |
+| 调参桥 | 壳页面引擎加载前解析 `?tuning=<JSON>` 进 `window.__GAME_TUNING__`，游戏侧 GameState 启动按 TUNING_META 声明的键钳制覆盖 | 缺 → 试玩调好的参数无法用 URL 复现，调参回写流程断裂 |
+| 部署后自测 | /health 与 / 都 200 只是起点，**必须**跑 mobile-web-smoke | 只 curl 200 就宣称部署成功 = 跳过移动端硬门槛 |
+
+## 六、mobile-web-smoke 移动端模拟门禁要点
+
+- **机判方式与维度**：headless Chrome 移动仿真打开线上 liveUrl，机判六项——网络（资源可达）、console（无报错）、渲染（画面在动）、触摸（可交互）、音频契约（解锁层在位）、视口（移动端尺寸正确）。
+- **证据落点**：`games/60-2/qa/mobile/`（report.json + 分阶段截图）。试玩节点（playtest）据此写试玩指引；若发现证据缺失或与 preHook 结论矛盾，如实回写 detail，不替门禁背书。
+- **已知边界一：静止页会被误判渲染冻结**。完全静止的页面「画面在动」检查会 FAIL——解法是给核心按钮加待机呼吸脉冲（game-12 实测：scale 1.00→1.06 / 0.9s，极差 0.060 ≥ 阈值 0.02），既是门禁过检又是移动端可点示能（关联知识 00314649）。
+- **已知边界二：门禁全绿 ≠ 真机可用**。触摸事件分发顺序（E-18：`mouse_filter=STOP` 的 Control 在 GUI 命中阶段吃掉触摸，永远到不了 `_unhandled_input`）与 InputEventAction 互踩（E-19）都属于「headless 门禁全绿、真机必挂」型，机判之后仍需真人真机过一次「开局可动、摇杆不误触」（关联知识 82e419bb）。
+- **与试玩验收的衔接**：mobile-web-smoke 全绿只是准入，试玩节点产出「试玩验收包」（试玩指引 + 四问量表 + 调参工作台入口 `<liveUrl>?tuning=1`）；试玩结论只能来自用户，量表未回填就如实标「待回填」，detail 里不得出现没有出处的「试玩通过」。
+
+## 七、知识沉淀节点自身的 API 事实（本次实测，供后续沉淀节点直接复用）
+
+- **本部署不存在 `GET /api/v1/knowledge/search`**（返回 404）。等效「先搜后写」：`GET /api/v1/knowledge?scope=global&limit=200` 拉全量后客户端按 title/内容过滤（服务端源码 src/routes/knowledge.ts 的 GET 只支持 scope/category/projectId 过滤，无全文检索；列表默认只返回 parentId=null 且 isPublished=true 的文档）。
+- **新增**：`POST /api/v1/knowledge`，必填 `title` + `scope`（'global'|'project'）；`title+scope` 重复 → 409 CONFLICT（先搜后写可顺便避开）；`tags` 必须是字符串数组；`category` 建议对齐既有口径（本文用「技术方案」，与同类游戏知识一致）；创建即 isPublished=true 并自动生成 v1 版本快照。
+- **更新**：`PATCH /api/v1/knowledge/doc?id=<docId>`，支持部分更新 title/content/category/tags/icon/scope/projectIds；平台自动做版本化（更新前快照旧版 → version+1 → parentVersion=`id@vN`），不需要调用方自己处理版本。
+- **单篇读取**：`GET /api/v1/knowledge/doc?id=<docId>`（返回 doc + associatedProjectIds；已删除文档也能读到，便于历史链接）。
+- **写入姿势**：JSON body 直接 PUT 不便时，用 python3 `json.dumps` 构造 payload 再交 curl 发送，避免 shell 转义事故。
+
+## 八、关联知识（互为补充，不重复）
+
+- `27407691-bcf8-4e73-b686-1bb8df684e5c`：Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路实战（oak-key）——三层门禁体系、退出码语义、routine 参数化、GODOT_BIN 单一实现、error-signatures 打回修复表。
+- `00314649-c4d2-407c-871b-62f7de91b07d`：game-12 双门禁通过路径——mobile-web-smoke PASS 10/10 实测、静止页呼吸脉冲、负例验证纪律。
+- `82e419bb-b641-4b5e-bb58-d8b9633169ca`：game-5 触屏虚拟摇杆与 AudioContext 解锁规范——E-18/E-19 机制、统一移动向量出口、音频门控三件套。
+- `6e91a11d-3632-4721-a3ea-d433e9622f9b`：game-5 玩法设计要点——与 60-2 同属「森林收集水果限时赛」玩法族（60 秒限时收集），数值基准可对照。
+- 设计 spec（platform）：`cmuspl1bw006lic7qkcplv73e`——60-2 的水果分值表（+1/+3/+10）、生成节奏与 60 秒结算契约及契约测试清单，实现与验收以此为准。
+
+## 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+# 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+> 来源：需求《《森林收集水果限时赛》游戏需求》（id=cmusp9cd00035ic7qxi8c4il3，验收节点 completed）→ GameDesignSpec《水果分值表与收集循环》（id=cmuspeqza004uic7qusqyn7gr）→ 小游戏工坊两次工作流运行皆 failed → 主策划验收指派（id=cmtn5fhk8000hjqckrib9i3bb，completed）。全部平台终态于 2026-10-04 经 API 与线上 URL 实测取证（见 §一）。
+>
+> 本文写三件事：① 可复用的「分值分档点按收集」玩法模板（+1/+2/+5 三档）；② Web 导出 + 双门禁的复用要点；③ 本 goal 双跑皆败的流程复盘教训。**不重复**总论：门禁三层体系与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key）；工程结构最小契约与帧预算推导见 78180e88-6486-404e-9265-e315e0da3c66（hello）；时间注入机判与单源单相见 00314649-c4d2-407c-871b-62f7de91b07d（game-12）；触屏适配与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca；**同名 IP 的另一机制变体**（松鼠移动+原木躲避+连击）见 6e91a11d-3632-4721-a3ea-d433e9622f9b（game-5 老版）。
+
+## 一、事实基线（本 goal 真实终态，先看这个再谈复用）
+
+| 对象 | 标识 | 终态 | 取证方式 |
+| --- | --- | --- | --- |
+| 需求 | cmusp9cd00035ic7qxi8c4il3 | completed | goal DAG 记录 |
+| GameDesignSpec（分值表与收集循环） | cmuspeqza004uic7qusqyn7gr | completed | goal DAG 记录 |
+| 工坊运行 #1 | workflow=cmusp1yao002pic7q384xxfse，run=cmuspf4oo0050ic7qfjj0azwh（工程 games/60，分支 myrd/games-goal-cmusp1ya8002lic7qk39zog9o） | **failed** | GET /api/v1/workflows/{id} 的 runs 字段 |
+| 工坊运行 #2（换 slug 重试） | workflow=cmuspb55m003xic7q9o18vjk2，run=cmuspld10006ric7qup55soew（工程 games/60-2，分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2） | **failed** | 同上 |
+| AppHost 记录 | 60=cmusp1ya6002jic7qz3dhps7r；60-2=cmuspb3xg003ric7q1ksya6c3 | 均卡在 status=creating，publicUrl=null，publishedAt=null | GET /api/v1/apps |
+| 线上地址 | https://leomac-studio.tail49399e.ts.net/apps/60 与 /apps/60-2（含 /gw 变体） | **404「应用不存在」** | curl -L 实测 2026-10-04 |
+| 主策划验收指派 | cmtn5fhk8000hjqckrib9i3bb（标题「验收复核线上版并回写产物标识」） | completed（节点完成；其结论正文经多个 API 路由探测不可回读） | goal DAG 记录 |
+| 同名老变体 game-5 | AppHost=cmuipis4f0063m9l6hagvvvd4，goal=cmuipis4g0065m9l69hew4nng，需求=cmuipol63006rm9l6cp2ww5r5 | ready，publicUrl=/apps/game-5，3 次工坊 run 全 completed | GET /api/v1/apps、/api/v1/workflows |
+
+结论一句话：**本 goal 的「点按分档版」截至 2026-10-04 没有可玩的线上版**；平台里唯一在线的「森林收集水果限时赛」是老变体 game-5（玩法口径完全不同）。后续任何验收、试玩、传播链接都必须先对照本表，别拿老 game-5 顶数。
+
+## 二、分值驱动收集玩法模板（+1/+2/+5 三档 · 点按拾取）
+
+### 2.1 分值表与频率反相关（需求硬性口径 + 建议校准值）
+
+| 档位 | 分值（需求硬性） | 出现权重（建议起点） | 期望得分贡献占比（建议） | 视觉要求 |
+| --- | --- | --- | --- | --- |
+| 低（苹果） | +1 | ~70% | ~45% | 常规色调 |
+| 中（橙子） | +2 | ~25% | ~35% | 提亮一档 |
+| 高（稀有水果） | +5 | ~5% | ~20% | 高对比 + 特效标识 |
+
+- **分值与频率必须反相关**且两者解耦配置（权重表与分值表分开两张常量表）——需求只锁「高分水果出现频率更低」，斜率是实现自由度；但三档贡献占比是手感核心，建议按上表起步、用冒烟统计实测校准（240 帧冒烟里统计三类生成次数的比例，替代人工目测）。
+- **期望值校准法**：单局期望总分 = 60s × 刷新速率 × Σ(权重ᵢ × 分值ᵢ)。先定「单局期望分」这一产品目标，再反推刷新速率，不要拍脑袋调刷新率。
+- **计分唯一入口**：所有得分变更走同一个 `add_score(points)`，分值查表发生在水果节点持有 `tier` 字段 → 入口处查表，禁止 UI 层或触摸回调里散落 `score += 1` 字面量。这是「+1/+2/+5 各自累加正确」能被机判断言的前提（同 game-12 的单源纪律）。
+
+### 2.2 60 秒计时的 ±1 秒验收实现口径
+
+- 用 `float` 剩余时间在 `_process(delta)` 里累积递减，显示层取 `ceil()`；归零判定用 `time_left <= 0.0` 触发结算，**不要**用「Timer 节点每 1 秒 tick 一次、tick 里 -1」的实现——tick 计数在暂停/掉帧/场景切换时会漂移，±1 秒容差经不起移动端浏览器节流（切后台回来一次就能漂 1~2 秒）。
+- 冒烟断言：读 UI 计时文本两次间隔 1~2 秒断言递减；用引擎时间注入（同 game-12 `try_count(now_ms)` 模式）把 `time_left` 直接压到 0，断言进入结算场景。显示值与内部值分离，断言内部值。
+
+### 2.3 点按拾取：单源单相 + 热区（移动端唯一操作）
+
+- Godot 4 默认 `emulate_mouse_from_touch=true` → 一次触摸可能产生 touch + mouse 双事件，再加 `_unhandled_input` 的动作路径，同一「点击」多来源。收敛方式与 game-12 相同：所有来源只调唯一入口 `attempt_collect(fruit)`，判定收口在 GameState 一处。
+- 触摸热区按「水果视觉半径 + 容差」配置，最小可点直径 ≥ 44~48 逻辑 px，且注意 DPR 换算（引 82e419bb）；相邻水果刷新点最小间距 ≥ 1.5 个水果直径，防误触串档（点到低档实际想点中档）。
+- 高分水果「稀有」也必须**可点**：特效动画不要吃掉点击区（动画节点 `mouse_filter=IGNORE`），否则会出现「看得见点不中」的体感灾难——美术动效是 Area2D 之外的子节点，别挂在碰撞体上。
+
+### 2.4 供给节奏与场上管理（点按版的补货口径）
+
+- 两段式供给（引 6e91a11d §二并适配）：开局铺场 8~12 个 → 场上存量低于下限（建议 6）时按 0.8~1.5 秒补 1 个。60 秒点按版的失败模式比躲避版更隐蔽：**可收目标耗尽 = 玩家空转**，补货下限是硬保障。
+- 三档各自独立掷骰，不共用计时器；高档（稀有）另加「场上同屏最多 1 个」约束，防止稀有权重 5% 在随机聚类下同屏堆 3 个、破坏「稀有」体感。
+- 场景边界内边距 ≥ 半个水果直径，保证边缘刷新可点；不做与障碍物的路径重叠问题（本变体无移动障碍），但要避免刷新点落在 UI 计时条/得分条下方。
+
+### 2.5 一键重开的完整重置清单（验收 5 的坑点）
+
+结算界面「重新开始」必须复位**全部**运行态，逐项列出防漏：倒计时回 60、得分清零、场上水果全部回收、三档刷新计时器重置、稀有水果在场标记清除、飘分/特效节点队列清空、结算面板隐藏。重开入口双通道（触摸可点 + 键盘 Enter/Space），坑源见 ed31081f-82be-4a76-a28b-476f7e18a00b（game-3 只有触摸入口导致桌面端无法重开）。冒烟断言：先打完一局（注入 time 归零）→ 点/按重开 → 断言计时==60 且得分==0 且场上水果数==铺场数。
+
+### 2.6 森林主题的可机判底线（验收 3）
+
+美术质量不进门禁，但结构可以机判：断言主场景节点树中存在 ≥ 2 类森林装饰元素组（如 Trees/Grass 两个 Node2D 组各自子节点数 > 0）；水果节点与背景装饰分属不同层级（水果层 z_index 更高且不被装饰遮罩覆盖）。preflight 不查这些，要写进工程内 `tests/smoke.gd` 的玩法断言段。
+
+### 2.7 验收 → 冒烟断言映射（写进 verify.sh 的建议）
+
+| 需求验收条目 | 冒烟断言建议 |
+| --- | --- |
+| 1. 60 秒递减、归零自动结算、偏差 ≤ ±1s | 两次读计时文本断言递减；注入 time_left=0 断言进结算 |
+| 2. ≥3 种分值（+1/+2/+5）各自累加、实时显示 | 依次对三档水果坐标注入触摸，断言得分序列 +1/+2/+5；断言 UI 总分文本同步 |
+| 3. 森林主题 ≥2 类元素、水果不遮挡 | 断言装饰节点组存在且子节点 >0；断言水果层在装饰层之上 |
+| 4. 移动端触屏可完整跑一局、无明显卡顿 | mobile-web-smoke 门禁（双门禁第二道）跑 FPS 采样，参照 game-12 实测 FPS 39 的基线口径 |
+| 5. 一键重开、倒计时与得分重置 | 跑完一局 → 触发重开 → 断言 60/0/铺场数三值（见 §2.5） |
+
+## 三、Web 导出与双门禁复用要点
+
+本 goal 两次工作流的 scaffold 节点 prompt（工坊流水线模板实文）把门禁资产判据钉死为**四件套**：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, resolve-godot.sh, mobile-web-smoke.mjs}` 全部在仓库内且不被 .gitignore 排除，缺任一 → blocked 上报，禁止从平台注入的 `.myrd-platform/.claude/skills/` 阅读副本里复制脚本充当判定器，也禁止自造等价脚本。对比老 game-5 工作流只要求三件套——**mobile-web-smoke.mjs 是后来加入的第四件**，新工程照四件套验收。
+
+- **双门禁分工**：godot-smoke（preflight 静态 + headless 冒烟 + input-fuzz）证明「能跑能玩」，mobile-web-smoke 证明「移动端模拟下可玩且不掉帧」。两道各自独立出退出码，任何一道非 0 都不该进入 deploy。
+- **退出码语义**（与总论同源）：0 通过 / 1 冒烟失败→打回修复循环 / 2 环境不可用→装环境、禁止为过门禁改代码 / 3 静态不一致（verify.sh 单独编码）。存在性守卫先行判 2，防「脚本缺失」被误判成 3 诱导修游戏代码。
+- **Web 导出配置五要点**（引 78180e88 实测，不再展开）：渲染器钉死 gl_compatibility 且 `.mobile` 双写；`thread_support=false`；中文必须内置 NotoSansSC 等字体（preflight P13 拦 Web 中文缺字）；导出产物落 `games/<工程>/export/web/` 并 .gitignore 豁免入库；UI 挂独立 CanvasLayer 与游戏世界分离。
+- **AppHost 部署口径**：部署 gitRef 必须是 goal 功能分支（`myrd/games-goal-<goalId>`），绝不能用 main；liveUrl 在部署完成前即由工坊确定（本 goal 为 /apps/60、/apps/60-2），移动端门禁与试玩都以它为准。
+
+## 四、流程复盘：为什么本 goal 没有线上版（双跑皆败实录）
+
+时间线（全部平台记录）：17:56:54 创建 AppHost「60」+ 工作流 #1 → run cmuspf4oo0050ic7qfjj0azwh **failed** → 18:04:01 换 slug 重试，创建 AppHost「60-2」+ 工作流 #2 → run cmuspld10006ric7qup55soew **再 failed** → 验收指派节点 completed 回写产物标识 → 2026-10-04 实测线上 404。
+
+- **教训 A：节点完成态 ≠ 线上可玩。** 验收指派节点 completed，但平台记录里不存在任何可访问的线上版本。「验收复核」类节点的完成前置必须是硬证据：liveUrl 返回 200 且真实浏览器跑通「开始→拾取→结算→重开」闭环，产物标识回写附上 deployment/gitRef；否则完成态与线上态脱节，下游（频道播报、试玩通知、知识沉淀）全部建立在幻觉上。
+- **教训 B：同名变体串场是本 IP 的特有陷阱。**「森林收集水果限时赛」在仓库里有两个机制完全不同的变体：老 game-5（松鼠移动+原木躲避+连击，已上线）与本版（点按拾取+分值分档，未上线）。两者需求 id、goal id、工程目录（games/game-5 vs games/60、60-2）、分支、slug 全不同。**一切定位以产物 id + 分支名 + 工程目录为准，禁止按游戏名搜索**——按名搜必然把老 game-5 的「已上线、3 run 全绿」误当成新版的现状。
+- **教训 C：换 slug 重试会留下孤儿 AppHost 空壳。** 60 失败后换 60-2 重试，AppHost 表留下两条 status=creating 的壳，publicUrl 均为 null。重试前应优先复用原 AppHost 记录；若必须换 slug，重试启动时把旧壳置为废弃态。排查「游戏上线了没」的正确顺序：先查 AppHost status（creating/ready/failed），再 curl liveUrl 实测——本 goal 的 404 就是这么确认的，不能只信工作流状态或节点状态。
+- **教训 D：复盘入口与取证边界。** 工作流 API 只回 run id + status，不回失败日志；复盘具体卡点需持 run id（cmuspf4oo0050ic7qfjj0azwh、cmuspld10006ric7qup55soew）到执行日志/workflow 详情页查。本机环境 GitHub 443 不通，`git ls-remote` 无法核实两条 goal 分支是否推上远端——分支存在性复核必须在能连 GitHub 的环境做，不要在本机下「分支不存在」的结论。
+
+## 五、给下一个同类小游戏的复用清单
+
+1. 玩法骨架直接抄 §二：三档分值表 + 反相关权重表 + `add_score` 单入口 + float 计时 + 两段式补货 + 完整重置清单，改数值不改结构。
+2. 工程起点抄 78180e88 §二的最小契约（project.godot 三类必接线、TUNING_META 白名单、tests/smoke.gd、verify.sh、export_presets.cfg）。
+3. 门禁四件套齐全性检查放在 scaffold 第一步（本 goal 工作流模板已内置该判据），双门禁全绿才允许 deploy。
+4. 验收断言按 §2.7 映射表逐条落进 smoke.gd，每条断言做负例验证（证明会真 FAIL）。
+5. 上线判定只认三件套：AppHost status=ready + liveUrl 200 + 实机操作闭环截图/录像；验收节点回写产物标识时必须附 deployment/gitRef。
+6. 涉及「森林收集水果限时赛」名字的一切操作，先对 §一事实基线表确认自己在操作哪个变体。
+
+## 六、关联知识
+
+- 门禁三层体系 + AppHost 部署总论：27407691-bcf8-4e73-b686-1bb8df684e5c
+- 工程结构最小契约 + 帧预算推导 + playtest blocked 实录：78180e88-6486-404e-9265-e315e0da3c66
+- 双门禁（godot-smoke + mobile-web-smoke）+ 时间注入机判 + 单源单相：00314649-c4d2-407c-871b-62f7de91b07d
+- 移动端触屏虚拟摇杆 + AudioContext 解锁：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- 同名 IP 老变体（松鼠+原木+连击）玩法口径：6e91a11d-3632-4721-a3ea-d433e9622f9b
+- game-9 单游戏部署先例：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 对抗性探索与机判方法论（QA 复用）：437f8129-89b5-4f46-95c0-2d475c3cead8
+
+## 沉淀 app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单（太空飞船躲陨石捡金币）
+
+# app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单
+
+> 来源：目标《创建小游戏应用：太空飞船躲陨石捡金币》（goal=cmuspfeyw0058ic7qrmh6qebm）首轮执行（2026-10-03 18:11~18:23 UTC）+ 次日（2026-10-04）知识沉淀时的时点复核。需求 id=cmuspmumf007cic7qlt6uwieo，GameDesignSpec id=cmuspqwhe007ric7qp0465dvk，工坊工作流 id=cmuspfez9005cic7q93j4fk74，失败运行 id=cmuspr5v7007xic7q5ng1aqqo。
+>
+> 本文只写本例增量：**工坊流水线在门禁一启动之前就整体失败**这一反面样本的取证、归类、复核方法论与重跑前置清单。godot-smoke 三层门禁体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-12 双门禁通过路径见 id=00314649-c4d2-407c-871b-62f7de91b07d；移动端触屏/音频规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；game-9 见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be。本文与它们互补：前面几篇讲「门禁怎么过」，本篇讲「门禁根本没来得及跑」时怎么定位、怎么复核、重跑前还要先解决什么。
+
+## 一、一手事实时间线（全部库内取证，非转述）
+
+| 时刻（UTC） | 事件 | 证据 |
+| --- | --- | --- |
+| 10-03 18:07:22 | hosted_apps 记录 app-2 创建（id=cmuspfdr20056ic7qm2ebhvwv，slug=app-2），status=creating | hosted_apps 行；updated_at 至 10-04 仍冻结在该时刻 |
+| 18:11~18:13 | 需求录入完成（含双门禁 + HostedApp 约束 + 4 条验收标准） | 需求 id=cmuspmumf007cic7qlt6uwieo |
+| 18:13~18:16 | GameDesignSpec v0 落账（八段、10 实体、数值写死） | spec id=cmuspqwhe007ric7qp0465dvk |
+| 18:16:30 → 18:17:36 | 工坊工作流运行启动后 **66 秒即 failed** | workflow_runs.status=failed |
+| 18:17:40 → 18:23:07 | express_lane 独立复核完成：app-2 未上线、验收 0/4、双门禁均未启动 | 复核结论（goal 会话） |
+| 10-04（本文写作时） | app-2 仍 status=creating、live_url 空、app_deployments **0 行**；该工作流**仅 1 次运行且为 failed，未重跑**；github.com 从 agent 环境再次 20s 超时不可达 | hosted_apps / app_deployments / workflow_runs 实查 + curl 探针 |
+
+失败报错原文（复现用）：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspfdqy0052ic7qnkimp4n5/run-cmuspr5v7007xic7q5ng1aqqo'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/':
+Failed to connect to github.com port 443 after 32655 ms: Couldn't connect to server
+```
+
+## 二、失败模式归类：不是「门禁失败」，是「门禁前基础设施失败」
+
+工坊四棒为 scaffold → implement → deploy → playtest（实现/部署两棒挂 godot-smoke preHook 240 帧，试玩棒挂 mobile-web-smoke）。本例失败的关键特征：
+
+1. **死在第 0 棒之前**：4 个节点状态全部 pending，工作流主体逻辑一行都没执行——失败发生在为运行准备 worktree 的 `git clone` 阶段。
+2. **零产物可判**：goal 分支 `myrd/games-goal-cmuspfeyw0058ic7qrmh6qebm` 在复核时不存在（`git ls-remote` 无此分支）→ 无任何代码/工程/导出物落库，不存在「半成品需要清理」的问题。
+3. **网络是间歇抖动，不是持久封锁**：复核时点（10-03 18:23）github.com HTTPS 200、`git ls-remote` 成功（HEAD=a592ea2）；次日（10-04）从 agent 环境又 20s 超时。两个时点结论相反，证明是**间歇性连接抖动**。
+4. **归类的处置含义**：门禁失败（godot-smoke 红、smoke 帧内崩溃）→ 修代码再过门禁；门禁前基础设施失败 → **不改任何代码，探针确认外网恢复后直接重跑**。两者处置路径完全不同，先归类再动手。
+
+## 三、独立复核方法论（本例实证有效，可整体复用）
+
+复核在「工作流已 failed」的背景下展开，五步证据链闭环：
+
+1. **不信状态字段，实测入口**：`status=creating` 不代表「正在部署中马上就好」——对内网 `$PLATFORM_API_URL/apps/app-2/gw` 与公网 `https://leomac-studio.tail49399e.ts.net/apps/app-2/` 双探测，均 404 `APP_NOT_FOUND`。应用记录侧 `publicUrl/publishedAt/version` 全空，项目侧 `resources=[]`、prodUrl/stagingUrl 空，app_deployments 0 行，四面证据一致。
+2. **对照实验排除平台故障**：同一 host 上其余 13 个 `status=ready` 应用（game-5/6/8/9/10/11/12、hello、app 等）全部 200 → 托管能力正常，是 app-2 自身从未部署的个案，不是平台级事故。
+3. **排他性核查防「张冠李戴」**：已上线 13 应用中无一款《太空飞船躲陨石捡金币》；题材相近的 `/apps/app/gw`「星云飞船收集」收集的是能量水晶、slug 与标题均不同，**不能冒充 app-2 交付物**。同类小游戏大量复用同套躲陨石玩法，验收时必须按 slug+标题+机制三重匹配认定交付物。
+4. **对账流程合规性**：需求 status=in-progress、close_reason 空 → 无人违规关闭需求，门禁二「未回填」是因「无入口」而非「被跳过」，流程无腐化。
+5. **失败棒位定位**：直接查 workflow_runs 的 result.error 与 nodes 状态数组，一眼定位「死在 scaffold 之前」，避免把失败误归因给某一棒的实现质量。
+
+## 四、⚠️ 规格冲突（重跑前必须拍板，否则白跑）
+
+工坊管线是 **Godot 4 → Web(HTML5) 导出**（工程 `games/app-2`、`export_presets.cfg` Web 预设、`--headless export` 构建步、godot-game-dev 技能包），而需求验收标准 4 明文要求「**纯前端 HTML/CSS/JS、无构建步骤、静态资源可直接打开运行**」。Godot 导出必然含构建步骤，两者直接冲突。
+
+- **不处理的后果**：即使部署成功、门禁一全绿，AC4 仍会判不达标——整条流水线白跑一轮。
+- **方案 A（推荐）**：把 AC4 措辞修订为「**导出产物为纯静态托管、无运行时后端、无外部 CDN 依赖**」。保留 Godot 管线，同时保住需求真正想约束的东西（免后端、免 CDN、双端可玩），且与既有门禁体系（27407691 总论）兼容。
+- **方案 B**：放弃 Godot 管线，改手写单文件 HTML/JS。仅当主人明确要求「字面意义无构建」时选它，代价是失去 godot-smoke 三层门禁与工坊流水线的既有能力。
+- **教训**：验收标准与管线能力要在**需求录入时**对齐。「无构建步骤」这类措辞对 Godot 管线应用天然不可满足，录入阶段就该识别。
+
+## 五、重跑修复路径（有序清单，供下一轮直接执行）
+
+1. **先探针再重跑**：从 runner 环境 `curl --max-time 20 https://github.com` + `git ls-remote <仓库>` 双探针确认恢复。网络是间歇抖动，盲目重跑可能再次 66 秒失败并空耗一轮。
+2. **先拍板第四节冲突**并回写需求措辞（方案 A 或 B），再触发重跑。
+3. **重跑即可，无需清理**：分支不存在、零产物，直接重跑工作流，从 scaffold 全新开始；不要试图「续跑」失败运行。
+4. **部署成功后先补门禁一**：由独立 agent 重做一轮线上可玩性复核（按第三节方法论），留证「全流程走通 + 控制台无报错」，之后才轮到 owner。
+5. **门禁二最后**：owner 桌面 + 移动各试玩一次并回填「试玩通过/不通过」，回填通过后需求方可关闭。当前门禁状态：**门禁一未启动（不可执行）、门禁二未启动（无入口）——注意是「未达」而非「失败」，回填话术要区分。**
+
+## 六、供后续 app 复用的教训清单
+
+1. **工作流失败 ≠ 游戏缺陷**：先查失败棒位。scaffold 之前死 = 基础设施层（网络/仓库可达性），与代码质量无关，处置是重跑而不是返工。
+2. **外网 git clone 是工坊流水线的第一单点**：仓库在 github.com，第一棒之前就要整仓克隆；网络抖动直接零产物。建议重跑前置「探针 + 失败自动退避重试」的习惯，并把「github 间歇不可达」记为平台环境的已知抖动源。
+3. **hosted_apps.status 不可单独作为「已上线」判据**：本例 status=creating 停滞超过 24h 且无任何部署行。判活必须「liveUrl 实测（内网+公网双探测）+ deployments 计数」双条件。
+4. **需求录入时做一次「AC × 管线」对齐检查**：把验收标准逐条对照工作流管线的既有能力（构建方式、导出形态、依赖服务），措辞冲突当场改，不要留到部署后才发现。
+5. **同题材应用排认**：平台同 slug 命名空间下有多款躲陨石/收集类小游戏，验收复核必须 slug+标题+核心机制三重匹配，防止把兄弟应用的 200 当成本应用的交付证据。
+
+---
+**一句话总结**：app-2 首轮执行是「门禁前基础设施失败」的完整样本——工坊四棒尚未启动即在 git clone 阶段遭遇 github.com 间歇性连接失败（66 秒即败、零产物、app-2 停在 creating），独立复核以五步证据链确认验收 0/4、双门禁均未达但流程未被违规绕过；修复路径 = 探针确认网络恢复 + 先拍板「Godot 构建管线 vs 无构建步骤」的规格冲突 + 直接重跑，重跑成功后再补门禁一自测与门禁二试玩回填。
 
 
 ## 沉淀 game-9 Godot Web 导出与 godot-smoke 冒烟门禁实战经验（推箱子点亮方块解谜 · 全四棒工作流）
@@ -19235,3 +26975,353 @@ Godot 4 默认 `emulate_touch_from_mouse=false / emulate_mouse_from_touch=true`�
 5. 部署抄「五查」：gitignore 的 /export/、apphost.toml 指向、gitRef=目标分支、壳三件套（文案/调参桥/音频解锁）、artifacts 回写 get→append→写回。
 
 关联知识：27407691-bcf8-4e73-b686-1bb8df684e5c（门禁+部署总论）· 36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9 增量）· 82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏摇杆+AudioContext）· 8345388c-cf30-4d7c-8413-39ccd7e65887（判定规则调研全文，项目文档库）
+
+## 沉淀 game-14 Godot Web 导出与移动端门禁经验
+
+> 来源：goal cmusp1rab0028ic7q9shcdzyl（项目 cmusp1ra00022ic7qnk18nofm）「小游戏工坊 · game-14」工作流执行沉淀。上游输入：需求《game-14 太空飞船躲陨石捡金币》（cmusphfbp0062ic7qrxlt2nk4）、GameDesignSpec v1（cmuspm7sm006uic7qzrbqyilp，approved）。工作流 run cmuspmlex0072ic7qnjiqxmpc **真实结局 = failed，且失败于工作区准备阶段，四个节点全部 pending**。本卡如实记录本轮真实结论（失败模式与补救路径），并把 game-14 真正进入开发后要带上的导出/门禁契约收拢成清单（引用既有基线、不重复）。**本轮没有产生任何 game-14 代码、导出产物、门禁判定或部署事实——请勿把本卡第 4~6 节的复用清单误读为 game-14 实测数据。**
+
+## 一、本轮真实结局：准备阶段 git clone 失败，门禁与导出根本未执行
+
+- 时间线：run 创建 2026-10-03T18:12:57Z → failed 2026-10-03T18:15:25Z（存活 2 分 28 秒）；prepSteps 仅「解析模型配置 3ms」；失败点 = preparationPhase「正在准备代码工作区（克隆仓库、拉取最新代码）」。
+- run.result.error 逐字：`git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmusp1ra00022ic7qnk18nofm/run-cmuspmlex0072ic7qnjiqxmpc'... fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75009 ms: Couldn't connect to server`。
+- 节点状态：脚手架 / 实现玩法 / 导出并部署 / 试玩验收 全部 pending；implement 与 deploy 的 godot-smoke preHook、playtest 的 mobile-web-smoke preHook 也均 pending——**门禁一次都没跑过，不存在「门禁打回」**。
+- 复盘纪律：「已启动 ≠ 已成功」在本轮的具体形态就是「run 状态 failed + 节点全 pending」；判定真实结局唯一依据 run 状态与 run.result.error，禁止凭预期脑补「门禁打到第几轮」。
+
+## 二、根因分类与补救：环境不可用 ≠ 代码缺陷，正确动作是重跑而非改代码
+
+- 根因：github.com:443 连接 75 秒超时（connect 阶段即失败，非认证/仓库问题），属瞬时网络故障——与 godot-smoke 退出码 2「环境不可用」同层语义：**禁止为它改游戏代码，更不允许宣称门禁失败**。
+- 恢复复核（2026-10-04）：`curl https://github.com` → 200（0.59s）；`git ls-remote https://github.com/hl3w22bupt/myrd-playground.git` 正常返回分支列表 → 复跑条件已具备。
+- 补救动作：`POST /api/v1/workflows/runs/cmuspmlex0072ic7qnjiqxmpc/rerun`（平台手册 rerun 入口）。DAG 输入不变：需求 cmusphfbp0062ic7qrxlt2nk4 + spec cmuspm7sm006uic7qzrbqyilp（v1 approved）仍是唯一权威。
+- 若同签名（clone exit 128 / 443 connect timeout）复现：先做宿主机连通性探针（curl github.com + git ls-remote），如实按「环境不可用」上报等待恢复；不得降级为纸面交付，也不得空转烧修复预算。
+
+## 三、game-14 工坊流水线契约（经本轮 run 定义实测核实）
+
+- 四棒 DAG：脚手架 scaffold → 实现玩法 implement → 导出并部署 deploy → 试玩验收 playtest；仓库 github.com/hl3w22bupt/myrd-playground（game-14 预期落位 `games/game-14`，以 scaffold 实际产物为准）。
+- 门禁挂点：**implement、deploy 两棒都挂 godot-smoke；playtest 挂 mobile-web-smoke**。routine 均 gate:false、由 preHook 显式引用；`{{liveUrl}}` 无默认值 = fail-closed（不传就报错，不会静默跳过门禁）；`{{gamePath}}` 必须经 preHookParams 显式传参（默认值指向不存在工程的坑见 27407691 §1.3）。
+- 判定资产唯一来源：仓库 `std-skills/godot-game-dev/scripts/`（mobile-web-smoke 判定脚本 mobile-web-smoke.mjs + 负例自测 mobile_smoke_selftest.mjs + routine 片段模板已随 commit 4a8e4b76 落地）；被检工程不得自造判定器，scaffold 只校验不自造。
+
+## 四、game-14 验收标准 → 门禁断言映射（approved spec v1 的可机判数值）
+
+| 验收项 | spec v1 锚点 | 机判断言落法 |
+| --- | --- | --- |
+| 难度阶梯 | 陨石生成间隔 950ms 逐档递减至封顶 430ms、下落速度 130px/s 逐档递增至封顶 270px/s，共 5 档（每 100 分一档） | 冒烟分相位读各档生成间隔/单位位移帧数，断言逐档单调变化且封顶后不再变化；档位边界按得分 100/200/300/400 推导写进断言注释 |
+| 状态机与持久化 | 开始（含操作说明）/进行中/暂停恢复/游戏结束/一键重开五状态；最高分 localStorage 键 `game14.highScore` | 状态标志断言；重开后断言分数清零而最高分保留；localStorage 属线上行为，由 mobile-web-smoke 打 liveUrl 验证 |
+| 操控与边界 | 键盘 ←→/A/D（含上下）+ 触摸拖动，飞船不可越出画布 | E-08 纪律：按住方向键测位移与动作注入分帧做；越界 clamp 断言；触摸拖动必须真实改变飞船目标位置（mobile 门禁 touch-response 预修，见 §六） |
+| 计分与生命 | 拾金币 +10 实时显示；撞陨石 −1 命（共 3 命），命尽进游戏结束页并展示本局得分 + 历史最高分 | 拾取/碰撞事件计数断言；连续碰撞或生命归零路径必须可达并断言 GAME_OVER |
+| 视听契约 | 三层星空视差滚动；碰撞爆炸闪烁 + 300ms 震屏 + 1.2s 无敌闪烁；+10 飘分 | 事件标志/帧差断言；无敌期 = 「碰撞不再扣命」的断言窗口 |
+| 音频契约 | coin-pickup / meteor-explosion / game-over 三 SFX 可编程触发；M 键静音且不影响逻辑 | headless 侧编程触发断言；AudioContext 解锁契约（__audioDebug）归 mobile-web-smoke 第 8 项 |
+| 性能 | 连续游玩 60s 帧率 ≥ 30fps；页面无控制台报错 | **阈值辨析：mobile-web-smoke 的 FPS≥8 是底线门禁，≥30fps 是需求验收线——门禁全绿 ≠ 验收达标，验收仍按 spec 执行** |
+
+## 五、复用基线指针（执行时直接带上，本卡不重复其内容）
+
+- **27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 总论）**：Godot 4.3 Web 导出参数基线（`variant/thread_support=false` 免 COOP/COEP、`canvas_resize_policy=2`、中文必须 theme/custom_font=P13、导出 7 件套与 wasm≈35MB 量级）；AppHost 部署契约（**一游戏一清单**——game-14 必须 `name="game-14"`、`assets_dir="games/game-14/export/web"`，绝不沿用他游戏 apphost.toml；部署 gitRef 必须是部署分支 `myrd/games-goal-<goalId>` 不是 main；`/export/` 产物必须入库否则上线全 404；M1 网关拦二进制 → gzip+b64 文本回传；壳内资源全走相对路径）；godot-smoke 三层门禁与退出码语义 0/1/2/3；error-signatures 修复循环纪律；部署终态独立复核四步。
+- **00314649-c4d2-407c-871b-62f7de91b07d（game-12）**：mobile-web-smoke 10 项明细（网络/console/canvas/非纯色首帧/画面在动/触摸到达/触摸响应/音频解锁契约/无横溢/FPS≥8）与「必须打部署后 liveUrl」纪律（本地静态伺服只能当预检）；标记辨析（判定脚本 stdout 小写 `godot-smoke: PASS` vs 引擎日志大写 `GODOT_SMOKE: PASS`）；证据随仓归档（`games/<game>/qa/mobile/report.json` + phase 截图）。
+- **82e419bb-b641-4b5e-bb58-d8b9633169ca**：移动端触屏虚拟摇杆与 AudioContext 解锁三件套（首手势解锁 + 解锁前记账 + 退后台回来再解锁），壳页与游戏侧都要进。
+- **36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）/ 78180e88-6486-404e-9265-e315e0da3c66（hello）**：同系列工程结构、模板与门禁增量结论。
+
+## 六、mobile-web-smoke 已知失败图谱（5 款游戏实测 → game-14 预修清单）
+
+仓库 mobile-gate 系列实测 verdict（commits 11957bd3~585db60c）：game-3 疾风忍者跑 **PASS**（十项全绿，tap 触发跳跃实证触摸驱动玩法）；game-2 星尘收集者 FAIL（console Godot 缺 cfg 告警 + tap 后零帧差）；game-4 光路谜阵 FAIL（tap 落空格零帧差，探针坐标与 letterbox 棋盘错位）；game-9 推箱子 FAIL（探针落点错位，摇杆实际 CSS(44,502)）；game-10 天天酷跑 FAIL（tap 落横带无响应，尚需探针区分「点按开始未实现」与「落点错位」）。
+
+- 主失败源集中在 **touch-response**，两类根因：①游戏触摸未真正接入玩法状态（UI 自称支持触摸但点按无效）；②探针坐标与画布 letterbox/控件 CSS 实际位置错位（屏幕坐标 ≠ 游戏坐标）。
+- game-14 预修清单：触摸拖动直接改飞船目标位置并与键盘同路径（game-12「单源单相」范式：多输入源汇一个判定入口）；可交互热区 ≥44px，避免依赖 letterbox 偏移的绝对坐标；开始页不要做成纯静止层（会触发「画面在动」误判，game-12 用待机呼吸脉冲拿到确定性非零帧差）；音频解锁契约随壳页一并实现。
+- 证据纪律：verdict 逐字进 commit message + report.json + phase-load/tap/joystick 三截图入库，供复跑比对。
+
+## 七、关联知识与权威来源
+
+- 知识卡：27407691-bcf8-4e73-b686-1bb8df684e5c（导出+门禁+AppHost 总论）、00314649-c4d2-407c-871b-62f7de91b07d（双门禁与 mobile-web-smoke 10 项）、82e419bb-b641-4b5e-bb58-d8b9633169ca（触屏/音频解锁）、36da3a87-2fe0-42be-b57a-b88c9c0fa4be（game-9）、78180e88-6486-404e-9265-e315e0da3c66（hello 工坊）、b07a928a-414b-4d48-9535-5b6d6cc859ae（平台仓库结构与路径陷阱）。
+- 仓库权威文件：`std-skills/godot-game-dev/scripts/{smoke.sh,preflight.py,input-fuzz.sh,resolve-godot.sh,mobile-web-smoke.mjs,mobile_smoke_selftest.mjs}`、`std-skills/godot-game-dev/references/{godot-smoke-routine.md,mobile-smoke-routine.md,error-signatures.md}`、`.myrd/routines.yaml`。
+- 平台事实源：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`（rerun 入口、「已启动 ≠ 已成功」纪律）；工作流 spec 与需求以平台登记产物为准。
+
+
+## 沉淀知识：Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+# Godot 4 Web 导出与移动端模拟门禁要点（games/60-2）
+
+> 来源：目标「森林收集水果限时赛」（goal=cmuspb558003tic7qwgyd02c2）的小游戏工坊流水线（workflow=cmuspb55m003xic7q9o18vjk2 v1，scaffold→implement→deploy→playtest）首轮执行（run=cmuspld10006ric7qup55soew，2026-10-03T18:12:00Z 起、18:14:30Z 判 failed）。固定参数：工程 games/60-2，功能分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2，AppHost cmuspb3xg003ric7q1ksya6c3（slug 60-2），liveUrl https://leomac-studio.tail49399e.ts.net/apps/60-2/（部署前即确定）。本文只写本轮实测增量：①双门禁在 60-2 的挂点与分工；②本次 run 的真实卡点——双门禁之前的第一堵墙；③一次「参数漂移」疑云的证伪过程；④知识沉淀节点自身的 API 事实。godot-smoke 三层门禁体系、打回修复签名表、AppHost 部署总论见关联知识（§八），不重复。
+
+## 一、结论速览
+
+| # | 要点 | 结论 | 依据 |
+| --- | --- | --- | --- |
+| 1 | 双门禁分工 | 工程门（godot-smoke，挂 implement 与 deploy 之前，判工程本体）×线上门（mobile-web-smoke，只挂 playtest 之前，判公网 liveUrl）——判定对象、执行环境、证据落点都不同，不可合并为一道 | 工作流定义逐节点核对 |
+| 2 | 本次失败层级 | run 级失败发生在**门禁之前**：工作区 git clone 连不上 github.com（443 端口 75s 连接超时），四个节点全部 pending，双门禁一次都没执行 | run.result.error 原文 |
+| 3 | 根因定性 | 环境阻塞，非代码/配置缺陷：github.com 从执行机**持续性**不可达（2026-10-03 run 失败 + 2026-10-04 复测 `curl -m 10 https://github.com` 仍超时，连接建立不了） | run 错误 + 本机复测 |
+| 4 | 重跑纪律 | 网络不通时重跑 run = 空烧：先 `curl -m 10 https://github.com` 验连通（10 秒成本），通了自己重跑（工作流定义无需改动），持续不通按「blocked 比空烧有用」上报运维（代理/镜像），禁止为绕过网络改仓库来源 | 本轮 2.5 分钟烧掉一次 run 的直接教训 |
+| 5 | 工作流定义健康度 | 60-2 四节点参数已逐一核对**全部正确**指向 games/60-2 / 60-2 分支 / 60-2 AppHost / 60-2 liveUrl，不存在「模板实例化只替换了首个节点」的漂移 | 8 个关键词 × 4 节点计数复核 |
+| 6 | 沉淀 API 事实 | 本部署**没有** `/api/v1/knowledge/search`（404）；等效做法与写入契约见 §七 | 本次实测 + 平台源码 src/routes/knowledge.ts |
+
+## 二、60-2 双门禁挂点与分工（逐节点实例核对）
+
+| 节点 | preHook | preHookParams | 判定对象 | 证据落点 |
+| --- | --- | --- | --- | --- |
+| scaffold | 无 | — | 资产存在性自检（门禁脚本/routines.yaml/模板，缺失→blocked） | 节点 detail |
+| implement | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（静态一致性 + 无头运行） | 门禁日志 |
+| deploy | godot-smoke | gamePath=games/60-2, smokeFrames=240 | 工程本体（部署前再拦一次，防止部署带病产物） | 门禁日志 |
+| playtest | mobile-web-smoke | gamePath=games/60-2, liveUrl=https://leomac-studio.tail49399e.ts.net/apps/60-2/ | **线上公网 liveUrl**（headless Chrome 移动仿真） | games/60-2/qa/mobile/（report.json + 分阶段截图） |
+
+要点展开：
+
+1. **工程门挂两道、线上门只挂一道，是有意设计**：godot-smoke 的判定对象是仓库内工程（preflight 静态 + headless 运行），所以在写代码（implement）和出产物（deploy）两处都要拦；mobile-web-smoke 的判定对象是已部署的线上地址，只有 playtest（试玩验收）消费它，且 liveUrl 在部署前就已锁定，preHook 可以在节点启动前先跑门禁、节点启动后直接读证据。
+2. **判定协议（与门禁同源，agent 本地自检命令完全一致）**：退出码 `0` 且日志含标记才算通过——`GODOT_SMOKE: PASS`（冒烟）/ `GODOT_FUZZ: PASS`（fuzz）/ `GODOT_PLAYTEST: PASS`（机器人试玩）；退出码 `2` = 环境不可用（装环境/上报，**禁止为过门禁改判定脚本或改松断言**）。
+3. **判定器独立性**：`preflight.py / smoke.sh / input-fuzz.sh / playtest.sh / resolve-godot.sh / mobile-web-smoke.mjs` 唯一合法来源是仓库 `std-skills/godot-game-dev/scripts/`（模板仓库预置）；平台注入的 `.myrd-platform/.claude/skills/godot-game-dev/` 只是阅读副本，不得当判定来源、不得现场改写、不得自造等价脚本——被检方自己写判定器，PASS 一文不值。缺任何一个 → status=blocked 上报（「模板仓库未预置门禁脚本：<文件名>；请运维补模板仓库」），**不要现场补**。
+4. **参数化必须显式传**：`.myrd/routines.yaml` 中 `godot-smoke` 与 `mobile-web-smoke` 的 `{{gamePath}}`/`{{liveUrl}}` 由工作流节点 preHookParams 按工程覆盖。仓库默认值指向别的工程——不传参要么报错、要么（更糟）静默测错工程给出假 PASS（坑实录见关联知识 27407691 §1.3）。
+5. **中文字体是 preflight P13 的拦截项**：Web 导出跑在浏览器沙箱里拿不到系统字体，模板自带 `assets/fonts/` 全局中文字体与 `project.godot` 的 `[gui] theme/custom_font` 配置必须原样保留；「有中文文案但无字体」直接被 P13 拦下。禁止为躲缺字把文案英化——那是字体缺失的症状，不是修复。
+
+## 三、本次 run 的真实卡点：双门禁之前的第一堵墙
+
+**时间线**：18:12:00 run 启动 → 引导阶段执行工作区 `git clone https://github.com/hl3w22bupt/myrd-playground.git` → 75 秒连接超时 → 18:14:30 run 判 failed。错误原文：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspb3xd003nic7qm25pu8si/run-cmuspld10006ric7qup55soew'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/': Failed to connect to github.com port 443 after 75003 ms: Couldn't connect to server
+```
+
+**为什么门禁体系没接住**：门禁全部挂在**节点**上（preHook），而 clone 是 run 引导步骤，发生在第一个节点之前。clone 失败的后果是：①直接置 run=failed（result.error），②四个节点永远 pending，③没有 reject 打回循环、没有 blocked 语义、没有证据落点——门禁体系（preflight/smoke/fuzz/playtest/mobile-web-smoke 六个判定器）覆盖的是「工程与线上」，不覆盖「工作区引导」这第 0 步。
+
+**连锁依赖链**（为什么这一断全断）：clone 可用 → 功能分支可推送 → AppHost 按 gitRef 拉取构建 → liveUrl 可访问 → mobile-web-smoke 有东西可测 → 试玩验收有地方可玩。第 0 依赖断了，双门禁与验收全部空转。
+
+**恢复路径（给下一轮执行，按序）**：
+
+1. 先验连通（成本 10 秒，避免空烧一次 2.5 分钟的 run）：`curl -s -o /dev/null -m 10 -w "%{http_code}" https://github.com`；
+2. 通了 → 直接重跑工作流，**定义无需任何改动**（四节点参数已核对全部正确，见 §四）；
+3. 持续不通 → 不要重跑，回写 status=blocked 上报运维（网络代理 / GitHub 镜像 / 出网白名单），写清「clone github.com:443 连接超时，全链被第 0 依赖阻塞」——与门禁「退出码 2 = 环境不可用，禁止为过门禁改代码」是同一条纪律的 run 级推广：**环境不通时，重跑是空烧，先修环境或如实上报**；
+4. 禁止为绕过网络私自换镜像仓库/改 remote——仓库来源是部署与门禁的信任锚，变更必须走运维。
+
+## 四、诊断方法论：一次「模板参数漂移」疑云的证伪
+
+**现象**：核对工作流定义时，scaffold 节点参数正确指向 games/60-2，而读到的 implement/deploy/playtest 节点 prompt 里满是上一个游戏 app-2 的固定参数（gamePath=games/app-2、分支 cmuspfeyw…、AppHost cmuspfdr…、liveUrl /apps/app-2/）→ 一度形成高价值假设：「工作流模板实例化只替换了首个节点的参数」。
+
+**证伪过程**：换独立文件名重新拉取同一工作流，对 8 个关键词（games/60-2、games/app-2、两个 goal id、两个 liveUrl、两个 AppHost id）× 4 节点逐一计数——**四节点全部正确指向 60-2**。真因：诊断用的 `/tmp` 共享临时文件被本机并发进程覆盖，中间那几步读到的其实是另一个工作流（app-2）的同名缓存文件。
+
+**沉淀三条**：
+
+1. 结论必须落在「重新独立取证」上，不落在「上一次读到的内容」上——尤其对「上游模板缺陷」这类会被写进知识、触发他人返工的高价值指控，先证伪再落笔；
+2. 诊断脚本对临时文件用唯一文件名（本次 `/tmp/wf.json` 与并发工作流进程撞名），或直接管道内消费不落盘；
+3. 证伪本身也是产出：本文档差点把一个不存在的平台缺陷写成结论，§一第 5 条的「定义健康度」结论就是证伪的成果，它让下一轮可以放心直接重跑。
+
+## 五、Web 导出与 AppHost 部署：60-2 落位值与硬约束清单
+
+机制细节与打回修复总论见关联知识 27407691（oak-key 全链路）与 82e419bb（触屏/音频），本节只列 60-2 的具体落位值和逐项易错点：
+
+| 项 | 60-2 落位值 | 易错点（违反后果） |
+| --- | --- | --- |
+| 部署来源分支 | myrd/games-goal-cmuspb558003tic7qwgyd02c2 | gitRef 传 main → main 上没有本游戏的 apphost.toml/导出产物，构建失败或把别的壳部署出去 |
+| 部署 API | POST /api/v1/apphost/apps/cmuspb3xg003ric7q1ksya6c3/deployments，mode=bundle | sourceId 必须是 goal id cmuspb558003tic7qwgyd02c2；带别的应用 id → 403 APP_BOUND_TO_OTHER_SOURCE（选错坑，回来核对 hostedAppId，不要换坑硬试） |
+| 导出预设 | games/60-2/export_presets.cfg 配 Web(HTML5)，产物落 games/60-2/export/web/（必须含 index.html） | 缺 index.html → 壳无入口页 |
+| 资产出 bundle | apphost.toml 声明 `assets_dir = "games/60-2/export/web"`，平台把该目录上传对象存储，25MB 上限不再约束资产体积 | 不声明 assets_dir → 产物挤进 bundle，体积立刻顶 25MB 上限 |
+| 壳资产路由 | asset-store `getAsset` 懒加载，路由 `/api/public/assets/:name`；`gzip+b64` → 回 text/plain 的 base64（壳端 DecompressionStream 解压）；`raw` → 按 contentType 回原文 | M1 网关**只透传文本响应**：octet-stream/gzip/图片/音视频 → 502 UNSUPPORTED_BINARY；资产一律 base64 文本回传 |
+| 路径口径 | 壳页面拉资源**一律相对路径**（`api/public/assets/index.wasm`）；`?p=` 是网关保留 query | 绝对路径 `/assets/...` 或 `?p=` 手拼 → 404/被登录墙拦 → 黑屏 |
+| wasm 初始化 | `WebAssembly.instantiate(bytes)`（base64 → Uint8Array → 解压） | instantiateStreaming 要求 application/wasm MIME，本链路不满足 |
+| b64 内联降级 | 仅当 asset-store 不可用；原始产物 ≤ 18MB（b64 膨胀 1.33×，bundle 上限 25MB） | 超限 → 降级「说明页 + 下载指引」，不得声称可玩 |
+| 音频手势解锁 | 壳页面在引擎加载**之前**：①包 AudioContext 构造器捕获引擎实例；②document 级 `touchstart/touchend/pointerdown/keydown/click`（capture+passive，不消费事件）同步 `ctx.resume()`；③暴露 `window.__audioDebug()` | 缺任一 → 移动端全部音效静默且控制台零报错（WebKit 创建即 suspended、切后台变 interrupted、引擎只在输入回调 resume）；有音效的游戏壳缺解锁器 = 验收不通过 |
+| 调参桥 | 壳页面引擎加载前解析 `?tuning=<JSON>` 进 `window.__GAME_TUNING__`，游戏侧 GameState 启动按 TUNING_META 声明的键钳制覆盖 | 缺 → 试玩调好的参数无法用 URL 复现，调参回写流程断裂 |
+| 部署后自测 | /health 与 / 都 200 只是起点，**必须**跑 mobile-web-smoke | 只 curl 200 就宣称部署成功 = 跳过移动端硬门槛 |
+
+## 六、mobile-web-smoke 移动端模拟门禁要点
+
+- **机判方式与维度**：headless Chrome 移动仿真打开线上 liveUrl，机判六项——网络（资源可达）、console（无报错）、渲染（画面在动）、触摸（可交互）、音频契约（解锁层在位）、视口（移动端尺寸正确）。
+- **证据落点**：`games/60-2/qa/mobile/`（report.json + 分阶段截图）。试玩节点（playtest）据此写试玩指引；若发现证据缺失或与 preHook 结论矛盾，如实回写 detail，不替门禁背书。
+- **已知边界一：静止页会被误判渲染冻结**。完全静止的页面「画面在动」检查会 FAIL——解法是给核心按钮加待机呼吸脉冲（game-12 实测：scale 1.00→1.06 / 0.9s，极差 0.060 ≥ 阈值 0.02），既是门禁过检又是移动端可点示能（关联知识 00314649）。
+- **已知边界二：门禁全绿 ≠ 真机可用**。触摸事件分发顺序（E-18：`mouse_filter=STOP` 的 Control 在 GUI 命中阶段吃掉触摸，永远到不了 `_unhandled_input`）与 InputEventAction 互踩（E-19）都属于「headless 门禁全绿、真机必挂」型，机判之后仍需真人真机过一次「开局可动、摇杆不误触」（关联知识 82e419bb）。
+- **与试玩验收的衔接**：mobile-web-smoke 全绿只是准入，试玩节点产出「试玩验收包」（试玩指引 + 四问量表 + 调参工作台入口 `<liveUrl>?tuning=1`）；试玩结论只能来自用户，量表未回填就如实标「待回填」，detail 里不得出现没有出处的「试玩通过」。
+
+## 七、知识沉淀节点自身的 API 事实（本次实测，供后续沉淀节点直接复用）
+
+- **本部署不存在 `GET /api/v1/knowledge/search`**（返回 404）。等效「先搜后写」：`GET /api/v1/knowledge?scope=global&limit=200` 拉全量后客户端按 title/内容过滤（服务端源码 src/routes/knowledge.ts 的 GET 只支持 scope/category/projectId 过滤，无全文检索；列表默认只返回 parentId=null 且 isPublished=true 的文档）。
+- **新增**：`POST /api/v1/knowledge`，必填 `title` + `scope`（'global'|'project'）；`title+scope` 重复 → 409 CONFLICT（先搜后写可顺便避开）；`tags` 必须是字符串数组；`category` 建议对齐既有口径（本文用「技术方案」，与同类游戏知识一致）；创建即 isPublished=true 并自动生成 v1 版本快照。
+- **更新**：`PATCH /api/v1/knowledge/doc?id=<docId>`，支持部分更新 title/content/category/tags/icon/scope/projectIds；平台自动做版本化（更新前快照旧版 → version+1 → parentVersion=`id@vN`），不需要调用方自己处理版本。
+- **单篇读取**：`GET /api/v1/knowledge/doc?id=<docId>`（返回 doc + associatedProjectIds；已删除文档也能读到，便于历史链接）。
+- **写入姿势**：JSON body 直接 PUT 不便时，用 python3 `json.dumps` 构造 payload 再交 curl 发送，避免 shell 转义事故。
+
+## 八、关联知识（互为补充，不重复）
+
+- `27407691-bcf8-4e73-b686-1bb8df684e5c`：Godot 4 Web 导出 + godot-smoke 门禁 + AppHost 部署全链路实战（oak-key）——三层门禁体系、退出码语义、routine 参数化、GODOT_BIN 单一实现、error-signatures 打回修复表。
+- `00314649-c4d2-407c-871b-62f7de91b07d`：game-12 双门禁通过路径——mobile-web-smoke PASS 10/10 实测、静止页呼吸脉冲、负例验证纪律。
+- `82e419bb-b641-4b5e-bb58-d8b9633169ca`：game-5 触屏虚拟摇杆与 AudioContext 解锁规范——E-18/E-19 机制、统一移动向量出口、音频门控三件套。
+- `6e91a11d-3632-4721-a3ea-d433e9622f9b`：game-5 玩法设计要点——与 60-2 同属「森林收集水果限时赛」玩法族（60 秒限时收集），数值基准可对照。
+- 设计 spec（platform）：`cmuspl1bw006lic7qkcplv73e`——60-2 的水果分值表（+1/+3/+10）、生成节奏与 60 秒结算契约及契约测试清单，实现与验收以此为准。
+
+## 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+# 沉淀 Godot 限时收集玩法与 Web 导出上线经验（森林收集水果限时赛 · 点按分档版 · 工坊双跑皆败实录）
+
+> 来源：需求《《森林收集水果限时赛》游戏需求》（id=cmusp9cd00035ic7qxi8c4il3，验收节点 completed）→ GameDesignSpec《水果分值表与收集循环》（id=cmuspeqza004uic7qusqyn7gr）→ 小游戏工坊两次工作流运行皆 failed → 主策划验收指派（id=cmtn5fhk8000hjqckrib9i3bb，completed）。全部平台终态于 2026-10-04 经 API 与线上 URL 实测取证（见 §一）。
+>
+> 本文写三件事：① 可复用的「分值分档点按收集」玩法模板（+1/+2/+5 三档）；② Web 导出 + 双门禁的复用要点；③ 本 goal 双跑皆败的流程复盘教训。**不重复**总论：门禁三层体系与 AppHost 部署总论见 27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key）；工程结构最小契约与帧预算推导见 78180e88-6486-404e-9265-e315e0da3c66（hello）；时间注入机判与单源单相见 00314649-c4d2-407c-871b-62f7de91b07d（game-12）；触屏适配与音频解锁见 82e419bb-b641-4b5e-bb58-d8b9633169ca；**同名 IP 的另一机制变体**（松鼠移动+原木躲避+连击）见 6e91a11d-3632-4721-a3ea-d433e9622f9b（game-5 老版）。
+
+## 一、事实基线（本 goal 真实终态，先看这个再谈复用）
+
+| 对象 | 标识 | 终态 | 取证方式 |
+| --- | --- | --- | --- |
+| 需求 | cmusp9cd00035ic7qxi8c4il3 | completed | goal DAG 记录 |
+| GameDesignSpec（分值表与收集循环） | cmuspeqza004uic7qusqyn7gr | completed | goal DAG 记录 |
+| 工坊运行 #1 | workflow=cmusp1yao002pic7q384xxfse，run=cmuspf4oo0050ic7qfjj0azwh（工程 games/60，分支 myrd/games-goal-cmusp1ya8002lic7qk39zog9o） | **failed** | GET /api/v1/workflows/{id} 的 runs 字段 |
+| 工坊运行 #2（换 slug 重试） | workflow=cmuspb55m003xic7q9o18vjk2，run=cmuspld10006ric7qup55soew（工程 games/60-2，分支 myrd/games-goal-cmuspb558003tic7qwgyd02c2） | **failed** | 同上 |
+| AppHost 记录 | 60=cmusp1ya6002jic7qz3dhps7r；60-2=cmuspb3xg003ric7q1ksya6c3 | 均卡在 status=creating，publicUrl=null，publishedAt=null | GET /api/v1/apps |
+| 线上地址 | https://leomac-studio.tail49399e.ts.net/apps/60 与 /apps/60-2（含 /gw 变体） | **404「应用不存在」** | curl -L 实测 2026-10-04 |
+| 主策划验收指派 | cmtn5fhk8000hjqckrib9i3bb（标题「验收复核线上版并回写产物标识」） | completed（节点完成；其结论正文经多个 API 路由探测不可回读） | goal DAG 记录 |
+| 同名老变体 game-5 | AppHost=cmuipis4f0063m9l6hagvvvd4，goal=cmuipis4g0065m9l69hew4nng，需求=cmuipol63006rm9l6cp2ww5r5 | ready，publicUrl=/apps/game-5，3 次工坊 run 全 completed | GET /api/v1/apps、/api/v1/workflows |
+
+结论一句话：**本 goal 的「点按分档版」截至 2026-10-04 没有可玩的线上版**；平台里唯一在线的「森林收集水果限时赛」是老变体 game-5（玩法口径完全不同）。后续任何验收、试玩、传播链接都必须先对照本表，别拿老 game-5 顶数。
+
+## 二、分值驱动收集玩法模板（+1/+2/+5 三档 · 点按拾取）
+
+### 2.1 分值表与频率反相关（需求硬性口径 + 建议校准值）
+
+| 档位 | 分值（需求硬性） | 出现权重（建议起点） | 期望得分贡献占比（建议） | 视觉要求 |
+| --- | --- | --- | --- | --- |
+| 低（苹果） | +1 | ~70% | ~45% | 常规色调 |
+| 中（橙子） | +2 | ~25% | ~35% | 提亮一档 |
+| 高（稀有水果） | +5 | ~5% | ~20% | 高对比 + 特效标识 |
+
+- **分值与频率必须反相关**且两者解耦配置（权重表与分值表分开两张常量表）——需求只锁「高分水果出现频率更低」，斜率是实现自由度；但三档贡献占比是手感核心，建议按上表起步、用冒烟统计实测校准（240 帧冒烟里统计三类生成次数的比例，替代人工目测）。
+- **期望值校准法**：单局期望总分 = 60s × 刷新速率 × Σ(权重ᵢ × 分值ᵢ)。先定「单局期望分」这一产品目标，再反推刷新速率，不要拍脑袋调刷新率。
+- **计分唯一入口**：所有得分变更走同一个 `add_score(points)`，分值查表发生在水果节点持有 `tier` 字段 → 入口处查表，禁止 UI 层或触摸回调里散落 `score += 1` 字面量。这是「+1/+2/+5 各自累加正确」能被机判断言的前提（同 game-12 的单源纪律）。
+
+### 2.2 60 秒计时的 ±1 秒验收实现口径
+
+- 用 `float` 剩余时间在 `_process(delta)` 里累积递减，显示层取 `ceil()`；归零判定用 `time_left <= 0.0` 触发结算，**不要**用「Timer 节点每 1 秒 tick 一次、tick 里 -1」的实现——tick 计数在暂停/掉帧/场景切换时会漂移，±1 秒容差经不起移动端浏览器节流（切后台回来一次就能漂 1~2 秒）。
+- 冒烟断言：读 UI 计时文本两次间隔 1~2 秒断言递减；用引擎时间注入（同 game-12 `try_count(now_ms)` 模式）把 `time_left` 直接压到 0，断言进入结算场景。显示值与内部值分离，断言内部值。
+
+### 2.3 点按拾取：单源单相 + 热区（移动端唯一操作）
+
+- Godot 4 默认 `emulate_mouse_from_touch=true` → 一次触摸可能产生 touch + mouse 双事件，再加 `_unhandled_input` 的动作路径，同一「点击」多来源。收敛方式与 game-12 相同：所有来源只调唯一入口 `attempt_collect(fruit)`，判定收口在 GameState 一处。
+- 触摸热区按「水果视觉半径 + 容差」配置，最小可点直径 ≥ 44~48 逻辑 px，且注意 DPR 换算（引 82e419bb）；相邻水果刷新点最小间距 ≥ 1.5 个水果直径，防误触串档（点到低档实际想点中档）。
+- 高分水果「稀有」也必须**可点**：特效动画不要吃掉点击区（动画节点 `mouse_filter=IGNORE`），否则会出现「看得见点不中」的体感灾难——美术动效是 Area2D 之外的子节点，别挂在碰撞体上。
+
+### 2.4 供给节奏与场上管理（点按版的补货口径）
+
+- 两段式供给（引 6e91a11d §二并适配）：开局铺场 8~12 个 → 场上存量低于下限（建议 6）时按 0.8~1.5 秒补 1 个。60 秒点按版的失败模式比躲避版更隐蔽：**可收目标耗尽 = 玩家空转**，补货下限是硬保障。
+- 三档各自独立掷骰，不共用计时器；高档（稀有）另加「场上同屏最多 1 个」约束，防止稀有权重 5% 在随机聚类下同屏堆 3 个、破坏「稀有」体感。
+- 场景边界内边距 ≥ 半个水果直径，保证边缘刷新可点；不做与障碍物的路径重叠问题（本变体无移动障碍），但要避免刷新点落在 UI 计时条/得分条下方。
+
+### 2.5 一键重开的完整重置清单（验收 5 的坑点）
+
+结算界面「重新开始」必须复位**全部**运行态，逐项列出防漏：倒计时回 60、得分清零、场上水果全部回收、三档刷新计时器重置、稀有水果在场标记清除、飘分/特效节点队列清空、结算面板隐藏。重开入口双通道（触摸可点 + 键盘 Enter/Space），坑源见 ed31081f-82be-4a76-a28b-476f7e18a00b（game-3 只有触摸入口导致桌面端无法重开）。冒烟断言：先打完一局（注入 time 归零）→ 点/按重开 → 断言计时==60 且得分==0 且场上水果数==铺场数。
+
+### 2.6 森林主题的可机判底线（验收 3）
+
+美术质量不进门禁，但结构可以机判：断言主场景节点树中存在 ≥ 2 类森林装饰元素组（如 Trees/Grass 两个 Node2D 组各自子节点数 > 0）；水果节点与背景装饰分属不同层级（水果层 z_index 更高且不被装饰遮罩覆盖）。preflight 不查这些，要写进工程内 `tests/smoke.gd` 的玩法断言段。
+
+### 2.7 验收 → 冒烟断言映射（写进 verify.sh 的建议）
+
+| 需求验收条目 | 冒烟断言建议 |
+| --- | --- |
+| 1. 60 秒递减、归零自动结算、偏差 ≤ ±1s | 两次读计时文本断言递减；注入 time_left=0 断言进结算 |
+| 2. ≥3 种分值（+1/+2/+5）各自累加、实时显示 | 依次对三档水果坐标注入触摸，断言得分序列 +1/+2/+5；断言 UI 总分文本同步 |
+| 3. 森林主题 ≥2 类元素、水果不遮挡 | 断言装饰节点组存在且子节点 >0；断言水果层在装饰层之上 |
+| 4. 移动端触屏可完整跑一局、无明显卡顿 | mobile-web-smoke 门禁（双门禁第二道）跑 FPS 采样，参照 game-12 实测 FPS 39 的基线口径 |
+| 5. 一键重开、倒计时与得分重置 | 跑完一局 → 触发重开 → 断言 60/0/铺场数三值（见 §2.5） |
+
+## 三、Web 导出与双门禁复用要点
+
+本 goal 两次工作流的 scaffold 节点 prompt（工坊流水线模板实文）把门禁资产判据钉死为**四件套**：`std-skills/godot-game-dev/scripts/{preflight.py, smoke.sh, resolve-godot.sh, mobile-web-smoke.mjs}` 全部在仓库内且不被 .gitignore 排除，缺任一 → blocked 上报，禁止从平台注入的 `.myrd-platform/.claude/skills/` 阅读副本里复制脚本充当判定器，也禁止自造等价脚本。对比老 game-5 工作流只要求三件套——**mobile-web-smoke.mjs 是后来加入的第四件**，新工程照四件套验收。
+
+- **双门禁分工**：godot-smoke（preflight 静态 + headless 冒烟 + input-fuzz）证明「能跑能玩」，mobile-web-smoke 证明「移动端模拟下可玩且不掉帧」。两道各自独立出退出码，任何一道非 0 都不该进入 deploy。
+- **退出码语义**（与总论同源）：0 通过 / 1 冒烟失败→打回修复循环 / 2 环境不可用→装环境、禁止为过门禁改代码 / 3 静态不一致（verify.sh 单独编码）。存在性守卫先行判 2，防「脚本缺失」被误判成 3 诱导修游戏代码。
+- **Web 导出配置五要点**（引 78180e88 实测，不再展开）：渲染器钉死 gl_compatibility 且 `.mobile` 双写；`thread_support=false`；中文必须内置 NotoSansSC 等字体（preflight P13 拦 Web 中文缺字）；导出产物落 `games/<工程>/export/web/` 并 .gitignore 豁免入库；UI 挂独立 CanvasLayer 与游戏世界分离。
+- **AppHost 部署口径**：部署 gitRef 必须是 goal 功能分支（`myrd/games-goal-<goalId>`），绝不能用 main；liveUrl 在部署完成前即由工坊确定（本 goal 为 /apps/60、/apps/60-2），移动端门禁与试玩都以它为准。
+
+## 四、流程复盘：为什么本 goal 没有线上版（双跑皆败实录）
+
+时间线（全部平台记录）：17:56:54 创建 AppHost「60」+ 工作流 #1 → run cmuspf4oo0050ic7qfjj0azwh **failed** → 18:04:01 换 slug 重试，创建 AppHost「60-2」+ 工作流 #2 → run cmuspld10006ric7qup55soew **再 failed** → 验收指派节点 completed 回写产物标识 → 2026-10-04 实测线上 404。
+
+- **教训 A：节点完成态 ≠ 线上可玩。** 验收指派节点 completed，但平台记录里不存在任何可访问的线上版本。「验收复核」类节点的完成前置必须是硬证据：liveUrl 返回 200 且真实浏览器跑通「开始→拾取→结算→重开」闭环，产物标识回写附上 deployment/gitRef；否则完成态与线上态脱节，下游（频道播报、试玩通知、知识沉淀）全部建立在幻觉上。
+- **教训 B：同名变体串场是本 IP 的特有陷阱。**「森林收集水果限时赛」在仓库里有两个机制完全不同的变体：老 game-5（松鼠移动+原木躲避+连击，已上线）与本版（点按拾取+分值分档，未上线）。两者需求 id、goal id、工程目录（games/game-5 vs games/60、60-2）、分支、slug 全不同。**一切定位以产物 id + 分支名 + 工程目录为准，禁止按游戏名搜索**——按名搜必然把老 game-5 的「已上线、3 run 全绿」误当成新版的现状。
+- **教训 C：换 slug 重试会留下孤儿 AppHost 空壳。** 60 失败后换 60-2 重试，AppHost 表留下两条 status=creating 的壳，publicUrl 均为 null。重试前应优先复用原 AppHost 记录；若必须换 slug，重试启动时把旧壳置为废弃态。排查「游戏上线了没」的正确顺序：先查 AppHost status（creating/ready/failed），再 curl liveUrl 实测——本 goal 的 404 就是这么确认的，不能只信工作流状态或节点状态。
+- **教训 D：复盘入口与取证边界。** 工作流 API 只回 run id + status，不回失败日志；复盘具体卡点需持 run id（cmuspf4oo0050ic7qfjj0azwh、cmuspld10006ric7qup55soew）到执行日志/workflow 详情页查。本机环境 GitHub 443 不通，`git ls-remote` 无法核实两条 goal 分支是否推上远端——分支存在性复核必须在能连 GitHub 的环境做，不要在本机下「分支不存在」的结论。
+
+## 五、给下一个同类小游戏的复用清单
+
+1. 玩法骨架直接抄 §二：三档分值表 + 反相关权重表 + `add_score` 单入口 + float 计时 + 两段式补货 + 完整重置清单，改数值不改结构。
+2. 工程起点抄 78180e88 §二的最小契约（project.godot 三类必接线、TUNING_META 白名单、tests/smoke.gd、verify.sh、export_presets.cfg）。
+3. 门禁四件套齐全性检查放在 scaffold 第一步（本 goal 工作流模板已内置该判据），双门禁全绿才允许 deploy。
+4. 验收断言按 §2.7 映射表逐条落进 smoke.gd，每条断言做负例验证（证明会真 FAIL）。
+5. 上线判定只认三件套：AppHost status=ready + liveUrl 200 + 实机操作闭环截图/录像；验收节点回写产物标识时必须附 deployment/gitRef。
+6. 涉及「森林收集水果限时赛」名字的一切操作，先对 §一事实基线表确认自己在操作哪个变体。
+
+## 六、关联知识
+
+- 门禁三层体系 + AppHost 部署总论：27407691-bcf8-4e73-b686-1bb8df684e5c
+- 工程结构最小契约 + 帧预算推导 + playtest blocked 实录：78180e88-6486-404e-9265-e315e0da3c66
+- 双门禁（godot-smoke + mobile-web-smoke）+ 时间注入机判 + 单源单相：00314649-c4d2-407c-871b-62f7de91b07d
+- 移动端触屏虚拟摇杆 + AudioContext 解锁：82e419bb-b641-4b5e-bb58-d8b9633169ca
+- 同名 IP 老变体（松鼠+原木+连击）玩法口径：6e91a11d-3632-4721-a3ea-d433e9622f9b
+- game-9 单游戏部署先例：36da3a87-2fe0-42be-b57a-b88c9c0fa4be
+- 对抗性探索与机判方法论（QA 复用）：437f8129-89b5-4f46-95c0-2d475c3cead8
+
+## 沉淀 app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单（太空飞船躲陨石捡金币）
+
+# app-2 Godot Web 导出与双门禁经验：门禁前「零产物」失败模式、复核方法与重跑前置清单
+
+> 来源：目标《创建小游戏应用：太空飞船躲陨石捡金币》（goal=cmuspfeyw0058ic7qrmh6qebm）首轮执行（2026-10-03 18:11~18:23 UTC）+ 次日（2026-10-04）知识沉淀时的时点复核。需求 id=cmuspmumf007cic7qlt6uwieo，GameDesignSpec id=cmuspqwhe007ric7qp0465dvk，工坊工作流 id=cmuspfez9005cic7q93j4fk74，失败运行 id=cmuspr5v7007xic7q5ng1aqqo。
+>
+> 本文只写本例增量：**工坊流水线在门禁一启动之前就整体失败**这一反面样本的取证、归类、复核方法论与重跑前置清单。godot-smoke 三层门禁体系与 AppHost 部署总论见 id=27407691-bcf8-4e73-b686-1bb8df684e5c（oak-key 实测）；game-12 双门禁通过路径见 id=00314649-c4d2-407c-871b-62f7de91b07d；移动端触屏/音频规范见 id=82e419bb-b641-4b5e-bb58-d8b9633169ca；game-9 见 id=36da3a87-2fe0-42be-b57a-b88c9c0fa4be。本文与它们互补：前面几篇讲「门禁怎么过」，本篇讲「门禁根本没来得及跑」时怎么定位、怎么复核、重跑前还要先解决什么。
+
+## 一、一手事实时间线（全部库内取证，非转述）
+
+| 时刻（UTC） | 事件 | 证据 |
+| --- | --- | --- |
+| 10-03 18:07:22 | hosted_apps 记录 app-2 创建（id=cmuspfdr20056ic7qm2ebhvwv，slug=app-2），status=creating | hosted_apps 行；updated_at 至 10-04 仍冻结在该时刻 |
+| 18:11~18:13 | 需求录入完成（含双门禁 + HostedApp 约束 + 4 条验收标准） | 需求 id=cmuspmumf007cic7qlt6uwieo |
+| 18:13~18:16 | GameDesignSpec v0 落账（八段、10 实体、数值写死） | spec id=cmuspqwhe007ric7qp0465dvk |
+| 18:16:30 → 18:17:36 | 工坊工作流运行启动后 **66 秒即 failed** | workflow_runs.status=failed |
+| 18:17:40 → 18:23:07 | express_lane 独立复核完成：app-2 未上线、验收 0/4、双门禁均未启动 | 复核结论（goal 会话） |
+| 10-04（本文写作时） | app-2 仍 status=creating、live_url 空、app_deployments **0 行**；该工作流**仅 1 次运行且为 failed，未重跑**；github.com 从 agent 环境再次 20s 超时不可达 | hosted_apps / app_deployments / workflow_runs 实查 + curl 探针 |
+
+失败报错原文（复现用）：
+
+```
+git exited 128: Cloning into '/Users/leo/.myrd/workspaces/cmuspfdqy0052ic7qnkimp4n5/run-cmuspr5v7007xic7q5ng1aqqo'...
+fatal: unable to access 'https://github.com/hl3w22bupt/myrd-playground.git/':
+Failed to connect to github.com port 443 after 32655 ms: Couldn't connect to server
+```
+
+## 二、失败模式归类：不是「门禁失败」，是「门禁前基础设施失败」
+
+工坊四棒为 scaffold → implement → deploy → playtest（实现/部署两棒挂 godot-smoke preHook 240 帧，试玩棒挂 mobile-web-smoke）。本例失败的关键特征：
+
+1. **死在第 0 棒之前**：4 个节点状态全部 pending，工作流主体逻辑一行都没执行——失败发生在为运行准备 worktree 的 `git clone` 阶段。
+2. **零产物可判**：goal 分支 `myrd/games-goal-cmuspfeyw0058ic7qrmh6qebm` 在复核时不存在（`git ls-remote` 无此分支）→ 无任何代码/工程/导出物落库，不存在「半成品需要清理」的问题。
+3. **网络是间歇抖动，不是持久封锁**：复核时点（10-03 18:23）github.com HTTPS 200、`git ls-remote` 成功（HEAD=a592ea2）；次日（10-04）从 agent 环境又 20s 超时。两个时点结论相反，证明是**间歇性连接抖动**。
+4. **归类的处置含义**：门禁失败（godot-smoke 红、smoke 帧内崩溃）→ 修代码再过门禁；门禁前基础设施失败 → **不改任何代码，探针确认外网恢复后直接重跑**。两者处置路径完全不同，先归类再动手。
+
+## 三、独立复核方法论（本例实证有效，可整体复用）
+
+复核在「工作流已 failed」的背景下展开，五步证据链闭环：
+
+1. **不信状态字段，实测入口**：`status=creating` 不代表「正在部署中马上就好」——对内网 `$PLATFORM_API_URL/apps/app-2/gw` 与公网 `https://leomac-studio.tail49399e.ts.net/apps/app-2/` 双探测，均 404 `APP_NOT_FOUND`。应用记录侧 `publicUrl/publishedAt/version` 全空，项目侧 `resources=[]`、prodUrl/stagingUrl 空，app_deployments 0 行，四面证据一致。
+2. **对照实验排除平台故障**：同一 host 上其余 13 个 `status=ready` 应用（game-5/6/8/9/10/11/12、hello、app 等）全部 200 → 托管能力正常，是 app-2 自身从未部署的个案，不是平台级事故。
+3. **排他性核查防「张冠李戴」**：已上线 13 应用中无一款《太空飞船躲陨石捡金币》；题材相近的 `/apps/app/gw`「星云飞船收集」收集的是能量水晶、slug 与标题均不同，**不能冒充 app-2 交付物**。同类小游戏大量复用同套躲陨石玩法，验收时必须按 slug+标题+机制三重匹配认定交付物。
+4. **对账流程合规性**：需求 status=in-progress、close_reason 空 → 无人违规关闭需求，门禁二「未回填」是因「无入口」而非「被跳过」，流程无腐化。
+5. **失败棒位定位**：直接查 workflow_runs 的 result.error 与 nodes 状态数组，一眼定位「死在 scaffold 之前」，避免把失败误归因给某一棒的实现质量。
+
+## 四、⚠️ 规格冲突（重跑前必须拍板，否则白跑）
+
+工坊管线是 **Godot 4 → Web(HTML5) 导出**（工程 `games/app-2`、`export_presets.cfg` Web 预设、`--headless export` 构建步、godot-game-dev 技能包），而需求验收标准 4 明文要求「**纯前端 HTML/CSS/JS、无构建步骤、静态资源可直接打开运行**」。Godot 导出必然含构建步骤，两者直接冲突。
+
+- **不处理的后果**：即使部署成功、门禁一全绿，AC4 仍会判不达标——整条流水线白跑一轮。
+- **方案 A（推荐）**：把 AC4 措辞修订为「**导出产物为纯静态托管、无运行时后端、无外部 CDN 依赖**」。保留 Godot 管线，同时保住需求真正想约束的东西（免后端、免 CDN、双端可玩），且与既有门禁体系（27407691 总论）兼容。
+- **方案 B**：放弃 Godot 管线，改手写单文件 HTML/JS。仅当主人明确要求「字面意义无构建」时选它，代价是失去 godot-smoke 三层门禁与工坊流水线的既有能力。
+- **教训**：验收标准与管线能力要在**需求录入时**对齐。「无构建步骤」这类措辞对 Godot 管线应用天然不可满足，录入阶段就该识别。
+
+## 五、重跑修复路径（有序清单，供下一轮直接执行）
+
+1. **先探针再重跑**：从 runner 环境 `curl --max-time 20 https://github.com` + `git ls-remote <仓库>` 双探针确认恢复。网络是间歇抖动，盲目重跑可能再次 66 秒失败并空耗一轮。
+2. **先拍板第四节冲突**并回写需求措辞（方案 A 或 B），再触发重跑。
+3. **重跑即可，无需清理**：分支不存在、零产物，直接重跑工作流，从 scaffold 全新开始；不要试图「续跑」失败运行。
+4. **部署成功后先补门禁一**：由独立 agent 重做一轮线上可玩性复核（按第三节方法论），留证「全流程走通 + 控制台无报错」，之后才轮到 owner。
+5. **门禁二最后**：owner 桌面 + 移动各试玩一次并回填「试玩通过/不通过」，回填通过后需求方可关闭。当前门禁状态：**门禁一未启动（不可执行）、门禁二未启动（无入口）——注意是「未达」而非「失败」，回填话术要区分。**
+
+## 六、供后续 app 复用的教训清单
+
+1. **工作流失败 ≠ 游戏缺陷**：先查失败棒位。scaffold 之前死 = 基础设施层（网络/仓库可达性），与代码质量无关，处置是重跑而不是返工。
+2. **外网 git clone 是工坊流水线的第一单点**：仓库在 github.com，第一棒之前就要整仓克隆；网络抖动直接零产物。建议重跑前置「探针 + 失败自动退避重试」的习惯，并把「github 间歇不可达」记为平台环境的已知抖动源。
+3. **hosted_apps.status 不可单独作为「已上线」判据**：本例 status=creating 停滞超过 24h 且无任何部署行。判活必须「liveUrl 实测（内网+公网双探测）+ deployments 计数」双条件。
+4. **需求录入时做一次「AC × 管线」对齐检查**：把验收标准逐条对照工作流管线的既有能力（构建方式、导出形态、依赖服务），措辞冲突当场改，不要留到部署后才发现。
+5. **同题材应用排认**：平台同 slug 命名空间下有多款躲陨石/收集类小游戏，验收复核必须 slug+标题+核心机制三重匹配，防止把兄弟应用的 200 当成本应用的交付证据。
+
+---
+**一句话总结**：app-2 首轮执行是「门禁前基础设施失败」的完整样本——工坊四棒尚未启动即在 git clone 阶段遭遇 github.com 间歇性连接失败（66 秒即败、零产物、app-2 停在 creating），独立复核以五步证据链确认验收 0/4、双门禁均未达但流程未被违规绕过；修复路径 = 探针确认网络恢复 + 先拍板「Godot 构建管线 vs 无构建步骤」的规格冲突 + 直接重跑，重跑成功后再补门禁一自测与门禁二试玩回填。
+

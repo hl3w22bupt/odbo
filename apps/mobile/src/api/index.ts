@@ -20,6 +20,8 @@ import type {
   LoginResult,
   MembershipInfo,
   MembershipPlan,
+  MemoryReadResult,
+  MoodTimelineResult,
   Message,
   Order,
   PayResult,
@@ -52,6 +54,8 @@ export interface ApiClient {
   getCharacter(id: string): Promise<Character>;
   listConversations(): Promise<{ items: Conversation[]; total: number }>;
   listMessages(conversationId: string, after?: string): Promise<{ items: Message[]; hasMore: boolean }>;
+  getConversationMemory(conversationId: string): Promise<MemoryReadResult>;
+  getMoodTimeline(conversationId: string): Promise<MoodTimelineResult>;
   sendMessage(params: SendMessageParams): Promise<ChatSendResult>;
   sendMultiMessage(params: SendMultiMessageParams): Promise<ChatMultiSendResult>;
   triggerProactive(characterId: string): Promise<{ triggered: boolean; messageId: string }>;
@@ -93,6 +97,12 @@ const realApi: ApiClient = {
   async listMessages(conversationId, after) {
     const q = after ? `?after=${encodeURIComponent(after)}` : '';
     return request<{ items: Message[]; hasMore: boolean }>('GET', `/api/v1/conversations/${conversationId}/messages${q}`);
+  },
+  async getConversationMemory(conversationId) {
+    return request<MemoryReadResult>('GET', `/api/v1/conversations/${conversationId}/memory`);
+  },
+  async getMoodTimeline(conversationId) {
+    return request<MoodTimelineResult>('GET', `/api/v1/conversations/${conversationId}/mood-timeline`);
   },
   async sendMessage(params) {
     return request<ChatSendResult>('POST', '/api/v1/chat/send', params);

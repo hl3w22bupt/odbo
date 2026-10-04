@@ -1,0 +1,12 @@
+== commits ==
+d7c91fa test(smoke): lock insight summary end-to-end contract
+ba8b54d feat(mobile): render mood insight summary states
+3537ca9 feat(server): add explainable mood insight summary
+2093115 docs(v0.4): freeze insight baseline and scope
+== schema diff ==
+== added prisma calls in routes ==
++    const conversation = await prisma.conversation.findFirst({ where: { id, userId: user.id } })
++      prisma.conversationMemory.findMany({
++      prisma.moodSnapshot.findMany({
+== forbidden write calls in new read-side files ==
+AUDIT_EXIT=0

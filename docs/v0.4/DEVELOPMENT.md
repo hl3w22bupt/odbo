@@ -76,13 +76,13 @@
 
 | # | 验收项 | 可判定口径 | 测试 / 冒烟锚点 | 状态 |
 |---|---|---|---|---|
-| V4-1 | 服务端洞察契约 | 空态 `summary=null`；有效输入产出 `trend/counts/keywords/reason/window` | `moodInsight.test.ts > returns an explicit empty insight before any valid mood point`、`aggregates an explainable trend from active memory-backed snapshots` | [ ] |
-| V4-2 | 脏数据与降级 | 脏点被跳过；memory/timeline/聚合失败返回 `available=false/degraded=true/summary=null` | `moodInsight.test.ts > skips dirty points that are not backed by an active memory`、`degrades when either source read is degraded`；`chat.routes.test.ts > serves the explicit empty insight summary before any valid point`、`> degrades the insight summary when storage fails`、`> degrades the insight summary when aggregation cannot safely complete` | [ ] |
-| V4-3 | HTTP 兼容 | 新路由注册；旧 memory / mood-timeline 契约测试不修改且全绿 | `chat.routes.test.ts > exposes the insight summary read API`；v0.3 既有四个 read handler 行为测试 | [ ] |
-| V4-4 | 客户端读视图 | 空态 / 降级态 / 就绪态判定正确，文案内容可见，不断言像素 | `insights.test.ts > treats an insight summary as empty before the first valid point`、`> hides dirty or degraded insight data`、`> asserts explainable insight content instead of pixels`；`MoodInsightPanel` | [ ] |
-| V4-5 | 全链路 | 01-19 v0.3 冒烟无回归；20-21 就绪摘要与样本口径；22 新会话空摘要；exit 0 | `scripts/smoke.sh` 20-21；`docs/smoke/v0.4.md` | [ ] |
-| V4-6 | v0.3 持久门无回归 | `npm run persist:check` exit 0，P01-P09 | `docs/smoke/v0.4.md` | [ ] |
-| V4-7 | 死测试清账 | 新旧测试无 skipped/todo/only，台账清零 | `docs/v0.4/BASELINE.md` §3 | [ ] |
+| V4-1 | 服务端洞察契约 | 空态 `summary=null`；有效输入产出 `trend/counts/keywords/reason/window` | `moodInsight.test.ts > returns an explicit empty insight before any valid mood point`、`aggregates an explainable trend from active memory-backed snapshots` | [x] |
+| V4-2 | 脏数据与降级 | 脏点被跳过；memory/timeline/聚合失败返回 `available=false/degraded=true/summary=null` | `moodInsight.test.ts > skips dirty points that are not backed by an active memory`、`degrades when either source read is degraded`；`chat.routes.test.ts > serves the explicit empty insight summary before any valid point`、`> degrades the insight summary when storage fails`、`> degrades the insight summary when aggregation cannot safely complete` | [x] |
+| V4-3 | HTTP 兼容 | 新路由注册；旧 memory / mood-timeline 契约测试不修改且全绿 | `chat.routes.test.ts > exposes the insight summary read API`；v0.3 既有四个 read handler 行为测试 | [x] |
+| V4-4 | 客户端读视图 | 空态 / 降级态 / 就绪态判定正确，文案内容可见，不断言像素 | `insights.test.ts > treats an insight summary as empty before the first valid point`、`> hides dirty or degraded insight data`、`> asserts explainable insight content instead of pixels`；`MoodInsightPanel` | [x] |
+| V4-5 | 全链路 | 01-19 v0.3 冒烟无回归；20-21 就绪摘要与样本口径；22 新会话空摘要；exit 0 | `scripts/smoke.sh` 20-21；`docs/smoke/v0.4.md` | [x] |
+| V4-6 | v0.3 持久门无回归 | `npm run persist:check` exit 0，P01-P09 | `docs/smoke/v0.4.md` | [x] |
+| V4-7 | 死测试清账 | 新旧测试无 skipped/todo/only，台账清零 | `docs/v0.4/BASELINE.md` §3 | [x] |
 
 窗口不足：只保 V4-1 至 V4-7（即 P0 整体）；不允许砍掉三件套换取功能上线。
 

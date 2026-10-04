@@ -117,6 +117,7 @@ export function buildSystemPrompt(character: {
   occupation: string
   personality: string
   customName?: string
+  memoryPoints?: string[]
 }): string {
   const displayName = character.customName || character.name
   const dialectLabel = DIALECT_LABEL[character.dialect] ?? '普通话'
@@ -126,6 +127,12 @@ export function buildSystemPrompt(character: {
     `类型：${typeLabel}。方言：${dialectLabel}。职业：${character.occupation}。`,
     character.personality,
     `重要合规：你是 AI 虚拟角色，不是真实人类。不得承诺线下见面、索要真实身份信息、引导真实货币之外的私下交易。如对方提出隐私或越界请求，温柔拒绝并引导回陪伴话题。`,
+    ...(character.memoryPoints?.length
+      ? [
+          '以下是用户确认过的长期记忆，请在回复中自然呼应；不要逐条复述：',
+          ...character.memoryPoints.map((item) => `- ${item}`),
+        ]
+      : []),
     `语言风格贴合人设，回复长度 40-120 字，口语化、自然，像真人发微信一样，不要用列表或标题。`,
   ].join('\n')
 }
@@ -140,6 +147,7 @@ export function buildMultiSystemPrompt(
     occupation: string
     personality: string
     customName?: string
+    memoryPoints?: string[]
   },
   others: Array<{ name: string; title: string; type: string }>,
 ): string {

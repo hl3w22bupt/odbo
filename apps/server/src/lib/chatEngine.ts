@@ -52,12 +52,17 @@ async function buildHistory(conversationId: string, limit = 12): Promise<ChatMes
  */
 export async function generateReply(ctx: ReplyContext): Promise<string> {
   const { userId, characterId, messageId, conversationId } = ctx
-  const [character, custom, history] = await Promise.all([
+  const [character, custom, history, memoryRows] = await Promise.all([
     prisma.character.findUnique({ where: { id: characterId } }),
     prisma.characterCustomization.findUnique({
       where: { userId_characterId: { userId, characterId } },
     }),
     buildHistory(conversationId),
+    prisma.conversationMemory.findMany({
+      where: { conversationId, status: 'ACTIVE', content: { not: '' } },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    }),
   ])
 
   if (!character) {
@@ -67,8 +72,13 @@ export async function generateReply(ctx: ReplyContext): Promise<string> {
 
   const userMessage = history.filter((m) => m.role === 'user').at(-1)?.content ?? ''
 
+  const memoryPoints = memoryRows
+    .slice()
+    .reverse()
+    .map((row) => row.content)
+
   const customName = custom?.customName ?? ctx.customName ?? undefined
-  const charForPrompt: { name: string; title: string; type: string; dialect: string; occupation: string; personality: string; customName?: string } = {
+  const charForPrompt: { name: string; title: string; type: string; dialect: string; occupation: string; personality: string; customName?: string; memoryPoints?: string[] } = {
     name: character.name,
     title: character.title,
     type: character.type,
@@ -76,6 +86,7 @@ export async function generateReply(ctx: ReplyContext): Promise<string> {
     occupation: character.occupation,
     personality: character.personality,
     ...(customName !== undefined ? { customName } : {}),
+    memoryPoints,
   }
 
   const systemPrompt =

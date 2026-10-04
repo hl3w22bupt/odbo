@@ -1,0 +1,16 @@
+=== RT-01 P09 硬门槛实现（persist 137-139）===
+# 硬门槛：写失败必须命中降级契约，读回空列表，不得携带脏数据。
+(cd "$ROOT/apps/server" && npx vitest run -t 'maps a memory write failure to the degraded read contract' src/lib/conversationInsights.test.ts >/dev/null)
+green 'P09 写失败降级断言（空列表，无脏数据）'
+=== RT-02 memoryPoints 注入测试覆盖 ===
+0
+=== RT-03 QUARANTINED 写入方 ===
+apps/server/src/lib/conversationInsights.ts:14:  status: 'ACTIVE' | 'QUARANTINED'
+apps/server/src/lib/conversationInsights.ts:86:    status: row.status === 'QUARANTINED' ? 'QUARANTINED' : 'ACTIVE',
+=== RT-04 serializeMood 循环断言 + classifyMood 覆盖 ===
+    const row = {
+      ...point,
+      keywords: '开心,顺利',
+      createdAt: new Date('2026-01-02T00:00:00.000Z'),
+    }
+       0

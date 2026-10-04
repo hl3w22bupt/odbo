@@ -12,6 +12,7 @@ import type {
   ChatSendResult,
   ComplianceStatus,
   Conversation,
+  ConversationMemory,
   CustomizationPayload,
   CustomizationResult,
   GeneratedImageResult,
@@ -20,7 +21,10 @@ import type {
   LoginResult,
   MembershipInfo,
   MembershipPlan,
+  MemoryReadResult,
   Message,
+  MoodSnapshot,
+  MoodTimelineResult,
   Order,
   PayResult,
   Product,
@@ -32,6 +36,24 @@ import { genId } from '../utils/format';
 import { ApiError } from './client';
 
 // ===================== 常量 =====================
+
+const moods = new Map<string, MoodSnapshot[]>();
+const POSITIVE_WORDS = ['开心', '高兴', '喜欢', '舒服', '顺利', '幸福', '满意', '不错', '舒心', '笑'];
+const NEGATIVE_WORDS = ['难过', '伤心', '孤独', '焦虑', '烦', '累', '生气', '失望', '害怕', '不舒服'];
+
+function classifyMood(content: string): { mood: 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE'; score: -1 | 0 | 1; keywords: string[] } {
+  const positive = POSITIVE_WORDS.filter((word) => content.includes(word));
+  const negative = NEGATIVE_WORDS.filter((word) => content.includes(word));
+  if (positive.length > negative.length) return { mood: 'POSITIVE', score: 1, keywords: positive };
+  if (negative.length > positive.length) return { mood: 'NEGATIVE', score: -1, keywords: negative };
+  return { mood: 'NEUTRAL', score: 0, keywords: [] };
+}
+
+const memories = new Map<string, ConversationMemory[]>();
+
+function normalizeMemory(content: string): string {
+  return content.replace(/\s+/g, ' ').trim().slice(0, 160);
+}
 
 const AI_NOTICE = '心伴AI 内所有角色均为 AI 虚拟形象，其言行由算法生成，不代表真实人物或观点。请理性看待，勿过度投入。';
 
@@ -410,6 +432,33 @@ export const mockApi = {
       createdAt: nowIso(),
     };
     list.push(userMsg, assistantMsg);
+    const memoryContent = normalizeMemory(params.content);
+    if (memoryContent) {
+      const items = memories.get(convId) ?? [];
+      items.push({
+        id: genId('memory'),
+        conversationId: convId,
+        characterId: character.id,
+        sourceMessageId: userMsg.id,
+        content: memoryContent,
+        status: 'ACTIVE',
+        createdAt: nowIso(),
+      });
+      memories.set(convId, items);
+      const classified = classifyMood(memoryContent);
+      const moodItems = moods.get(convId) ?? [];
+      const mood: MoodSnapshot = {
+        id: genId('mood'),
+        conversationId: convId,
+        characterId: character.id,
+        sourceMessageId: userMsg.id,
+        memoryId: items[items.length - 1]!.id,
+        ...classified,
+        createdAt: nowIso(),
+      };
+      moodItems.push(mood);
+      moods.set(convId, moodItems);
+    }
 
     // 好感度小幅上涨
     affectionValues[character.id] = (affectionValues[character.id] ?? 0) + (character.type === 'POSSESSIVE' ? 3 : 2);
@@ -426,7 +475,37 @@ export const mockApi = {
       assistantMessage: assistantMsg,
       quota: quotaStatus(),
       affection: computeAffection(affectionValues[character.id] ?? 0),
+      memory: {
+        conversationId: convId,
+        available: true,
+        degraded: false,
+        items: memories.get(convId) ?? [],
+      },
+      moodTimeline: {
+        conversationId: convId,
+        available: true,
+        degraded: false,
+        points: moods.get(convId) ?? [],
+      },
       typing: true,
+    };
+  },
+
+  async getConversationMemory(conversationId: string): Promise<MemoryReadResult> {
+    return {
+      conversationId,
+      available: true,
+      degraded: false,
+      items: memories.get(conversationId) ?? [],
+    };
+  },
+
+  async getMoodTimeline(conversationId: string): Promise<MoodTimelineResult> {
+    return {
+      conversationId,
+      available: true,
+      degraded: false,
+      points: moods.get(conversationId) ?? [],
     };
   },
 

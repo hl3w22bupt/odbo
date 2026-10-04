@@ -6,7 +6,7 @@
 2. **范围冻结**：只在既有会话记忆 + 情绪轨迹之上做读侧派生；冻结契约与 DoD。
 3. **服务端派生层**：新增情绪洞察纯函数、路由注册与读 handler；空态、脏数据、聚合失败降级、鉴权兼容先红后绿。
 4. **客户端展示层**：新增 API/类型/状态纯函数/摘要面板；空态、降级态、可解释文案内容断言先红后绿。
-5. **端到端锚点**：扩展 smoke 20-21，不改 01-19 基线；v0.3 persist 保持 P01-P09。
+5. **端到端锚点**：扩展 smoke 20-22，不改 01-19 基线；v0.3 persist 保持 P01-P09。
 6. **质量与部署**：DoD 逐项锚点验收，build/test/smoke/persist 复跑后进入 deploy，部署侧重跑冒烟。
 
 ## 2. 技术选型与模块边界
@@ -18,7 +18,7 @@
 | 客户端类型/API | `apps/mobile/src/types/index.ts`、`src/api/index.ts` | 新增读方法，不改既有方法 |
 | 展示状态 | `apps/mobile/src/utils/insights.ts` | 空态 / 降级态 / 就绪态判定，隐藏无效摘要 |
 | 展示组件 | `apps/mobile/src/components/MoodInsightPanel.tsx`、`ChatScreen.tsx` | 读侧文案展示；不触发任何写入 |
-| 端到端 | `scripts/smoke.sh` | 01-19 不变，20 就绪摘要、21 空摘要 |
+| 端到端 | `scripts/smoke.sh` | 01-19 不变，20-21 就绪摘要与样本口径、22 空摘要 |
 
 禁止：schema migration、Prisma create/update/upsert/delete、修改既有 HTTP 字段、移动端既有组件契约变更。
 
@@ -80,7 +80,7 @@
 | V4-2 | 脏数据与降级 | 脏点被跳过；memory/timeline/聚合失败返回 `available=false/degraded=true/summary=null` | `moodInsight.test.ts > skips dirty points that are not backed by an active memory`、`degrades when either source read is degraded`；`chat.routes.test.ts > serves the explicit empty insight summary before any valid point`、`> degrades the insight summary when storage fails`、`> degrades the insight summary when aggregation cannot safely complete` | [ ] |
 | V4-3 | HTTP 兼容 | 新路由注册；旧 memory / mood-timeline 契约测试不修改且全绿 | `chat.routes.test.ts > exposes the insight summary read API`；v0.3 既有四个 read handler 行为测试 | [ ] |
 | V4-4 | 客户端读视图 | 空态 / 降级态 / 就绪态判定正确，文案内容可见，不断言像素 | `insights.test.ts > treats an insight summary as empty before the first valid point`、`> hides dirty or degraded insight data`、`> asserts explainable insight content instead of pixels`；`MoodInsightPanel` | [ ] |
-| V4-5 | 全链路 | 01-19 v0.3 冒烟无回归；20 就绪摘要；21 新会话空摘要；exit 0 | `scripts/smoke.sh` 20-21；`docs/smoke/v0.4.md` | [ ] |
+| V4-5 | 全链路 | 01-19 v0.3 冒烟无回归；20-21 就绪摘要与样本口径；22 新会话空摘要；exit 0 | `scripts/smoke.sh` 20-21；`docs/smoke/v0.4.md` | [ ] |
 | V4-6 | v0.3 持久门无回归 | `npm run persist:check` exit 0，P01-P09 | `docs/smoke/v0.4.md` | [ ] |
 | V4-7 | 死测试清账 | 新旧测试无 skipped/todo/only，台账清零 | `docs/v0.4/BASELINE.md` §3 | [ ] |
 

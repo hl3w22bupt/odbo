@@ -1,0 +1,2 @@
+$ grep -RInE "\.(skip|only|todo)\b|[[:<:]](xit|xdescribe)\(" apps/server/src apps/mobile/src scripts
+exit=0

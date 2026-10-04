@@ -1,0 +1,33 @@
+
+> xinban-v01@1.0.0 test
+> cd apps/server && npm test && cd ../mobile && npm test
+
+
+> @xinban/server@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmut05a9i00ahic7qu2z0uk1v/apps/server
+
+
+ Test Files  7 passed (7)
+      Tests  32 passed (32)
+   Start at  07:44:54
+   Duration  280ms (transform 399ms, setup 0ms, import 651ms, tests 87ms, environment 0ms)
+
+
+> xinban-ai-mobile@1.0.0 test
+> vitest run
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmut05a9i00ahic7qu2z0uk1v/apps/mobile
+
+
+ Test Files  3 passed (3)
+      Tests  26 passed (26)
+   Start at  07:44:54
+   Duration  125ms (transform 54ms, setup 0ms, import 74ms, tests 20ms, environment 0ms)
+

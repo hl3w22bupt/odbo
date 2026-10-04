@@ -1,0 +1,40 @@
+399a195 docs(smoke): backfill v0.3 deploy gate rerun exit codes
+验收项：V3-5 部署等价门与冒烟 deploy 段重跑退出码闭环；锚点：本轮实测
+build/test/smoke/persist/start-standalone 五门全部 exit 0（19 项/19 项、
+9 项、server 32 + mobile 26 tests、/health up）。
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+88e6e52 test(smoke): add v0.3 empty-state steps 18-19 and fix fixed-string grep
+验收项：V3-1/V3-2 冒烟步骤可复现空态；锚点：npm run smoke 19 项/19 项
+exit 0（14-17 写后读 + 18/19 新会话 available=true/items=[]/points=[]）；
+assert_contains 改 grep -F，修复 [] 被 BRE bracket 表达式误解析。
+文档同步：docs/smoke/v0.3.md 增量段 14-19；DEVELOPMENT.md DoD 锚点与
+契约测试绑定表。
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+c616b8b test(memory): cover v0.3 read handlers for empty and degraded states
+验收项：V3-1/V3-4 读路径空态与降级态行为测试；锚点：
+chat.routes.test.ts > serves the explicit empty memory state for a fresh
+conversation / degrades the memory read to an empty list when storage
+fails / serves the explicit empty mood timeline before the first
+snapshot / degrades the mood timeline read to an empty list when
+storage fails。server 7 files / 32 tests 全绿。
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+6a29e57 myrd: workflow auto-commit [skip ci]
+---
+8c6cf07 test(v0.3): gate smoke and cross-restart persistence
+验收项：V3-3/V3-4/V3-5；锚点：scripts/persistence-regression.sh P01-P09、smoke 01-17；写失败降级与重启读回均 exit 0。
+---
+f98dab2 feat(mood): add structured emotion trajectory view
+验收项：P1 情绪轨迹可视化；锚点：chat.routes.test.ts、conversationInsights.test.ts、insights.test.ts；快照断言 mood/score 内容，不断言像素。
+---
+24705b3 feat(memory): close the conversation memory loop
+验收项：P0 会话记忆展示利用；锚点：chat.routes.test.ts、conversationInsights.test.ts、insights.test.ts；空态/降级态不展示脏数据。
+---
+f09d5b1 docs(baseline): record v0.2 command evidence and recover missing baseline doc
+验收项：基线确认/漂移先修；锚点：npm run build/test/smoke 全部 exit 0，死测试 0。
+---

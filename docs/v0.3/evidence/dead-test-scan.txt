@@ -1,0 +1,4 @@
+dead-marker-scan-exit=1
+apps/server/src/lib/conversationInsights.test.ts:6
+apps/mobile/src/utils/insights.test.ts:5
+apps/server/src/routes/chat.routes.test.ts:6

@@ -20,6 +20,15 @@ import { getAffectionsForUser } from '../lib/affection.js'
 import { hasActiveMembership } from '../lib/quota.js'
 import { logger } from '../lib/logger.js'
 import {
+  createEmotion,
+  deleteEmotion,
+  getEmotion,
+  safeUpsertEmotionFromContent,
+  updateEmotion,
+  EMOTION_STATES,
+  type EmotionInput,
+} from '../lib/emotion.js'
+import {
   extractMemoryContent,
   classifyMood,
   moodTimelineDegraded,
@@ -370,6 +379,9 @@ async function chatSend(ctx: HttpRouteContext) {
     }
   }
 
+  // v0.2 伴生情绪：持久层失败时只降级记日志，不影响已落库的消息与响应。
+  await safeUpsertEmotionFromContent(conversation.id, safeContent)
+
   // 后台生成回复
   const ctx2: ReplyContext = {
     conversationId: conversation.id,
@@ -592,6 +604,65 @@ async function proactiveShareNow(ctx: HttpRouteContext) {
   return ok({ triggered: true, messageId: placeholder.id }, '已触发主动分享')
 }
 
+function parseEmotionBody(body: Record<string, unknown>): EmotionInput {
+  const emotion = body.emotion
+  if (typeof emotion !== 'string' || !(EMOTION_STATES as readonly string[]).includes(emotion)) {
+    throw AppError.badRequest('emotion 不合法')
+  }
+  const rawScore = body.score ?? 0
+  if (typeof rawScore !== 'number' || !Number.isFinite(rawScore)) {
+    throw AppError.badRequest('score 必须是有限数字')
+  }
+  const rawVersion = body.version ?? 1
+  if (typeof rawVersion !== 'number' || !Number.isInteger(rawVersion) || rawVersion < 1) {
+    throw AppError.badRequest('version 必须是正整数')
+  }
+  if (body.payload != null && (typeof body.payload !== 'object' || Array.isArray(body.payload))) {
+    throw AppError.badRequest('payload 必须是对象')
+  }
+  return {
+    emotion: emotion as EmotionInput['emotion'],
+    score: Math.max(-1, Math.min(1, rawScore)),
+    version: rawVersion,
+    payload: (body.payload ?? {}) as Record<string, unknown>,
+  }
+}
+
+async function requireOwnedConversation(id: string | undefined, userId: string) {
+  if (!id) throw AppError.badRequest('缺少会话 id')
+  const conversation = await prisma.conversation.findFirst({ where: { id, userId } })
+  if (!conversation) throw AppError.notFound('会话不存在')
+  return conversation
+}
+
+async function createConversationEmotion(ctx: HttpRouteContext) {
+  const user = await authenticate(ctx)
+  const conversation = await requireOwnedConversation(ctx.params.id, user.id)
+  const input = parseEmotionBody(ctx.body)
+  const item = await createEmotion(conversation.id, input)
+  return created(item)
+}
+
+async function getConversationEmotion(ctx: HttpRouteContext) {
+  const user = await authenticate(ctx)
+  const conversation = await requireOwnedConversation(ctx.params.id, user.id)
+  return ok(await getEmotion(conversation.id))
+}
+
+async function updateConversationEmotion(ctx: HttpRouteContext) {
+  const user = await authenticate(ctx)
+  const conversation = await requireOwnedConversation(ctx.params.id, user.id)
+  const input = parseEmotionBody(ctx.body)
+  return ok(await updateEmotion(conversation.id, input))
+}
+
+async function deleteConversationEmotion(ctx: HttpRouteContext) {
+  const user = await authenticate(ctx)
+  const conversation = await requireOwnedConversation(ctx.params.id, user.id)
+  await deleteEmotion(conversation.id)
+  return ok({ conversationId: conversation.id, deleted: true })
+}
+
 export function registerChatRoutes(router: HttpRouter): void {
   router.define('chat::create-conversation', '/api/v1/conversations', 'POST', createConversation)
   router.define('chat::list-conversations', '/api/v1/conversations', 'GET', listConversations)
@@ -602,4 +673,8 @@ export function registerChatRoutes(router: HttpRouter): void {
   router.define('chat::send', '/api/v1/chat/send', 'POST', chatSend)
   router.define('chat::multi-send', '/api/v1/chat/multi/send', 'POST', chatMultiSend)
   router.define('chat::proactive-now', '/api/v1/chat/proactive', 'POST', proactiveShareNow)
+  router.define('chat::emotion-create', '/api/v1/conversations/:id/emotion', 'POST', createConversationEmotion)
+  router.define('chat::emotion-read', '/api/v1/conversations/:id/emotion', 'GET', getConversationEmotion)
+  router.define('chat::emotion-update', '/api/v1/conversations/:id/emotion', 'PATCH', updateConversationEmotion)
+  router.define('chat::emotion-delete', '/api/v1/conversations/:id/emotion', 'DELETE', deleteConversationEmotion)
 }

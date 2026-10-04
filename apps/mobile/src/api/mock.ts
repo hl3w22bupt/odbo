@@ -23,6 +23,7 @@ import type {
   MembershipPlan,
   MemoryReadResult,
   Message,
+  MoodInsightSummaryResult,
   MoodSnapshot,
   MoodTimelineResult,
   Order,
@@ -506,6 +507,39 @@ export const mockApi = {
       available: true,
       degraded: false,
       points: moods.get(conversationId) ?? [],
+    };
+  },
+
+  async getMoodInsightSummary(conversationId: string): Promise<MoodInsightSummaryResult> {
+    const points = moods.get(conversationId) ?? [];
+    if (!points.length) {
+      return { conversationId, available: true, degraded: false, summary: null };
+    }
+    const counts = points.reduce(
+      (acc, point) => {
+        if (point.mood === 'POSITIVE') acc.positive += 1;
+        else if (point.mood === 'NEGATIVE') acc.negative += 1;
+        else acc.neutral += 1;
+        return acc;
+      },
+      { positive: 0, neutral: 0, negative: 0 },
+    );
+    return {
+      conversationId,
+      available: true,
+      degraded: false,
+      summary: {
+        sampleSize: points.length,
+        counts,
+        trend: 'STABLE',
+        headline: '整体情绪比较平稳',
+        reason: `已聚合 ${points.length} 条情绪快照，先以稳定观察为主。`,
+        keywords: [...new Set(points.flatMap((point) => point.keywords))].slice(0, 3),
+        window: {
+          from: points[0]!.createdAt,
+          to: points[points.length - 1]!.createdAt,
+        },
+      },
     };
   },
 

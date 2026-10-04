@@ -21,6 +21,7 @@ import type {
   MembershipInfo,
   MembershipPlan,
   MemoryReadResult,
+  MoodInsightSummaryResult,
   MoodTimelineResult,
   Message,
   Order,
@@ -56,6 +57,7 @@ export interface ApiClient {
   listMessages(conversationId: string, after?: string): Promise<{ items: Message[]; hasMore: boolean }>;
   getConversationMemory(conversationId: string): Promise<MemoryReadResult>;
   getMoodTimeline(conversationId: string): Promise<MoodTimelineResult>;
+  getMoodInsightSummary(conversationId: string): Promise<MoodInsightSummaryResult>;
   sendMessage(params: SendMessageParams): Promise<ChatSendResult>;
   sendMultiMessage(params: SendMultiMessageParams): Promise<ChatMultiSendResult>;
   triggerProactive(characterId: string): Promise<{ triggered: boolean; messageId: string }>;
@@ -103,6 +105,9 @@ const realApi: ApiClient = {
   },
   async getMoodTimeline(conversationId) {
     return request<MoodTimelineResult>('GET', `/api/v1/conversations/${conversationId}/mood-timeline`);
+  },
+  async getMoodInsightSummary(conversationId) {
+    return request<MoodInsightSummaryResult>('GET', `/api/v1/conversations/${conversationId}/insight-summary`);
   },
   async sendMessage(params) {
     return request<ChatSendResult>('POST', '/api/v1/chat/send', params);

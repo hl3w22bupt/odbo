@@ -18,6 +18,7 @@ import { CustomizeModal } from '../components/CustomizeModal';
 import { GiftFloatLayer } from '../components/GiftFloatLayer';
 import { GiftSheet } from '../components/GiftSheet';
 import { MemoryPanel } from '../components/MemoryPanel';
+import { MoodInsightPanel } from '../components/MoodInsightPanel';
 import { MoodTimelinePanel } from '../components/MoodTimelinePanel';
 import { HeartbeatBar } from '../components/HeartbeatBar';
 import { LoadingView } from '../components/LoadingView';
@@ -27,7 +28,7 @@ import { useNavigation } from '../navigation/NavigationContext';
 import { useSession } from '../store/SessionContext';
 import { useToast } from '../store/ToastContext';
 import { colors, fontSizes, fontWeights, radii, spacing } from '../theme';
-import type { Affection, Character, ChatMode, CustomizationPayload, Gift, MemoryReadResult, Message, MoodTimelineResult } from '../types';
+import type { Affection, Character, ChatMode, CustomizationPayload, Gift, MemoryReadResult, Message, MoodInsightSummaryResult, MoodTimelineResult } from '../types';
 import { affectionLevelLabel, genId } from '../utils/format';
 
 interface ChatScreenProps {
@@ -56,6 +57,7 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
   const [messages, setMessages] = useState<Message[]>([]);
   const [memory, setMemory] = useState<MemoryReadResult | null>(null);
   const [moodTimeline, setMoodTimeline] = useState<MoodTimelineResult | null>(null);
+  const [moodInsight, setMoodInsight] = useState<MoodInsightSummaryResult | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(initConvId ?? null);
   const [activeCharId, setActiveCharId] = useState<string>(initCharacters[0]?.id ?? '');
   const [affections, setAffections] = useState<Record<string, Affection>>(() =>
@@ -172,14 +174,16 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
     (async () => {
       setLoading(true);
       try {
-        const [res, memoryView, moodView] = await Promise.all([
+        const [res, memoryView, moodView, insightView] = await Promise.all([
           api.listMessages(initConvId),
           api.getConversationMemory(initConvId).catch(() => null),
           api.getMoodTimeline(initConvId).catch(() => null),
+          api.getMoodInsightSummary(initConvId).catch(() => null),
         ]);
         if (mounted) setMessages(res.items);
         if (mounted) setMemory(memoryView);
         if (mounted) setMoodTimeline(moodView);
+        if (mounted) setMoodInsight(insightView);
         if (mounted) ensurePolling(initConvId);
         if (mounted) scheduleProactive(initConvId);
       } catch (e) {
@@ -271,6 +275,7 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
           res.moodTimeline ??
             (await api.getMoodTimeline(res.conversationId).catch(() => null)),
         );
+        setMoodInsight(await api.getMoodInsightSummary(res.conversationId).catch(() => null));
         ensurePolling(res.conversationId);
         scheduleProactive(res.conversationId);
       } else {
@@ -457,6 +462,7 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
       </View>
       <MemoryPanel value={memory} />
       <MoodTimelinePanel value={moodTimeline} />
+      <MoodInsightPanel value={moodInsight} />
 
       <ScrollView
         ref={scrollRef}

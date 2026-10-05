@@ -107,6 +107,25 @@ export interface MoodTimelineResult {
   points: MoodSnapshot[];
 }
 
+export type MoodInsightTrend = 'IMPROVING' | 'STABLE' | 'WORSENING';
+
+export interface MoodInsightSummary {
+  sampleSize: number;
+  counts: { positive: number; neutral: number; negative: number };
+  trend: MoodInsightTrend;
+  headline: string;
+  reason: string;
+  keywords: string[];
+  window: { from: string; to: string };
+}
+
+export interface MoodInsightSummaryResult {
+  conversationId: string;
+  available: boolean;
+  degraded: boolean;
+  summary: MoodInsightSummary | null;
+}
+
 export interface QuotaStatus {
   used: number;
   limit: number;

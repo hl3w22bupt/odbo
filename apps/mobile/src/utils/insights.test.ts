@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { memoryViewState, moodViewState } from './insights';
+import { memoryViewState, moodInsightViewState, moodViewState } from './insights';
 import type { MemoryReadResult, MoodTimelineResult } from '../types';
 
 const memory: MemoryReadResult = {
@@ -67,5 +67,49 @@ describe('moodViewState', () => {
       mode: 'degraded',
       points: [],
     });
+  });
+});
+
+describe('moodInsightViewState', () => {
+  const summary = {
+    sampleSize: 2,
+    counts: { positive: 1, neutral: 1, negative: 0 },
+    trend: 'STABLE' as const,
+    headline: '整体情绪比较平稳',
+    reason: '前后两段均分接近，最近情绪以平稳为主。',
+    keywords: ['开心'],
+    window: {
+      from: '2026-01-01T00:00:00.000Z',
+      to: '2026-01-02T00:00:00.000Z',
+    },
+  };
+  const view = {
+    conversationId: 'conv_1',
+    available: true,
+    degraded: false,
+    summary,
+  };
+
+  it('treats an insight summary as empty before the first valid point', () => {
+    expect(moodInsightViewState({ conversationId: 'conv_1', available: true, degraded: false, summary: null })).toEqual({
+      mode: 'empty',
+      summary: null,
+    });
+  });
+
+  it('hides dirty or degraded insight data', () => {
+    expect(moodInsightViewState({ ...view, available: false, degraded: true })).toEqual({
+      mode: 'degraded',
+      summary: null,
+    });
+    expect(moodInsightViewState({ ...view, summary: { ...summary, sampleSize: 0 } }).mode).toBe('empty');
+  });
+
+  it('asserts explainable insight content instead of pixels', () => {
+    expect(moodInsightViewState(view)).toEqual({
+      mode: 'ready',
+      summary,
+    });
+    expect(moodInsightViewState(view).summary?.reason).toContain('前后两段均分接近');
   });
 });

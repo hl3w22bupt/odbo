@@ -1,0 +1,13 @@
+== server anchors ==
+apps/server/src/lib/moodInsight.test.ts:54:  it('returns an explicit empty insight before any valid mood point', () => {
+apps/server/src/lib/moodInsight.test.ts:66:  it('aggregates an explainable trend from active memory-backed snapshots', () => {
+apps/server/src/lib/moodInsight.test.ts:95:  it('skips dirty points that are not backed by an active memory', () => {
+apps/server/src/lib/moodInsight.test.ts:113:  it('degrades when either source read is degraded', () => {
+apps/server/src/routes/chat.routes.test.ts:135:  it('exposes the insight summary read API', () => {
+apps/server/src/routes/chat.routes.test.ts:145:  it('serves the explicit empty insight summary before any valid point', async () => {
+apps/server/src/routes/chat.routes.test.ts:158:  it('degrades the insight summary when storage fails', async () => {
+apps/server/src/routes/chat.routes.test.ts:171:  it('degrades the insight summary when aggregation cannot safely complete', async () => {
+== mobile anchors ==
+apps/mobile/src/utils/insights.test.ts:93:  it('treats an insight summary as empty before the first valid point', () => {
+apps/mobile/src/utils/insights.test.ts:100:  it('hides dirty or degraded insight data', () => {
+apps/mobile/src/utils/insights.test.ts:108:  it('asserts explainable insight content instead of pixels', () => {

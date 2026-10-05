@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 心伴 v0.3 · 一条命令全链路冒烟（01-13 v0.2 基线段 + 14-19 增量段）
+# 心伴 v0.4 · 一条命令全链路冒烟（01-13 基线 + 14-19 v0.3 增量 + 20-21 洞察摘要）
 # 用法：npm run smoke
 # 可用环境变量：XINBAN_SMOKE_PORT（默认 13888）、KEEP_SMOKE_DIR=1（保留临时目录）
 set -euo pipefail
@@ -164,4 +164,12 @@ assert_contains '18 新会话记忆空态契约' "$fresh_memory" '"available":tr
 fresh_mood="$(http GET "/api/v1/conversations/$FRESH_CONVERSATION_ID/mood-timeline" "$TOKEN")"
 assert_contains '19 新会话情绪轨迹空态契约' "$fresh_mood" '"available":true,"degraded":false,"points":[]'
 
-green "心伴 v0.3 冒烟通过：$PASS 项 / 19 项"
+# ---------- v0.4 增量段：既有记忆 + 轨迹之上的读侧洞察 ----------
+insight="$(http GET "/api/v1/conversations/$CONVERSATION_ID/insight-summary" "$TOKEN")"
+assert_contains '20 情绪洞察就绪摘要' "$insight" '"headline":"整体情绪比较平稳"'
+assert_contains '21 情绪洞察样本与观察口径' "$insight" '"sampleSize":1'
+
+fresh_insight="$(http GET "/api/v1/conversations/$FRESH_CONVERSATION_ID/insight-summary" "$TOKEN")"
+assert_contains '22 新会话情绪洞察空态契约' "$fresh_insight" '"available":true,"degraded":false,"summary":null'
+
+green "心伴 v0.4 冒烟通过：$PASS 项 / 22 项"

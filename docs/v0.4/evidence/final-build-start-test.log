@@ -1,0 +1,86 @@
+== final build ==
+
+> xinban-v01@1.0.0 build
+> cd apps/server && npm run build && cd ../mobile && npm run typecheck && EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-http://127.0.0.1:3888} npm run export -- --platform web --output-dir dist-web --clear
+
+
+> @xinban/server@1.0.0 build
+> tsc -p tsconfig.build.json
+
+
+> xinban-ai-mobile@1.0.0 typecheck
+> tsc --noEmit
+
+
+> xinban-ai-mobile@1.0.0 export
+> expo export --platform web --output-dir dist-web --clear
+
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+| (node:28316) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:28316) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:28316) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:28316) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:28316) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:28316) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:28316) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:28316) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+Web Bundled 2594ms index.ts (332 modules)
+
+› web bundles (1):
+_expo/static/js/web/index-e8431dc84de012602a032a6a67f2ea30.js (659KB)
+
+› Files (3):
+favicon.ico (15KB)
+index.html (1.2KB)
+metadata.json (49B)
+
+Exported: dist-web
+== final start ==
+curl: (7) Failed to connect to 127.0.0.1 port 15891 after 0 ms: Couldn't connect to server
+{"code":"OK","message":"ok","data":{"service":"xinban-ai","status":"up","mode":"standalone","time":"2026-10-04T23:20:56.194Z"}}
+start exit: 0
+== final test ==
+
+> xinban-v01@1.0.0 test
+> cd apps/server && npm test && cd ../mobile && npm test
+
+
+> @xinban/server@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmuufi2ip0019icry302mk1em/apps/server
+
+
+ Test Files  9 passed (9)
+      Tests  46 passed (46)
+   Start at  07:20:56
+   Duration  282ms (transform 486ms, setup 0ms, import 771ms, tests 84ms, environment 0ms)
+
+
+> xinban-ai-mobile@1.0.0 test
+> vitest run
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmuufi2ip0019icry302mk1em/apps/mobile
+
+
+ Test Files  3 passed (3)
+      Tests  29 passed (29)
+   Start at  07:20:57
+   Duration  123ms (transform 56ms, setup 0ms, import 76ms, tests 20ms, environment 0ms)
+
+FINAL_BUILD_START_TEST_EXIT=0

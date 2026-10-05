@@ -1,4 +1,4 @@
-import type { MemoryReadResult, MoodTimelineResult } from '../types';
+import type { MemoryReadResult, MoodInsightSummaryResult, MoodTimelineResult } from '../types';
 
 export type MemoryViewState =
   | { mode: 'empty'; items: [] }
@@ -22,4 +22,19 @@ export function moodViewState(view: MoodTimelineResult | null | undefined): Mood
   if (!view || view.degraded || !view.available) return { mode: 'degraded', points: [] };
   const points = (view.points ?? []).filter((point) => point.id && point.createdAt);
   return points.length > 0 ? { mode: 'ready', points } : { mode: 'empty', points: [] };
+}
+
+export type MoodInsightViewState =
+  | { mode: 'empty'; summary: null }
+  | { mode: 'degraded'; summary: null }
+  | { mode: 'ready'; summary: NonNullable<MoodInsightSummaryResult['summary']> };
+
+export function moodInsightViewState(
+  view: MoodInsightSummaryResult | null | undefined,
+): MoodInsightViewState {
+  if (!view || view.degraded || !view.available) return { mode: 'degraded', summary: null };
+  const summary = view.summary;
+  return summary && summary.sampleSize > 0 && summary.headline && summary.reason
+    ? { mode: 'ready', summary }
+    : { mode: 'empty', summary: null };
 }

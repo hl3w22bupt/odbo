@@ -1,0 +1,529 @@
+{
+  "schemaVersion": "1.0",
+  "reportId": "vrf_xinbanv04qareview01",
+  "criteriaHash": "sha256:d3f10c7100b697d24d7216ac2cb0b5cde668c9b86789a7ec3ac6da409bc8a0b2",
+  "target": {
+    "type": "requirement",
+    "id": "xinban-v0.4-data-value",
+    "ref": "docs/v0.4/DEVELOPMENT.md",
+    "title": "心伴 v0.4「数据价值深化」增量交付质量验收（质量验收节点独立复审）"
+  },
+  "triggeredBy": {
+    "scenario": "explicit_invoke",
+    "actor": "workflow-node:quality-review",
+    "at": "2026-10-04T23:52:47.000Z"
+  },
+  "criteria": [
+    {
+      "id": "AC-01",
+      "text": "V4-1 服务端洞察契约：空态 summary=null；有效输入产出 trend/counts/keywords/reason/window",
+      "weight": 3,
+      "kind": "core",
+      "verifiable": true,
+      "originTarget": {
+        "type": "requirement",
+        "id": "xinban-v0.4-data-value"
+      },
+      "parseNote": "冻结 DoD V4-1，锚点 moodInsight.test.ts 空态例 + 聚合例"
+    },
+    {
+      "id": "AC-02",
+      "text": "V4-2 脏数据与降级：脏点跳过；memory/timeline/聚合失败返回 available=false/degraded=true/summary=null",
+      "weight": 3,
+      "kind": "core",
+      "verifiable": true,
+      "originTarget": {
+        "type": "requirement",
+        "id": "xinban-v0.4-data-value"
+      },
+      "parseNote": "冻结 DoD V4-2，三件套之降级半；锚点 moodInsight 2 例 + chat.routes 3 例"
+    },
+    {
+      "id": "AC-03",
+      "text": "V4-3 HTTP 兼容：新路由注册；v0.3 既有 memory/mood-timeline 契约测试未修改且全绿",
+      "weight": 2,
+      "kind": "core",
+      "verifiable": true,
+      "originTarget": {
+        "type": "requirement",
+        "id": "xinban-v0.4-data-value"
+      },
+      "parseNote": "冻结 DoD V4-3，三件套之兼容半"
+    },
+    {
+      "id": "AC-04",
+      "text": "V4-4 客户端读视图：空/降级/就绪三态判定正确，文案内容断言非像素",
+      "weight": 2,
+      "kind": "core",
+      "verifiable": true,
+      "originTarget": {
+        "type": "requirement",
+        "id": "xinban-v0.4-data-value"
+      },
+      "parseNote": "冻结 DoD V4-4，锚点 insights.test.ts 3 例 + MoodInsightPanel"
+    },
+    {
+      "id": "AC-05",
+      "text": "V4-5 全链路：smoke 01-19 v0.3 基线无回归 + 20-22 增量，exit 0",
+      "weight": 3,
+      "kind": "core",
+      "verifiable": true,
+      "originTarget": {
+        "type": "requirement",
+        "id": "xinban-v0.4-data-value"
+      },
+      "parseNote": "冻结 DoD V4-5，同时承载阻塞级拦截标准 B2"
+    },
+    {
+      "id": "AC-06",
+      "text": "V4-6 v0.3 持久门无回归：persist:check exit 0，P01-P09",
+      "weight": 2,
+      "kind": "core",
+      "verifiable": true,
+      "originTarget": {
+        "type": "requirement",
+        "id": "xinban-v0.4-data-value"
+      },
+      "parseNote": "冻结 DoD V4-6"
+    },
+    {
+      "id": "AC-07",
+      "text": "V4-7 死测试清账：扫描 0 命中，Vitest 无 skipped/todo",
+      "weight": 1,
+      "kind": "normal",
+      "verifiable": true,
+      "originTarget": {
+        "type": "requirement",
+        "id": "xinban-v0.4-data-value"
+      },
+      "parseNote": "冻结 DoD V4-7，死测试挂账清零验收口径"
+    }
+  ],
+  "adjudications": [
+    {
+      "criterionId": "AC-01",
+      "verdict": "pass",
+      "rationale": "两个锚点测试在源树逐字命中并随套件全绿：moodInsight.test.ts 'returns an explicit empty insight before any valid mood point' 断言 available=true/degraded=false/summary=null（EV-08，4/4 绿）；'aggregates an explainable trend from active memory-backed snapshots' 断言 sampleSize=4、counts、trend=IMPROVING、keywords=['开心','孤独']、window 起止与 reason 中前后半段均分文案（EV-08）。实现 moodInsight.ts 纯函数与冻结契约逐条对应（EV-10）。",
+      "evidenceIds": [
+        "EV-08",
+        "EV-01",
+        "EV-10"
+      ],
+      "checkedAt": "2026-10-04T23:52:47.000Z",
+      "downgradedBy": null
+    },
+    {
+      "criterionId": "AC-02",
+      "verdict": "pass",
+      "rationale": "降级三路径均有锚点且绿：模块级 'skips dirty points…'（无归因点跳过后 sampleSize=1）与 'degrades when either source read is degraded'（EV-08）；路由级 'serves the explicit empty insight summary…'、'degrades the insight summary when storage fails'（mock reject）、'degrades the insight summary when aggregation cannot safely complete'（createdAt 抛错注入）（EV-09，14/14 绿）。实现侧 catch 先透传 AppError 再降级，404 不被吞（红队 CH-4 反证不成立）。",
+      "evidenceIds": [
+        "EV-08",
+        "EV-09",
+        "EV-03"
+      ],
+      "checkedAt": "2026-10-04T23:52:47.000Z",
+      "downgradedBy": null
+    },
+    {
+      "criterionId": "AC-03",
+      "verdict": "pass",
+      "rationale": "'exposes the insight summary read API' 断言路由表新增 GET /api/v1/conversations/:id/insight-summary（EV-09）。git diff ee98243..HEAD 证明：chat.routes.test.ts 纯追加零删行，conversationInsights.ts 与 prisma/schema.prisma 零改动，既有 46+29 测试全绿即 v0.3 契约行为未变（EV-04/EV-05/EV-06）。红队 CH-7 契约侵蚀反证不成立。",
+      "evidenceIds": [
+        "EV-09",
+        "EV-04",
+        "EV-05"
+      ],
+      "checkedAt": "2026-10-04T23:52:47.000Z",
+      "downgradedBy": null
+    },
+    {
+      "criterionId": "AC-04",
+      "verdict": "pass",
+      "rationale": "insights.test.ts 三个新锚点 'treats an insight summary as empty before the first valid point' / 'hides dirty or degraded insight data' / 'asserts explainable insight content instead of pixels' 命中且随套件全绿（EV-05：mobile 3 files/29 tests；EV-11 绿日志 8/8 含先红 EV-13）。MoodInsightPanel 按 moodInsightViewState 三态渲染文案，不触任何写 API（EV-12）。红队 CH-5 指出的 keywords 缺失崩溃路径需服务端发畸形载荷，当前类型+测试不可达，记为非阻塞加固项（RT-03 minor）。",
+      "evidenceIds": [
+        "EV-05",
+        "EV-11",
+        "EV-12",
+        "EV-13"
+      ],
+      "checkedAt": "2026-10-04T23:52:47.000Z",
+      "downgradedBy": null
+    },
+    {
+      "criterionId": "AC-05",
+      "verdict": "pass",
+      "rationale": "验收侧独立复跑 npm run smoke：exit 0，末行 '心伴 v0.4 冒烟通过：22 项 / 22 项'，01-19 v0.3 基线段逐项 ✅ 无回归，20-22 增量段（就绪摘要 headline、样本口径 sampleSize=1、新会话空态）通过（EV-06）。smoke.sh diff 为纯追加，01-19 步骤字节级未变（EV-14）。红队独立复现（CH-8 refuted）。",
+      "evidenceIds": [
+        "EV-06",
+        "EV-14"
+      ],
+      "checkedAt": "2026-10-04T23:52:47.000Z",
+      "downgradedBy": null
+    },
+    {
+      "criterionId": "AC-06",
+      "verdict": "pass",
+      "rationale": "验收侧独立复跑 npm run persist:check：exit 0，P01-P09 共 9 项全 ✅，含 P02 写 → P05 kill → P06 重启 → P07/P08 读回一致 → P09 写失败降级（EV-07）。红队独立复现（CH-9 refuted）。",
+      "evidenceIds": [
+        "EV-07"
+      ],
+      "checkedAt": "2026-10-04T23:52:47.000Z",
+      "downgradedBy": null
+    },
+    {
+      "criterionId": "AC-07",
+      "verdict": "pass",
+      "rationale": "验收侧以 grep -RInE '\\.(skip|only|todo)\\b|\\b(xit|xdescribe)\\(' 扫描 apps/server/src、apps/mobile/src、scripts：0 命中；两份 Vitest 日志 grep skipped/todo 均 0（EV-04/EV-05）。死测试挂账清零，与 docs/v0.4/BASELINE.md §3 台账一致。红队复核含 fit( 误报排除（CH-10 refuted）。",
+      "evidenceIds": [
+        "EV-04",
+        "EV-05"
+      ],
+      "checkedAt": "2026-10-04T23:52:47.000Z",
+      "downgradedBy": null
+    }
+  ],
+  "evidence": [
+    {
+      "id": "EV-01",
+      "type": "log",
+      "uri": "docs/v0.4/evidence/qa-build.log",
+      "fetchedAt": "2026-10-04T23:52:47.000Z",
+      "digest": "sha256:5a0481f682dc3521fb04cd33727c40303cde1552b8e2beb904cbfa93b53d56c0",
+      "excerpt": "BUILD_EXIT=0；server tsc + mobile typecheck + Expo Web 导出（Exported: dist-web）",
+      "reliability": "direct",
+      "status": "ok"
+    },
+    {
+      "id": "EV-02",
+      "type": "log",
+      "uri": "docs/v0.4/evidence/qa-start-health.log",
+      "fetchedAt": "2026-10-04T23:52:47.000Z",
+      "digest": "sha256:8c2e9ad97e70b3087cdeadaac90a39decaa18df9a73fe931089a9fcc2832cf2e",
+      "excerpt": "/health → {\"status\":\"up\",\"mode\":\"standalone\"}，路由表含 chat::conversation-insight-summary",
+      "reliability": "direct",
+      "status": "ok"
+    },
+    {
+      "id": "EV-03",
+      "type": "log",
+      "uri": "docs/v0.4/evidence/qa-test-server.log",
+      "fetchedAt": "2026-10-04T23:52:47.000Z",
+      "digest": "sha256:238aee9ed421acf35b3ba072dc772f25c54909cc9cabc1164b5f073ea19ef055",
+      "excerpt": "Test Files 9 passed (9) / Tests 46 passed (46)，SERVER_TEST_EXIT=0",
+      "reliability": "direct",
+      "status": "ok"
+    },
+    {
+      "id": "EV-04",
+      "type": "log",
+      "uri": "docs/v0.4/evidence/qa-test-mobile.log",
+      "fetchedAt": "2026-10-04T23:52:47.000Z",
+      "digest": "sha256:953841a9946aea5eb5c279909bc3d56c34ec2be953a05c4f10ad6a5b37f504e8",
+      "excerpt": "Test Files 3 passed (3) / Tests 29 passed (29)，MOBILE_TEST_EXIT=0",
+      "reliability": "direct",
+      "status": "ok"
+    },
+    {
+      "id": "EV-05",
+      "type": "log",
+      "uri": "docs/v0.4/evidence/qa-test-mobile.log",
+      "fetchedAt": "2026-10-04T23:52:47.000Z",
+      "digest": "sha256:953841a9946aea5eb5c279909bc3d56c34ec2be953a05c4f10ad6a5b37f504e8",
+      "excerpt": "insights.test.ts 8 tests passed（5 旧 + 3 新），无 skipped/todo",
+      "reliability": "direct",
+      "status": "ok"
+    },
+    {
+      "id": "EV-06",
+      "type": "log",
+      "uri": "docs/v0.4/evidence/qa-smoke.log",
+      "fetchedAt": "2026-10-04T23:52:47.000Z",
+      "digest": "sha256:6610aeef2e3835a8b6747ce74919c1c06b2d52d2f5df919176233deb9e7ed9eb",
+      "excerpt": "SMOKE_EXIT=0；01-19 逐项 ✅；20 情绪洞察就绪摘要 / 21 样本口径 / 22 空态契约；心伴 v0.4 冒烟通过：22 项 / 22 项",
+      "reliability": "direct",
+      "status": "ok"
+    },
+    {
+      "id": "EV-07",
+      "type": "log",
+      "uri": "docs/v0.4/evidence/qa-persist.log",
+      "fetchedAt": "2026-10-04T23:52:47.000Z",
+      "digest": "sha256:7735b97ce0821fdc6603fec680eaa025b4a8297e0aedfebd9447af11a2f10034",
+      "excerpt": "PERSIST_EXIT=0；P01-P09 全 ✅（含 P05 kill → P06 重启 → P07/P08 读回一致 → P09 降级）",
+      "reliability": "direct",
+      "status": "ok"
+    },
+    {
+      "id": "EV-08",
+      "type": "log",
+      "uri": "docs/v0.4/evidence/green-server-mood-insight.log",
+      "fetchedAt": "2026-10-04T23:52:47.000Z",
+      "digest": "sha256:022e956df16e9fd153c3baf14207ebbb152d12846135b3a9d7e4522b65bc80b0",
+      "excerpt": "moodInsight.test.ts：Test Files 1 passed / Tests 4 passed（对应先红 EV-12）",
+      "reliability": "direct",
+      "status": "ok"
+    },
+    {
+      "id": "EV-09",
+      "type": "log",
+      "uri": "docs/v0.4/evidence/green-server-insight-route.log",
+      "fetchedAt": "2026-10-04T23:52:47.000Z",
+      "digest": "sha256:1c816a8f8bc92e2bd3cbc25c8b87674d5ab67e987ebf219f07db3adaebf1be6f",
+      "excerpt": "chat.routes + conversationInsights：Test Files 2 passed / Tests 14 passed（对应先红 EV-13）",
+      "reliability": "direct",
+      "status": "ok"
+    },
+    {
+      "id": "EV-10",
+      "type": "git_commit",
+      "uri": "apps/server/src/lib/moodInsight.ts",
+      "fetchedAt": "2026-10-04T23:52:47.000Z",
+      "digest": "sha256:565bd12834c73701746315cd3250daa22f51dfce6fcc093af447e7767a6b36fd",
+      "excerpt": "readableMoodInsightSummary：ACTIVE 归因过滤 + 脏点跳过 + 样本<3 STABLE + 关键词频次/首现 top3；零 Prisma 依赖",
+      "reliability": "direct",
+      "status": "ok"
+    },
+    {
+      "id": "EV-11",
+      "type": "log",
+      "uri": "docs/v0.4/evidence/green-mobile-insight.log",
+      "fetchedAt": "2026-10-04T23:52:47.000Z",
+      "digest": "sha256:a11b3cc909b0a42501341e7d0f95e673792fbaa6d436d2b6febd9b7d0e7c2ed7",
+      "excerpt": "insights.test.ts：Test Files 1 passed / Tests 8 passed（5 旧 + 3 新）",
+      "reliability": "direct",
+      "status": "ok"
+    },
+    {
+      "id": "EV-12",
+      "type": "git_commit",
+      "uri": "apps/mobile/src/components/MoodInsightPanel.tsx",
+      "fetchedAt": "2026-10-04T23:52:47.000Z",
+      "digest": "sha256:6e6e1a6194ce99b5eb856aadbd0ce1c83e6b6303874f780b4e2c4a68509c119a",
+      "excerpt": "MoodInsightPanel：degraded/empty/ready 三态文案渲染，无任何写调用",
+      "reliability": "direct",
+      "status": "ok"
+    },
+    {
+      "id": "EV-13",
+      "type": "log",
+      "uri": "docs/v0.4/evidence/red-server-insight-route.log",
+      "fetchedAt": "2026-10-04T23:52:47.000Z",
+      "digest": "sha256:72601a8e0062599c8b15e43ce41caa5231f117f8dea536c9a46e9e2c1858faa1",
+      "excerpt": "先红：chat.routes.test.ts 4 failed（路由未注册/用例缺失），红绿证据链完整（red-* 3 份 + green-* 3 份）",
+      "reliability": "indirect",
+      "status": "ok"
+    },
+    {
+      "id": "EV-14",
+      "type": "git_commit",
+      "uri": "scripts/smoke.sh",
+      "fetchedAt": "2026-10-04T23:52:47.000Z",
+      "digest": "sha256:809325daf95541ee608825b53abbcd8ee6313a573dd364f0b30d949279e89405",
+      "excerpt": "01-19 步骤字节级未变（git show d7c91fa diff 为证）；追加 20 就绪摘要 / 21 sampleSize=1 / 22 空态契约",
+      "reliability": "indirect",
+      "status": "ok"
+    },
+    {
+      "id": "EV-15",
+      "type": "log",
+      "uri": "docs/v0.4/evidence/server-step-test.log",
+      "fetchedAt": "2026-10-04T23:52:47.000Z",
+      "digest": "sha256:3afe8b85fba95ee9198dff7ad6ffa1353dad40f37793e6e6f6c1486e95775a64",
+      "excerpt": "3537ca9 提交时点：server 46 + mobile 26 全绿（验收侧另以 worktree 独立复现 build exit 0 + 46/46 + 26/26）",
+      "reliability": "indirect",
+      "status": "ok"
+    }
+  ],
+  "redTeam": {
+    "status": "completed",
+    "skipReason": "",
+    "summary": "独立上下文子 agent 执行 12 项攻击（反证 7 + 证据抽查 + 独立复现 3 + 范围/diff 副作用 2）。17 条证据 digest 全部一致；AC-5/6/7 被独立复现。0 blocker / 0 major upheld，4 项 minor upheld（RT-01 样本口径、RT-02 Date.parse 宽容解析、RT-03 客户端防御纵深、RT-04 mock 契约不一致），另 1 项记录级（RT-05 chatSend 注释丢失）。全部 pass 判定维持，无降级。",
+    "uncoveredAttackSurface": [
+      "多并发写读下 insight-summary 与 /mood-timeline 的瞬时一致性（超出本轮读侧范围）",
+      "真实 LLM 摘要路径（停车场项，本轮无实现）"
+    ],
+    "challenges": [
+      {
+        "id": "RT-01",
+        "targetCriterionId": "AC-01",
+        "attackType": "falsification",
+        "severity": "minor",
+        "claim": "readableMemories 以 MEMORY_LIMIT=20 截断而路由 findMany take:50：第 21+ 条 ACTIVE 记忆支撑的合法情绪点会被 insight 摘要按脏点跳过，与 /mood-timeline（cap 50）样本口径不一致，长会话下可能误报空态。红队以 30 条记忆的可运行反例证实。",
+        "evidenceIds": [
+          "EV-10"
+        ],
+        "outcome": "upheld",
+        "arbitrationNote": "核验侧复核确认两处 cap 不一致属实；行为符合『无归因即跳过』的冻结策略且偏保守，不违反任何 DoD 谓词，判 minor 不降级；记入 v0.5 改进清单（统一 cap 或显式声明截断口径）。"
+      },
+      {
+        "id": "RT-02",
+        "targetCriterionId": "AC-01",
+        "attackType": "falsification",
+        "severity": "minor",
+        "claim": "isValidDate 用 Date.parse 宽容解析（'2026'、'January 2, 2026 UTC' 均通过），原始串直接进 window.from/to，与 v0.3 serializeMood 恒 ISO 的事实契约不一致；当前 Prisma 写路径不可达。",
+        "evidenceIds": [
+          "EV-10"
+        ],
+        "outcome": "upheld",
+        "arbitrationNote": "不可达但属读侧派生器被复用时的真实缺口；记入停车场（window 输出归一为 toISOString）。"
+      },
+      {
+        "id": "RT-03",
+        "targetCriterionId": "AC-04",
+        "attackType": "falsification",
+        "severity": "minor",
+        "claim": "moodInsightViewState 不校验 keywords/trend/counts/window，request<T> 为裸 cast 无运行时校验：keywords=undefined 时面板在 keywords.length 处 TypeError，trend 未知值查表 undefined。需服务端发畸形载荷，当前类型+测试不可达。",
+        "evidenceIds": [
+          "EV-12"
+        ],
+        "outcome": "upheld",
+        "arbitrationNote": "防御纵深缺口，当前不可达；记入停车场（viewState 补 keywords Array.isArray 守卫）。"
+      },
+      {
+        "id": "RT-04",
+        "targetCriterionId": "AC-04",
+        "attackType": "scope",
+        "severity": "minor",
+        "claim": "mock 的 getMoodInsightSummary 恒 STABLE/恒不降级/不做 ACTIVE 归因 join，与真实服务端派生行为不一致；为 v0.3 mock 朴素 stub 模式的延续。",
+        "evidenceIds": [
+          "EV-12"
+        ],
+        "outcome": "upheld",
+        "arbitrationNote": "不升 major（模式延续、mock 环境限定）；记入停车场。"
+      },
+      {
+        "id": "RT-05",
+        "targetCriterionId": "AC-03",
+        "attackType": "scope",
+        "severity": "minor",
+        "claim": "3537ca9 将原 chatSend 的 doc 注释挪给新函数后未补回，chatSend 现无注释；纯注释丢失无行为影响。",
+        "evidenceIds": [
+          "EV-10"
+        ],
+        "outcome": "upheld",
+        "arbitrationNote": "记录级可维护性瑕疵，随下次触碰该文件时顺手补回即可，不卡交付。"
+      },
+      {
+        "id": "RT-06",
+        "targetCriterionId": "AC-02",
+        "attackType": "falsification",
+        "severity": "minor",
+        "claim": "尝试『降级吞 404』与『跨用户越权读』：反证不成立——AppError 先透传、findFirst 带 userId 隔离。",
+        "evidenceIds": [
+          "EV-03"
+        ],
+        "outcome": "overturned",
+        "arbitrationNote": "红队实测 rejects.toMatchObject({statusCode:404})，安全语义正确。"
+      },
+      {
+        "id": "RT-07",
+        "targetCriterionId": "AC-05",
+        "attackType": "probing",
+        "severity": "minor",
+        "claim": "红队独立复跑 npm run smoke：22/22 exit 0，与判定一致。",
+        "evidenceIds": [
+          "EV-06"
+        ],
+        "outcome": "overturned",
+        "arbitrationNote": "独立复现成功，反证不成立。"
+      },
+      {
+        "id": "RT-08",
+        "targetCriterionId": "AC-06",
+        "attackType": "probing",
+        "severity": "minor",
+        "claim": "红队独立复跑 npm run persist:check：9/9 exit 0，与判定一致。",
+        "evidenceIds": [
+          "EV-07"
+        ],
+        "outcome": "overturned",
+        "arbitrationNote": "独立复现成功，反证不成立。"
+      },
+      {
+        "id": "RT-09",
+        "targetCriterionId": "AC-03",
+        "attackType": "scope",
+        "severity": "minor",
+        "claim": "尝试找被删/放宽的既有断言：diff 证明 chat.routes.test.ts 纯追加、conversationInsights.ts 零改动、insights.test.ts 仅 import 增补、smoke 01-19 字节级未变。",
+        "evidenceIds": [
+          "EV-14"
+        ],
+        "outcome": "overturned",
+        "arbitrationNote": "契约侵蚀反证不成立。"
+      }
+    ]
+  },
+  "scoring": {
+    "score": 100,
+    "passed": 7,
+    "partial": 0,
+    "failed": 0,
+    "unverified": 0,
+    "total": 7,
+    "breakdown": [
+      {
+        "criterionId": "AC-01",
+        "verdict": "pass",
+        "weighted": 3
+      },
+      {
+        "criterionId": "AC-02",
+        "verdict": "pass",
+        "weighted": 3
+      },
+      {
+        "criterionId": "AC-03",
+        "verdict": "pass",
+        "weighted": 2
+      },
+      {
+        "criterionId": "AC-04",
+        "verdict": "pass",
+        "weighted": 2
+      },
+      {
+        "criterionId": "AC-05",
+        "verdict": "pass",
+        "weighted": 3
+      },
+      {
+        "criterionId": "AC-06",
+        "verdict": "pass",
+        "weighted": 2
+      },
+      {
+        "criterionId": "AC-07",
+        "verdict": "pass",
+        "weighted": 1
+      }
+    ]
+  },
+  "verdict": {
+    "value": "CERTIFIED",
+    "reasons": [
+      "RULE_NO_FAILED_CORE: failed=0 且 unverified=0 且 partial=0（7/7 pass）",
+      "RULE_NO_UPHELD_BLOCKER_OR_MAJOR: 红队 0 blocker / 0 major upheld（仅 4 minor + 1 记录级）",
+      "RULE_SCORE_ABOVE_THRESHOLD: score=100（>=40）",
+      "RULE_EVIDENCE_COMPLETE: 全部 pass 判定均引用 direct 证据且 digest 校验一致（红队抽查 17/17 匹配）"
+    ],
+    "summary": "v0.4 P0『情绪洞察摘要』DoD 7/7 锚点命中且全绿；v0.3 冒烟 01-19 与持久门 P01-P09 独立复跑无回归；死测试挂账清零；五条阻塞级拦截标准全部未触发；红绿证据链完整。验收通过，签收 CERTIFIED。非阻塞改进项 4+2 条已记录在案（见 QA-ACCEPTANCE.md §5）。"
+  },
+  "durationMs": 2820000,
+  "createdAt": "2026-10-04T23:52:47.000Z",
+  "writeBack": {
+    "status": "pending",
+    "targets": [
+      {
+        "kind": "requirement_verification_result",
+        "ref": "docs/v0.4/QA-ACCEPTANCE.md"
+      },
+      {
+        "kind": "notification",
+        "ref": "workflow-node:delivery"
+      }
+    ],
+    "attempts": 0,
+    "error": "",
+    "revokedReason": ""
+  }
+}

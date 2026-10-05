@@ -1,0 +1,59 @@
+
+> xinban-v01@1.0.0 smoke
+> ./scripts/smoke.sh
+
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+
+✔ Generated Prisma Client (7.9.1) to ./src/generated/prisma in 73ms
+
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": SQLite database "xinban-smoke.db" at "file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-smoke.uiFuuB/xinban-smoke.db"
+
+SQLite database xinban-smoke.db created at file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-smoke.uiFuuB/xinban-smoke.db
+
+🚀  Your database is now in sync with your Prisma schema. Done in 29ms
+
+
+> @xinban/server@1.0.0 prisma:seed
+> tsx prisma/seed.ts
+
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+[2026-10-04T23:19:46.091Z] [INFO] 开始初始化种子数据…
+[2026-10-04T23:19:46.157Z] [INFO] 角色已创建：林晚晴（温婉知己 · FREE）
+[2026-10-04T23:19:46.158Z] [INFO] 角色已创建：阿秀（爽朗直爽 · FREE）
+[2026-10-04T23:19:46.159Z] [INFO] 角色已创建：小满（俏皮灵动 · VIP）
+[2026-10-04T23:19:46.160Z] [INFO] 角色已创建：苏雅（成熟通透 · VIP）
+[2026-10-04T23:19:46.163Z] [INFO] 商品已创建：5 个
+[2026-10-04T23:19:46.167Z] [INFO] 礼物已创建：5 个
+[2026-10-04T23:19:46.173Z] [INFO] 管理账号就绪：13800000000（role=ADMIN）
+[2026-10-04T23:19:46.175Z] [INFO] 敏感词已创建：4 条
+[2026-10-04T23:19:46.175Z] [INFO] 种子数据初始化完成 ✔
+[32m✅ 01 健康检查[0m
+[32m✅ 02 发送验证码[0m
+[32m✅ 03 注册并登录[0m
+[32m✅ 04 未登录访问被拦截[0m
+[32m✅ 05 角色列表可读[0m
+[32m✅ 06 登录态资料[0m
+[32m✅ 07 创建持久化会话[0m
+[32m✅ 08 核心消息写入[0m
+[32m✅ 09 AI 回复完成并落库[0m
+[32m✅ 10 用户消息重启后保留[0m
+[32m✅ 11 助手消息重启后保留[0m
+[32m✅ 12 消息状态一致[0m
+[32m✅ 13 令牌刷新[0m
+[32m✅ 14 会话记忆重启后可读[0m
+[32m✅ 15 会话记忆契约无降级[0m
+[32m✅ 16 情绪轨迹结构化快照[0m
+[32m✅ 17 情绪轨迹内容非像素契约[0m
+[32m✅ 18 新会话记忆空态契约[0m
+[32m✅ 19 新会话情绪轨迹空态契约[0m
+[32m✅ 20 情绪洞察就绪摘要[0m
+[32m✅ 21 情绪洞察样本与观察口径[0m
+[32m✅ 22 新会话情绪洞察空态契约[0m
+[32m✅ 心伴 v0.4 冒烟通过：22 项 / 22 项[0m

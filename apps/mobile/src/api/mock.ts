@@ -24,6 +24,8 @@ import type {
   MemoryReadResult,
   Message,
   MoodInsightSummaryResult,
+  MoodCorrectionPayload,
+  MoodCorrectionWriteResult,
   MoodSnapshot,
   MoodTimelineResult,
   Order,
@@ -499,6 +501,35 @@ export const mockApi = {
       degraded: false,
       items: memories.get(conversationId) ?? [],
     };
+  },
+
+  async correctMoodPoint(
+    conversationId: string,
+    moodPointId: string,
+    payload: MoodCorrectionPayload,
+  ): Promise<MoodCorrectionWriteResult> {
+    const items = moods.get(conversationId) ?? [];
+    const index = items.findIndex((item) => item.id === moodPointId);
+    if (index < 0) throw new ApiError(404, 'NOT_FOUND', '情绪记录不存在');
+    const original = items[index]!;
+    const score = payload.mood === 'POSITIVE' ? 1 : payload.mood === 'NEGATIVE' ? -1 : 0;
+    const next: MoodSnapshot = {
+      ...original,
+      mood: payload.mood,
+      score,
+      tags: payload.tags ?? [],
+      reason: payload.reason ?? '',
+      originalMood: original.mood,
+      originalScore: original.score,
+      correctionId: Date.now(),
+      correctedAt: nowIso(),
+    };
+    items[index] = next;
+    return { point: next, correction: {
+      id: next.correctionId!, moodSnapshotId: next.id, mood: next.mood, score: next.score,
+      tags: next.tags ?? [], reason: next.reason ?? '', clientMutationId: payload.clientMutationId ?? null,
+      createdAt: next.correctedAt!,
+    }, persisted: true, degraded: false };
   },
 
   async getMoodTimeline(conversationId: string): Promise<MoodTimelineResult> {

@@ -1,11 +1,12 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, fontSizes, radii, spacing } from '../theme';
 import { moodViewState } from '../utils/insights';
-import type { MoodTimelineResult } from '../types';
+import type { MoodSnapshot, MoodTimelineResult } from '../types';
 
 interface MoodTimelinePanelProps {
   value: MoodTimelineResult | null | undefined;
+  onCorrect?: (point: MoodSnapshot) => void;
 }
 
 const MOOD_META: Record<'POSITIVE' | 'NEUTRAL' | 'NEGATIVE', { icon: string; label: string }> = {
@@ -14,7 +15,7 @@ const MOOD_META: Record<'POSITIVE' | 'NEUTRAL' | 'NEGATIVE', { icon: string; lab
   NEGATIVE: { icon: '😞', label: '低落' },
 };
 
-export function MoodTimelinePanel({ value }: MoodTimelinePanelProps) {
+export function MoodTimelinePanel({ value, onCorrect }: MoodTimelinePanelProps) {
   const view = moodViewState(value);
   const label =
     view.mode === 'degraded'
@@ -34,6 +35,14 @@ export function MoodTimelinePanel({ value }: MoodTimelinePanelProps) {
               <View key={point.id} style={styles.point}>
                 <Text style={styles.icon}>{meta.icon}</Text>
                 <Text style={styles.caption}>{meta.label}</Text>
+                {(point.tags?.length ?? 0) > 0 || Boolean(point.reason) ? (
+                  <Text style={styles.mark} numberOfLines={1}>已标注</Text>
+                ) : null}
+                {onCorrect ? (
+                  <Pressable accessibilityLabel={`修正情绪记录 ${point.id}`} onPress={() => onCorrect(point)} style={styles.button}>
+                    <Text style={styles.buttonText}>修正</Text>
+                  </Pressable>
+                ) : null}
               </View>
             );
           })}
@@ -60,7 +69,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xs,
   },
   point: {
-    minWidth: 64,
+    minWidth: 72,
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -73,5 +82,25 @@ const styles = StyleSheet.create({
   caption: {
     color: colors.textSecondary,
     fontSize: fontSizes.xs,
+  },
+  mark: {
+    marginTop: 2,
+    maxWidth: 60,
+    color: colors.info,
+    fontSize: 10,
+  },
+  button: {
+    marginTop: 4,
+    borderRadius: radii.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.primaryLight,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  buttonText: {
+    color: colors.primaryDark,
+    fontSize: 10,
+    fontWeight: '600',
   },
 });

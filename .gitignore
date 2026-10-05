@@ -9,3 +9,8 @@ graphify-out/cache/
 
 # Expo Web generated export
 /apps/mobile/dist-web/
+
+# graphify 自动备份/签名与派生分析（图谱本体与报告仍入库）
+graphify-out/????-??-??/
+graphify-out/.graphify_analysis.json
+graphify-out/.graphify_labels.json.sig

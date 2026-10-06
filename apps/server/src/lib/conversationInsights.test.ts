@@ -92,7 +92,7 @@ describe('mood timeline contract', () => {
       conversationId: 'conv_1',
       available: true,
       degraded: false,
-      points: [{ ...point, keywords: ['开心', '顺利'] }],
+      points: [{ ...point, keywords: ['开心', '顺利'], tags: [], reason: '', originalMood: null, originalScore: null, correctionId: null, correctedAt: null }],
     })
   })
 })

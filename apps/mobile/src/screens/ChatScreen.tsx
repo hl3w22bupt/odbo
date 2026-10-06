@@ -18,6 +18,7 @@ import { CustomizeModal } from '../components/CustomizeModal';
 import { GiftFloatLayer } from '../components/GiftFloatLayer';
 import { GiftSheet } from '../components/GiftSheet';
 import { MemoryPanel } from '../components/MemoryPanel';
+import { MoodCorrectionModal } from '../components/MoodCorrectionModal';
 import { MoodInsightPanel } from '../components/MoodInsightPanel';
 import { MoodTimelinePanel } from '../components/MoodTimelinePanel';
 import { HeartbeatBar } from '../components/HeartbeatBar';
@@ -28,7 +29,8 @@ import { useNavigation } from '../navigation/NavigationContext';
 import { useSession } from '../store/SessionContext';
 import { useToast } from '../store/ToastContext';
 import { colors, fontSizes, fontWeights, radii, spacing } from '../theme';
-import type { Affection, Character, ChatMode, CustomizationPayload, Gift, MemoryReadResult, Message, MoodInsightSummaryResult, MoodTimelineResult } from '../types';
+import type { Affection, Character, ChatMode, CustomizationPayload, Gift, MemoryReadResult, Message, MoodInsightSummaryResult, MoodSnapshot, MoodTimelineResult } from '../types';
+import { applyMoodCorrection, correctionFallbackNotice, createCorrectionForm, type MoodCorrectionForm } from '../utils/moodCorrections';
 import { affectionLevelLabel, genId } from '../utils/format';
 
 interface ChatScreenProps {
@@ -76,6 +78,9 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
   const [giftLabel, setGiftLabel] = useState<string | undefined>(undefined);
   const [giftIntensity, setGiftIntensity] = useState<'medium' | 'high'>('medium');
 
+  const [correctionPoint, setCorrectionPoint] = useState<MoodSnapshot | null>(null);
+  const [correctionForm, setCorrectionForm] = useState<MoodCorrectionForm>({ mood: 'NEUTRAL', tags: [], reason: '' });
+  const [correctionSaving, setCorrectionSaving] = useState(false);
   const [memberGuideVisible, setMemberGuideVisible] = useState(false);
   const [customizeVisible, setCustomizeVisible] = useState(false);
   const [customizing, setCustomizing] = useState(false);
@@ -303,6 +308,49 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
     }
   };
 
+  // ===================== 情绪修正 =====================
+
+  const openCorrection = useCallback((point: MoodSnapshot) => {
+    setCorrectionPoint(point);
+    setCorrectionForm(createCorrectionForm(point));
+  }, []);
+
+  const handleCorrectionSave = useCallback(async () => {
+    const convId = conversationId;
+    const point = correctionPoint;
+    if (!convId || !point || correctionSaving) return;
+    setCorrectionSaving(true);
+    try {
+      const result = await api.correctMoodPoint(convId, point.id, {
+        mood: correctionForm.mood,
+        tags: correctionForm.tags,
+        reason: correctionForm.reason,
+        clientMutationId: genId('correction'),
+      });
+      setMoodTimeline((prev) => prev && prev.conversationId === convId
+        ? {
+            ...prev,
+            points: prev.points.map((item) => (item.id === point.id
+              ? applyMoodCorrection(item, result.degraded ? item : result.point)
+              : item)),
+          }
+        : prev);
+      const insight = await api.getMoodInsightSummary(convId).catch(() => null);
+      if (insight) setMoodInsight(insight);
+      const notice = correctionFallbackNotice(result);
+      if (notice) showToast({ title: '修正未保存', message: notice, type: 'error' });
+      setCorrectionPoint(null);
+    } catch (e) {
+      showToast({
+        title: '修正失败',
+        message: e instanceof Error ? e.message : '已保留原情绪值，请稍后重试',
+        type: 'error',
+      });
+    } finally {
+      setCorrectionSaving(false);
+    }
+  }, [conversationId, correctionForm, correctionPoint, correctionSaving, showToast]);
+
   // ===================== 送礼 =====================
 
   const handleGiftSend = async (giftId: string, quantity: number) => {
@@ -461,7 +509,7 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
         <AINoticeBar compact />
       </View>
       <MemoryPanel value={memory} />
-      <MoodTimelinePanel value={moodTimeline} />
+      <MoodTimelinePanel value={moodTimeline} onCorrect={openCorrection} />
       <MoodInsightPanel value={moodInsight} />
 
       <ScrollView
@@ -533,6 +581,14 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
       ) : null}
 
       {/* 会员引导 */}
+      <MoodCorrectionModal
+        point={correctionPoint}
+        value={correctionForm}
+        saving={correctionSaving}
+        onChange={setCorrectionForm}
+        onSave={() => { void handleCorrectionSave(); }}
+        onClose={() => setCorrectionPoint(null)}
+      />
       <AppModal visible={memberGuideVisible} onClose={() => setMemberGuideVisible(false)}>
         <View style={styles.modalBody}>
           <Text style={styles.modalEmoji}>👑</Text>

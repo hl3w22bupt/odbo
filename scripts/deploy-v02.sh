@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 心伴 v0.2 · 本仓 deploy 节点复验
+# 心伴 v0.5 · 本仓 deploy 节点复验（兼容 deploy:v02 工作流入口）
 # deploy 定义：production build 产物 dist/localServer.js 可启动且 /health up。
 # 部署后重跑的 build/start/test 必须是仓库根的完整三命令（server + mobile）。
 set -uo pipefail
@@ -9,6 +9,7 @@ PORT="${XINBAN_DEPLOY_PORT:-15888}"
 BASE="http://127.0.0.1:${PORT}"
 LOG="$(mktemp "${TMPDIR:-/tmp}/xinban-deploy-v02.XXXXXX")"
 PID=''
+DEPLOY_DB="${XINBAN_DEPLOY_DATABASE_URL:-file:./data/xinban-deploy-v02.db}"
 
 descendants() {
   local child
@@ -40,7 +41,7 @@ start_dist() {
   # 子 shell 内启动 dist 产物：不得污染主流程 cwd，否则部署后重跑会退化成 server 子包命令。
   (
     cd "$ROOT/apps/server" || exit 1
-    exec env DATABASE_URL="${XINBAN_DEPLOY_DATABASE_URL:-file:./data/xinban-deploy-v02.db}" HTTP_PORT="$PORT" \
+    exec env DATABASE_URL="$DEPLOY_DB" HTTP_PORT="$PORT" \
       SMS_PROVIDER=dev PAY_PROVIDER=mock LLM_PROVIDER=mock ANTI_ADDICTION_LATE_NIGHT=false \
       npm run start:standalone
   ) >"$LOG" 2>&1 &
@@ -58,6 +59,9 @@ start_dist() {
 echo '== deploy build =='
 cd "$ROOT"
 npm run build || exit $?
+
+# additive schema 同步：确保既有 deploy SQLite 补齐 v0.5 correction 表，不做破坏性迁移。
+(cd "$ROOT/apps/server" && DATABASE_URL="$DEPLOY_DB" npx prisma db push) || exit $?
 
 echo '== deploy start =='
 if start_dist; then echo 'deploy /health: 0'; else tail -100 "$LOG" >&2; exit 1; fi

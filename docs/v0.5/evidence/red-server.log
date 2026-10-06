@@ -1,0 +1,109 @@
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmuvv1ya80154icry4hbxbhgj/apps/server
+
+ ❯ src/lib/exportData.test.ts (0 test)
+ ❯ src/lib/moodCorrections.test.ts (0 test)
+ ❯ src/routes/export.routes.test.ts (0 test)
+stdout | src/routes/chat.routes.test.ts
+◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
+
+ ❯ src/routes/chat.routes.test.ts (14 tests | 4 failed) 7ms
+     × test_correction_latest_wins 2ms
+     × test_edit_nonexistent_returns_defined_error 0ms
+     × test_correction_write_failure_preserves_old_value 0ms
+     × replays one client mutation id without creating another correction 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/exportData.test.ts [ src/lib/exportData.test.ts ]
+Error: Cannot find module './exportData.js' imported from /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmuvv1ya80154icry4hbxbhgj/apps/server/src/lib/exportData.test.ts
+ ❯ src/lib/exportData.test.ts:2:1
+      1| import { describe, expect, it } from 'vitest'
+      2| import { serializeExport, EXPORT_FORMAT, EXPORT_SCHEMA_VERSION } from …
+       | ^
+      3|
+      4| describe('user data export', () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  src/lib/moodCorrections.test.ts [ src/lib/moodCorrections.test.ts ]
+Error: Cannot find module './moodCorrections.js' imported from /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmuvv1ya80154icry4hbxbhgj/apps/server/src/lib/moodCorrections.test.ts
+ ❯ src/lib/moodCorrections.test.ts:2:1
+      1| import { describe, expect, it } from 'vitest'
+      2| import {
+       | ^
+      3|   applyLatestCorrection,
+      4|   normalizeCorrectionInput,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  src/routes/export.routes.test.ts [ src/routes/export.routes.test.ts ]
+Error: Cannot find module '/src/routes/export.js' imported from /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmuvv1ya80154icry4hbxbhgj/apps/server/src/routes/export.routes.test.ts
+ ❯ src/routes/export.routes.test.ts:4:1
+      2| import type { AuthUser } from '../lib/auth.js'
+      3| import type { HttpHandler, HttpRouteContext } from '../http.js'
+      4| import { registerExportRoutes } from './export.js'
+       | ^
+      5|
+      6| const prismaMock = vi.hoisted(() => ({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/routes/chat.routes.test.ts > chat v0.5 mood correction write side > test_correction_latest_wins
+TypeError: handlers.get(...) is not a function
+ ❯ src/routes/chat.routes.test.ts:190:68
+    188|       })
+    189|
+    190|     const first = await handlers.get('chat::mood-point-correction')!(
+       |                                                                    ^
+    191|       writeContext({ mood: 'NEUTRAL', tags: ['状态变化'], reason: '当时记错了',…
+    192|     )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  src/routes/chat.routes.test.ts > chat v0.5 mood correction write side > test_edit_nonexistent_returns_defined_error
+TypeError: handlers.get(...) is not a function
+ ❯ src/routes/chat.routes.test.ts:205:66
+    203|   it('test_edit_nonexistent_returns_defined_error', async () => {
+    204|     prismaMock.moodSnapshot.findUnique.mockResolvedValue(null)
+    205|     const res = await handlers.get('chat::mood-point-correction')!(
+       |                                                                  ^
+    206|       writeContext({ mood: 'NEUTRAL' }),
+    207|     )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  src/routes/chat.routes.test.ts > chat v0.5 mood correction write side > test_correction_write_failure_preserves_old_value
+TypeError: handlers.get(...) is not a function
+ ❯ src/routes/chat.routes.test.ts:216:66
+    214|   it('test_correction_write_failure_preserves_old_value', async () => {
+    215|     prismaMock.moodCorrection.create.mockRejectedValue(new Error('sqli…
+    216|     const res = await handlers.get('chat::mood-point-correction')!(
+       |                                                                  ^
+    217|       writeContext({ mood: 'NEUTRAL', reason: '修正' }),
+    218|     )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  src/routes/chat.routes.test.ts > chat v0.5 mood correction write side > replays one client mutation id without creating another correction
+TypeError: handlers.get(...) is not a function
+ ❯ src/routes/chat.routes.test.ts:242:66
+    240|     }
+    241|     prismaMock.moodCorrection.findFirst.mockResolvedValue(correction)
+    242|     const res = await handlers.get('chat::mood-point-correction')!(
+       |                                                                  ^
+    243|       writeContext({ mood: 'NEUTRAL', clientMutationId: 'same-id' }),
+    244|     )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+
+ Test Files  4 failed (4)
+      Tests  4 failed | 10 passed (14)
+   Start at  07:18:28
+   Duration  237ms (transform 160ms, setup 0ms, import 138ms, tests 7ms, environment 0ms)
+
+RED_SERVER_EXIT=1

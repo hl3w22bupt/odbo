@@ -1,0 +1,22 @@
+
+> xinban-v01@1.0.0 persist:check
+> ./scripts/persistence-regression.sh
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+[32m✅ P01 写前服务就绪并发码[0m
+[32m✅ P02 写入用户消息/P0 记忆/P1 情绪快照[0m
+[32m✅ P03 P0 写回读取一致[0m
+[32m✅ P04 P1 情绪快照写回[0m
+[32m✅ P05 kill 服务[0m
+[32m✅ P06 同一 SQLite 重启服务[0m
+[32m✅ P07 重启后 P0 记忆读回一致[0m
+[32m✅ P08 重启后 P1 情绪快照读回一致[0m
+[32m✅ P09 写失败降级断言（空列表，无脏数据）[0m
+[32m✅ 心伴 v0.3 持久性硬门槛通过：9 项，exit=0[0m
+
+PERSIST_EXIT=0

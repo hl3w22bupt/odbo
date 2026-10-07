@@ -1,0 +1,7 @@
+[graphify extract] incremental scan of /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmuvv1ya80154icry4hbxbhgj
+[graphify extract] --code-only: skipping 67 non-code file(s) (65 docs, 0 papers, 2 images) — no LLM extraction
+[graphify extract] 21 code, 0 docs, 0 papers, 0 images changed; 157 unchanged; 0 deleted
+[graphify extract] 101 file(s) not classified (no supported extension or shebang), skipped: .env.example, .gitignore, LICENSE, NotoSansSC-Regular.otf, NotoSansSC-Regular.otf.import, baseline-build.log (+95 more)
+[graphify extract] AST extraction on 21 code files...
+[graphify] backed up curated graph (5 files) -> 2026-10-06/
+[graphify extract] wrote /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmuvv1ya80154icry4hbxbhgj/graphify-out/graph.json — 1721 nodes, 3287 edges (no clustering)

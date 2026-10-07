@@ -3,6 +3,8 @@
  * 纯函数层负责提取、契约序列化与降级兜底；路由层负责鉴权和 Prisma 持久化。
  */
 
+import { applyLatestCorrection, serializeCorrection, type MoodCorrectionContract, type CorrectedMoodPoint } from './moodCorrections.js'
+
 export type ConversationMood = 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE'
 
 export interface ConversationMemoryContract {
@@ -174,12 +176,39 @@ export function readableMoodTimeline(
   conversationId: string,
   rows: Array<Parameters<typeof serializeMood>[0]>,
   degraded = false,
+  correctionRows: Array<Parameters<typeof serializeCorrection>[0]> = [],
 ): MoodTimelineContract {
   if (degraded) return moodTimelineDegraded(conversationId)
+  const latest = new Map<string, MoodCorrectionContract>()
+  for (const row of correctionRows) {
+    const correction = serializeCorrection(row)
+    const current = latest.get(correction.moodSnapshotId)
+    if (!current || current.createdAt < correction.createdAt || (current.createdAt === correction.createdAt && current.id < correction.id)) {
+      latest.set(correction.moodSnapshotId, correction)
+    }
+  }
   return {
     conversationId,
     available: true,
     degraded: false,
-    points: rows.slice(0, 50).map(serializeMood),
+    points: rows
+      .slice(0, 50)
+      .map(serializeMood)
+      .map((point): CorrectedMoodPoint => {
+        if (!point.id) {
+          return {
+            ...point,
+            tags: [],
+            reason: '',
+            originalMood: null,
+            originalScore: null,
+            correctionId: null,
+            correctedAt: null,
+          }
+        }
+        return applyLatestCorrection(point, latest.get(point.id) ?? null)
+      }),
   }
 }
+
+export { applyLatestCorrection, serializeCorrection as serializeMoodCorrection } from './moodCorrections.js'

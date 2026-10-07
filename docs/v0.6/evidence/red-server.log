@@ -1,0 +1,42 @@
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmuyq23k10021m93ew3n6padp/apps/server
+
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/importData.test.ts [ src/lib/importData.test.ts ]
+Error: Cannot find module './importData.js' imported from /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmuyq23k10021m93ew3n6padp/apps/server/src/lib/importData.test.ts
+ ❯ src/lib/importData.test.ts:3:1
+      1| import { describe, expect, it } from 'vitest'
+      2| import { AppError } from './errors.js'
+      3| import { assertImportPayload, IMPORT_FORMAT, IMPORT_SCHEMA_VERSION } f…
+       | ^
+      4|
+      5| export const validImportPayload = {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_MODULE_NOT_FOUND' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/routes/import.persistence.test.ts [ src/routes/import.persistence.test.ts ]
+Error: Cannot find module './importData.js' imported from /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmuyq23k10021m93ew3n6padp/apps/server/src/lib/importData.test.ts
+ ❯ src/lib/importData.test.ts:3:1
+      1| import { describe, expect, it } from 'vitest'
+      2| import { AppError } from './errors.js'
+      3| import { assertImportPayload, IMPORT_FORMAT, IMPORT_SCHEMA_VERSION } f…
+       | ^
+      4|
+      5| export const validImportPayload = {
+ ❯ src/routes/import.persistence.test.ts:8:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_MODULE_NOT_FOUND' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  no tests
+   Start at  07:21:20
+   Duration  116ms (transform 36ms, setup 0ms, import 0ms, tests 0ms, environment 0ms)
+
+RED_EXIT=1

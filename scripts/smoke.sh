@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 心伴 v0.5 · 一条命令全链路冒烟（01-22 基线 + 23-31 写侧闭环与导出）
+# 心伴 v0.6 · 一条命令全链路冒烟（01-22 基线 + 23-31 写侧闭环与导出 + 32-38 JSON 导入）
 # 用法：npm run smoke
 # 可用环境变量：XINBAN_SMOKE_PORT（默认 13888）、KEEP_SMOKE_DIR=1（保留临时目录）
 set -euo pipefail
@@ -259,4 +259,113 @@ else
   red "❌ 空库导出非法（body=$empty_export）"
 fi
 
-green "心伴 v0.5 冒烟通过：$PASS 项 / 31 项"
+# ---------- v0.6 增量段：JSON 备份导入写侧闭环 ----------
+IMPORT_BODY="$RUN_DIR/import-body.json"
+IMPORT_RESPONSE="$RUN_DIR/import-response.json"
+IMPORTED_EXPORT="$RUN_DIR/imported-export.json"
+REENPORT_AFTER_REPEAT="$RUN_DIR/reexport-after-repeat.json"
+post_import() {
+  local payload_file="$1" token="$2"
+  curl -sS -m 20 -o "$IMPORT_RESPONSE" -w '%{http_code}' -X POST "$BASE/api/v1/import" \
+    -H 'content-type: application/json' -H "Authorization: Bearer $token" --data-binary @"$payload_file"
+}
+
+IMPORT_PHONE="139$(printf '%08d' $((RANDOM * RANDOM % 100000000)))"
+import_sms="$(http POST /api/v1/auth/sms-code '' "{\"phone\":\"$IMPORT_PHONE\",\"purpose\":\"LOGIN\"}")"
+assert_contains '32 导入目标用户验证码' "$import_sms" '"devCode":"123456"'
+import_login="$(http POST /api/v1/auth/login '' "{\"phone\":\"$IMPORT_PHONE\",\"code\":\"123456\"}")"
+IMPORT_TOKEN="$(printf '%s' "$import_login" | json_get accessToken)"
+[ -n "$IMPORT_TOKEN" ] || red '❌ 导入目标用户登录失败'
+
+IMPORT_SOURCE="$RUN_DIR/import-source.json"
+RUN_ID="$(basename "$RUN_DIR")"
+node -e '
+const fs = require("node:fs")
+const [input, output, nonce] = process.argv.slice(1)
+const source = JSON.parse(fs.readFileSync(input, "utf8")).data
+source.conversations = source.conversations.map((conversation, conversationIndex) => {
+  const messageIdMap = new Map()
+  const memoryIdMap = new Map()
+  const moodIdMap = new Map()
+  const next = { ...conversation, id: `conv_${nonce}_${conversationIndex}` }
+  next.messages = conversation.messages.map((message, index) => {
+    const id = `msg_${nonce}_${conversationIndex}_${index}`
+    messageIdMap.set(message.id, id)
+    return { ...message, id }
+  })
+  next.memories = conversation.memories.map((memory, index) => {
+    const id = `memory_${nonce}_${conversationIndex}_${index}`
+    memoryIdMap.set(memory.id, id)
+    return { ...memory, id, sourceMessageId: memory.sourceMessageId ? messageIdMap.get(memory.sourceMessageId) ?? null : null }
+  })
+  next.moodSnapshots = conversation.moodSnapshots.map((mood, index) => {
+    const id = `mood_${nonce}_${conversationIndex}_${index}`
+    moodIdMap.set(mood.id, id)
+    return {
+      ...mood,
+      id,
+      sourceMessageId: mood.sourceMessageId ? messageIdMap.get(mood.sourceMessageId) ?? null : null,
+      memoryId: mood.memoryId ? memoryIdMap.get(mood.memoryId) ?? null : null,
+      corrections: mood.corrections.map((correction, correctionIndex) => ({
+        ...correction,
+        id: 1_000_000 + Number(BigInt(nonce.replace(/\D/g, "") || "0") % 900000n) + conversationIndex * 1000 + correctionIndex,
+        clientMutationId: `import_${nonce}_${conversationIndex}_${correctionIndex}`,
+      })),
+    }
+  })
+  return next
+})
+fs.writeFileSync(output, JSON.stringify(source))
+' "$EXPORT_BODY" "$IMPORT_SOURCE" "$RUN_ID"
+
+import_status="$(post_import "$IMPORT_SOURCE" "$IMPORT_TOKEN")"
+if [ "$import_status" = 200 ] \
+  && jq -e '.code == "OK" and .data.schemaVersion == 1 and .data.format == "xinban-json" and .data.received > 0 and .data.imported == .data.received and .data.skipped == 0 and (.data.results | all(.status == "imported"))' "$IMPORT_RESPONSE" >/dev/null; then
+  green '33 JSON 导入恢复会话与关联实体'
+else
+  red "❌ 导入失败（status=$import_status body=$(cat "$IMPORT_RESPONSE")）"
+fi
+
+import_export_status="$(curl -sS -m 20 -o "$IMPORTED_EXPORT" -w '%{http_code}' "$BASE/api/v1/export" -H "Authorization: Bearer $IMPORT_TOKEN")"
+if [ "$import_export_status" = 200 ] \
+  && jq -e --slurpfile source "$IMPORT_SOURCE" '.data.conversations == $source[0].conversations' "$IMPORTED_EXPORT" >/dev/null; then
+  green '34 导入后再导出 conversations 往返一致'
+else
+  red "❌ 导入往返不一致（status=$import_export_status body=$(cat "$IMPORTED_EXPORT")）"
+fi
+
+repeat_status="$(post_import "$IMPORT_SOURCE" "$IMPORT_TOKEN")"
+curl -sS -m 20 -o "$REENPORT_AFTER_REPEAT" "$BASE/api/v1/export" -H "Authorization: Bearer $IMPORT_TOKEN"
+if [ "$repeat_status" = 200 ] \
+  && jq -e '.data.received > 0 and .data.imported == 0 and .data.skipped == .data.received and (.data.results | all(.status == "skipped" and .reason == "CONVERSATION_EXISTS"))' "$IMPORT_RESPONSE" >/dev/null \
+  && jq -e --slurpfile before "$IMPORTED_EXPORT" '.data.conversations == $before[0].data.conversations' "$REENPORT_AFTER_REPEAT" >/dev/null; then
+  green '35 重复导入幂等且数据不变'
+else
+  red "❌ 幂等导入失败（status=$repeat_status body=$(cat "$IMPORT_RESPONSE")）"
+fi
+
+jq 'del(.schemaVersion)' "$IMPORT_SOURCE" > "$IMPORT_BODY"
+missing_version_status="$(post_import "$IMPORT_BODY" "$IMPORT_TOKEN")"
+if [ "$missing_version_status" = 422 ] && jq -e '.code == "IMPORT_VERSION_MISSING"' "$IMPORT_RESPONSE" >/dev/null; then
+  green '36 schemaVersion 缺失整批拒收'
+else
+  red "❌ 缺版本未被拒收（status=$missing_version_status body=$(cat "$IMPORT_RESPONSE")）"
+fi
+
+jq '.schemaVersion = 2' "$IMPORT_SOURCE" > "$IMPORT_BODY"
+high_version_status="$(post_import "$IMPORT_BODY" "$IMPORT_TOKEN")"
+if [ "$high_version_status" = 422 ] && jq -e '.code == "IMPORT_VERSION_UNSUPPORTED"' "$IMPORT_RESPONSE" >/dev/null; then
+  green '37 schemaVersion 高版本整批拒收'
+else
+  red "❌ 高版本未被拒收（status=$high_version_status body=$(cat "$IMPORT_RESPONSE")）"
+fi
+
+jq 'del(.conversations[0].id)' "$IMPORT_SOURCE" > "$IMPORT_BODY"
+schema_status="$(post_import "$IMPORT_BODY" "$IMPORT_TOKEN")"
+if [ "$schema_status" = 422 ] && jq -e '.code == "IMPORT_SCHEMA_REJECTED"' "$IMPORT_RESPONSE" >/dev/null; then
+  green '38 schema 非法整批拒收'
+else
+  red "❌ schema 非法未被拒收（status=$schema_status body=$(cat "$IMPORT_RESPONSE")）"
+fi
+
+green "心伴 v0.6 冒烟通过：$PASS 项 / 38 项"

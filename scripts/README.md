@@ -57,3 +57,7 @@
 ## v0.5
 - `scripts/smoke.sh` 覆盖 01-22 基线与 23-31 修正/标注/导出/降级链路。
 - `scripts/deploy-v02.sh` 保留为工作流 deploy 入口，部署 SQLite 会先执行 additive `prisma db push`。
+
+## v0.6
+- `scripts/smoke.sh` 覆盖 01-31 基线与 32-38 JSON 导入、往返一致、幂等、版本/schema 拒收链路。
+- 导入 API：`POST /api/v1/import`，兼容导出响应 envelope 和裸导出契约。

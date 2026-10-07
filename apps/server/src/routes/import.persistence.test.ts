@@ -12,6 +12,7 @@ const databaseUrl = `file:${join(runDir, 'import.db')}`
 type PrismaClientType = import('../generated/prisma/client.js').PrismaClient
 let prisma: PrismaClientType
 let importHandler: HttpHandler
+const importRoutes: Array<{ name: string; path: string; method: string }> = []
 const authUser = { id: 'user_import_1', phone: '13800008888', role: 'USER', status: 'ACTIVE' } as const
 
 function context(payload: unknown): HttpRouteContext {
@@ -41,7 +42,7 @@ beforeAll(async () => {
   await prisma.character.create({ data: { id: 'char_import', name: '导入角色', title: '备份', type: 'INCLUSIVE', occupation: '朋友', personality: '温暖', greeting: '你好' } })
 
   const importHandlers = new Map<string, HttpHandler>()
-  importModule.registerImportRoutes({ define(name: string, _path: string, _method: string, handler: HttpHandler) { importHandlers.set(name, handler) } } as never)
+  importModule.registerImportRoutes({ define(name: string, path: string, method: string, handler: HttpHandler) { importRoutes.push({ name, path, method }); importHandlers.set(name, handler) } } as never)
   importHandler = importHandlers.get('user-data::import')!
 
   const exportHandlers = new Map<string, HttpHandler>()
@@ -70,6 +71,7 @@ async function counts() {
 
 describe('json import persistence', () => {
   it('test_import_roundtrip_and_idempotent_anchor', async () => {
+    expect(importRoutes).toContainEqual({ name: 'user-data::import', path: '/api/v1/import', method: 'POST' })
     const first = await importHandler(context(validImportPayload))
     expect(first.status_code).toBe(200)
     expect(first.body.data).toMatchObject({
@@ -123,11 +125,7 @@ describe('json import persistence', () => {
     expect(await counts()).toEqual(before)
 
     const extra = JSON.parse(JSON.stringify(validImportPayload)) as Record<string, any>
-    extra.conversations[0].id = 'conv_import_old'
-    extra.conversations[0].messages[0].id = 'msg_import_old'
-    extra.conversations[0].memories[0].id = 'memory_import_old'
-    extra.conversations[0].moodSnapshots[0].id = 'mood_import_old'
-    extra.conversations[0].moodSnapshots[0].corrections[0].clientMutationId = 'import-mutation-old'
+    extra.conversations[0].characterId = 'char_import'
     extra.conversations.push({
       id: 'conv_import_new', mode: 'MULTI', title: '新会话', characterId: null,
       createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-02-01T00:00:00.000Z',
@@ -137,7 +135,7 @@ describe('json import persistence', () => {
     expect(mixed.status_code).toBe(200)
     expect(mixed.body.data).toMatchObject({ received: 2, imported: 1, skipped: 1 })
     expect(mixed.body.data.results).toEqual(expect.arrayContaining([
-      { conversationId: 'conv_import_old', status: 'skipped', reason: 'CONVERSATION_EXISTS' },
+      { conversationId: 'conv_import_1', status: 'skipped', reason: 'CONVERSATION_EXISTS' },
       { conversationId: 'conv_import_new', status: 'imported' },
     ]))
     expect((await counts()).conversations).toBe(2)

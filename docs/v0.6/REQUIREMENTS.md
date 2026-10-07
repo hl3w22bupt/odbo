@@ -51,16 +51,16 @@
 
 ## 4. 可机判 DoD 打勾表
 
-- [ ] F1 路由契约：route test 断言 `POST /api/v1/import` 已注册、鉴权后 200、响应字段完整。
-- [ ] F2 实体恢复：route test 注入捕获创建调用，断言 4 类实体及其关联全部传给存储层。
-- [ ] F3 整批/跳过分列：schema 非法时 route test 断言 422 且零 `create`；重复 conversation 时返回 `skipped` 并继续导入新 conversation。
-- [ ] F4 版本门：缺 `schemaVersion` 与 `schemaVersion=2` 分别返回固定 code；`schemaVersion=1` 通过。
-- [ ] F5 幂等：持久化测试首次 `imported=1`，同备份第二次全部 `skipped`，conversation/message/memory/moodSnapshot/correction 计数不变。
-- [ ] F6 往返：纯函数/持久化测试先导出→导入→再导出，`conversations` JSON 逐字段一致。
-- [ ] 冒烟：`scripts/smoke.sh` 在 v0.5 01-31 后追加 32-38 导入链；末行 `心伴 v0.6 冒烟通过：38 项 / 38 项`。
-- [ ] 兼容回归：`npm run build`、`npm test`、`npm run smoke`、`npm run persist:check`、`npm run deploy:v02` 全 0。
-- [ ] 死测试：四类扫描 0 且 Vitest 无 skipped/todo。
-- [ ] 文档：`docs/smoke/v0.6.md` 同步为 v0.6 基线。
+- [x] F1 路由契约：route test 断言 `POST /api/v1/import` 已注册、鉴权后 200、响应字段完整。
+- [x] F2 实体恢复：route test 注入捕获创建调用，断言 4 类实体及其关联全部传给存储层。
+- [x] F3 整批/跳过分列：schema 非法时 route test 断言 422 且零 `create`；重复 conversation 时返回 `skipped` 并继续导入新 conversation。
+- [x] F4 版本门：缺 `schemaVersion` 与 `schemaVersion=2` 分别返回固定 code；`schemaVersion=1` 通过。
+- [x] F5 幂等：持久化测试首次 `imported=1`，同备份第二次全部 `skipped`，conversation/message/memory/moodSnapshot/correction 计数不变。
+- [x] F6 往返：纯函数/持久化测试先导出→导入→再导出，`conversations` JSON 逐字段一致。
+- [x] 冒烟：`scripts/smoke.sh` 在 v0.5 01-31 后追加 32-38 导入链；末行 `心伴 v0.6 冒烟通过：38 项 / 38 项`。
+- [x] 兼容回归：`npm run build`、`npm test`、`npm run smoke`、`npm run persist:check`、`npm run deploy:v02` 全 0。
+- [x] 死测试：四类扫描 0 且 Vitest 无 skipped/todo。
+- [x] 文档：`docs/smoke/v0.6.md` 同步为 v0.6 基线。
 
 状态必须在红测→绿测→冒烟证据齐备后才改 `[x]`。
 

@@ -91,7 +91,7 @@ describe('json import schema gate', () => {
   it('test_import_invalid_record_rejects_schema_without_partial_plan', () => {
     const payload = invalidClone((data) => {
       const conversations = data.conversations as Array<Record<string, unknown>>
-      conversations[0]!.messages = []
+      delete (conversations[0]!.messages as Array<Record<string, unknown>>)[0]!.id
     })
     try {
       assertImportPayload(payload)

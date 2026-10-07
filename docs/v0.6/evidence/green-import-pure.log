@@ -1,0 +1,14 @@
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmuyq23k10021m93ew3n6padp/apps/server
+
+ ✓ src/lib/importData.test.ts > json import schema gate > test_import_missing_version_rejects_whole_batch 1ms
+ ✓ src/lib/importData.test.ts > json import schema gate > test_import_higher_version_rejects_whole_batch 0ms
+ ✓ src/lib/importData.test.ts > json import schema gate > test_import_invalid_record_rejects_schema_without_partial_plan 0ms
+ ✓ src/lib/importData.test.ts > json import schema gate > test_import_valid_payload_keeps_frozen_envelope 1ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  07:23:20
+   Duration  116ms (transform 24ms, setup 0ms, import 31ms, tests 4ms, environment 0ms)
+
+PURE_EXIT=0

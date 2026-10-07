@@ -60,6 +60,8 @@
 - [x] 冒烟：`scripts/smoke.sh` 在 v0.5 01-31 后追加 32-38 导入链；末行 `心伴 v0.6 冒烟通过：38 项 / 38 项`。
 - [x] 兼容回归：`npm run build`、`npm test`、`npm run smoke`、`npm run persist:check`、`npm run deploy:v02` 全 0。
 - [x] 死测试：四类扫描 0 且 Vitest 无 skipped/todo。
+- [x] Deploy：`npm run deploy:v02` 后重跑 build/start/test、38 项冒烟与 9 项持久回归。
+- [x] AppHost：dist-web tar 已上传对象存储且签名 GET 200。
 - [x] 文档：`docs/smoke/v0.6.md` 同步为 v0.6 基线。
 
 状态必须在红测→绿测→冒烟证据齐备后才改 `[x]`。

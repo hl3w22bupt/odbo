@@ -1,6 +1,6 @@
 # 心伴 v0.6 质量验收报告
 
-结论：**开发/质量验收通过**；deploy 段见 `DEPLOY.md` 与证据。
+结论：**开发、质量、仓库 production deploy 复验与 AppHost 资产导出通过**；见 `DEPLOY.md`。
 
 ## 1. 门禁
 
@@ -12,6 +12,9 @@
 | 持久 | `npm run persist:check` | 0 | 9/9 | `qa-persist.log` |
 | 死测试 | 四类 grep + Vitest 输出 | 0 | 0 skipped/todo | `final-dead-test-scan.log` |
 | Mobile lint | `npx eslint src --max-warnings 0` | 0 | 通过 | `mobile-src-lint.log` |
+| deploy | `npm run deploy:v02` | 0 | build/start/test 全 0 | `deploy-replay.log` |
+| 部署后冒烟 | `npm run smoke` | 0 | 38/38 | `post-deploy-smoke.log` |
+| 部署后持久 | `npm run persist:check` | 0 | 9/9 | `post-deploy-persist.log` |
 | 红测 | targeted Vitest | 1 | 模块缺失 2 suites 红 | `red-server.log` |
 | 绿锚点 | targeted Vitest | 0 | 11 passed | `green-import-pure.log`、`green-import-anchor.log` |
 

@@ -22,23 +22,7 @@
 Starting Metro Bundler
 
 warning: Bundler cache is empty, rebuilding (this may take a minute)
-| (node:61838) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-| (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:61838) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-| (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:61838) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-| (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:61838) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-| (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:61838) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-| (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:61838) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-| (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:61838) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-| (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:61838) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-| (Use `node --trace-warnings ...` to show where the warning was created)
-Web Bundled 2684ms index.ts (334 modules)
+Web Bundled 2495ms index.ts (334 modules)
 
 › web bundles (1):
 _expo/static/js/web/index-1e4cf2d1ab5c4cd239f65d72a2076277.js (665KB)
@@ -49,15 +33,13 @@ index.html (1.2KB)
 metadata.json (49B)
 
 Exported: dist-web
-◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
 Loaded Prisma config from prisma.config.ts.
 
 Prisma schema loaded from prisma/schema.prisma.
 Datasource "db": SQLite database "xinban-deploy-v02.db" at "file:./data/xinban-deploy-v02.db"
 
-SQLite database xinban-deploy-v02.db created at file:./data/xinban-deploy-v02.db
-
-🚀  Your database is now in sync with your Prisma schema. Done in 31ms
+The database is already in sync with the Prisma schema.
 
 == deploy start ==
 deploy /health: 0
@@ -81,23 +63,7 @@ deploy /health: 0
 Starting Metro Bundler
 
 warning: Bundler cache is empty, rebuilding (this may take a minute)
-| (node:62503) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-| (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:62503) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-| (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:62503) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-| (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:62503) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-| (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:62503) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-| (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:62503) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-| (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:62503) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-| (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:62503) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-| (Use `node --trace-warnings ...` to show where the warning was created)
-Web Bundled 2578ms index.ts (334 modules)
+Web Bundled 2558ms index.ts (334 modules)
 
 › web bundles (1):
 _expo/static/js/web/index-1e4cf2d1ab5c4cd239f65d72a2076277.js (665KB)
@@ -127,8 +93,8 @@ start exit: 0
 
  Test Files  15 passed (15)
       Tests  70 passed (70)
-   Start at  07:36:25
-   Duration  1.07s (transform 888ms, setup 0ms, import 1.40s, tests 1.87s, environment 1ms)
+   Start at  07:48:07
+   Duration  1.33s (transform 900ms, setup 0ms, import 1.35s, tests 2.36s, environment 1ms)
 
 
 > xinban-ai-mobile@1.0.0 test
@@ -143,10 +109,9 @@ Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
 
  Test Files  4 passed (4)
       Tests  31 passed (31)
-   Start at  07:36:26
-   Duration  132ms (transform 85ms, setup 0ms, import 113ms, tests 24ms, environment 0ms)
+   Start at  07:48:08
+   Duration  139ms (transform 87ms, setup 0ms, import 115ms, tests 23ms, environment 0ms)
 
 test exit: 0
 
 心伴 v0.2 deploy 复验：build=0 start=0 test=0
-DEPLOY_EXIT=0

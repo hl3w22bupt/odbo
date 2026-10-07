@@ -18,4 +18,3 @@ Prisma schema loaded from prisma/schema.prisma.
 [32m✅ P08 重启后 P1 情绪快照读回一致[0m
 [32m✅ P09 写失败降级断言（空列表，无脏数据）[0m
 [32m✅ 心伴 v0.3 持久性硬门槛通过：9 项，exit=0[0m
-PERSIST_EXIT=0

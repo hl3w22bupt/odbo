@@ -7,33 +7,43 @@ Loaded Prisma config from prisma.config.ts.
 
 Prisma schema loaded from prisma/schema.prisma.
 
-✔ Generated Prisma Client (7.9.1) to ./src/generated/prisma in 77ms
+✔ Generated Prisma Client (7.9.1) to ./src/generated/prisma in 79ms
 
-◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
 Loaded Prisma config from prisma.config.ts.
 
 Prisma schema loaded from prisma/schema.prisma.
-Datasource "db": SQLite database "xinban-smoke.db" at "file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-smoke.YEILs7/xinban-smoke.db"
+Datasource "db": SQLite database "xinban-smoke.db" at "file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-smoke.QEZZ9M/xinban-smoke.db"
 
-SQLite database xinban-smoke.db created at file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-smoke.YEILs7/xinban-smoke.db
+SQLite database xinban-smoke.db created at file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-smoke.QEZZ9M/xinban-smoke.db
 
-🚀  Your database is now in sync with your Prisma schema. Done in 30ms
+🚀  Your database is now in sync with your Prisma schema. Done in 31ms
+┌─────────────────────────────────────────────────────────┐
+│  Update available 7.9.1 -> 8.0.0-rc.21                  │
+│                                                         │
+│  This is a major update - please follow the guide at    │
+│  https://pris.ly/d/major-version-upgrade                │
+│                                                         │
+│  Run the following to update                            │
+│    npm i --save-dev prisma@latest                       │
+│    npm i @prisma/client@latest                          │
+└─────────────────────────────────────────────────────────┘
 
 
 > @xinban/server@1.0.0 prisma:seed
 > tsx prisma/seed.ts
 
-◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
-[2026-10-07T23:36:32.313Z] [INFO] 开始初始化种子数据…
-[2026-10-07T23:36:32.381Z] [INFO] 角色已创建：林晚晴（温婉知己 · FREE）
-[2026-10-07T23:36:32.382Z] [INFO] 角色已创建：阿秀（爽朗直爽 · FREE）
-[2026-10-07T23:36:32.383Z] [INFO] 角色已创建：小满（俏皮灵动 · VIP）
-[2026-10-07T23:36:32.384Z] [INFO] 角色已创建：苏雅（成熟通透 · VIP）
-[2026-10-07T23:36:32.388Z] [INFO] 商品已创建：5 个
-[2026-10-07T23:36:32.391Z] [INFO] 礼物已创建：5 个
-[2026-10-07T23:36:32.398Z] [INFO] 管理账号就绪：13800000000（role=ADMIN）
-[2026-10-07T23:36:32.400Z] [INFO] 敏感词已创建：4 条
-[2026-10-07T23:36:32.400Z] [INFO] 种子数据初始化完成 ✔
+◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
+[2026-10-07T23:48:19.675Z] [INFO] 开始初始化种子数据…
+[2026-10-07T23:48:19.745Z] [INFO] 角色已创建：林晚晴（温婉知己 · FREE）
+[2026-10-07T23:48:19.746Z] [INFO] 角色已创建：阿秀（爽朗直爽 · FREE）
+[2026-10-07T23:48:19.747Z] [INFO] 角色已创建：小满（俏皮灵动 · VIP）
+[2026-10-07T23:48:19.748Z] [INFO] 角色已创建：苏雅（成熟通透 · VIP）
+[2026-10-07T23:48:19.752Z] [INFO] 商品已创建：5 个
+[2026-10-07T23:48:19.756Z] [INFO] 礼物已创建：5 个
+[2026-10-07T23:48:19.762Z] [INFO] 管理账号就绪：13800000000（role=ADMIN）
+[2026-10-07T23:48:19.764Z] [INFO] 敏感词已创建：4 条
+[2026-10-07T23:48:19.764Z] [INFO] 种子数据初始化完成 ✔
 [32m✅ 01 健康检查[0m
 [32m✅ 02 发送验证码[0m
 [32m✅ 03 注册并登录[0m
@@ -76,4 +86,3 @@ Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
 [32m✅ 37 schemaVersion 高版本整批拒收[0m
 [32m✅ 38 schema 非法整批拒收[0m
 [32m✅ 心伴 v0.6 冒烟通过：38 项 / 38 项[0m
-POST_DEPLOY_SMOKE_EXIT=0

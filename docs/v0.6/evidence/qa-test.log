@@ -12,8 +12,8 @@
 
  Test Files  15 passed (15)
       Tests  70 passed (70)
-   Start at  07:33:30
-   Duration  1.13s (transform 848ms, setup 0ms, import 1.39s, tests 1.94s, environment 1ms)
+   Start at  07:47:09
+   Duration  1.11s (transform 899ms, setup 0ms, import 1.45s, tests 1.92s, environment 1ms)
 
 
 > xinban-ai-mobile@1.0.0 test
@@ -28,7 +28,6 @@ Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
 
  Test Files  4 passed (4)
       Tests  31 passed (31)
-   Start at  07:33:31
-   Duration  131ms (transform 85ms, setup 0ms, import 110ms, tests 23ms, environment 0ms)
+   Start at  07:47:11
+   Duration  130ms (transform 87ms, setup 0ms, import 111ms, tests 23ms, environment 0ms)
 
-TEST_EXIT=0

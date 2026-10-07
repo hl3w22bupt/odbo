@@ -1,0 +1,151 @@
+docs/v0.4/QA-ACCEPTANCE.md:57:| N1 | `readableMemories` MEMORY_LIMIT=20 与路由 `findMany take:50` 口径不一 | 21+ 条 ACTIVE 记忆支撑的合法快照会被摘要按脏点跳过（红队可运行反例证实），与 `/mood-timeline`（cap 50）样本口径不一致 | 统一两处 cap，或在契约中显式声明截断口径 |
+docs/v0.4/evidence/baseline-smoke.log:62:[32m✅ 16 情绪轨迹结构化快照[0m
+docs/v0.4/evidence/baseline-smoke.log:63:[32m✅ 17 情绪轨迹内容非像素契约[0m
+docs/v0.4/evidence/baseline-smoke.log:65:[32m✅ 19 新会话情绪轨迹空态契约[0m
+docs/v0.4/evidence/red-server-mood-insight.log:12:      2| import type { MemoryReadContract, MoodTimelineContract } from './conve…
+docs/v0.4/evidence/v04-smoke.log:52:[32m✅ 16 情绪轨迹结构化快照[0m
+docs/v0.4/evidence/v04-smoke.log:53:[32m✅ 17 情绪轨迹内容非像素契约[0m
+docs/v0.4/evidence/v04-smoke.log:55:[32m✅ 19 新会话情绪轨迹空态契约[0m
+docs/v0.4/evidence/baseline-start.log:22:[2026-10-04T23:07:59.784Z] [INFO] [route] GET /api/v1/conversations/:id/mood-timeline -> chat::conversation-mood-timeline
+docs/v0.4/evidence/r2-start-health.log:21:[2026-10-04T23:29:50.019Z] [INFO] [route] GET /api/v1/conversations/:id/mood-timeline -> chat::conversation-mood-timeline
+docs/v0.4/evidence/qa-start-health.log:18:[2026-10-04T23:37:15.700Z] [INFO] [route] GET /api/v1/conversations/:id/mood-timeline -> chat::conversation-mood-timeline
+docs/v0.4/evidence/r2-smoke.log:48:[32m✅ 16 情绪轨迹结构化快照[0m
+docs/v0.4/evidence/r2-smoke.log:49:[32m✅ 17 情绪轨迹内容非像素契约[0m
+docs/v0.4/evidence/r2-smoke.log:51:[32m✅ 19 新会话情绪轨迹空态契约[0m
+docs/v0.4/evidence/red-server-insight-route.log:54:    "name": "chat::conversation-mood-timeline",
+docs/v0.4/evidence/red-server-insight-route.log:55:    "path": "/api/v1/conversations/:id/mood-timeline",
+docs/v0.4/evidence/qa-smoke.log:52:[32m✅ 16 情绪轨迹结构化快照[0m
+docs/v0.4/evidence/qa-smoke.log:53:[32m✅ 17 情绪轨迹内容非像素契约[0m
+docs/v0.4/evidence/qa-smoke.log:55:[32m✅ 19 新会话情绪轨迹空态契约[0m
+docs/v0.4/evidence/post-deploy-smoke.log:52:[32m✅ 16 情绪轨迹结构化快照[0m
+docs/v0.4/evidence/post-deploy-smoke.log:53:[32m✅ 17 情绪轨迹内容非像素契约[0m
+docs/v0.4/evidence/post-deploy-smoke.log:55:[32m✅ 19 新会话情绪轨迹空态契约[0m
+docs/v0.4/REPLAY.md:17:## 2. v0.3 P1（情绪轨迹可视化）落地复核
+docs/v0.4/REPLAY.md:24:| `apps/server/src/lib/conversationInsights.ts` | `serializeMood`（L145）/ `readableMoodTimeline`（L173）导出存在 |
+docs/v0.4/REPLAY.md:25:| `apps/server/src/routes/chat.ts` | `GET /api/v1/conversations/:id/mood-timeline` 注册于 L711 |
+docs/v0.4/REPLAY.md:26:| `apps/mobile/src/components/MoodTimelinePanel.tsx` | 存在并接入 `ChatScreen.tsx` |
+docs/v0.4/REPLAY.md:27:| 测试锚点 | `conversationInsights.test.ts > serializes mood snapshots with structured keywords`；`chat.routes.test.ts > degrades the mood timeline read...`；`insights.test.ts > asserts timeline content instead of pixels`、`> uses empty and degraded states...` 全部命中且本轮随套件全绿 |
+docs/v0.4/BASELINE.md:24:| `apps/server/src/lib/conversationInsights.ts` | `readableMoodTimeline` / `serializeMood` 输出结构化快照并兼容脏值归一 |
+docs/v0.4/BASELINE.md:25:| `apps/server/src/routes/chat.ts` | `GET /api/v1/conversations/:id/mood-timeline` 鉴权读取与显式降级 |
+docs/v0.4/BASELINE.md:26:| `apps/mobile/src/components/MoodTimelinePanel.tsx` | emoji/标签读视图，不断言像素 |
+docs/v0.4/BASELINE.md:27:| server tests | `conversationInsights.test.ts > serializes mood snapshots with structured keywords`；`chat.routes.test.ts > serves the explicit empty mood timeline before the first snapshot`；`> degrades the mood timeline read to an empty list when storage fails` |
+docs/v0.4/BASELINE.md:28:| mobile test | `insights.test.ts > asserts timeline content instead of pixels`；`> uses empty and degraded states without exposing partial rows` |
+docs/v0.4/verification-report.md:22:| AC-02 【core】V4-2 脏数据与降级：脏点跳过；memory/timeline/聚合失败返回 available=false/degraded=true/summary=null | pass | 3 | 降级三路径均有锚点且绿：模块级 'skips dirty points…'（无归因点跳过后 sampleSize=1）与 'degrades when either source read is degraded'（EV-08）；路由级 'serves the explicit empty insight summary…'、'degrades the insight summary when storage fails'（mock reject）、'degrades the insight summary when aggregation cannot safely complete'（createdAt 抛错注入）（EV-09，14/14 绿）。实现侧 catch 先透传 AppError 再降级，404 不被吞（红队 CH-4 反证不成立）。 | [EV-08](docs/v0.4/evidence/green-server-mood-insight.log) [EV-09](docs/v0.4/evidence/green-server-insight-route.log) [EV-03](docs/v0.4/evidence/qa-test-server.log) |
+docs/v0.4/verification-report.md:23:| AC-03 【core】V4-3 HTTP 兼容：新路由注册；v0.3 既有 memory/mood-timeline 契约测试未修改且全绿 | pass | 2 | 'exposes the insight summary read API' 断言路由表新增 GET /api/v1/conversations/:id/insight-summary（EV-09）。git diff ee98243..HEAD 证明：chat.routes.test.ts 纯追加零删行，conversationInsights.ts 与 prisma/schema.prisma 零改动，既有 46+29 测试全绿即 v0.3 契约行为未变（EV-04/EV-05/EV-06）。红队 CH-7 契约侵蚀反证不成立。 | [EV-09](docs/v0.4/evidence/green-server-insight-route.log) [EV-04](docs/v0.4/evidence/qa-test-mobile.log) [EV-05](docs/v0.4/evidence/qa-test-mobile.log) |
+docs/v0.4/verification-report.md:33:- 未覆盖攻击面：多并发写读下 insight-summary 与 /mood-timeline 的瞬时一致性（超出本轮读侧范围）；真实 LLM 摘要路径（停车场项，本轮无实现）
+docs/v0.4/verification-report.md:37:| RT-01 | AC-01 | falsification | minor | readableMemories 以 MEMORY_LIMIT=20 截断而路由 findMany take:50：第 21+ 条 ACTIVE 记忆支撑的合法情绪点会被 insight 摘要按脏点跳过，与 /mood-timeline（cap 50）样本口径不一致，长会话下可能误报空态。红队以 30 条记忆的可运行反例证实。 | upheld：核验侧复核确认两处 cap 不一致属实；行为符合『无归因即跳过』的冻结策略且偏保守，不违反任何 DoD 谓词，判 minor 不降级；记入 v0.5 改进清单（统一 cap 或显式声明截断口径）。 |
+docs/v0.4/verification-report.md:49:- RT-01（minor upheld）：readableMemories 以 MEMORY_LIMIT=20 截断而路由 findMany take:50：第 21+ 条 ACTIVE 记忆支撑的合法情绪点会被 insight 摘要按脏点跳过，与 /mood-timeline（cap 50）样本口径不一致，长会话下可能误报空态。红队以 30 条记忆的可运行反例证实。
+docs/v0.4/verification-report.json:31:      "text": "V4-2 脏数据与降级：脏点跳过；memory/timeline/聚合失败返回 available=false/degraded=true/summary=null",
+docs/v0.4/verification-report.json:43:      "text": "V4-3 HTTP 兼容：新路由注册；v0.3 既有 memory/mood-timeline 契约测试未修改且全绿",
+docs/v0.4/verification-report.json:342:      "多并发写读下 insight-summary 与 /mood-timeline 的瞬时一致性（超出本轮读侧范围）",
+docs/v0.4/verification-report.json:351:        "claim": "readableMemories 以 MEMORY_LIMIT=20 截断而路由 findMany take:50：第 21+ 条 ACTIVE 记忆支撑的合法情绪点会被 insight 摘要按脏点跳过，与 /mood-timeline（cap 50）样本口径不一致，长会话下可能误报空态。红队以 30 条记忆的可运行反例证实。",
+docs/v0.4/DEVELOPMENT.md:6:2. **范围冻结**：只在既有会话记忆 + 情绪轨迹之上做读侧派生；冻结契约与 DoD。
+docs/v0.4/DEVELOPMENT.md:16:| 洞察纯函数 | `apps/server/src/lib/moodInsight.ts` | 只消费 memory / timeline 读契约；聚合趋势、关键词、可解释文案；不访问 Prisma |
+docs/v0.4/DEVELOPMENT.md:69:- 输入 B：`MoodTimelineContract.points`，只接受 `memoryId` 映射到输入 A、`id/createdAt/mood/score` 可解析的情绪点。
+docs/v0.4/DEVELOPMENT.md:73:- 兼容：现有 `/memory`、`/mood-timeline`、`/chat/send` 字段不删除、不改名、不改类型。
+docs/v0.4/DEVELOPMENT.md:80:| V4-2 | 脏数据与降级 | 脏点被跳过；memory/timeline/聚合失败返回 `available=false/degraded=true/summary=null` | `moodInsight.test.ts > skips dirty points that are not backed by an active memory`、`degrades when either source read is degraded`；`chat.routes.test.ts > serves the explicit empty insight summary before any valid point`、`> degrades the insight summary when storage fails`、`> degrades the insight summary when aggregation cannot safely complete` | [x] |
+docs/v0.4/DEVELOPMENT.md:81:| V4-3 | HTTP 兼容 | 新路由注册；旧 memory / mood-timeline 契约测试不修改且全绿 | `chat.routes.test.ts > exposes the insight summary read API`；v0.3 既有四个 read handler 行为测试 | [x] |
+docs/v0.5/QA-ACCEPTANCE.md:36:- **② 标注链 27**：同一 correction payload 携带 `tags` 与 `reason`；timeline/导出可见；UI 回调与 state 局部更新具名测试锁定。
+docs/v0.5/QA-ACCEPTANCE.md:50:- 空态导出、空态 timeline、降级 timeline 均返回 200 显式结构；不把空库解释成 404/500。
+docs/v0.5/ARCHITECTURE.md:16:  UI[Mobile 展示层<br/>MoodTimelinePanel / 修正弹窗] --> API[API Client 契约]
+docs/v0.5/ARCHITECTURE.md:27:- **派生层**：`conversationInsights.ts` 先按 correction 序号做 latest-wins，再供 timeline、洞察和导出消费；派生层不直接访问 Prisma。
+docs/v0.5/ARCHITECTURE.md:35:| 派生层 → 核心交互 | 不成立 | 派生函数只接收 memory/timeline 数据契约 |
+docs/v0.5/ARCHITECTURE.md:61:- **决策**：不改写 `MoodSnapshot`；每次保存新增 `MoodCorrection`，timeline / insight / export 读取最新 correction。
+docs/v0.5/ARCHITECTURE.md:86:| 可用性 | correction 写失败不影响旧 point；timeline 存储失败显式 degraded | write-failure + v0.3 persist |
+docs/v0.5/evidence/baseline-smoke.log:62:[32m✅ 16 情绪轨迹结构化快照[0m
+docs/v0.5/evidence/baseline-smoke.log:63:[32m✅ 17 情绪轨迹内容非像素契约[0m
+docs/v0.5/evidence/baseline-smoke.log:65:[32m✅ 19 新会话情绪轨迹空态契约[0m
+docs/v0.5/evidence/qa-smoke-first.log:52:[32m✅ 16 情绪轨迹结构化快照[0m
+docs/v0.5/evidence/qa-smoke-first.log:53:[32m✅ 17 情绪轨迹内容非像素契约[0m
+docs/v0.5/evidence/qa-smoke-first.log:55:[32m✅ 19 新会话情绪轨迹空态契约[0m
+docs/v0.5/evidence/review-2026-10-06-smoke.log:52:[32m✅ 16 情绪轨迹结构化快照[0m
+docs/v0.5/evidence/review-2026-10-06-smoke.log:53:[32m✅ 17 情绪轨迹内容非像素契约[0m
+docs/v0.5/evidence/review-2026-10-06-smoke.log:55:[32m✅ 19 新会话情绪轨迹空态契约[0m
+docs/v0.5/evidence/qa-smoke.log:52:[32m✅ 16 情绪轨迹结构化快照[0m
+docs/v0.5/evidence/qa-smoke.log:53:[32m✅ 17 情绪轨迹内容非像素契约[0m
+docs/v0.5/evidence/qa-smoke.log:55:[32m✅ 19 新会话情绪轨迹空态契约[0m
+docs/v0.5/RECHECK.md:39:- **UI 闭环**（`ChatScreen.tsx` 313-352）：列表项「修正」（`MoodTimelinePanel` accessibilityLabel `修正情绪记录`）→ 弹窗保存 → `setMoodTimeline` 局部替换该 point（降级时保原值）→ 洞察联动刷新 → 失败 toast 回显；无整页刷新依赖。
+docs/v0.5/REVIEW.md:20:2. **空库/降级误判**：空导出 200；timeline 降级返回显式空 points；不存在修正 404。
+docs/v0.5/REVIEW.md:21:3. **静默覆盖**：原始 snapshot 无 UPDATE/DELETE 路径；readable timeline 记录 originalMood/originalScore/correctionId。
+docs/v0.5/DEVELOPMENT.md:35:| T5 最小 UI | P0-2 | `MoodTimelinePanel` / Chat | 列表项「修正」、三态情绪、标签/原因、即时更新 |
+docs/v0.5/DEVELOPMENT.md:106:- timeline 继续返回旧契约字段；未修正点新增 `tags:[],reason:"",originalMood/originalScore=null,correctionId=null,correctedAt=null`。
+apps/mobile/src/types/index.ts:132:export interface MoodTimelineResult {
+apps/mobile/src/types/index.ts:313:  moodTimeline?: MoodTimelineResult;
+apps/mobile/src/utils/insights.ts:1:import type { MemoryReadResult, MoodInsightSummaryResult, MoodTimelineResult } from '../types';
+apps/mobile/src/utils/insights.ts:19:  | { mode: 'ready'; points: NonNullable<MoodTimelineResult['points']>[number][] };
+apps/mobile/src/utils/insights.ts:21:export function moodViewState(view: MoodTimelineResult | null | undefined): MoodViewState {
+apps/mobile/src/utils/insights.test.ts:3:import type { MemoryReadResult, MoodTimelineResult } from '../types';
+apps/mobile/src/utils/insights.test.ts:41:  const timeline: MoodTimelineResult = {
+apps/mobile/src/utils/insights.test.ts:60:  it('asserts timeline content instead of pixels', () => {
+apps/mobile/src/utils/insights.test.ts:61:    expect(moodViewState(timeline).points[0]).toMatchObject({ mood: 'POSITIVE', score: 1 });
+apps/mobile/src/utils/insights.test.ts:65:    expect(moodViewState({ ...timeline, points: [] }).mode).toBe('empty');
+apps/mobile/src/utils/insights.test.ts:66:    expect(moodViewState({ ...timeline, available: false, degraded: true })).toEqual({
+apps/mobile/src/screens/ChatScreen.tsx:23:import { MoodTimelinePanel } from '../components/MoodTimelinePanel';
+apps/mobile/src/screens/ChatScreen.tsx:32:import type { Affection, Character, ChatMode, CustomizationPayload, Gift, MemoryReadResult, Message, MoodInsightSummaryResult, MoodSnapshot, MoodTimelineResult } from '../types';
+apps/mobile/src/screens/ChatScreen.tsx:61:  const [moodTimeline, setMoodTimeline] = useState<MoodTimelineResult | null>(null);
+apps/mobile/src/screens/ChatScreen.tsx:185:          api.getMoodTimeline(initConvId).catch(() => null),
+apps/mobile/src/screens/ChatScreen.tsx:190:        if (mounted) setMoodTimeline(moodView);
+apps/mobile/src/screens/ChatScreen.tsx:279:        setMoodTimeline(
+apps/mobile/src/screens/ChatScreen.tsx:280:          res.moodTimeline ??
+apps/mobile/src/screens/ChatScreen.tsx:281:            (await api.getMoodTimeline(res.conversationId).catch(() => null)),
+apps/mobile/src/screens/ChatScreen.tsx:330:      setMoodTimeline((prev) => prev && prev.conversationId === convId
+apps/mobile/src/screens/ChatScreen.tsx:512:      <MoodTimelinePanel value={moodTimeline} onCorrect={openCorrection} />
+apps/mobile/src/components/MoodTimelinePanel.tsx:5:import type { MoodSnapshot, MoodTimelineResult } from '../types';
+apps/mobile/src/components/MoodTimelinePanel.tsx:7:interface MoodTimelinePanelProps {
+apps/mobile/src/components/MoodTimelinePanel.tsx:8:  value: MoodTimelineResult | null | undefined;
+apps/mobile/src/components/MoodTimelinePanel.tsx:18:export function MoodTimelinePanel({ value, onCorrect }: MoodTimelinePanelProps) {
+apps/mobile/src/components/MoodTimelinePanel.tsx:22:      ? '情绪轨迹暂不可用'
+apps/mobile/src/components/MoodTimelinePanel.tsx:25:        : '情绪轨迹';
+apps/mobile/src/api/mock.ts:30:  MoodTimelineResult,
+apps/mobile/src/api/mock.ts:487:      moodTimeline: {
+apps/mobile/src/api/mock.ts:535:  async getMoodTimeline(conversationId: string): Promise<MoodTimelineResult> {
+apps/mobile/src/api/index.ts:27:  MoodTimelineResult,
+apps/mobile/src/api/index.ts:61:  getMoodTimeline(conversationId: string): Promise<MoodTimelineResult>;
+apps/mobile/src/api/index.ts:109:  async getMoodTimeline(conversationId) {
+apps/mobile/src/api/index.ts:110:    return request<MoodTimelineResult>('GET', `/api/v1/conversations/${conversationId}/mood-timeline`);
+apps/server/src/lib/conversationInsights.test.ts:8:  readableMoodTimeline,
+apps/server/src/lib/conversationInsights.test.ts:73:describe('mood timeline contract', () => {
+apps/server/src/lib/conversationInsights.test.ts:91:    expect(readableMoodTimeline('conv_1', [row])).toEqual({
+apps/server/src/lib/conversationInsights.ts:2: * 心伴 v0.3 · 会话记忆与情绪轨迹
+apps/server/src/lib/conversationInsights.ts:39:export interface MoodTimelineContract {
+apps/server/src/lib/conversationInsights.ts:65:export function moodTimelineEmpty(conversationId: string): MoodTimelineContract {
+apps/server/src/lib/conversationInsights.ts:69:export function moodTimelineDegraded(conversationId: string): MoodTimelineContract {
+apps/server/src/lib/conversationInsights.ts:175:export function readableMoodTimeline(
+apps/server/src/lib/conversationInsights.ts:180:): MoodTimelineContract {
+apps/server/src/lib/conversationInsights.ts:181:  if (degraded) return moodTimelineDegraded(conversationId)
+apps/server/src/lib/moodInsight.test.ts:2:import type { MemoryReadContract, MoodTimelineContract } from './conversationInsights.js'
+apps/server/src/lib/moodInsight.test.ts:26:function timelineWith(
+apps/server/src/lib/moodInsight.test.ts:27:  points: MoodTimelineContract['points'],
+apps/server/src/lib/moodInsight.test.ts:28:  overrides: Partial<MoodTimelineContract> = {},
+apps/server/src/lib/moodInsight.test.ts:29:): MoodTimelineContract {
+apps/server/src/lib/moodInsight.test.ts:55:    expect(readableMoodInsightSummary('conv_1', memoryView, timelineWith([]))).toEqual(
+apps/server/src/lib/moodInsight.test.ts:70:      timelineWith([
+apps/server/src/lib/moodInsight.test.ts:99:      timelineWith([
+apps/server/src/lib/moodInsight.test.ts:115:    const dirtyTimeline = timelineWith([], { available: false, degraded: true })
+apps/server/src/lib/moodInsight.test.ts:117:    expect(readableMoodInsightSummary('conv_1', dirtyMemory, timelineWith([]))).toEqual(
+apps/server/src/lib/moodInsight.test.ts:120:    expect(readableMoodInsightSummary('conv_1', memoryView, dirtyTimeline)).toEqual(
+apps/server/src/lib/moodInsight.ts:4:  MoodTimelineContract,
+apps/server/src/lib/moodInsight.ts:108:  timeline: MoodTimelineContract,
+apps/server/src/lib/moodInsight.ts:110:  if (!memory.available || memory.degraded || !timeline.available || timeline.degraded) {
+apps/server/src/lib/moodInsight.ts:117:  const validPoints = timeline.points
+apps/server/src/routes/chat.ts:34:  moodTimelineDegraded,
+apps/server/src/routes/chat.ts:35:  moodTimelineEmpty,
+apps/server/src/routes/chat.ts:40:  readableMoodTimeline,
+apps/server/src/routes/chat.ts:234: * v0.3 P1 读接口：情绪轨迹结构化快照。
+apps/server/src/routes/chat.ts:237:async function conversationMoodTimeline(ctx: HttpRouteContext) {
+apps/server/src/routes/chat.ts:257:    return ok(readableMoodTimeline(id, rows, false, correctionRows))
+apps/server/src/routes/chat.ts:260:    logger.warn('[chat] mood timeline read degraded', { err: String(err), conversationId: id })
+apps/server/src/routes/chat.ts:261:    return ok(moodTimelineDegraded(id))
+apps/server/src/routes/chat.ts:267: * 只消费既有 ACTIVE 记忆与情绪轨迹，聚合失败时显式降级为空摘要。
+apps/server/src/routes/chat.ts:298:        readableMoodTimeline(id, moodRows, false, correctionRows),
+apps/server/src/routes/chat.ts:468:      moodTimeline: mood
+apps/server/src/routes/chat.ts:469:        ? readableMoodTimeline(conversation.id, [mood])
+apps/server/src/routes/chat.ts:470:        : moodTimelineDegraded(conversation.id),
+apps/server/src/routes/chat.ts:830:  router.define('chat::conversation-mood-timeline', '/api/v1/conversations/:id/mood-timeline', 'GET', conversationMoodTimeline)
+apps/server/src/routes/chat.routes.test.ts:56:  it('exposes the structured mood timeline read API', () => {
+apps/server/src/routes/chat.routes.test.ts:60:      name: 'chat::conversation-mood-timeline',
+apps/server/src/routes/chat.routes.test.ts:62:      path: '/api/v1/conversations/:id/mood-timeline',
+apps/server/src/routes/chat.routes.test.ts:101:  it('serves the explicit empty mood timeline before the first snapshot', async () => {
+apps/server/src/routes/chat.routes.test.ts:103:    const res = await handlers.get('chat::conversation-mood-timeline')!(readContext(conversationId))
+apps/server/src/routes/chat.routes.test.ts:113:  it('degrades the mood timeline read to an empty list when storage fails', async () => {
+apps/server/src/routes/chat.routes.test.ts:115:    const res = await handlers.get('chat::conversation-mood-timeline')!(readContext(conversationId))

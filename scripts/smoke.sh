@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 心伴 v0.6 · 一条命令全链路冒烟（01-22 基线 + 23-31 写侧闭环与导出 + 32-38 JSON 导入）
+# 心伴 v0.7 · 一条命令全链路冒烟（01-38 兼容基线 + 39-42 近7日周报）
 # 用法：npm run smoke
 # 可用环境变量：XINBAN_SMOKE_PORT（默认 13888）、KEEP_SMOKE_DIR=1（保留临时目录）
 set -euo pipefail
@@ -368,4 +368,35 @@ else
   red "❌ schema 非法未被拒收（status=$schema_status body=$(cat "$IMPORT_RESPONSE")）"
 fi
 
-green "心伴 v0.6 冒烟通过：$PASS 项 / 38 项"
+# ---------- v0.7 增量段：近7日情绪周报最小版 ----------
+second_sent="$(http POST /api/v1/chat/send "$TOKEN" "{\"conversationId\":\"$CONVERSATION_ID\",\"characterId\":\"$CHARACTER_ID\",\"content\":\"冒烟测试：今天有点难过\"}")"
+if printf '%s' "$second_sent" | jq -e '.data.moodTimeline.points | length == 1' >/dev/null; then
+  : # chat/send 只返回本次点位；周报接口负责读全量。
+else
+  red "❌ 周报第二样本写入失败（body=$second_sent）"
+fi
+
+weekly="$(http GET "/api/v1/conversations/$CONVERSATION_ID/mood-weekly-report" "$TOKEN")"
+if jq -e '.data.available == true and .data.degraded == false and .data.report != null and .data.report.sampleSize == 2 and .data.report.counts == {"positive":0,"neutral":0,"negative":2} and .data.report.trend == "STABLE"' "$BODY" >/dev/null   && printf '%s' "$weekly" | jq -e '.data.report.reason | contains("近7日样本2条")' >/dev/null; then
+  green '39 周报7日窗口读取修正后样本'
+else
+  red "❌ 周报契约失败（body=$weekly）"
+fi
+
+fresh_weekly="$(http GET "/api/v1/conversations/$FRESH_CONVERSATION_ID/mood-weekly-report" "$TOKEN")"
+if jq -e '.data.available == true and .data.degraded == false and .data.report == null' "$BODY" >/dev/null; then
+  green '40 周报不足样本固定空态'
+else
+  red "❌ 周报空态失败（body=$fresh_weekly）"
+fi
+
+grep -q '<MoodWeeklyReportPanel value={moodWeeklyReport} />' "$ROOT/apps/mobile/src/screens/ChatScreen.tsx"
+grep -q '近7日还没有足够的情绪记录' "$ROOT/apps/mobile/src/components/MoodWeeklyReportPanel.tsx"
+grep -q '近7日情绪报告暂不可用' "$ROOT/apps/mobile/src/components/MoodWeeklyReportPanel.tsx"
+(cd "$ROOT/apps/mobile" && npx vitest run -t 'maps ready empty and degraded weekly report states' src/utils/weeklyReport.test.ts >/dev/null)
+green '41 周报用户可见状态契约'
+
+(cd "$ROOT/apps/server" && npx vitest run -t 'degrades the weekly report when persistence or aggregation fails' src/routes/chat.routes.test.ts >/dev/null)
+green '42 周报聚合失败安全降级'
+
+green "心伴 v0.7 冒烟通过：$PASS 项 / 42 项"

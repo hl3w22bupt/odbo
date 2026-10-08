@@ -155,6 +155,25 @@ export interface MoodInsightSummaryResult {
   summary: MoodInsightSummary | null;
 }
 
+export type MoodWeeklyTrend = 'IMPROVING' | 'STABLE' | 'WORSENING';
+
+export interface MoodWeeklyReport {
+  sampleSize: number;
+  counts: { positive: number; neutral: number; negative: number };
+  trend: MoodWeeklyTrend;
+  headline: string;
+  reason: string;
+  keywords: string[];
+  window: { from: string; to: string };
+}
+
+export interface MoodWeeklyReportResult {
+  conversationId: string;
+  available: boolean;
+  degraded: boolean;
+  report: MoodWeeklyReport | null;
+}
+
 export interface QuotaStatus {
   used: number;
   limit: number;

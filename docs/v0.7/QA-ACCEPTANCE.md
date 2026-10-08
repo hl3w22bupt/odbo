@@ -1,6 +1,6 @@
 # 心伴 v0.7 质量验收
 
-结论：**通过 / READY FOR DEPLOY**。阻塞 0，Major 0。
+结论：**通过 / DEPLOY CLOSED**。阻塞 0，Major 0；独立审查 PASS。
 
 ## 1. 门禁机判
 
@@ -42,3 +42,10 @@
 ## 5. 遗留停车场
 
 图表渲染、推送、环比、跨会话聚合、自定义窗口、行动建议、真实 LLM 文案；均不阻塞本轮签收。
+
+## 6. 部署后终态
+
+- `npm run deploy:v02` exit 0；build/start/test 复跑全绿，见 `deploy-replay.log`。
+- 部署后 smoke 42 / 42、persist 9 / 9，与部署前一致，见 `post-deploy-smoke.log`、`post-deploy-persist.log`。
+- AppHost 发布包 PUT 200、签名回读 200、SHA256 一致，见 `apphost-upload.log`、`apphost-download-check.log`。
+- 独立代码审查 Agent 复验 PASS，0 blocker / 0 major；4 个 minor 全部记录且不阻塞，见 `evidence/independent-code-review.md`。

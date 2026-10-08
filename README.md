@@ -1,6 +1,6 @@
-# 心伴 v0.1（可运行 / 可演示 / 可验收）
+# 心伴 v0.7（可运行 / 可演示 / 可验收）
 
-> 当前增量基线：v0.6 JSON 备份导入；v0.5 冒烟 01-31 作为兼容段保留。
+> 当前增量基线：v0.7 近7日情绪周报；v0.3-v0.6 记忆、轨迹、修正、导入导出全量兼容保留。
 
 心伴是面向单身中老年男性用户的 AI 情感陪伴原型。v0.1 只交付并冻结主链路：
 
@@ -14,10 +14,10 @@
 ```bash
 npm run setup   # 首次：安装依赖、生成 Prisma Client、同步 SQLite、写入种子数据
 npm run build   # 后端编译 + 移动端类型检查 + Expo Web 静态导出
-npm test        # server 59 tests + mobile 31 tests
-npm run smoke            # v0.5 全链路冒烟，预期 31/31
+npm test        # server 76 tests + mobile 33 tests
+npm run smoke            # v0.7 全链路冒烟，预期 42/42
 npm run persistence:v02  # v0.2 情绪/会话重启持久化与降级
-npm run deploy:v02       # 工作流 deploy 入口；v0.5 已补 additive schema 同步
+npm run deploy:v02       # 工作流 deploy 入口；v0.7 复验 build/start/test
 ```
 
 ## 本地启动
@@ -49,8 +49,10 @@ EXPO_PUBLIC_API_URL=http://127.0.0.1:13888 npx expo start --web
 | 业务 handlers | `apps/server/src/routes` | auth/users/characters/chat 等主链路；商业化等表外能力不验收 |
 | 路由适配 | `apps/server/src/http.ts` | 同一 handler 支持 standalone 与 iii 注册 |
 | 持久化 | `apps/server/prisma` | SQLite schema、seed、用户/会话/消息/配额/JWT 会话 |
-| 冒烟 | `scripts/smoke.sh` | 临时数据库、真实 HTTP、服务重启、38 项断言 |
+| 冒烟 | `scripts/smoke.sh` | 临时数据库、真实 HTTP、服务重启、42 项断言 |
 | 情绪持久化 | `apps/server/src/lib/emotion.ts` | 会话情绪伴生态 CRUD、坏数据兼容、写失败降级 |
+| 周报派生 | `apps/server/src/lib/moodWeeklyReport.ts` | 近 7 日窗口、ACTIVE 归因、修正后趋势与一句解释 |
+| 周报展示 | `apps/mobile/src/components/MoodWeeklyReportPanel.tsx` | ready / 空态 / 降级三态用户可见文案 |
 | v0.2 验收 | `scripts/persistence-v02.sh` / `scripts/deploy-v02.sh` | 重启一致性与工作流 deploy 复验 |
 | 情绪修正/导出 | `apps/server/src/lib/moodCorrections.ts`、`apps/server/src/routes/export.ts` | 追加式修正 latest-wins、JSON 用户数据导出 |
 

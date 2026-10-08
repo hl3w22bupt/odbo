@@ -54,3 +54,10 @@
 2. **`.env` 必须存在**：`apps/server/.env` 里 `DATABASE_URL` 指向本机 PostgreSQL 的 `xinban_dev`（`postgresql://leo@localhost:5432/xinban_dev?schema=public`），否则默认 `file:./dev.db` 会连错。
 3. **验证码防刷**：同一手机号 60 秒内不能重发，测试换手机号或等待。
 4. **cron worker 缺失**：`iii-cron` 未启用时，"主动分享见闻"定时任务不注册，不影响登录等核心链路。
+## v0.5
+- `scripts/smoke.sh` 覆盖 01-22 基线与 23-31 修正/标注/导出/降级链路。
+- `scripts/deploy-v02.sh` 保留为工作流 deploy 入口，部署 SQLite 会先执行 additive `prisma db push`。
+
+## v0.6
+- `scripts/smoke.sh` 覆盖 01-31 基线与 32-38 JSON 导入、往返一致、幂等、版本/schema 拒收链路。
+- 导入 API：`POST /api/v1/import`，兼容导出响应 envelope 和裸导出契约。

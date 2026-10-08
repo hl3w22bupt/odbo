@@ -1,0 +1,8 @@
+## four-class source scan
+## Vitest output counters
+13: Test Files  15 passed (15)
+14:      Tests  70 passed (70)
+29: Test Files  4 passed (4)
+30:      Tests  31 passed (31)
+
+DEAD_TEST_COUNT=0

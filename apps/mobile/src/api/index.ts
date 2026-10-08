@@ -21,6 +21,8 @@ import type {
   MembershipInfo,
   MembershipPlan,
   MemoryReadResult,
+  MoodCorrectionPayload,
+  MoodCorrectionWriteResult,
   MoodInsightSummaryResult,
   MoodTimelineResult,
   Message,
@@ -57,6 +59,7 @@ export interface ApiClient {
   listMessages(conversationId: string, after?: string): Promise<{ items: Message[]; hasMore: boolean }>;
   getConversationMemory(conversationId: string): Promise<MemoryReadResult>;
   getMoodTimeline(conversationId: string): Promise<MoodTimelineResult>;
+  correctMoodPoint(conversationId: string, moodPointId: string, payload: MoodCorrectionPayload): Promise<MoodCorrectionWriteResult>;
   getMoodInsightSummary(conversationId: string): Promise<MoodInsightSummaryResult>;
   sendMessage(params: SendMessageParams): Promise<ChatSendResult>;
   sendMultiMessage(params: SendMultiMessageParams): Promise<ChatMultiSendResult>;
@@ -105,6 +108,13 @@ const realApi: ApiClient = {
   },
   async getMoodTimeline(conversationId) {
     return request<MoodTimelineResult>('GET', `/api/v1/conversations/${conversationId}/mood-timeline`);
+  },
+  async correctMoodPoint(conversationId, moodPointId, payload) {
+    return request<MoodCorrectionWriteResult>(
+      'POST',
+      `/api/v1/conversations/${conversationId}/mood-points/${moodPointId}/correction`,
+      payload,
+    );
   },
   async getMoodInsightSummary(conversationId) {
     return request<MoodInsightSummaryResult>('GET', `/api/v1/conversations/${conversationId}/insight-summary`);

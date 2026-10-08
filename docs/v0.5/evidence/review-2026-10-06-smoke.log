@@ -1,0 +1,71 @@
+
+> xinban-v01@1.0.0 smoke
+> ./scripts/smoke.sh
+
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+
+✔ Generated Prisma Client (7.9.1) to ./src/generated/prisma in 77ms
+
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": SQLite database "xinban-smoke.db" at "file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-smoke.x7IA0v/xinban-smoke.db"
+
+SQLite database xinban-smoke.db created at file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-smoke.x7IA0v/xinban-smoke.db
+
+🚀  Your database is now in sync with your Prisma schema. Done in 30ms
+
+
+> @xinban/server@1.0.0 prisma:seed
+> tsx prisma/seed.ts
+
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+[2026-10-05T23:59:37.410Z] [INFO] 开始初始化种子数据…
+[2026-10-05T23:59:37.477Z] [INFO] 角色已创建：林晚晴（温婉知己 · FREE）
+[2026-10-05T23:59:37.478Z] [INFO] 角色已创建：阿秀（爽朗直爽 · FREE）
+[2026-10-05T23:59:37.478Z] [INFO] 角色已创建：小满（俏皮灵动 · VIP）
+[2026-10-05T23:59:37.479Z] [INFO] 角色已创建：苏雅（成熟通透 · VIP）
+[2026-10-05T23:59:37.483Z] [INFO] 商品已创建：5 个
+[2026-10-05T23:59:37.487Z] [INFO] 礼物已创建：5 个
+[2026-10-05T23:59:37.493Z] [INFO] 管理账号就绪：13800000000（role=ADMIN）
+[2026-10-05T23:59:37.495Z] [INFO] 敏感词已创建：4 条
+[2026-10-05T23:59:37.495Z] [INFO] 种子数据初始化完成 ✔
+[32m✅ 01 健康检查[0m
+[32m✅ 02 发送验证码[0m
+[32m✅ 03 注册并登录[0m
+[32m✅ 04 未登录访问被拦截[0m
+[32m✅ 05 角色列表可读[0m
+[32m✅ 06 登录态资料[0m
+[32m✅ 07 创建持久化会话[0m
+[32m✅ 08 核心消息写入[0m
+[32m✅ 09 AI 回复完成并落库[0m
+[32m✅ 10 用户消息重启后保留[0m
+[32m✅ 11 助手消息重启后保留[0m
+[32m✅ 12 消息状态一致[0m
+[32m✅ 13 令牌刷新[0m
+[32m✅ 14 会话记忆重启后可读[0m
+[32m✅ 15 会话记忆契约无降级[0m
+[32m✅ 16 情绪轨迹结构化快照[0m
+[32m✅ 17 情绪轨迹内容非像素契约[0m
+[32m✅ 18 新会话记忆空态契约[0m
+[32m✅ 19 新会话情绪轨迹空态契约[0m
+[32m✅ 20 情绪洞察就绪摘要[0m
+[32m✅ 21 情绪洞察样本与观察口径[0m
+[32m✅ 22 新会话情绪洞察空态契约[0m
+[32m✅ 23 情绪修正追加成功[0m
+[32m✅ 24 修正记录跨重启保留（服务重启成功）[0m
+[32m✅ 25 读侧 latest-wins 解析与原始值保留[0m
+[32m✅ 26 不存在修正明确 404[0m
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+[32m✅ 27 列表修正入口与即时更新契约[0m
+[32m✅ 28 写失败降级并保留旧值[0m
+[32m✅ 29 导出端点 200[0m
+[32m✅ 30 导出冻结 schema 字段断言[0m
+[32m✅ 31 空库导出返回合法空结构[0m
+[32m✅ 心伴 v0.5 冒烟通过：31 项 / 31 项[0m

@@ -1,0 +1,38 @@
+
+> xinban-v01@1.0.0 persistence:v02
+> ./scripts/persistence-v02.sh
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+[32m✅ 01 发送开发验证码[0m
+[32m✅ 02 注册登录[0m
+[32m✅ 03 创建会话[0m
+[32m✅ 04 情绪 create[0m
+[32m✅ 05 主链路消息写入[0m
+[32m✅ 06 情绪 update[0m
+[32m✅ 07 情绪 read[0m
+[32m✅ 08 更新值已写入[0m
+[32m✅ 09 情绪 delete[0m
+[32m✅ 10 删除后读回默认[0m
+[32m✅ 11 重建重启前值[0m
+./scripts/persistence-v02.sh: line 68: 55193 Killed: 9               DATABASE_URL="file:$DB_PATH" HTTP_PORT="$PORT" SMS_PROVIDER=dev PAY_PROVIDER=mock LLM_PROVIDER=mock ANTI_ADDICTION_LATE_NIGHT=false CHAT_REPLY_DELAY_MIN_MS=50 CHAT_REPLY_DELAY_MAX_MS=100 npm run dev:standalone > "$SERVER_LOG" 2>&1
+[32m✅ 12 kill 后会话消息读回一致[0m
+[32m✅ 13 kill 后情绪读回[0m
+[32m✅ 14 kill 后情绪内容一致[0m
+./scripts/persistence-v02.sh: line 68: 55307 Killed: 9               DATABASE_URL="file:$DB_PATH" HTTP_PORT="$PORT" SMS_PROVIDER=dev PAY_PROVIDER=mock LLM_PROVIDER=mock ANTI_ADDICTION_LATE_NIGHT=false CHAT_REPLY_DELAY_MIN_MS=50 CHAT_REPLY_DELAY_MAX_MS=100 npm run dev:standalone > "$SERVER_LOG" 2>&1
+[32m✅ 15 坏情绪数据丢弃回退默认[0m
+./scripts/persistence-v02.sh: line 68: 55370 Killed: 9               DATABASE_URL="file:$DB_PATH" HTTP_PORT="$PORT" SMS_PROVIDER=dev PAY_PROVIDER=mock LLM_PROVIDER=mock ANTI_ADDICTION_LATE_NIGHT=false CHAT_REPLY_DELAY_MIN_MS=50 CHAT_REPLY_DELAY_MAX_MS=100 npm run dev:standalone > "$SERVER_LOG" 2>&1
+[32m✅ 16 情绪写失败时主链路仍成功[0m
+./scripts/persistence-v02.sh: line 68: 55431 Killed: 9               DATABASE_URL="file:$DB_PATH" HTTP_PORT="$PORT" SMS_PROVIDER=dev PAY_PROVIDER=mock LLM_PROVIDER=mock ANTI_ADDICTION_LATE_NIGHT=false CHAT_REPLY_DELAY_MIN_MS=50 CHAT_REPLY_DELAY_MAX_MS=100 npm run dev:standalone > "$SERVER_LOG" 2>&1
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+[32m✅ 17 降级消息跨进程仍在[0m
+[32m✅ 18 失败伴生态保持默认且不丢主链路[0m
+
+心伴 v0.2 持久化增量通过：18 项 / 18 项
+./scripts/persistence-v02.sh: line 44: 55519 Killed: 9               DATABASE_URL="file:$DB_PATH" HTTP_PORT="$PORT" SMS_PROVIDER=dev PAY_PROVIDER=mock LLM_PROVIDER=mock ANTI_ADDICTION_LATE_NIGHT=false CHAT_REPLY_DELAY_MIN_MS=50 CHAT_REPLY_DELAY_MAX_MS=100 npm run dev:standalone > "$SERVER_LOG" 2>&1

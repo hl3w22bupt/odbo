@@ -98,6 +98,35 @@ export interface MoodSnapshot {
   score: -1 | 0 | 1;
   keywords: string[];
   createdAt: string;
+  tags?: string[];
+  reason?: string;
+  originalMood?: ConversationMood | null;
+  originalScore?: -1 | 0 | 1 | null;
+  correctionId?: number | null;
+  correctedAt?: string | null;
+}
+
+export interface MoodCorrectionPayload {
+  mood: ConversationMood;
+  tags?: string[];
+  reason?: string;
+  clientMutationId?: string;
+}
+
+export interface MoodCorrectionWriteResult {
+  point: MoodSnapshot;
+  correction: {
+    id: number;
+    moodSnapshotId: string;
+    mood: ConversationMood;
+    score: -1 | 0 | 1;
+    tags: string[];
+    reason: string;
+    clientMutationId: string | null;
+    createdAt: string;
+  } | null;
+  persisted: boolean;
+  degraded: boolean;
 }
 
 export interface MoodTimelineResult {

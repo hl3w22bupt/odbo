@@ -41,6 +41,18 @@ import {
   serializeMemory,
 } from '../lib/conversationInsights.js'
 import {
+  applyLatestCorrection,
+  normalizeCorrectionInput,
+  readableCorrection,
+  serializeCorrection,
+  type CorrectedMoodPoint,
+  type MoodCorrectionContract,
+} from '../lib/moodCorrections.js'
+import {
+  moodWeeklyReportDegraded,
+  readableMoodWeeklyReport,
+} from '../lib/moodWeeklyReport.js'
+import {
   readableMoodInsightSummary,
   moodInsightDegraded as moodInsightSummaryDegraded,
 } from '../lib/moodInsight.js'
@@ -235,12 +247,18 @@ async function conversationMoodTimeline(ctx: HttpRouteContext) {
     const conversation = await prisma.conversation.findFirst({ where: { id, userId: user.id } })
     if (!conversation) throw AppError.notFound('会话不存在')
 
-    const rows = await prisma.moodSnapshot.findMany({
-      where: { conversationId: id },
-      orderBy: { createdAt: 'asc' },
-      take: 50,
-    })
-    return ok(readableMoodTimeline(id, rows))
+    const [rows, correctionRows] = await Promise.all([
+      prisma.moodSnapshot.findMany({
+        where: { conversationId: id },
+        orderBy: { createdAt: 'asc' },
+        take: 50,
+      }),
+      prisma.moodCorrection.findMany({
+        where: { conversationId: id, userId: user.id },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      }),
+    ])
+    return ok(readableMoodTimeline(id, rows, false, correctionRows))
   } catch (err) {
     if (err instanceof AppError) throw err
     logger.warn('[chat] mood timeline read degraded', { err: String(err), conversationId: id })
@@ -261,7 +279,7 @@ async function conversationInsightSummary(ctx: HttpRouteContext) {
     const conversation = await prisma.conversation.findFirst({ where: { id, userId: user.id } })
     if (!conversation) throw AppError.notFound('会话不存在')
 
-    const [memoryRows, moodRows] = await Promise.all([
+    const [memoryRows, moodRows, correctionRows] = await Promise.all([
       prisma.conversationMemory.findMany({
         where: { conversationId: id },
         orderBy: { createdAt: 'asc' },
@@ -272,18 +290,65 @@ async function conversationInsightSummary(ctx: HttpRouteContext) {
         orderBy: { createdAt: 'asc' },
         take: 50,
       }),
+      prisma.moodCorrection.findMany({
+        where: { conversationId: id, userId: user.id },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      }),
     ])
     return ok(
       readableMoodInsightSummary(
         id,
         readableMemories(id, memoryRows),
-        readableMoodTimeline(id, moodRows),
+        readableMoodTimeline(id, moodRows, false, correctionRows),
       ),
     )
   } catch (err) {
     if (err instanceof AppError) throw err
     logger.warn('[chat] insight summary degraded', { err: String(err), conversationId: id })
     return ok(moodInsightSummaryDegraded(id))
+  }
+}
+
+/**
+ * v0.7 读接口：近 7 日情绪周报最小版。
+ * 复用既有记忆 / 轨迹 / correction 读侧契约，聚合失败时显式降级。
+ */
+async function conversationWeeklyMoodReport(ctx: HttpRouteContext) {
+  const user = await authenticate(ctx)
+  const id = ctx.params.id
+  if (!id) throw AppError.badRequest('缺少会话 id')
+
+  try {
+    const conversation = await prisma.conversation.findFirst({ where: { id, userId: user.id } })
+    if (!conversation) throw AppError.notFound('会话不存在')
+
+    const [memoryRows, moodRows, correctionRows] = await Promise.all([
+      prisma.conversationMemory.findMany({
+        where: { conversationId: id },
+        orderBy: { createdAt: 'asc' },
+        take: 50,
+      }),
+      prisma.moodSnapshot.findMany({
+        where: { conversationId: id },
+        orderBy: { createdAt: 'asc' },
+        take: 50,
+      }),
+      prisma.moodCorrection.findMany({
+        where: { conversationId: id, userId: user.id },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      }),
+    ])
+    return ok(
+      readableMoodWeeklyReport(
+        id,
+        readableMemories(id, memoryRows),
+        readableMoodTimeline(id, moodRows, false, correctionRows),
+      ),
+    )
+  } catch (err) {
+    if (err instanceof AppError) throw err
+    logger.warn('[chat] weekly mood report degraded', { err: String(err), conversationId: id })
+    return ok(moodWeeklyReportDegraded(id))
   }
 }
 
@@ -643,6 +708,107 @@ async function proactiveShareNow(ctx: HttpRouteContext) {
   return ok({ triggered: true, messageId: placeholder.id }, '已触发主动分享')
 }
 
+
+function serializeCorrectionPoint(
+  row: Parameters<typeof serializeMoodFromRow>[0],
+  correction: MoodCorrectionContract | null,
+): CorrectedMoodPoint {
+  return applyLatestCorrection(serializeMoodFromRow(row), correction)
+}
+
+function serializeMoodFromRow(row: {
+  id: string
+  conversationId: string
+  characterId: string | null
+  sourceMessageId: string | null
+  memoryId: string | null
+  mood: string
+  score: number
+  keywords: string | string[]
+  createdAt: Date
+}) {
+  return {
+    id: row.id,
+    conversationId: row.conversationId,
+    characterId: row.characterId,
+    sourceMessageId: row.sourceMessageId,
+    memoryId: row.memoryId,
+    mood: row.mood === 'POSITIVE' ? 'POSITIVE' as const : row.mood === 'NEGATIVE' ? 'NEGATIVE' as const : 'NEUTRAL' as const,
+    score: row.score > 0 ? 1 as const : row.score < 0 ? -1 as const : 0 as const,
+    keywords: Array.isArray(row.keywords)
+      ? row.keywords.filter(Boolean)
+      : row.keywords.split(',').filter(Boolean),
+    createdAt: row.createdAt.toISOString(),
+  }
+}
+
+async function correctionResponse(
+  pointRow: NonNullable<Awaited<ReturnType<typeof prisma.moodSnapshot.findUnique>>>,
+  correction: MoodCorrectionContract,
+) {
+  return ok({
+    point: serializeCorrectionPoint(pointRow, correction),
+    ...readableCorrection(correction),
+  }, '情绪修正已保存')
+}
+
+/**
+ * v0.5 编辑/标注同一入口：追加 MoodCorrection，原始情绪点不改写。
+ */
+async function correctMoodPoint(ctx: HttpRouteContext) {
+  const user = await authenticate(ctx)
+  const conversationId = ctx.params.id
+  const pointId = ctx.params.pointId
+  if (!conversationId) throw AppError.badRequest('缺少会话 id')
+  if (!pointId) throw AppError.badRequest('缺少情绪记录 id')
+  const input = normalizeCorrectionInput(ctx.body)
+
+  const conversation = await prisma.conversation.findFirst({ where: { id: conversationId, userId: user.id } })
+  if (!conversation) throw AppError.notFound('会话不存在')
+  const point = await prisma.moodSnapshot.findUnique({ where: { id: pointId } })
+  if (!point || point.userId !== user.id || point.conversationId !== conversation.id) {
+    throw AppError.notFound('情绪记录不存在')
+  }
+
+  if (input.clientMutationId) {
+    const replay = await prisma.moodCorrection.findFirst({
+      where: { userId: user.id, clientMutationId: input.clientMutationId },
+    })
+    if (replay) {
+      if (replay.moodSnapshotId !== point.id || replay.conversationId !== conversation.id) {
+        throw AppError.conflict('clientMutationId 已用于其他记录')
+      }
+      return correctionResponse(point, serializeCorrection(replay))
+    }
+  }
+
+  try {
+    const row = await prisma.moodCorrection.create({
+      data: {
+        conversationId: conversation.id,
+        userId: user.id,
+        moodSnapshotId: point.id,
+        mood: input.mood,
+        score: input.score,
+        tags: input.tags.join(','),
+        reason: input.reason,
+        clientMutationId: input.clientMutationId,
+      },
+    })
+    return correctionResponse(point, serializeCorrection(row))
+  } catch (err) {
+    logger.warn('[chat] mood correction write degraded', {
+      err: String(err),
+      conversationId: conversation.id,
+      moodPointId: point.id,
+    })
+    return ok({
+      point: serializeCorrectionPoint(point, null),
+      ...readableCorrection(null),
+    }, '修正暂未保存，已显示原值')
+  }
+}
+
 function parseEmotionBody(body: Record<string, unknown>): EmotionInput {
   const emotion = body.emotion
   if (typeof emotion !== 'string' || !(EMOTION_STATES as readonly string[]).includes(emotion)) {
@@ -710,9 +876,11 @@ export function registerChatRoutes(router: HttpRouter): void {
   router.define('chat::conversation-memory', '/api/v1/conversations/:id/memory', 'GET', conversationMemory)
   router.define('chat::conversation-mood-timeline', '/api/v1/conversations/:id/mood-timeline', 'GET', conversationMoodTimeline)
   router.define('chat::conversation-insight-summary', '/api/v1/conversations/:id/insight-summary', 'GET', conversationInsightSummary)
+  router.define('chat::conversation-weekly-report', '/api/v1/conversations/:id/mood-weekly-report', 'GET', conversationWeeklyMoodReport)
   router.define('chat::send', '/api/v1/chat/send', 'POST', chatSend)
   router.define('chat::multi-send', '/api/v1/chat/multi/send', 'POST', chatMultiSend)
   router.define('chat::proactive-now', '/api/v1/chat/proactive', 'POST', proactiveShareNow)
+  router.define('chat::mood-point-correction', '/api/v1/conversations/:id/mood-points/:pointId/correction', 'POST', correctMoodPoint)
   router.define('chat::emotion-create', '/api/v1/conversations/:id/emotion', 'POST', createConversationEmotion)
   router.define('chat::emotion-read', '/api/v1/conversations/:id/emotion', 'GET', getConversationEmotion)
   router.define('chat::emotion-update', '/api/v1/conversations/:id/emotion', 'PATCH', updateConversationEmotion)

@@ -18,7 +18,9 @@ import { CustomizeModal } from '../components/CustomizeModal';
 import { GiftFloatLayer } from '../components/GiftFloatLayer';
 import { GiftSheet } from '../components/GiftSheet';
 import { MemoryPanel } from '../components/MemoryPanel';
+import { MoodCorrectionModal } from '../components/MoodCorrectionModal';
 import { MoodInsightPanel } from '../components/MoodInsightPanel';
+import { MoodWeeklyReportPanel } from '../components/MoodWeeklyReportPanel';
 import { MoodTimelinePanel } from '../components/MoodTimelinePanel';
 import { HeartbeatBar } from '../components/HeartbeatBar';
 import { LoadingView } from '../components/LoadingView';
@@ -28,7 +30,8 @@ import { useNavigation } from '../navigation/NavigationContext';
 import { useSession } from '../store/SessionContext';
 import { useToast } from '../store/ToastContext';
 import { colors, fontSizes, fontWeights, radii, spacing } from '../theme';
-import type { Affection, Character, ChatMode, CustomizationPayload, Gift, MemoryReadResult, Message, MoodInsightSummaryResult, MoodTimelineResult } from '../types';
+import type { Affection, Character, ChatMode, CustomizationPayload, Gift, MemoryReadResult, Message, MoodInsightSummaryResult, MoodSnapshot, MoodTimelineResult, MoodWeeklyReportResult } from '../types';
+import { applyMoodCorrection, correctionFallbackNotice, createCorrectionForm, type MoodCorrectionForm } from '../utils/moodCorrections';
 import { affectionLevelLabel, genId } from '../utils/format';
 
 interface ChatScreenProps {
@@ -58,6 +61,7 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
   const [memory, setMemory] = useState<MemoryReadResult | null>(null);
   const [moodTimeline, setMoodTimeline] = useState<MoodTimelineResult | null>(null);
   const [moodInsight, setMoodInsight] = useState<MoodInsightSummaryResult | null>(null);
+  const [moodWeeklyReport, setMoodWeeklyReport] = useState<MoodWeeklyReportResult | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(initConvId ?? null);
   const [activeCharId, setActiveCharId] = useState<string>(initCharacters[0]?.id ?? '');
   const [affections, setAffections] = useState<Record<string, Affection>>(() =>
@@ -76,6 +80,9 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
   const [giftLabel, setGiftLabel] = useState<string | undefined>(undefined);
   const [giftIntensity, setGiftIntensity] = useState<'medium' | 'high'>('medium');
 
+  const [correctionPoint, setCorrectionPoint] = useState<MoodSnapshot | null>(null);
+  const [correctionForm, setCorrectionForm] = useState<MoodCorrectionForm>({ mood: 'NEUTRAL', tags: [], reason: '' });
+  const [correctionSaving, setCorrectionSaving] = useState(false);
   const [memberGuideVisible, setMemberGuideVisible] = useState(false);
   const [customizeVisible, setCustomizeVisible] = useState(false);
   const [customizing, setCustomizing] = useState(false);
@@ -174,16 +181,18 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
     (async () => {
       setLoading(true);
       try {
-        const [res, memoryView, moodView, insightView] = await Promise.all([
+        const [res, memoryView, moodView, insightView, weeklyView] = await Promise.all([
           api.listMessages(initConvId),
           api.getConversationMemory(initConvId).catch(() => null),
           api.getMoodTimeline(initConvId).catch(() => null),
           api.getMoodInsightSummary(initConvId).catch(() => null),
+          api.getMoodWeeklyReport(initConvId).catch(() => null),
         ]);
         if (mounted) setMessages(res.items);
         if (mounted) setMemory(memoryView);
         if (mounted) setMoodTimeline(moodView);
         if (mounted) setMoodInsight(insightView);
+        if (mounted) setMoodWeeklyReport(weeklyView);
         if (mounted) ensurePolling(initConvId);
         if (mounted) scheduleProactive(initConvId);
       } catch (e) {
@@ -276,6 +285,7 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
             (await api.getMoodTimeline(res.conversationId).catch(() => null)),
         );
         setMoodInsight(await api.getMoodInsightSummary(res.conversationId).catch(() => null));
+        setMoodWeeklyReport(await api.getMoodWeeklyReport(res.conversationId).catch(() => null));
         ensurePolling(res.conversationId);
         scheduleProactive(res.conversationId);
       } else {
@@ -302,6 +312,51 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
       setSending(false);
     }
   };
+
+  // ===================== 情绪修正 =====================
+
+  const openCorrection = useCallback((point: MoodSnapshot) => {
+    setCorrectionPoint(point);
+    setCorrectionForm(createCorrectionForm(point));
+  }, []);
+
+  const handleCorrectionSave = useCallback(async () => {
+    const convId = conversationId;
+    const point = correctionPoint;
+    if (!convId || !point || correctionSaving) return;
+    setCorrectionSaving(true);
+    try {
+      const result = await api.correctMoodPoint(convId, point.id, {
+        mood: correctionForm.mood,
+        tags: correctionForm.tags,
+        reason: correctionForm.reason,
+        clientMutationId: genId('correction'),
+      });
+      setMoodTimeline((prev) => prev && prev.conversationId === convId
+        ? {
+            ...prev,
+            points: prev.points.map((item) => (item.id === point.id
+              ? applyMoodCorrection(item, result.degraded ? item : result.point)
+              : item)),
+          }
+        : prev);
+      const insight = await api.getMoodInsightSummary(convId).catch(() => null);
+      if (insight) setMoodInsight(insight);
+      const weekly = await api.getMoodWeeklyReport(convId).catch(() => null);
+      if (weekly) setMoodWeeklyReport(weekly);
+      const notice = correctionFallbackNotice(result);
+      if (notice) showToast({ title: '修正未保存', message: notice, type: 'error' });
+      setCorrectionPoint(null);
+    } catch (e) {
+      showToast({
+        title: '修正失败',
+        message: e instanceof Error ? e.message : '已保留原情绪值，请稍后重试',
+        type: 'error',
+      });
+    } finally {
+      setCorrectionSaving(false);
+    }
+  }, [conversationId, correctionForm, correctionPoint, correctionSaving, showToast]);
 
   // ===================== 送礼 =====================
 
@@ -461,8 +516,9 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
         <AINoticeBar compact />
       </View>
       <MemoryPanel value={memory} />
-      <MoodTimelinePanel value={moodTimeline} />
+      <MoodTimelinePanel value={moodTimeline} onCorrect={openCorrection} />
       <MoodInsightPanel value={moodInsight} />
+      <MoodWeeklyReportPanel value={moodWeeklyReport} />
 
       <ScrollView
         ref={scrollRef}
@@ -533,6 +589,14 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
       ) : null}
 
       {/* 会员引导 */}
+      <MoodCorrectionModal
+        point={correctionPoint}
+        value={correctionForm}
+        saving={correctionSaving}
+        onChange={setCorrectionForm}
+        onSave={() => { void handleCorrectionSave(); }}
+        onClose={() => setCorrectionPoint(null)}
+      />
       <AppModal visible={memberGuideVisible} onClose={() => setMemberGuideVisible(false)}>
         <View style={styles.modalBody}>
           <Text style={styles.modalEmoji}>👑</Text>

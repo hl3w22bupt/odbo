@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthUser } from '../lib/auth.js'
 import type { HttpHandler, HttpRouteContext } from '../http.js'
+import { logger } from '../lib/logger.js'
 import { registerChatRoutes } from './chat.js'
 
 const prismaMock = vi.hoisted(() => ({
@@ -445,5 +446,117 @@ describe('chat v0.7 weekly mood report', () => {
       degraded: true,
       report: null,
     })
+  })
+})
+
+describe('chat v0.8 natural-week period mood report', () => {
+  const conversationId = 'conv_1'
+  const handlers = captureHandlers()
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('exposes the natural week period mood report read API', () => {
+    const router = new ContractRouter()
+    registerChatRoutes(router as never)
+    expect(router.routes).toContainEqual({
+      name: 'chat::conversation-period-report',
+      method: 'GET',
+      path: '/api/v1/conversations/:id/mood-period-report',
+    })
+  })
+
+  it('reads persisted corrections into the period report', async () => {
+    const now = Date.parse('2026-10-07T02:00:00.000Z')
+    const day = 86_400_000
+    prismaMock.conversation.findFirst.mockResolvedValue({ id: conversationId, userId: 'user_1' })
+    prismaMock.conversationMemory.findMany.mockResolvedValue([
+      {
+        id: 'mem_1',
+        conversationId,
+        characterId: 'char_1',
+        sourceMessageId: 'msg_1',
+        content: '女儿下周生日',
+        status: 'ACTIVE',
+        createdAt: new Date(now - 2 * day),
+      },
+    ])
+    prismaMock.moodSnapshot.findMany.mockResolvedValue([
+      {
+        id: 'mood_1',
+        conversationId,
+        characterId: 'char_1',
+        sourceMessageId: 'msg_1',
+        memoryId: 'mem_1',
+        mood: 'POSITIVE',
+        score: 1,
+        keywords: '开心',
+        createdAt: new Date(now - 2 * day),
+      },
+      {
+        id: 'mood_2',
+        conversationId,
+        characterId: 'char_1',
+        sourceMessageId: 'msg_1',
+        memoryId: 'mem_1',
+        mood: 'NEGATIVE',
+        score: -1,
+        keywords: '',
+        createdAt: new Date(now - 3_600_000),
+      },
+    ])
+    prismaMock.moodCorrection.findMany.mockResolvedValue([
+      {
+        id: 12,
+        conversationId,
+        userId: 'user_1',
+        moodSnapshotId: 'mood_1',
+        mood: 'NEGATIVE',
+        score: -1,
+        tags: '状态变化',
+        reason: '当时记错了',
+        clientMutationId: 'mutation-2',
+        createdAt: new Date(now - day),
+      },
+    ])
+
+    const res = await handlers.get('chat::conversation-period-report')!(readContext(conversationId))
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toMatchObject({
+      conversationId,
+      available: true,
+      degraded: false,
+      coverageDays: 2,
+      totalDays: 7,
+      summary: {
+        sampleSize: 2,
+        counts: { positive: 0, neutral: 0, negative: 2 },
+        trend: 'STABLE',
+      },
+    })
+  })
+
+  it('degrades the period report and logs loudly when persistence or aggregation fails', async () => {
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined)
+    prismaMock.conversation.findFirst.mockResolvedValue({ id: conversationId, userId: 'user_1' })
+    prismaMock.conversationMemory.findMany.mockRejectedValue(new Error('sqlite locked'))
+
+    const res = await handlers.get('chat::conversation-period-report')!(readContext(conversationId))
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toEqual({
+      conversationId,
+      available: false,
+      degraded: true,
+      period: null,
+      coverageDays: 0,
+      totalDays: 7,
+      moods: [],
+      summary: null,
+    })
+    // 非静默吞错：降级必须伴随错误日志
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    expect(String(errorSpy.mock.calls[0]?.[0])).toContain('period mood report degraded')
+    errorSpy.mockRestore()
   })
 })

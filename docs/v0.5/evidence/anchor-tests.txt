@@ -1,0 +1,12 @@
+--- named anchors ---
+apps/server/src/lib/exportData.test.ts:5:  it('test_export_empty_db_returns_valid_empty', () => {
+apps/server/src/lib/exportData.test.ts:15:  it('test_v04_data_readable_by_v05', () => {
+apps/server/src/lib/moodCorrections.test.ts:37:  it('test_correction_latest_wins', () => {
+apps/server/src/lib/moodCorrections.test.ts:71:  it('test_correction_write_failure_preserves_old_value', () => {
+apps/server/src/routes/export.routes.test.ts:28:  it('test_export_empty_db_returns_valid_empty', async () => {
+apps/server/src/routes/moodCorrection.persistence.test.ts:67:  it('test_edit_persists_across_restart', async () => {
+apps/server/src/routes/chat.routes.test.ts:164:  it('test_correction_latest_wins', async () => {
+apps/server/src/routes/chat.routes.test.ts:204:  it('test_edit_nonexistent_returns_defined_error', async () => {
+apps/server/src/routes/chat.routes.test.ts:215:  it('test_correction_write_failure_preserves_old_value', async () => {
+apps/mobile/src/utils/moodCorrections.test.ts:11:  it('creates the minimal correction form from a selected point', () => {
+apps/mobile/src/utils/moodCorrections.test.ts:15:  it('applies a correction result immediately or preserves the old point', () => {

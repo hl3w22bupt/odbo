@@ -6,7 +6,8 @@ import { registerChatRoutes } from './chat.js'
 const prismaMock = vi.hoisted(() => ({
   conversation: { findFirst: vi.fn() },
   conversationMemory: { findMany: vi.fn() },
-  moodSnapshot: { findMany: vi.fn() },
+  moodSnapshot: { findMany: vi.fn(), findUnique: vi.fn() },
+  moodCorrection: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() },
 }))
 
 vi.mock('../db.js', () => ({ prisma: prismaMock }))
@@ -14,7 +15,7 @@ vi.mock('../db.js', () => ({ prisma: prismaMock }))
 class ContractRouter {
   readonly routes: Array<{ name: string; method: string; path: string }> = []
 
-  define(name: string, path: string, method: 'GET' | 'POST', _handler: unknown): void {
+  define(name: string, path: string, method: 'GET' | 'POST' | 'PATCH' | 'DELETE', _handler: unknown): void {
     this.routes.push({ name, method, path })
   }
 }
@@ -122,6 +123,132 @@ describe('chat v0.3 read handler behavior', () => {
   })
 })
 
+
+describe('chat v0.5 mood correction write side', () => {
+  const conversationId = 'conv_1'
+  const pointId = 'mood_1'
+  let handlers: Map<string, HttpHandler>
+
+  const originalPoint = {
+    id: pointId,
+    conversationId,
+    userId: 'user_1',
+    characterId: 'char_1',
+    sourceMessageId: 'msg_1',
+    memoryId: 'memory_1',
+    mood: 'POSITIVE',
+    score: 1,
+    keywords: '开心',
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  }
+
+  function writeContext(body: Record<string, unknown>): HttpRouteContext {
+    return {
+      ...readContext(conversationId),
+      body,
+      method: 'POST',
+      params: { id: conversationId, pointId },
+      path: `/api/v1/conversations/${conversationId}/mood-points/${pointId}/correction`,
+    }
+  }
+
+  beforeEach(() => {
+    handlers = captureHandlers()
+    vi.clearAllMocks()
+    prismaMock.conversation.findFirst.mockResolvedValue({ id: conversationId, userId: 'user_1' })
+    prismaMock.moodSnapshot.findUnique.mockResolvedValue(originalPoint)
+    prismaMock.moodCorrection.findFirst.mockResolvedValue(null)
+    prismaMock.moodCorrection.create.mockReset()
+  })
+
+  it('test_correction_latest_wins', async () => {
+    prismaMock.moodCorrection.create
+      .mockResolvedValueOnce({
+        id: 11,
+        conversationId,
+        userId: 'user_1',
+        moodSnapshotId: pointId,
+        mood: 'NEUTRAL',
+        score: 0,
+        tags: '状态变化',
+        reason: '当时记错了',
+        clientMutationId: 'mutation-1',
+        createdAt: new Date('2026-01-01T01:00:00.000Z'),
+      })
+      .mockResolvedValueOnce({
+        id: 12,
+        conversationId,
+        userId: 'user_1',
+        moodSnapshotId: pointId,
+        mood: 'NEGATIVE',
+        score: -1,
+        tags: '',
+        reason: '第二天更低落',
+        clientMutationId: 'mutation-2',
+        createdAt: new Date('2026-01-01T02:00:00.000Z'),
+      })
+
+    const first = await handlers.get('chat::mood-point-correction')!(
+      writeContext({ mood: 'NEUTRAL', tags: ['状态变化'], reason: '当时记错了', clientMutationId: 'mutation-1' }),
+    )
+    const second = await handlers.get('chat::mood-point-correction')!(
+      writeContext({ mood: 'NEGATIVE', reason: '第二天更低落', clientMutationId: 'mutation-2' }),
+    )
+
+    expect(first.status_code).toBe(200)
+    expect(first.body.data.persisted).toBe(true)
+    expect(second.body.data.point).toMatchObject({ id: pointId, mood: 'NEGATIVE', score: -1, correctionId: 12 })
+    expect(second.body.data.point.originalMood).toBe('POSITIVE')
+  })
+
+  it('test_edit_nonexistent_returns_defined_error', async () => {
+    prismaMock.moodSnapshot.findUnique.mockResolvedValue(null)
+    await expect(handlers.get('chat::mood-point-correction')!(
+      writeContext({ mood: 'NEUTRAL' }),
+    )).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'NOT_FOUND',
+      message: '情绪记录不存在',
+    })
+  })
+
+  it('test_correction_write_failure_preserves_old_value', async () => {
+    prismaMock.moodCorrection.create.mockRejectedValue(new Error('sqlite locked'))
+    const res = await handlers.get('chat::mood-point-correction')!(
+      writeContext({ mood: 'NEUTRAL', reason: '修正' }),
+    )
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toMatchObject({
+      persisted: false,
+      degraded: true,
+      correction: null,
+    })
+    expect(res.body.data.point).toMatchObject({ id: pointId, mood: 'POSITIVE', score: 1 })
+  })
+
+  it('replays one client mutation id without creating another correction', async () => {
+    const correction = {
+      id: 7,
+      conversationId,
+      userId: 'user_1',
+      moodSnapshotId: pointId,
+      mood: 'NEGATIVE',
+      score: -1,
+      tags: '状态变化',
+      reason: '更低落',
+      clientMutationId: 'same-id',
+      createdAt: new Date('2026-01-01T01:00:00.000Z'),
+    }
+    prismaMock.moodCorrection.findFirst.mockResolvedValue(correction)
+    const res = await handlers.get('chat::mood-point-correction')!(
+      writeContext({ mood: 'NEUTRAL', clientMutationId: 'same-id' }),
+    )
+    expect(prismaMock.moodCorrection.create).not.toHaveBeenCalled()
+    expect(res.body.data).toMatchObject({ persisted: true, degraded: false, correction: { id: 7 } })
+    expect(res.body.data.point).toMatchObject({ mood: 'NEGATIVE', score: -1 })
+  })
+})
+
 describe('chat v0.4 insight summary', () => {
   const conversationId = 'conv_1'
   let handlers: Map<string, HttpHandler>
@@ -200,6 +327,123 @@ describe('chat v0.4 insight summary', () => {
       available: false,
       degraded: true,
       summary: null,
+    })
+  })
+})
+
+describe('chat v0.7 weekly mood report', () => {
+  const conversationId = 'conv_1'
+  let handlers: Map<string, HttpHandler>
+
+  beforeEach(() => {
+    handlers = captureHandlers()
+    vi.clearAllMocks()
+    prismaMock.conversation.findFirst.mockResolvedValue({ id: conversationId, userId: 'user_1' })
+  })
+
+  it('exposes the weekly mood report read API', () => {
+    const router = new ContractRouter()
+    registerChatRoutes(router as never)
+    expect(router.routes).toContainEqual({
+      name: 'chat::conversation-weekly-report',
+      method: 'GET',
+      path: '/api/v1/conversations/:id/mood-weekly-report',
+    })
+  })
+
+  it('serves the explicit weekly report empty state before enough valid points', async () => {
+    prismaMock.conversationMemory.findMany.mockResolvedValue([])
+    prismaMock.moodSnapshot.findMany.mockResolvedValue([])
+    prismaMock.moodCorrection.findMany.mockResolvedValue([])
+    const res = await handlers.get('chat::conversation-weekly-report')!(readContext(conversationId))
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toEqual({
+      conversationId,
+      available: true,
+      degraded: false,
+      report: null,
+    })
+  })
+
+  it('reads persisted corrections into the weekly report', async () => {
+    const now = Date.now()
+    const day = 86_400_000
+    prismaMock.conversationMemory.findMany.mockResolvedValue([
+      {
+        id: 'mem_1',
+        conversationId,
+        characterId: 'char_1',
+        sourceMessageId: 'msg_1',
+        content: '女儿下周生日',
+        status: 'ACTIVE',
+        createdAt: new Date(now - 2 * day),
+      },
+    ])
+    prismaMock.moodSnapshot.findMany.mockResolvedValue([
+      {
+        id: 'mood_1',
+        conversationId,
+        characterId: 'char_1',
+        sourceMessageId: 'msg_1',
+        memoryId: 'mem_1',
+        mood: 'POSITIVE',
+        score: 1,
+        keywords: '开心',
+        createdAt: new Date(now - 2 * day),
+      },
+      {
+        id: 'mood_2',
+        conversationId,
+        characterId: 'char_1',
+        sourceMessageId: 'msg_1',
+        memoryId: 'mem_1',
+        mood: 'NEGATIVE',
+        score: -1,
+        keywords: '',
+        createdAt: new Date(now - 3_600_000),
+      },
+    ])
+    prismaMock.moodCorrection.findMany.mockResolvedValue([
+      {
+        id: 12,
+        conversationId,
+        userId: 'user_1',
+        moodSnapshotId: 'mood_1',
+        mood: 'NEGATIVE',
+        score: -1,
+        tags: '状态变化',
+        reason: '当时记错了',
+        clientMutationId: 'mutation-2',
+        createdAt: new Date(now - day),
+      },
+    ])
+
+    const res = await handlers.get('chat::conversation-weekly-report')!(readContext(conversationId))
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toMatchObject({
+      conversationId,
+      available: true,
+      degraded: false,
+      report: {
+        sampleSize: 2,
+        counts: { positive: 0, neutral: 0, negative: 2 },
+        trend: 'STABLE',
+        headline: '近7日情绪比较平稳',
+      },
+    })
+    expect(res.body.data.report.reason).toContain('近7日样本2条')
+    expect(res.body.data.report.keywords).toEqual(['开心'])
+  })
+
+  it('degrades the weekly report when persistence or aggregation fails', async () => {
+    prismaMock.conversationMemory.findMany.mockRejectedValue(new Error('sqlite locked'))
+    const res = await handlers.get('chat::conversation-weekly-report')!(readContext(conversationId))
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toEqual({
+      conversationId,
+      available: false,
+      degraded: true,
+      report: null,
     })
   })
 })

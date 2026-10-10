@@ -98,6 +98,35 @@ export interface MoodSnapshot {
   score: -1 | 0 | 1;
   keywords: string[];
   createdAt: string;
+  tags?: string[];
+  reason?: string;
+  originalMood?: ConversationMood | null;
+  originalScore?: -1 | 0 | 1 | null;
+  correctionId?: number | null;
+  correctedAt?: string | null;
+}
+
+export interface MoodCorrectionPayload {
+  mood: ConversationMood;
+  tags?: string[];
+  reason?: string;
+  clientMutationId?: string;
+}
+
+export interface MoodCorrectionWriteResult {
+  point: MoodSnapshot;
+  correction: {
+    id: number;
+    moodSnapshotId: string;
+    mood: ConversationMood;
+    score: -1 | 0 | 1;
+    tags: string[];
+    reason: string;
+    clientMutationId: string | null;
+    createdAt: string;
+  } | null;
+  persisted: boolean;
+  degraded: boolean;
 }
 
 export interface MoodTimelineResult {
@@ -124,6 +153,25 @@ export interface MoodInsightSummaryResult {
   available: boolean;
   degraded: boolean;
   summary: MoodInsightSummary | null;
+}
+
+export type MoodWeeklyTrend = 'IMPROVING' | 'STABLE' | 'WORSENING';
+
+export interface MoodWeeklyReport {
+  sampleSize: number;
+  counts: { positive: number; neutral: number; negative: number };
+  trend: MoodWeeklyTrend;
+  headline: string;
+  reason: string;
+  keywords: string[];
+  window: { from: string; to: string };
+}
+
+export interface MoodWeeklyReportResult {
+  conversationId: string;
+  available: boolean;
+  degraded: boolean;
+  report: MoodWeeklyReport | null;
 }
 
 export interface QuotaStatus {

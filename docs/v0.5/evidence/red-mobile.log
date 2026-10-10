@@ -1,0 +1,28 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmuvv1ya80154icry4hbxbhgj/apps/mobile
+
+ ❯ src/utils/moodCorrections.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/utils/moodCorrections.test.ts [ src/utils/moodCorrections.test.ts ]
+Error: Cannot find module './moodCorrections' imported from /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmuvv1ya80154icry4hbxbhgj/apps/mobile/src/utils/moodCorrections.test.ts
+ ❯ src/utils/moodCorrections.test.ts:2:1
+      1| import { describe, expect, it } from 'vitest'
+      2| import { applyMoodCorrection, createCorrectionForm } from './moodCorre…
+       | ^
+      3| import type { MoodSnapshot } from '../types'
+      4|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  07:18:37
+   Duration  100ms (transform 11ms, setup 0ms, import 0ms, tests 0ms, environment 0ms)
+
+RED_MOBILE_EXIT=1

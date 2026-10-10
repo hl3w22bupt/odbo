@@ -1,0 +1,1 @@
+red_server_exit=1 red_mobile_exit=1

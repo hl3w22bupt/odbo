@@ -1,0 +1,151 @@
+
+> xinban-v01@1.0.0 deploy:v02
+> ./scripts/deploy-v02.sh
+
+== deploy build ==
+
+> xinban-v01@1.0.0 build
+> cd apps/server && npm run build && cd ../mobile && npm run typecheck && EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-http://127.0.0.1:3888} npm run export -- --platform web --output-dir dist-web --clear
+
+
+> @xinban/server@1.0.0 build
+> tsc -p tsconfig.build.json
+
+
+> xinban-ai-mobile@1.0.0 typecheck
+> tsc --noEmit
+
+
+> xinban-ai-mobile@1.0.0 export
+> expo export --platform web --output-dir dist-web --clear
+
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+| (node:3751) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:3751) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:3751) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:3751) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:3751) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:3751) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:3751) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:3751) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+Web Bundled 2750ms index.ts (336 modules)
+
+› web bundles (1):
+_expo/static/js/web/index-3676416ecdff287b210b0241b1558d52.js (670KB)
+
+› Files (3):
+favicon.ico (15KB)
+index.html (1.2KB)
+metadata.json (49B)
+
+Exported: dist-web
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": SQLite database "xinban-deploy-v02.db" at "file:./data/xinban-deploy-v02.db"
+
+SQLite database xinban-deploy-v02.db created at file:./data/xinban-deploy-v02.db
+
+🚀  Your database is now in sync with your Prisma schema. Done in 31ms
+
+== deploy start ==
+deploy /health: 0
+== post-deploy rerun: build ==
+
+> xinban-v01@1.0.0 build
+> cd apps/server && npm run build && cd ../mobile && npm run typecheck && EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-http://127.0.0.1:3888} npm run export -- --platform web --output-dir dist-web --clear
+
+
+> @xinban/server@1.0.0 build
+> tsc -p tsconfig.build.json
+
+
+> xinban-ai-mobile@1.0.0 typecheck
+> tsc --noEmit
+
+
+> xinban-ai-mobile@1.0.0 export
+> expo export --platform web --output-dir dist-web --clear
+
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+| (node:4456) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:4456) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:4456) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:4456) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:4456) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:4456) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:4456) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:4456) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+Web Bundled 2626ms index.ts (336 modules)
+
+› web bundles (1):
+_expo/static/js/web/index-3676416ecdff287b210b0241b1558d52.js (670KB)
+
+› Files (3):
+favicon.ico (15KB)
+index.html (1.2KB)
+metadata.json (49B)
+
+Exported: dist-web
+build exit: 0
+== post-deploy rerun: start ==
+start /health: 0
+start exit: 0
+== post-deploy rerun: test ==
+
+> xinban-v01@1.0.0 test
+> cd apps/server && npm test && cd ../mobile && npm test
+
+
+> @xinban/server@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv05adee002sm9vi6dtn7xlt/apps/server
+
+
+ Test Files  16 passed (16)
+      Tests  76 passed (76)
+   Start at  07:24:04
+   Duration  1.17s (transform 828ms, setup 0ms, import 1.34s, tests 2.05s, environment 1ms)
+
+
+> xinban-ai-mobile@1.0.0 test
+> vitest run
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv05adee002sm9vi6dtn7xlt/apps/mobile
+
+
+ Test Files  5 passed (5)
+      Tests  33 passed (33)
+   Start at  07:24:05
+   Duration  149ms (transform 119ms, setup 0ms, import 164ms, tests 27ms, environment 0ms)
+
+test exit: 0
+
+心伴 v0.2 deploy 复验：build=0 start=0 test=0

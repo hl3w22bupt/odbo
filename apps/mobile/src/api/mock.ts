@@ -24,6 +24,9 @@ import type {
   MemoryReadResult,
   Message,
   MoodInsightSummaryResult,
+  MoodWeeklyReportResult,
+  MoodCorrectionPayload,
+  MoodCorrectionWriteResult,
   MoodSnapshot,
   MoodTimelineResult,
   Order,
@@ -501,12 +504,83 @@ export const mockApi = {
     };
   },
 
+  async correctMoodPoint(
+    conversationId: string,
+    moodPointId: string,
+    payload: MoodCorrectionPayload,
+  ): Promise<MoodCorrectionWriteResult> {
+    const items = moods.get(conversationId) ?? [];
+    const index = items.findIndex((item) => item.id === moodPointId);
+    if (index < 0) throw new ApiError(404, 'NOT_FOUND', '情绪记录不存在');
+    const original = items[index]!;
+    const score = payload.mood === 'POSITIVE' ? 1 : payload.mood === 'NEGATIVE' ? -1 : 0;
+    const next: MoodSnapshot = {
+      ...original,
+      mood: payload.mood,
+      score,
+      tags: payload.tags ?? [],
+      reason: payload.reason ?? '',
+      originalMood: original.mood,
+      originalScore: original.score,
+      correctionId: Date.now(),
+      correctedAt: nowIso(),
+    };
+    items[index] = next;
+    return { point: next, correction: {
+      id: next.correctionId!, moodSnapshotId: next.id, mood: next.mood, score: next.score,
+      tags: next.tags ?? [], reason: next.reason ?? '', clientMutationId: payload.clientMutationId ?? null,
+      createdAt: next.correctedAt!,
+    }, persisted: true, degraded: false };
+  },
+
   async getMoodTimeline(conversationId: string): Promise<MoodTimelineResult> {
     return {
       conversationId,
       available: true,
       degraded: false,
       points: moods.get(conversationId) ?? [],
+    };
+  },
+
+  async getMoodWeeklyReport(conversationId: string): Promise<MoodWeeklyReportResult> {
+    const now = Date.now();
+    const from = now - 7 * 24 * 60 * 60 * 1000;
+    const activeMemoryIds = new Set((memories.get(conversationId) ?? []).filter((item) => item.status === 'ACTIVE').map((item) => item.id));
+    const points = (moods.get(conversationId) ?? [])
+      .filter((point) => {
+        const time = Date.parse(point.createdAt);
+        return activeMemoryIds.has(point.memoryId ?? '') && time >= from && time <= now;
+      })
+      .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+    if (points.length < 2) return { conversationId, available: true, degraded: false, report: null };
+    const counts = points.reduce((acc, point) => {
+      if (point.mood === 'POSITIVE') acc.positive += 1;
+      else if (point.mood === 'NEGATIVE') acc.negative += 1;
+      else acc.neutral += 1;
+      return acc;
+    }, { positive: 0, neutral: 0, negative: 0 });
+    const split = Math.floor(points.length / 2);
+    const average = (items: typeof points) => items.reduce((sum, item) => sum + item.score, 0) / items.length;
+    const previousAverage = average(points.slice(0, split));
+    const recentAverage = average(points.slice(points.length - split));
+    const trend = recentAverage > previousAverage ? 'IMPROVING' as const : recentAverage < previousAverage ? 'WORSENING' as const : 'STABLE' as const;
+    const headline = trend === 'IMPROVING' ? '近7日情绪有所好转' : trend === 'WORSENING' ? '近7日情绪转弱，值得关注' : '近7日情绪比较平稳';
+    const reason = trend === 'STABLE'
+      ? `近7日样本${points.length}条，前后两段均分接近，情绪平稳。`
+      : `近7日样本${points.length}条，前半段均分 ${Number(previousAverage.toFixed(2))}，后半段均分 ${Number(recentAverage.toFixed(2))}，情绪${trend === 'IMPROVING' ? '有所好转' : '转弱'}。`;
+    return {
+      conversationId,
+      available: true,
+      degraded: false,
+      report: {
+        sampleSize: points.length,
+        counts,
+        trend,
+        headline,
+        reason,
+        keywords: [...new Set(points.flatMap((point) => point.keywords))].slice(0, 3),
+        window: { from: new Date(from).toISOString(), to: new Date(now).toISOString() },
+      },
     };
   },
 

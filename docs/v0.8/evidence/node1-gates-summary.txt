@@ -1,0 +1,14 @@
+[2026-10-10T23:23:12Z] HEAD=be8ef48183bf7de239a3b872e8e00d7727d7cea8 branch=myrd/v08-deploy-20261010-commit-cmv305l80000zm90464ys0lys
+[2026-10-10T23:23:12Z] GATE build START
+build_exit=0 2026-10-10T23:23:18Z
+[2026-10-10T23:23:18Z] GATE start START (standalone dist + /health probe)
+start_health_http=200 probe_tries=1
+{"code":"OK","message":"ok","data":{"service":"xinban-ai","status":"up","mode":"standalone","time":"2026-10-10T23:23:19.952Z"}}
+start_gate_done 2026-10-10T23:23:20Z
+[2026-10-10T23:23:21Z] GATE test START
+test_exit=0 2026-10-10T23:23:25Z
+[2026-10-10T23:23:25Z] GATE smoke START
+smoke_exit=0 2026-10-10T23:23:33Z
+[2026-10-10T23:23:33Z] GATE persist START
+persist_exit=0 2026-10-10T23:23:37Z
+[2026-10-10T23:23:37Z] ALL_GATES_DONE

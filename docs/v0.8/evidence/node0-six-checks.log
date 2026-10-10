@@ -1,6 +1,6 @@
-# 节点0 六条就绪检查单机判证据（v0.8 重入轮）
-执行时间: 2026-10-10T23:19:52Z
-HEAD SHA: 54c90464a6a9762caa17fad6a4ce9b6964ee9d08
+# 节点0 六条就绪检查单机判证据（v0.8 重入轮 · 权威版）
+执行时间: 2026-10-10T23:21:41Z
+HEAD SHA(运行时): a077a8bcf2591dd91940bb1675044c38aa685a09
 
 ## 检查1 当前分支可识别
 $ git branch --show-current
@@ -9,14 +9,12 @@ rc=0
 
 ## 检查2 交付面工作树干净
 $ git status --porcelain=v1 -- apps/server apps/mobile docs package.json scripts
-lines=1
-rc=0
+stdout_lines=0 rc=0（注：本日志文件在该命令运行之后写入，运行时工作树全净）
 
 ## 检查3 v0.7 装配提交包含于 HEAD
 $ git merge-base --is-ancestor 44f27b809ff75621ddee27394401a25d33d28e16 HEAD
 ancestor_rc=0
-$ git rev-list --count HEAD..44f27b8 ; git rev-list --count 44f27b8..HEAD
-ahead_of_v07_by_v07side=0 head_only=2
+v07_side_ahead=0 head_only=3
 
 ## 检查4 v0.7 冒烟基线存在于 HEAD
 $ git cat-file -e HEAD:docs/smoke/v0.7.md

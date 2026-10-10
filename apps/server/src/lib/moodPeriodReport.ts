@@ -31,7 +31,7 @@ export interface MoodPeriodReport {
   conversationId: string
   available: boolean
   degraded: boolean
-  period: { id: string; from: string; to: string }
+  period: { id: string; from: string; to: string } | null
   coverageDays: number
   totalDays: number
   moods: MoodPeriodDayBucket[]

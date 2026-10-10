@@ -1,0 +1,9 @@
+
+> xinban-v01@1.0.0 build
+> cd apps/server && npm run build && cd ../mobile && npm run typecheck && EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-http://127.0.0.1:3888} npm run export -- --platform web --output-dir dist-web --clear
+
+
+> @xinban/server@1.0.0 build
+> tsc -p tsconfig.build.json
+
+src/lib/moodPeriodReport.ts(75,5): error TS2322: Type 'null' is not assignable to type '{ id: string; from: string; to: string; }'.

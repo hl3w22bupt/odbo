@@ -559,4 +559,16 @@ describe('chat v0.8 natural-week period mood report', () => {
     expect(String(errorSpy.mock.calls[0]?.[0])).toContain('period mood report degraded')
     errorSpy.mockRestore()
   })
+
+  // 终审补验（红队 A4）：冻结 DoD T4 口径含「越权 404」——非本人/不存在的会话必须 404 而非 200/空态
+  it('rejects cross-user or missing conversations with the defined 404 error', async () => {
+    prismaMock.conversation.findFirst.mockResolvedValue(null)
+    await expect(handlers.get('chat::conversation-period-report')!(
+      readContext(conversationId),
+    )).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'NOT_FOUND',
+      message: '会话不存在',
+    })
+  })
 })

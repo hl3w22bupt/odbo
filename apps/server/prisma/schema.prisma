@@ -410,7 +410,27 @@ model MoodSnapshot {
   score           Int // 1 | 0 | -1
   keywords        String   @default("")
   createdAt       DateTime @default(now())
+  corrections     MoodCorrection[]
 
   @@index([conversationId, createdAt])
   @@index([userId, createdAt])
+}
+
+/// v0.5 情绪修正追加记录：原始 MoodSnapshot 不改写，读侧 latest-wins。
+model MoodCorrection {
+  id               Int      @id @default(autoincrement())
+  conversationId   String
+  userId           String
+  moodSnapshotId   String
+  mood             String // POSITIVE | NEUTRAL | NEGATIVE
+  score            Int // 1 | 0 | -1
+  tags             String   @default("")
+  reason           String   @default("")
+  clientMutationId String?  @unique
+  createdAt        DateTime @default(now())
+
+  moodSnapshot MoodSnapshot @relation(fields: [moodSnapshotId], references: [id], onDelete: Cascade)
+
+  @@index([moodSnapshotId, createdAt, id])
+  @@index([conversationId, userId])
 }

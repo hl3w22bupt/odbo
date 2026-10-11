@@ -12,10 +12,10 @@
 ```bash
 npm run setup   # 首次：安装依赖、生成 Prisma Client、同步 SQLite、写入种子数据
 npm run build   # 后端编译 + 移动端类型检查 + Expo Web 静态导出
-npm test        # server 26 tests + mobile 21 tests
-npm run smoke            # v0.1 全链路冒烟，预期 13/13
-npm run persistence:v02  # v0.2 情绪/会话重启持久化与降级，预期 18/18
-npm run deploy:v02       # v0.2 deploy 后重跑 build/start/test
+npm test        # server 59 tests + mobile 31 tests
+npm run smoke            # v0.5 全链路冒烟，预期 31/31
+npm run persistence:v02  # v0.2 情绪/会话重启持久化与降级
+npm run deploy:v02       # 工作流 deploy 入口；v0.5 已补 additive schema 同步
 ```
 
 ## 本地启动
@@ -49,7 +49,8 @@ EXPO_PUBLIC_API_URL=http://127.0.0.1:13888 npx expo start --web
 | 持久化 | `apps/server/prisma` | SQLite schema、seed、用户/会话/消息/配额/JWT 会话 |
 | 冒烟 | `scripts/smoke.sh` | 临时数据库、真实 HTTP、服务重启、13 项断言 |
 | 情绪持久化 | `apps/server/src/lib/emotion.ts` | 会话情绪伴生态 CRUD、坏数据兼容、写失败降级 |
-| v0.2 验收 | `scripts/persistence-v02.sh` / `scripts/deploy-v02.sh` | 重启一致性与本地部署复验 |
+| v0.2 验收 | `scripts/persistence-v02.sh` / `scripts/deploy-v02.sh` | 重启一致性与工作流 deploy 复验 |
+| 情绪修正/导出 | `apps/server/src/lib/moodCorrections.ts`、`apps/server/src/routes/export.ts` | 追加式修正 latest-wins、JSON 用户数据导出 |
 
 ## v0.1 技术选型
 

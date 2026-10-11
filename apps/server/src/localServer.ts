@@ -14,6 +14,7 @@ import { registerAuthRoutes } from './routes/auth.js'
 import { registerUserRoutes } from './routes/users.js'
 import { registerCharacterRoutes } from './routes/characters.js'
 import { registerChatRoutes } from './routes/chat.js'
+import { registerExportRoutes } from './routes/export.js'
 import { registerGiftRoutes } from './routes/gifts.js'
 import { registerCommerceRoutes } from './routes/commerce.js'
 import { registerImageRoutes } from './routes/images.js'
@@ -76,6 +77,7 @@ export async function startLocalServer(port = config.httpPort): Promise<http.Ser
   registerUserRoutes(router)
   registerCharacterRoutes(router)
   registerChatRoutes(router)
+  registerExportRoutes(router)
   registerGiftRoutes(router)
   registerCommerceRoutes(router)
   registerImageRoutes(router)

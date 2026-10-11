@@ -1,0 +1,155 @@
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv05adee002sm9vi6dtn7xlt/apps/server
+
+stdout | src/routes/chat.routes.test.ts
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+
+ ❯ src/routes/chat.routes.test.ts (18 tests | 4 failed) 10ms
+     × exposes the weekly mood report read API 3ms
+     × serves the explicit weekly report empty state before enough valid points 0ms
+     × reads persisted corrections into the weekly report 0ms
+     × degrades the weekly report when persistence or aggregation fails 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/routes/chat.routes.test.ts > chat v0.7 weekly mood report > exposes the weekly mood report read API
+AssertionError: expected [ { …(3) }, { …(3) }, { …(3) }, …(12) ] to deep equally contain { …(3) }
+
+- Expected:
+{
+  "method": "GET",
+  "name": "chat::conversation-weekly-report",
+  "path": "/api/v1/conversations/:id/mood-weekly-report",
+}
+
++ Received:
+[
+  {
+    "method": "POST",
+    "name": "chat::create-conversation",
+    "path": "/api/v1/conversations",
+  },
+  {
+    "method": "GET",
+    "name": "chat::list-conversations",
+    "path": "/api/v1/conversations",
+  },
+  {
+    "method": "GET",
+    "name": "chat::conversation-detail",
+    "path": "/api/v1/conversations/:id",
+  },
+  {
+    "method": "GET",
+    "name": "chat::list-messages",
+    "path": "/api/v1/conversations/:id/messages",
+  },
+  {
+    "method": "GET",
+    "name": "chat::conversation-memory",
+    "path": "/api/v1/conversations/:id/memory",
+  },
+  {
+    "method": "GET",
+    "name": "chat::conversation-mood-timeline",
+    "path": "/api/v1/conversations/:id/mood-timeline",
+  },
+  {
+    "method": "GET",
+    "name": "chat::conversation-insight-summary",
+    "path": "/api/v1/conversations/:id/insight-summary",
+  },
+  {
+    "method": "POST",
+    "name": "chat::send",
+    "path": "/api/v1/chat/send",
+  },
+  {
+    "method": "POST",
+    "name": "chat::multi-send",
+    "path": "/api/v1/chat/multi/send",
+  },
+  {
+    "method": "POST",
+    "name": "chat::proactive-now",
+    "path": "/api/v1/chat/proactive",
+  },
+  {
+    "method": "POST",
+    "name": "chat::mood-point-correction",
+    "path": "/api/v1/conversations/:id/mood-points/:pointId/correction",
+  },
+  {
+    "method": "POST",
+    "name": "chat::emotion-create",
+    "path": "/api/v1/conversations/:id/emotion",
+  },
+  {
+    "method": "GET",
+    "name": "chat::emotion-read",
+    "path": "/api/v1/conversations/:id/emotion",
+  },
+  {
+    "method": "PATCH",
+    "name": "chat::emotion-update",
+    "path": "/api/v1/conversations/:id/emotion",
+  },
+  {
+    "method": "DELETE",
+    "name": "chat::emotion-delete",
+    "path": "/api/v1/conversations/:id/emotion",
+  },
+]
+
+ ❯ src/routes/chat.routes.test.ts:347:27
+    345|     const router = new ContractRouter()
+    346|     registerChatRoutes(router as never)
+    347|     expect(router.routes).toContainEqual({
+       |                           ^
+    348|       name: 'chat::conversation-weekly-report',
+    349|       method: 'GET',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/routes/chat.routes.test.ts > chat v0.7 weekly mood report > serves the explicit weekly report empty state before enough valid points
+TypeError: handlers.get(...) is not a function
+ ❯ src/routes/chat.routes.test.ts:358:71
+    356|     prismaMock.moodSnapshot.findMany.mockResolvedValue([])
+    357|     prismaMock.moodCorrection.findMany.mockResolvedValue([])
+    358|     const res = await handlers.get('chat::conversation-weekly-report')…
+       |                                                                       ^
+    359|     expect(res.status_code).toBe(200)
+    360|     expect(res.body.data).toEqual({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/routes/chat.routes.test.ts > chat v0.7 weekly mood report > reads persisted corrections into the weekly report
+TypeError: handlers.get(...) is not a function
+ ❯ src/routes/chat.routes.test.ts:421:71
+    419|     ])
+    420|
+    421|     const res = await handlers.get('chat::conversation-weekly-report')…
+       |                                                                       ^
+    422|     expect(res.status_code).toBe(200)
+    423|     expect(res.body.data).toMatchObject({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/routes/chat.routes.test.ts > chat v0.7 weekly mood report > degrades the weekly report when persistence or aggregation fails
+TypeError: handlers.get(...) is not a function
+ ❯ src/routes/chat.routes.test.ts:440:71
+    438|   it('degrades the weekly report when persistence or aggregation fails…
+    439|     prismaMock.conversationMemory.findMany.mockRejectedValue(new Error…
+    440|     const res = await handlers.get('chat::conversation-weekly-report')…
+       |                                                                       ^
+    441|     expect(res.status_code).toBe(200)
+    442|     expect(res.body.data).toEqual({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  4 failed | 16 passed (20)
+   Start at  07:17:07
+   Duration  244ms (transform 110ms, setup 0ms, import 178ms, tests 13ms, environment 0ms)
+

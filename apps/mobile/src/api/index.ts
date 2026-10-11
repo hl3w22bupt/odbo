@@ -25,6 +25,7 @@ import type {
   MoodCorrectionWriteResult,
   MoodInsightSummaryResult,
   MoodTimelineResult,
+  MoodWeeklyReportResult,
   Message,
   Order,
   PayResult,
@@ -61,6 +62,7 @@ export interface ApiClient {
   getMoodTimeline(conversationId: string): Promise<MoodTimelineResult>;
   correctMoodPoint(conversationId: string, moodPointId: string, payload: MoodCorrectionPayload): Promise<MoodCorrectionWriteResult>;
   getMoodInsightSummary(conversationId: string): Promise<MoodInsightSummaryResult>;
+  getMoodWeeklyReport(conversationId: string): Promise<MoodWeeklyReportResult>;
   sendMessage(params: SendMessageParams): Promise<ChatSendResult>;
   sendMultiMessage(params: SendMultiMessageParams): Promise<ChatMultiSendResult>;
   triggerProactive(characterId: string): Promise<{ triggered: boolean; messageId: string }>;
@@ -118,6 +120,9 @@ const realApi: ApiClient = {
   },
   async getMoodInsightSummary(conversationId) {
     return request<MoodInsightSummaryResult>('GET', `/api/v1/conversations/${conversationId}/insight-summary`);
+  },
+  async getMoodWeeklyReport(conversationId) {
+    return request<MoodWeeklyReportResult>('GET', `/api/v1/conversations/${conversationId}/mood-weekly-report`);
   },
   async sendMessage(params) {
     return request<ChatSendResult>('POST', '/api/v1/chat/send', params);

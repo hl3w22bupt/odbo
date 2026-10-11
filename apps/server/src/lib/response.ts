@@ -15,6 +15,8 @@ export interface HttpResponse {
   status_code: number
   headers: Record<string, string>
   body: ApiEnvelope<unknown>
+  /** standalone runtime 直接输出；JSON envelope 仅供 iii 兼容。 */
+  rawBody?: string
 }
 
 export function ok<T>(data: T, message = 'ok'): HttpResponse {

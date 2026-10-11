@@ -14,6 +14,7 @@ import { registerAuthRoutes } from './routes/auth.js'
 import { registerUserRoutes } from './routes/users.js'
 import { registerCharacterRoutes } from './routes/characters.js'
 import { registerChatRoutes } from './routes/chat.js'
+import { registerMoodComparisonRoutes } from './routes/moodComparison.js'
 import { registerExportRoutes } from './routes/export.js'
 import { registerImportRoutes } from './routes/import.js'
 import { registerGiftRoutes } from './routes/gifts.js'
@@ -78,6 +79,7 @@ export async function startLocalServer(port = config.httpPort): Promise<http.Ser
   registerUserRoutes(router)
   registerCharacterRoutes(router)
   registerChatRoutes(router)
+  registerMoodComparisonRoutes(router)
   registerExportRoutes(router)
   registerImportRoutes(router)
   registerGiftRoutes(router)
@@ -108,7 +110,12 @@ export async function startLocalServer(port = config.httpPort): Promise<http.Ser
         headers: req.headers,
       }
       const response = await router.dispatch(req.method ?? 'GET', url.pathname, ctx)
-      writeJson(res, response.status_code, response.body)
+      if (typeof response.rawBody === 'string') {
+        res.writeHead(response.status_code, { ...CORS_HEADERS, ...response.headers })
+        res.end(response.rawBody)
+      } else {
+        writeJson(res, response.status_code, response.body)
+      }
     } catch (err) {
       const response = fromError(err)
       writeJson(res, response.status_code, response.body)

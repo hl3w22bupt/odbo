@@ -1,0 +1,9 @@
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv4foce10012m9p8zj3mf3ls/apps/server
+
+
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  07:23:45
+   Duration  168ms (transform 54ms, setup 0ms, import 83ms, tests 10ms, environment 0ms)
+

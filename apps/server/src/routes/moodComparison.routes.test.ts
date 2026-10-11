@@ -170,14 +170,14 @@ describe('mood period comparison and CSV export', () => {
       data.trendPairs.find((pair: any) => pair.dimension === dimension)
     expect(rate('count')).toMatchObject({ previousValue: 1, nextValue: 1, rate: 0, direction: 'STABLE', empty: false })
     expect(rate('negative')).toMatchObject({ previousValue: 1, nextValue: 0, rate: -1, direction: 'DOWN', empty: false })
-    expect(rate('averageScore')).toMatchObject({ previousValue: -1, nextValue: 1, rate: -2, direction: 'UP', empty: false })
+    expect(rate('averageScore')).toMatchObject({ previousValue: -1, nextValue: 1, rate: -2, direction: 'DOWN', empty: false })
     expect(rate('positive')).toMatchObject({ previousValue: 0, nextValue: 1, rate: null, direction: null, empty: true })
     expect(data.overallTrends).toEqual([
       { dimension: 'count', rate: 0, direction: 'STABLE', empty: false },
       { dimension: 'positive', rate: null, direction: null, empty: true },
       { dimension: 'neutral', rate: null, direction: null, empty: true },
       { dimension: 'negative', rate: -1, direction: 'DOWN', empty: false },
-      { dimension: 'averageScore', rate: -2, direction: 'UP', empty: false },
+      { dimension: 'averageScore', rate: -2, direction: 'DOWN', empty: false },
     ])
   })
 
@@ -188,7 +188,7 @@ describe('mood period comparison and CSV export', () => {
       const data = res.body.data as any
       expect(data.periods).toHaveLength(periods)
       expect(data.periods.every((period: any) => period.empty && period.aggregateValues.count === null)).toBe(true)
-      expect(data.overallCompleteness.status).toBe('EMPTY')
+      expect(data.completeness.status).toBe('EMPTY')
     }
     const one = (await handlers.get('chat::conversation-period-comparison')!(context(conversationId, { periods: '1' }))).body.data as any
     expect(one.periods[0].id).toBe('2026-10-05')
@@ -233,6 +233,21 @@ describe('mood period comparison and CSV export', () => {
     expect(encodeCsvCell('x,"y"\nz')).toBe('"x,""y""\nz"')
   })
 
+  it('returns the comparison JSON degraded state after an injected source failure retries once', async () => {
+    prismaMock.conversation.findFirst.mockResolvedValue({ id: conversationId, userId: 'user_1' })
+    __setMoodComparisonSourceForTests(() => Promise.reject(new Error('sqlite locked')))
+    const res = await handlers.get('chat::conversation-period-comparison')!(context(conversationId, { periods: '2' }))
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toMatchObject({
+      conversationId,
+      available: false,
+      degraded: true,
+      requestedPeriods: 2,
+      periods: [],
+      completeness: { expectedPoints: 10, actualPoints: 0, status: 'EMPTY' },
+    })
+  })
+
   it('returns a machine-readable no-file signal for empty source data', async () => {
     mockSource({ memoryRows: [], moodRows: [], correctionRows: [] })
     const res = await handlers.get('chat::conversation-period-comparison-csv')!(context(conversationId))
@@ -271,7 +286,7 @@ describe('mood period comparison and CSV export', () => {
   it('returns a usable CSV with degraded and partial signals when one cycle source fails', async () => {
     const rows = twoCycleRows()
     prismaMock.conversation.findFirst.mockResolvedValue({ id: conversationId, userId: 'user_1' })
-    __setMoodComparisonSourceForTests(() => Promise.resolve({ ...rows, failedPeriodIndexes: [1] }))
+    __setMoodComparisonSourceForTests(() => Promise.resolve({ ...rows, failedPeriodIndexes: [0] }))
     const res = await handlers.get('chat::conversation-period-comparison-csv')!(context(conversationId, { periods: '2' }))
     expect(res.status_code).toBe(200)
     expect(res.headers).toMatchObject({

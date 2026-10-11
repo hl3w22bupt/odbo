@@ -53,6 +53,10 @@ import {
   readableMoodWeeklyReport,
 } from '../lib/moodWeeklyReport.js'
 import {
+  moodPeriodReportDegraded,
+  readableMoodPeriodReport,
+} from '../lib/moodPeriodReport.js'
+import {
   readableMoodInsightSummary,
   moodInsightDegraded as moodInsightSummaryDegraded,
 } from '../lib/moodInsight.js'
@@ -349,6 +353,49 @@ async function conversationWeeklyMoodReport(ctx: HttpRouteContext) {
     if (err instanceof AppError) throw err
     logger.warn('[chat] weekly mood report degraded', { err: String(err), conversationId: id })
     return ok(moodWeeklyReportDegraded(id))
+  }
+}
+
+/**
+ * v0.8 读接口：自然周口径周期情绪报告最小版（additive，见 docs/v0.8/REQUIREMENTS.md）。
+ * 复用既有 latest-wins 修正与读侧契约；聚合失败时显式降级并记录非静默错误日志。
+ */
+async function conversationPeriodMoodReport(ctx: HttpRouteContext) {
+  const user = await authenticate(ctx)
+  const id = ctx.params.id
+  if (!id) throw AppError.badRequest('缺少会话 id')
+
+  try {
+    const conversation = await prisma.conversation.findFirst({ where: { id, userId: user.id } })
+    if (!conversation) throw AppError.notFound('会话不存在')
+
+    const [memoryRows, moodRows, correctionRows] = await Promise.all([
+      prisma.conversationMemory.findMany({
+        where: { conversationId: id },
+        orderBy: { createdAt: 'asc' },
+        take: 50,
+      }),
+      prisma.moodSnapshot.findMany({
+        where: { conversationId: id },
+        orderBy: { createdAt: 'asc' },
+        take: 50,
+      }),
+      prisma.moodCorrection.findMany({
+        where: { conversationId: id, userId: user.id },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      }),
+    ])
+    return ok(
+      readableMoodPeriodReport(
+        id,
+        readableMemories(id, memoryRows),
+        readableMoodTimeline(id, moodRows, false, correctionRows),
+      ),
+    )
+  } catch (err) {
+    if (err instanceof AppError) throw err
+    logger.error('[chat] period mood report degraded', { err: String(err), conversationId: id })
+    return ok(moodPeriodReportDegraded(id))
   }
 }
 
@@ -877,6 +924,7 @@ export function registerChatRoutes(router: HttpRouter): void {
   router.define('chat::conversation-mood-timeline', '/api/v1/conversations/:id/mood-timeline', 'GET', conversationMoodTimeline)
   router.define('chat::conversation-insight-summary', '/api/v1/conversations/:id/insight-summary', 'GET', conversationInsightSummary)
   router.define('chat::conversation-weekly-report', '/api/v1/conversations/:id/mood-weekly-report', 'GET', conversationWeeklyMoodReport)
+  router.define('chat::conversation-period-report', '/api/v1/conversations/:id/mood-period-report', 'GET', conversationPeriodMoodReport)
   router.define('chat::send', '/api/v1/chat/send', 'POST', chatSend)
   router.define('chat::multi-send', '/api/v1/chat/multi/send', 'POST', chatMultiSend)
   router.define('chat::proactive-now', '/api/v1/chat/proactive', 'POST', proactiveShareNow)

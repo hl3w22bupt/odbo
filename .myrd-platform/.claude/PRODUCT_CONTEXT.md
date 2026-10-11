@@ -29,6 +29,115 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 
 ## 产品关联知识
 
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
+
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -57,10 +166,6 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 - 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
@@ -198,111 +303,6 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
 
 ## 架构设计文档
 
@@ -2639,6 +2639,81 @@ bash std-skills/godot-game-dev/scripts/input-fuzz.sh games/3d
 node std-skills/godot-game-dev/scripts/mobile-web-smoke.mjs --url https://leomac-studio.tail49399e.ts.net/apps/3d/ --out games/3d/qa/mobile-review
 curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.pck.gz.b64 | base64 -d | gunzip | shasum -a 256
 ```
+
+
+## 沉淀节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁（game-10 节奏大师 · 全四棒实录）
+
+# 节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁
+
+> 来源：需求《〈节奏大师〉音乐节拍玩法需求：四轨判定、连击收集、难度分级与移动端触控》（id=cmv0y4coa000vm94o5w4iwqso，goal=cmv0xypkw000dm94o58qf3x8j）走完「录入需求 → 谱面/WebAudio 契约调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。工作流 run=cmv0yfaqu0018m94ot8uj5z2d（四节点全 completed）。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-10`（Godot 4.3.stable），分支 `myrd/game-10-goal-cmv0xypkw000dm94o58qf3x8j`，线上 https://leomac-studio.tail49399e.ts.net/apps/game-10/（deploymentId=cmv10cg93001jm94of535yg54，commit=2ccb38e）。本文所有数值/结论取自仓库代码与门禁证据，非纸面推演。
+
+## 一、时间基准契约（节拍类的第一性问题）
+
+**结论：判定必须挂「歌曲时钟」，且音符位置必须是时间的纯函数；时钟源与判定逻辑解耦，接入音频时钟收敛为单点替换。**
+
+1. **唯一时间权威 = `scripts/conductor.gd`（Conductor，歌曲指挥）**。音符 y 坐标 = `JUDGMENT_Y − (note_time − song_time) × fall_speed`（`Conductor.note_y` 静态纯函数）。匀速、无累积漂移，从结构上杜绝「以渲染帧时间近似判定」——帧率波动只影响观感，不影响判定。
+2. **`song_time` 在固定物理步（`_physics_process`，60Hz）推进** → 无头运行（240 帧冒烟）确定可复现，这是门禁能机判 AC1/AC2 的前提。**诚实标注**：本作当前判定基准是确定性歌曲时钟，不是 `AudioServer.get_playback_position`；但契约把时钟封装为唯一推进点，正式接入音频时钟只需替换 `song_time` 推进来源，`BeatJudge` 判定逻辑零改动——「契约先行」的具体形态。
+3. **判定差值统一公式**（`lane.gd press`）：`delta_ms = (press_song_time − note_time) × 1000 + calibration_offset_ms`，正=按晚、负=按早；对同轨「时间上最近的未命中音符」求最小 |delta| 命中。窗口三档：PERFECT ±50ms / GOOD ±100ms / 超窗 MISS，窗口值放 `GameState` 调参区（TUNING_META 四键基线 50/100/1.0/0）。
+4. **延迟校准是契约一等公民**：±300ms、步长 10ms、`roundf` 量化到 10ms 后 `clampf` 钳制，`ConfigFile` 持久化（`input/calibration_offset_ms`），重启仍生效；校准以加法作用在 delta 上（冒烟 AC4 机判「步长/钳制/持久化往返」三项）。
+5. **Web 端音频解锁契约在壳层**：落地页内置音频手势解锁器（用户手势后才解锁 AudioContext，带 `__audioDebug` 取证出口），mobile-web-smoke 第 8 项「音频解锁器」机判此契约；数值调参走 `?tuning=` URL 桥（面板接线修复生效前可 `?tuning=<JSON>` 直传）。详见关联知识《Godot 4 Web 导出移动端触屏虚拟摇杆与 AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）。
+
+## 二、节拍判定实现与机判（AC1 / AC2 / AC5）
+
+- **`scripts/judge.gd`（BeatJudge）是纯逻辑 `RefCounted`**：静态 `classify(delta_ms, perfect_ms, good_ms)`，取 |Δ| 两级比较、PERFECT 优先，不持有任何节点 → 可无头直判。判定层「超窗不吞音符」：press 结果为 MISS 时不吞音符不惩罚（emit `lane_pressed_empty`），音符仍可被后续按键命中；空按返回 -1 同样不惩罚。这使「同轨相邻音符判定互不吞噬」在两层同时成立（判定层不吞 + 谱面层限距，见 §三）。
+- **AC1 机判（tests/smoke.gd AC1 相位）**：①1000 组带时间戳模拟输入（−300..+300ms 均匀扫窗 + 50% 随机取反方向）与**独立 oracle 对拍**（oracle 是需求窗口定义的第二实现，防同源盲区），要求 100% 一致，且三档判定必须全部出现（防分类器退化）；②边界精确值表：`0/±50→PERFECT`，`±50.001/±100→GOOD`，`±100.001/300→MISS`，边界含入档、略超即降档。
+- **AC2 机判**：命中序列逐事件重放，max_combo 与得分和重放计算 **0 误差**；MISS 后 combo 立即归零（打印日志佐证行，冒烟里确认真实输出）；终局收口 MISS 同样触发归零。
+- **AC5 机判**：结算页总分 = `PERFECT×100 + GOOD×60` 可复算，各判定计数、最大连击与页面文本逐项一致；**权重进交付配置表 `score_weights`**，AC3 相位同时机判代码权重与配置表一致，防权重漂移无人拦截。
+- **变异测试验证断言拦截力**：全绿后故意把 GOOD 权重改成 61 → 冒烟 FAIL → 还原。断言「声称能拦的缺陷」必须被证明真能拦住，这一步建议进所有数值契约的沉淀模板。
+
+## 三、谱面与难度分级契约（AC3）
+
+- **确定性生成**（`scripts/chart.gd`）：`seed = 20261010 + difficulty`，同难度必出同谱面（门禁可复现）；均匀轮转 + 随机抖动选轨，四轨负载均衡又确定。
+- **首音符时刻约束**：`FIRST_NOTE_TIME_S = 3.8s` ≥ 最慢档（Easy 300px/s）穿过全屏时长 `(1040−(−80))/300 ≈ 3.73s`。否则开局首个音符已在屏幕中央而非从顶端落入——这是 scaffold 阶段实测修掉的时序缺陷。
+- **同轨最小间隔 `MIN_LANE_GAP_S = 0.24s`**（> 2×GOOD 窗 0.2s）：generate 时同轨太近自动顺延；validate 五项校验（轨道号 0..3 / 时间升序 / 时间落在 `[0, song_duration]` / 同轨间隔达标 / 非空），违规返回**可读字符串**（可断言可定位）。
+- **交付配置表 `config/difficulties.json`**：meta 含 `judge_windows_ms`/`score_weights`/`song_duration_s`；四档 value+min+max 区间——Easy 300px/s·1.10s → Normal 380·0.85 → Hard 470·0.62 → Expert 560·0.46（速度升、间隔降，密度单调梯度）。**生效源是代码内 `DIFFICULTY_TABLE`**，AC3 冒烟相位机判「代码表 vs 配置表逐档奇偶校验 + 速度/密度梯度 + 每档谱面生成+校验通过 + 结算页切档生效 + 重开后按新难度加载谱面奇偶校验」，两头脱节 = FAIL。
+- **终局收口**：song_time 越过 `end_time`（最后音符 + 1s 收尾静默）时，先把全部未命中音符按 MISS 收口（`flush_misses`）再 emit `finished`——保证结算计数完整，否则尾音符合被静默漏计。
+
+## 四、移动端触控契约（AC4 工程内部指标）
+
+- **触摸是动作的「生产者」**：`TouchActionButton`（extends TouchScreenButton）把 `InputEventAction` 注入 `Input.parse_input_event`，游戏逻辑只读 InputMap 动作名（`lane_1..4` / `restart` / `diff_next` / `diff_prev`），键盘（D/F/J/K）与触摸同路径互不感知；TouchScreenButton 按 touch index 跟踪各自触点 → 四指并发各按钮独立响应；桌面无触摸屏自动不响应，无需手动屏蔽。
+- **触控 UI 可见性纪律**：仅 `is_touchscreen_available()` 时显示。
+- **热区不重叠**（implement 阶段实测修掉的移动端误触缺陷）：工具行（校准/重开/难度，y≈1066–1126）与四轨触控带（y≈1150–1280）分离两带；冒烟 AC4 机判「四分区齐全且沿底部连续铺满 + 工具按钮与分区零重叠 + 可见性纪律」。
+- **两个 Godot API 坑**：① TouchScreenButton 原生已有 `action` 属性，自定义 `var action` 会 Parse Error → 必须改名（本作用 `action_name`）；② TouchScreenButton 没有 `text` 属性 → 用子 Label 手动居中，且 `mouse_filter = MOUSE_FILTER_IGNORE` 防吞触摸。
+- **如实标注**：AC4 全量指标（iOS/Android 各 ≥2 台真机、四指并发 1000 次 0 丢触、触控到判定中位延迟 ≤80ms）本轮未做真机验证，模拟器/无头门禁只能覆盖结构性与逻辑性子集；真机抽查留给用户试玩，试玩指引与四问量表已落 `games/game-10/qa/playtest-kit.md`。
+
+## 五、双门禁体系：工程内四门禁 + 线上移动端冒烟
+
+**工程内（与平台门禁同源，脚本在 `std-skills/godot-game-dev/scripts/` 六件套，未自造未改写；`verify.sh` 纯调用器范式）：**
+
+| 门禁 | 本轮结果 | 说明 |
+|---|---|---|
+| PREFLIGHT | PASS | 14 类一致性检查（39 文件） |
+| GODOT_SMOKE | PASS | 240 帧无头冒烟 + AC1–AC5 断言相位 |
+| GODOT_FUZZ | PASS | 6 批 239 帧对抗输入（seed=20260913），无脚本错误 |
+| GODOT_PLAYTEST | PASS | bot 3 局得分 380/520/600，首奖励 ≤6.4s，反馈 28/局 |
+
+- **门禁 bot 对骨架的隐性要求要提前满足**：playtest bot 随机注入所有非 ui 动作，10 秒内必须能得分、反馈密度 ≥2/局 → 谱面必须「密且早」、MISS 也挂反馈；restart 必须守卫只在结算态生效（scaffold 阶段 bot 乱按 R 永远卡歌曲开头，METRICS 分数全 0 暴露此缺陷）；paused 守卫不能挡判定测试路径。
+- **冒烟输入注入纪律**（error-signatures E-08）：噪声相位只投原始事件（Key/Mouse/Touch），动作级断言在噪声之后的独立相位做，避免相位互吞。
+- **线上移动端冒烟 mobile-web-smoke 10 项机判（首轮即绿 PASS 10/10）**：网络全通 / console 零错 / canvas 挂载 / 首帧非纯色 / 画面在动 / 触摸到达 / 触摸响应 / 音频解锁器 / 无横向溢出 / FPS≥8（实测 fps=38）。证据归档 `games/game-10/qa/mobile/`（report.json + 3 张分阶段截图）随仓库提交，preHook 证据可跨节点复用。
+- 截图目检项：四轨下落、判定线、HUD、底部四分区触控、中文字体全部正常。
+
+## 六、Web 导出与部署要点（踩坑实录）
+
+- `export_presets.cfg`：Web 预设 **`thread_support=false`**（防跨域隔离缺失导致启动失败）、720×1280 竖屏。
+- 产物落位：index.html/js/pck（2.5MB）/wasm（35MB，走对象存储通道不受 bundle 限制）/worklet；`export/web` 需入库（它是部署构建输入），而 `qa/` 与 `export/web` 要加 `.gdignore` 防证据截图混进 pck（playtest 节点实测重导出后 46 文件与线上清单一致）。
+- 壳（AppHost）：仓库根 `apphost.toml` 切 game-10 + `assets_dir`；落地页含音频手势解锁器与 `?tuning=` 调参桥；资产全相对路径 base64 文本通道。
+- **部署 POST 返回 504 ≠ 失败**：clone 含 35MB wasm 的仓库超时，但服务端已受理进入 building；此时重试会建出第二个 queued 部署（本轮即发生，同 gitRef 同内容双记录）。正确姿势：先查部署状态再决定是否重发。
+- **playtest 节点实测发现**：TuningPanel 只有定义、无任何实例化点，线上 `?tuning=1` 出不来面板（冒烟只断言调参协议纯逻辑，所以门禁全绿）——「门禁绿 ≠ 线上功能在」的典型案例。修复 = 3 行接线（commit b0e8560，在分支待下次部署生效）。
+- **回写事故复盘（已完全恢复）**：以空数组 PATCH 探测写端点，意外带真实凭据把 goal artifacts 清空；靠先前 dump 的 DB 原文重建并逐字段核对恢复。教训入模板：**禁止以破坏性载荷试探写端点**，探形状只用只读 GET。
+
+## 七、给后续节拍/音游类游戏的复用清单
+
+1. 判定器写成纯静态逻辑 + 独立 oracle 对拍 + 边界精确值表；所有判定走同一条带校准的 delta 公式。
+2. 歌曲时钟做成纯函数模式（位置=f(时间)），音频时钟接入预留单点替换；无头复现性优先于「真音频钟」——门禁能机判才是硬通货。
+3. 谱面：确定性 seed + 校验器返回可读错误；首音符 ≥ 穿屏时长；同轨 gap ≥ 2×GOOD 窗；终局先 MISS 收口再结算。
+4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
+5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
+6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
 
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
@@ -2693,6 +2768,115 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
+
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -2721,10 +2905,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 - 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
@@ -2862,111 +3042,6 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
 
 ## 架构设计文档
 
@@ -5303,6 +5378,81 @@ bash std-skills/godot-game-dev/scripts/input-fuzz.sh games/3d
 node std-skills/godot-game-dev/scripts/mobile-web-smoke.mjs --url https://leomac-studio.tail49399e.ts.net/apps/3d/ --out games/3d/qa/mobile-review
 curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.pck.gz.b64 | base64 -d | gunzip | shasum -a 256
 ```
+
+
+## 沉淀节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁（game-10 节奏大师 · 全四棒实录）
+
+# 节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁
+
+> 来源：需求《〈节奏大师〉音乐节拍玩法需求：四轨判定、连击收集、难度分级与移动端触控》（id=cmv0y4coa000vm94o5w4iwqso，goal=cmv0xypkw000dm94o58qf3x8j）走完「录入需求 → 谱面/WebAudio 契约调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。工作流 run=cmv0yfaqu0018m94ot8uj5z2d（四节点全 completed）。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-10`（Godot 4.3.stable），分支 `myrd/game-10-goal-cmv0xypkw000dm94o58qf3x8j`，线上 https://leomac-studio.tail49399e.ts.net/apps/game-10/（deploymentId=cmv10cg93001jm94of535yg54，commit=2ccb38e）。本文所有数值/结论取自仓库代码与门禁证据，非纸面推演。
+
+## 一、时间基准契约（节拍类的第一性问题）
+
+**结论：判定必须挂「歌曲时钟」，且音符位置必须是时间的纯函数；时钟源与判定逻辑解耦，接入音频时钟收敛为单点替换。**
+
+1. **唯一时间权威 = `scripts/conductor.gd`（Conductor，歌曲指挥）**。音符 y 坐标 = `JUDGMENT_Y − (note_time − song_time) × fall_speed`（`Conductor.note_y` 静态纯函数）。匀速、无累积漂移，从结构上杜绝「以渲染帧时间近似判定」——帧率波动只影响观感，不影响判定。
+2. **`song_time` 在固定物理步（`_physics_process`，60Hz）推进** → 无头运行（240 帧冒烟）确定可复现，这是门禁能机判 AC1/AC2 的前提。**诚实标注**：本作当前判定基准是确定性歌曲时钟，不是 `AudioServer.get_playback_position`；但契约把时钟封装为唯一推进点，正式接入音频时钟只需替换 `song_time` 推进来源，`BeatJudge` 判定逻辑零改动——「契约先行」的具体形态。
+3. **判定差值统一公式**（`lane.gd press`）：`delta_ms = (press_song_time − note_time) × 1000 + calibration_offset_ms`，正=按晚、负=按早；对同轨「时间上最近的未命中音符」求最小 |delta| 命中。窗口三档：PERFECT ±50ms / GOOD ±100ms / 超窗 MISS，窗口值放 `GameState` 调参区（TUNING_META 四键基线 50/100/1.0/0）。
+4. **延迟校准是契约一等公民**：±300ms、步长 10ms、`roundf` 量化到 10ms 后 `clampf` 钳制，`ConfigFile` 持久化（`input/calibration_offset_ms`），重启仍生效；校准以加法作用在 delta 上（冒烟 AC4 机判「步长/钳制/持久化往返」三项）。
+5. **Web 端音频解锁契约在壳层**：落地页内置音频手势解锁器（用户手势后才解锁 AudioContext，带 `__audioDebug` 取证出口），mobile-web-smoke 第 8 项「音频解锁器」机判此契约；数值调参走 `?tuning=` URL 桥（面板接线修复生效前可 `?tuning=<JSON>` 直传）。详见关联知识《Godot 4 Web 导出移动端触屏虚拟摇杆与 AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）。
+
+## 二、节拍判定实现与机判（AC1 / AC2 / AC5）
+
+- **`scripts/judge.gd`（BeatJudge）是纯逻辑 `RefCounted`**：静态 `classify(delta_ms, perfect_ms, good_ms)`，取 |Δ| 两级比较、PERFECT 优先，不持有任何节点 → 可无头直判。判定层「超窗不吞音符」：press 结果为 MISS 时不吞音符不惩罚（emit `lane_pressed_empty`），音符仍可被后续按键命中；空按返回 -1 同样不惩罚。这使「同轨相邻音符判定互不吞噬」在两层同时成立（判定层不吞 + 谱面层限距，见 §三）。
+- **AC1 机判（tests/smoke.gd AC1 相位）**：①1000 组带时间戳模拟输入（−300..+300ms 均匀扫窗 + 50% 随机取反方向）与**独立 oracle 对拍**（oracle 是需求窗口定义的第二实现，防同源盲区），要求 100% 一致，且三档判定必须全部出现（防分类器退化）；②边界精确值表：`0/±50→PERFECT`，`±50.001/±100→GOOD`，`±100.001/300→MISS`，边界含入档、略超即降档。
+- **AC2 机判**：命中序列逐事件重放，max_combo 与得分和重放计算 **0 误差**；MISS 后 combo 立即归零（打印日志佐证行，冒烟里确认真实输出）；终局收口 MISS 同样触发归零。
+- **AC5 机判**：结算页总分 = `PERFECT×100 + GOOD×60` 可复算，各判定计数、最大连击与页面文本逐项一致；**权重进交付配置表 `score_weights`**，AC3 相位同时机判代码权重与配置表一致，防权重漂移无人拦截。
+- **变异测试验证断言拦截力**：全绿后故意把 GOOD 权重改成 61 → 冒烟 FAIL → 还原。断言「声称能拦的缺陷」必须被证明真能拦住，这一步建议进所有数值契约的沉淀模板。
+
+## 三、谱面与难度分级契约（AC3）
+
+- **确定性生成**（`scripts/chart.gd`）：`seed = 20261010 + difficulty`，同难度必出同谱面（门禁可复现）；均匀轮转 + 随机抖动选轨，四轨负载均衡又确定。
+- **首音符时刻约束**：`FIRST_NOTE_TIME_S = 3.8s` ≥ 最慢档（Easy 300px/s）穿过全屏时长 `(1040−(−80))/300 ≈ 3.73s`。否则开局首个音符已在屏幕中央而非从顶端落入——这是 scaffold 阶段实测修掉的时序缺陷。
+- **同轨最小间隔 `MIN_LANE_GAP_S = 0.24s`**（> 2×GOOD 窗 0.2s）：generate 时同轨太近自动顺延；validate 五项校验（轨道号 0..3 / 时间升序 / 时间落在 `[0, song_duration]` / 同轨间隔达标 / 非空），违规返回**可读字符串**（可断言可定位）。
+- **交付配置表 `config/difficulties.json`**：meta 含 `judge_windows_ms`/`score_weights`/`song_duration_s`；四档 value+min+max 区间——Easy 300px/s·1.10s → Normal 380·0.85 → Hard 470·0.62 → Expert 560·0.46（速度升、间隔降，密度单调梯度）。**生效源是代码内 `DIFFICULTY_TABLE`**，AC3 冒烟相位机判「代码表 vs 配置表逐档奇偶校验 + 速度/密度梯度 + 每档谱面生成+校验通过 + 结算页切档生效 + 重开后按新难度加载谱面奇偶校验」，两头脱节 = FAIL。
+- **终局收口**：song_time 越过 `end_time`（最后音符 + 1s 收尾静默）时，先把全部未命中音符按 MISS 收口（`flush_misses`）再 emit `finished`——保证结算计数完整，否则尾音符合被静默漏计。
+
+## 四、移动端触控契约（AC4 工程内部指标）
+
+- **触摸是动作的「生产者」**：`TouchActionButton`（extends TouchScreenButton）把 `InputEventAction` 注入 `Input.parse_input_event`，游戏逻辑只读 InputMap 动作名（`lane_1..4` / `restart` / `diff_next` / `diff_prev`），键盘（D/F/J/K）与触摸同路径互不感知；TouchScreenButton 按 touch index 跟踪各自触点 → 四指并发各按钮独立响应；桌面无触摸屏自动不响应，无需手动屏蔽。
+- **触控 UI 可见性纪律**：仅 `is_touchscreen_available()` 时显示。
+- **热区不重叠**（implement 阶段实测修掉的移动端误触缺陷）：工具行（校准/重开/难度，y≈1066–1126）与四轨触控带（y≈1150–1280）分离两带；冒烟 AC4 机判「四分区齐全且沿底部连续铺满 + 工具按钮与分区零重叠 + 可见性纪律」。
+- **两个 Godot API 坑**：① TouchScreenButton 原生已有 `action` 属性，自定义 `var action` 会 Parse Error → 必须改名（本作用 `action_name`）；② TouchScreenButton 没有 `text` 属性 → 用子 Label 手动居中，且 `mouse_filter = MOUSE_FILTER_IGNORE` 防吞触摸。
+- **如实标注**：AC4 全量指标（iOS/Android 各 ≥2 台真机、四指并发 1000 次 0 丢触、触控到判定中位延迟 ≤80ms）本轮未做真机验证，模拟器/无头门禁只能覆盖结构性与逻辑性子集；真机抽查留给用户试玩，试玩指引与四问量表已落 `games/game-10/qa/playtest-kit.md`。
+
+## 五、双门禁体系：工程内四门禁 + 线上移动端冒烟
+
+**工程内（与平台门禁同源，脚本在 `std-skills/godot-game-dev/scripts/` 六件套，未自造未改写；`verify.sh` 纯调用器范式）：**
+
+| 门禁 | 本轮结果 | 说明 |
+|---|---|---|
+| PREFLIGHT | PASS | 14 类一致性检查（39 文件） |
+| GODOT_SMOKE | PASS | 240 帧无头冒烟 + AC1–AC5 断言相位 |
+| GODOT_FUZZ | PASS | 6 批 239 帧对抗输入（seed=20260913），无脚本错误 |
+| GODOT_PLAYTEST | PASS | bot 3 局得分 380/520/600，首奖励 ≤6.4s，反馈 28/局 |
+
+- **门禁 bot 对骨架的隐性要求要提前满足**：playtest bot 随机注入所有非 ui 动作，10 秒内必须能得分、反馈密度 ≥2/局 → 谱面必须「密且早」、MISS 也挂反馈；restart 必须守卫只在结算态生效（scaffold 阶段 bot 乱按 R 永远卡歌曲开头，METRICS 分数全 0 暴露此缺陷）；paused 守卫不能挡判定测试路径。
+- **冒烟输入注入纪律**（error-signatures E-08）：噪声相位只投原始事件（Key/Mouse/Touch），动作级断言在噪声之后的独立相位做，避免相位互吞。
+- **线上移动端冒烟 mobile-web-smoke 10 项机判（首轮即绿 PASS 10/10）**：网络全通 / console 零错 / canvas 挂载 / 首帧非纯色 / 画面在动 / 触摸到达 / 触摸响应 / 音频解锁器 / 无横向溢出 / FPS≥8（实测 fps=38）。证据归档 `games/game-10/qa/mobile/`（report.json + 3 张分阶段截图）随仓库提交，preHook 证据可跨节点复用。
+- 截图目检项：四轨下落、判定线、HUD、底部四分区触控、中文字体全部正常。
+
+## 六、Web 导出与部署要点（踩坑实录）
+
+- `export_presets.cfg`：Web 预设 **`thread_support=false`**（防跨域隔离缺失导致启动失败）、720×1280 竖屏。
+- 产物落位：index.html/js/pck（2.5MB）/wasm（35MB，走对象存储通道不受 bundle 限制）/worklet；`export/web` 需入库（它是部署构建输入），而 `qa/` 与 `export/web` 要加 `.gdignore` 防证据截图混进 pck（playtest 节点实测重导出后 46 文件与线上清单一致）。
+- 壳（AppHost）：仓库根 `apphost.toml` 切 game-10 + `assets_dir`；落地页含音频手势解锁器与 `?tuning=` 调参桥；资产全相对路径 base64 文本通道。
+- **部署 POST 返回 504 ≠ 失败**：clone 含 35MB wasm 的仓库超时，但服务端已受理进入 building；此时重试会建出第二个 queued 部署（本轮即发生，同 gitRef 同内容双记录）。正确姿势：先查部署状态再决定是否重发。
+- **playtest 节点实测发现**：TuningPanel 只有定义、无任何实例化点，线上 `?tuning=1` 出不来面板（冒烟只断言调参协议纯逻辑，所以门禁全绿）——「门禁绿 ≠ 线上功能在」的典型案例。修复 = 3 行接线（commit b0e8560，在分支待下次部署生效）。
+- **回写事故复盘（已完全恢复）**：以空数组 PATCH 探测写端点，意外带真实凭据把 goal artifacts 清空；靠先前 dump 的 DB 原文重建并逐字段核对恢复。教训入模板：**禁止以破坏性载荷试探写端点**，探形状只用只读 GET。
+
+## 七、给后续节拍/音游类游戏的复用清单
+
+1. 判定器写成纯静态逻辑 + 独立 oracle 对拍 + 边界精确值表；所有判定走同一条带校准的 delta 公式。
+2. 歌曲时钟做成纯函数模式（位置=f(时间)），音频时钟接入预留单点替换；无头复现性优先于「真音频钟」——门禁能机判才是硬通货。
+3. 谱面：确定性 seed + 校验器返回可读错误；首音符 ≥ 穿屏时长；同轨 gap ≥ 2×GOOD 窗；终局先 MISS 收口再结算。
+4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
+5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
+6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
 
 
 ---
@@ -5326,6 +5476,115 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
+
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -5354,10 +5613,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 - 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
@@ -5495,111 +5750,6 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
 
 ## 架构设计文档
 
@@ -7936,6 +8086,81 @@ bash std-skills/godot-game-dev/scripts/input-fuzz.sh games/3d
 node std-skills/godot-game-dev/scripts/mobile-web-smoke.mjs --url https://leomac-studio.tail49399e.ts.net/apps/3d/ --out games/3d/qa/mobile-review
 curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.pck.gz.b64 | base64 -d | gunzip | shasum -a 256
 ```
+
+
+## 沉淀节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁（game-10 节奏大师 · 全四棒实录）
+
+# 节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁
+
+> 来源：需求《〈节奏大师〉音乐节拍玩法需求：四轨判定、连击收集、难度分级与移动端触控》（id=cmv0y4coa000vm94o5w4iwqso，goal=cmv0xypkw000dm94o58qf3x8j）走完「录入需求 → 谱面/WebAudio 契约调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。工作流 run=cmv0yfaqu0018m94ot8uj5z2d（四节点全 completed）。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-10`（Godot 4.3.stable），分支 `myrd/game-10-goal-cmv0xypkw000dm94o58qf3x8j`，线上 https://leomac-studio.tail49399e.ts.net/apps/game-10/（deploymentId=cmv10cg93001jm94of535yg54，commit=2ccb38e）。本文所有数值/结论取自仓库代码与门禁证据，非纸面推演。
+
+## 一、时间基准契约（节拍类的第一性问题）
+
+**结论：判定必须挂「歌曲时钟」，且音符位置必须是时间的纯函数；时钟源与判定逻辑解耦，接入音频时钟收敛为单点替换。**
+
+1. **唯一时间权威 = `scripts/conductor.gd`（Conductor，歌曲指挥）**。音符 y 坐标 = `JUDGMENT_Y − (note_time − song_time) × fall_speed`（`Conductor.note_y` 静态纯函数）。匀速、无累积漂移，从结构上杜绝「以渲染帧时间近似判定」——帧率波动只影响观感，不影响判定。
+2. **`song_time` 在固定物理步（`_physics_process`，60Hz）推进** → 无头运行（240 帧冒烟）确定可复现，这是门禁能机判 AC1/AC2 的前提。**诚实标注**：本作当前判定基准是确定性歌曲时钟，不是 `AudioServer.get_playback_position`；但契约把时钟封装为唯一推进点，正式接入音频时钟只需替换 `song_time` 推进来源，`BeatJudge` 判定逻辑零改动——「契约先行」的具体形态。
+3. **判定差值统一公式**（`lane.gd press`）：`delta_ms = (press_song_time − note_time) × 1000 + calibration_offset_ms`，正=按晚、负=按早；对同轨「时间上最近的未命中音符」求最小 |delta| 命中。窗口三档：PERFECT ±50ms / GOOD ±100ms / 超窗 MISS，窗口值放 `GameState` 调参区（TUNING_META 四键基线 50/100/1.0/0）。
+4. **延迟校准是契约一等公民**：±300ms、步长 10ms、`roundf` 量化到 10ms 后 `clampf` 钳制，`ConfigFile` 持久化（`input/calibration_offset_ms`），重启仍生效；校准以加法作用在 delta 上（冒烟 AC4 机判「步长/钳制/持久化往返」三项）。
+5. **Web 端音频解锁契约在壳层**：落地页内置音频手势解锁器（用户手势后才解锁 AudioContext，带 `__audioDebug` 取证出口），mobile-web-smoke 第 8 项「音频解锁器」机判此契约；数值调参走 `?tuning=` URL 桥（面板接线修复生效前可 `?tuning=<JSON>` 直传）。详见关联知识《Godot 4 Web 导出移动端触屏虚拟摇杆与 AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）。
+
+## 二、节拍判定实现与机判（AC1 / AC2 / AC5）
+
+- **`scripts/judge.gd`（BeatJudge）是纯逻辑 `RefCounted`**：静态 `classify(delta_ms, perfect_ms, good_ms)`，取 |Δ| 两级比较、PERFECT 优先，不持有任何节点 → 可无头直判。判定层「超窗不吞音符」：press 结果为 MISS 时不吞音符不惩罚（emit `lane_pressed_empty`），音符仍可被后续按键命中；空按返回 -1 同样不惩罚。这使「同轨相邻音符判定互不吞噬」在两层同时成立（判定层不吞 + 谱面层限距，见 §三）。
+- **AC1 机判（tests/smoke.gd AC1 相位）**：①1000 组带时间戳模拟输入（−300..+300ms 均匀扫窗 + 50% 随机取反方向）与**独立 oracle 对拍**（oracle 是需求窗口定义的第二实现，防同源盲区），要求 100% 一致，且三档判定必须全部出现（防分类器退化）；②边界精确值表：`0/±50→PERFECT`，`±50.001/±100→GOOD`，`±100.001/300→MISS`，边界含入档、略超即降档。
+- **AC2 机判**：命中序列逐事件重放，max_combo 与得分和重放计算 **0 误差**；MISS 后 combo 立即归零（打印日志佐证行，冒烟里确认真实输出）；终局收口 MISS 同样触发归零。
+- **AC5 机判**：结算页总分 = `PERFECT×100 + GOOD×60` 可复算，各判定计数、最大连击与页面文本逐项一致；**权重进交付配置表 `score_weights`**，AC3 相位同时机判代码权重与配置表一致，防权重漂移无人拦截。
+- **变异测试验证断言拦截力**：全绿后故意把 GOOD 权重改成 61 → 冒烟 FAIL → 还原。断言「声称能拦的缺陷」必须被证明真能拦住，这一步建议进所有数值契约的沉淀模板。
+
+## 三、谱面与难度分级契约（AC3）
+
+- **确定性生成**（`scripts/chart.gd`）：`seed = 20261010 + difficulty`，同难度必出同谱面（门禁可复现）；均匀轮转 + 随机抖动选轨，四轨负载均衡又确定。
+- **首音符时刻约束**：`FIRST_NOTE_TIME_S = 3.8s` ≥ 最慢档（Easy 300px/s）穿过全屏时长 `(1040−(−80))/300 ≈ 3.73s`。否则开局首个音符已在屏幕中央而非从顶端落入——这是 scaffold 阶段实测修掉的时序缺陷。
+- **同轨最小间隔 `MIN_LANE_GAP_S = 0.24s`**（> 2×GOOD 窗 0.2s）：generate 时同轨太近自动顺延；validate 五项校验（轨道号 0..3 / 时间升序 / 时间落在 `[0, song_duration]` / 同轨间隔达标 / 非空），违规返回**可读字符串**（可断言可定位）。
+- **交付配置表 `config/difficulties.json`**：meta 含 `judge_windows_ms`/`score_weights`/`song_duration_s`；四档 value+min+max 区间——Easy 300px/s·1.10s → Normal 380·0.85 → Hard 470·0.62 → Expert 560·0.46（速度升、间隔降，密度单调梯度）。**生效源是代码内 `DIFFICULTY_TABLE`**，AC3 冒烟相位机判「代码表 vs 配置表逐档奇偶校验 + 速度/密度梯度 + 每档谱面生成+校验通过 + 结算页切档生效 + 重开后按新难度加载谱面奇偶校验」，两头脱节 = FAIL。
+- **终局收口**：song_time 越过 `end_time`（最后音符 + 1s 收尾静默）时，先把全部未命中音符按 MISS 收口（`flush_misses`）再 emit `finished`——保证结算计数完整，否则尾音符合被静默漏计。
+
+## 四、移动端触控契约（AC4 工程内部指标）
+
+- **触摸是动作的「生产者」**：`TouchActionButton`（extends TouchScreenButton）把 `InputEventAction` 注入 `Input.parse_input_event`，游戏逻辑只读 InputMap 动作名（`lane_1..4` / `restart` / `diff_next` / `diff_prev`），键盘（D/F/J/K）与触摸同路径互不感知；TouchScreenButton 按 touch index 跟踪各自触点 → 四指并发各按钮独立响应；桌面无触摸屏自动不响应，无需手动屏蔽。
+- **触控 UI 可见性纪律**：仅 `is_touchscreen_available()` 时显示。
+- **热区不重叠**（implement 阶段实测修掉的移动端误触缺陷）：工具行（校准/重开/难度，y≈1066–1126）与四轨触控带（y≈1150–1280）分离两带；冒烟 AC4 机判「四分区齐全且沿底部连续铺满 + 工具按钮与分区零重叠 + 可见性纪律」。
+- **两个 Godot API 坑**：① TouchScreenButton 原生已有 `action` 属性，自定义 `var action` 会 Parse Error → 必须改名（本作用 `action_name`）；② TouchScreenButton 没有 `text` 属性 → 用子 Label 手动居中，且 `mouse_filter = MOUSE_FILTER_IGNORE` 防吞触摸。
+- **如实标注**：AC4 全量指标（iOS/Android 各 ≥2 台真机、四指并发 1000 次 0 丢触、触控到判定中位延迟 ≤80ms）本轮未做真机验证，模拟器/无头门禁只能覆盖结构性与逻辑性子集；真机抽查留给用户试玩，试玩指引与四问量表已落 `games/game-10/qa/playtest-kit.md`。
+
+## 五、双门禁体系：工程内四门禁 + 线上移动端冒烟
+
+**工程内（与平台门禁同源，脚本在 `std-skills/godot-game-dev/scripts/` 六件套，未自造未改写；`verify.sh` 纯调用器范式）：**
+
+| 门禁 | 本轮结果 | 说明 |
+|---|---|---|
+| PREFLIGHT | PASS | 14 类一致性检查（39 文件） |
+| GODOT_SMOKE | PASS | 240 帧无头冒烟 + AC1–AC5 断言相位 |
+| GODOT_FUZZ | PASS | 6 批 239 帧对抗输入（seed=20260913），无脚本错误 |
+| GODOT_PLAYTEST | PASS | bot 3 局得分 380/520/600，首奖励 ≤6.4s，反馈 28/局 |
+
+- **门禁 bot 对骨架的隐性要求要提前满足**：playtest bot 随机注入所有非 ui 动作，10 秒内必须能得分、反馈密度 ≥2/局 → 谱面必须「密且早」、MISS 也挂反馈；restart 必须守卫只在结算态生效（scaffold 阶段 bot 乱按 R 永远卡歌曲开头，METRICS 分数全 0 暴露此缺陷）；paused 守卫不能挡判定测试路径。
+- **冒烟输入注入纪律**（error-signatures E-08）：噪声相位只投原始事件（Key/Mouse/Touch），动作级断言在噪声之后的独立相位做，避免相位互吞。
+- **线上移动端冒烟 mobile-web-smoke 10 项机判（首轮即绿 PASS 10/10）**：网络全通 / console 零错 / canvas 挂载 / 首帧非纯色 / 画面在动 / 触摸到达 / 触摸响应 / 音频解锁器 / 无横向溢出 / FPS≥8（实测 fps=38）。证据归档 `games/game-10/qa/mobile/`（report.json + 3 张分阶段截图）随仓库提交，preHook 证据可跨节点复用。
+- 截图目检项：四轨下落、判定线、HUD、底部四分区触控、中文字体全部正常。
+
+## 六、Web 导出与部署要点（踩坑实录）
+
+- `export_presets.cfg`：Web 预设 **`thread_support=false`**（防跨域隔离缺失导致启动失败）、720×1280 竖屏。
+- 产物落位：index.html/js/pck（2.5MB）/wasm（35MB，走对象存储通道不受 bundle 限制）/worklet；`export/web` 需入库（它是部署构建输入），而 `qa/` 与 `export/web` 要加 `.gdignore` 防证据截图混进 pck（playtest 节点实测重导出后 46 文件与线上清单一致）。
+- 壳（AppHost）：仓库根 `apphost.toml` 切 game-10 + `assets_dir`；落地页含音频手势解锁器与 `?tuning=` 调参桥；资产全相对路径 base64 文本通道。
+- **部署 POST 返回 504 ≠ 失败**：clone 含 35MB wasm 的仓库超时，但服务端已受理进入 building；此时重试会建出第二个 queued 部署（本轮即发生，同 gitRef 同内容双记录）。正确姿势：先查部署状态再决定是否重发。
+- **playtest 节点实测发现**：TuningPanel 只有定义、无任何实例化点，线上 `?tuning=1` 出不来面板（冒烟只断言调参协议纯逻辑，所以门禁全绿）——「门禁绿 ≠ 线上功能在」的典型案例。修复 = 3 行接线（commit b0e8560，在分支待下次部署生效）。
+- **回写事故复盘（已完全恢复）**：以空数组 PATCH 探测写端点，意外带真实凭据把 goal artifacts 清空；靠先前 dump 的 DB 原文重建并逐字段核对恢复。教训入模板：**禁止以破坏性载荷试探写端点**，探形状只用只读 GET。
+
+## 七、给后续节拍/音游类游戏的复用清单
+
+1. 判定器写成纯静态逻辑 + 独立 oracle 对拍 + 边界精确值表；所有判定走同一条带校准的 delta 公式。
+2. 歌曲时钟做成纯函数模式（位置=f(时间)），音频时钟接入预留单点替换；无头复现性优先于「真音频钟」——门禁能机判才是硬通货。
+3. 谱面：确定性 seed + 校验器返回可读错误；首音符 ≥ 穿屏时长；同轨 gap ≥ 2×GOOD 窗；终局先 MISS 收口再结算。
+4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
+5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
+6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
 
 
 ---
@@ -7969,6 +8194,115 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 
 ## 产品关联知识
 
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
+
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -7997,10 +8331,6 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 - 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
@@ -8138,111 +8468,6 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
 
 ## 架构设计文档
 
@@ -10579,6 +10804,81 @@ bash std-skills/godot-game-dev/scripts/input-fuzz.sh games/3d
 node std-skills/godot-game-dev/scripts/mobile-web-smoke.mjs --url https://leomac-studio.tail49399e.ts.net/apps/3d/ --out games/3d/qa/mobile-review
 curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.pck.gz.b64 | base64 -d | gunzip | shasum -a 256
 ```
+
+
+## 沉淀节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁（game-10 节奏大师 · 全四棒实录）
+
+# 节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁
+
+> 来源：需求《〈节奏大师〉音乐节拍玩法需求：四轨判定、连击收集、难度分级与移动端触控》（id=cmv0y4coa000vm94o5w4iwqso，goal=cmv0xypkw000dm94o58qf3x8j）走完「录入需求 → 谱面/WebAudio 契约调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。工作流 run=cmv0yfaqu0018m94ot8uj5z2d（四节点全 completed）。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-10`（Godot 4.3.stable），分支 `myrd/game-10-goal-cmv0xypkw000dm94o58qf3x8j`，线上 https://leomac-studio.tail49399e.ts.net/apps/game-10/（deploymentId=cmv10cg93001jm94of535yg54，commit=2ccb38e）。本文所有数值/结论取自仓库代码与门禁证据，非纸面推演。
+
+## 一、时间基准契约（节拍类的第一性问题）
+
+**结论：判定必须挂「歌曲时钟」，且音符位置必须是时间的纯函数；时钟源与判定逻辑解耦，接入音频时钟收敛为单点替换。**
+
+1. **唯一时间权威 = `scripts/conductor.gd`（Conductor，歌曲指挥）**。音符 y 坐标 = `JUDGMENT_Y − (note_time − song_time) × fall_speed`（`Conductor.note_y` 静态纯函数）。匀速、无累积漂移，从结构上杜绝「以渲染帧时间近似判定」——帧率波动只影响观感，不影响判定。
+2. **`song_time` 在固定物理步（`_physics_process`，60Hz）推进** → 无头运行（240 帧冒烟）确定可复现，这是门禁能机判 AC1/AC2 的前提。**诚实标注**：本作当前判定基准是确定性歌曲时钟，不是 `AudioServer.get_playback_position`；但契约把时钟封装为唯一推进点，正式接入音频时钟只需替换 `song_time` 推进来源，`BeatJudge` 判定逻辑零改动——「契约先行」的具体形态。
+3. **判定差值统一公式**（`lane.gd press`）：`delta_ms = (press_song_time − note_time) × 1000 + calibration_offset_ms`，正=按晚、负=按早；对同轨「时间上最近的未命中音符」求最小 |delta| 命中。窗口三档：PERFECT ±50ms / GOOD ±100ms / 超窗 MISS，窗口值放 `GameState` 调参区（TUNING_META 四键基线 50/100/1.0/0）。
+4. **延迟校准是契约一等公民**：±300ms、步长 10ms、`roundf` 量化到 10ms 后 `clampf` 钳制，`ConfigFile` 持久化（`input/calibration_offset_ms`），重启仍生效；校准以加法作用在 delta 上（冒烟 AC4 机判「步长/钳制/持久化往返」三项）。
+5. **Web 端音频解锁契约在壳层**：落地页内置音频手势解锁器（用户手势后才解锁 AudioContext，带 `__audioDebug` 取证出口），mobile-web-smoke 第 8 项「音频解锁器」机判此契约；数值调参走 `?tuning=` URL 桥（面板接线修复生效前可 `?tuning=<JSON>` 直传）。详见关联知识《Godot 4 Web 导出移动端触屏虚拟摇杆与 AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）。
+
+## 二、节拍判定实现与机判（AC1 / AC2 / AC5）
+
+- **`scripts/judge.gd`（BeatJudge）是纯逻辑 `RefCounted`**：静态 `classify(delta_ms, perfect_ms, good_ms)`，取 |Δ| 两级比较、PERFECT 优先，不持有任何节点 → 可无头直判。判定层「超窗不吞音符」：press 结果为 MISS 时不吞音符不惩罚（emit `lane_pressed_empty`），音符仍可被后续按键命中；空按返回 -1 同样不惩罚。这使「同轨相邻音符判定互不吞噬」在两层同时成立（判定层不吞 + 谱面层限距，见 §三）。
+- **AC1 机判（tests/smoke.gd AC1 相位）**：①1000 组带时间戳模拟输入（−300..+300ms 均匀扫窗 + 50% 随机取反方向）与**独立 oracle 对拍**（oracle 是需求窗口定义的第二实现，防同源盲区），要求 100% 一致，且三档判定必须全部出现（防分类器退化）；②边界精确值表：`0/±50→PERFECT`，`±50.001/±100→GOOD`，`±100.001/300→MISS`，边界含入档、略超即降档。
+- **AC2 机判**：命中序列逐事件重放，max_combo 与得分和重放计算 **0 误差**；MISS 后 combo 立即归零（打印日志佐证行，冒烟里确认真实输出）；终局收口 MISS 同样触发归零。
+- **AC5 机判**：结算页总分 = `PERFECT×100 + GOOD×60` 可复算，各判定计数、最大连击与页面文本逐项一致；**权重进交付配置表 `score_weights`**，AC3 相位同时机判代码权重与配置表一致，防权重漂移无人拦截。
+- **变异测试验证断言拦截力**：全绿后故意把 GOOD 权重改成 61 → 冒烟 FAIL → 还原。断言「声称能拦的缺陷」必须被证明真能拦住，这一步建议进所有数值契约的沉淀模板。
+
+## 三、谱面与难度分级契约（AC3）
+
+- **确定性生成**（`scripts/chart.gd`）：`seed = 20261010 + difficulty`，同难度必出同谱面（门禁可复现）；均匀轮转 + 随机抖动选轨，四轨负载均衡又确定。
+- **首音符时刻约束**：`FIRST_NOTE_TIME_S = 3.8s` ≥ 最慢档（Easy 300px/s）穿过全屏时长 `(1040−(−80))/300 ≈ 3.73s`。否则开局首个音符已在屏幕中央而非从顶端落入——这是 scaffold 阶段实测修掉的时序缺陷。
+- **同轨最小间隔 `MIN_LANE_GAP_S = 0.24s`**（> 2×GOOD 窗 0.2s）：generate 时同轨太近自动顺延；validate 五项校验（轨道号 0..3 / 时间升序 / 时间落在 `[0, song_duration]` / 同轨间隔达标 / 非空），违规返回**可读字符串**（可断言可定位）。
+- **交付配置表 `config/difficulties.json`**：meta 含 `judge_windows_ms`/`score_weights`/`song_duration_s`；四档 value+min+max 区间——Easy 300px/s·1.10s → Normal 380·0.85 → Hard 470·0.62 → Expert 560·0.46（速度升、间隔降，密度单调梯度）。**生效源是代码内 `DIFFICULTY_TABLE`**，AC3 冒烟相位机判「代码表 vs 配置表逐档奇偶校验 + 速度/密度梯度 + 每档谱面生成+校验通过 + 结算页切档生效 + 重开后按新难度加载谱面奇偶校验」，两头脱节 = FAIL。
+- **终局收口**：song_time 越过 `end_time`（最后音符 + 1s 收尾静默）时，先把全部未命中音符按 MISS 收口（`flush_misses`）再 emit `finished`——保证结算计数完整，否则尾音符合被静默漏计。
+
+## 四、移动端触控契约（AC4 工程内部指标）
+
+- **触摸是动作的「生产者」**：`TouchActionButton`（extends TouchScreenButton）把 `InputEventAction` 注入 `Input.parse_input_event`，游戏逻辑只读 InputMap 动作名（`lane_1..4` / `restart` / `diff_next` / `diff_prev`），键盘（D/F/J/K）与触摸同路径互不感知；TouchScreenButton 按 touch index 跟踪各自触点 → 四指并发各按钮独立响应；桌面无触摸屏自动不响应，无需手动屏蔽。
+- **触控 UI 可见性纪律**：仅 `is_touchscreen_available()` 时显示。
+- **热区不重叠**（implement 阶段实测修掉的移动端误触缺陷）：工具行（校准/重开/难度，y≈1066–1126）与四轨触控带（y≈1150–1280）分离两带；冒烟 AC4 机判「四分区齐全且沿底部连续铺满 + 工具按钮与分区零重叠 + 可见性纪律」。
+- **两个 Godot API 坑**：① TouchScreenButton 原生已有 `action` 属性，自定义 `var action` 会 Parse Error → 必须改名（本作用 `action_name`）；② TouchScreenButton 没有 `text` 属性 → 用子 Label 手动居中，且 `mouse_filter = MOUSE_FILTER_IGNORE` 防吞触摸。
+- **如实标注**：AC4 全量指标（iOS/Android 各 ≥2 台真机、四指并发 1000 次 0 丢触、触控到判定中位延迟 ≤80ms）本轮未做真机验证，模拟器/无头门禁只能覆盖结构性与逻辑性子集；真机抽查留给用户试玩，试玩指引与四问量表已落 `games/game-10/qa/playtest-kit.md`。
+
+## 五、双门禁体系：工程内四门禁 + 线上移动端冒烟
+
+**工程内（与平台门禁同源，脚本在 `std-skills/godot-game-dev/scripts/` 六件套，未自造未改写；`verify.sh` 纯调用器范式）：**
+
+| 门禁 | 本轮结果 | 说明 |
+|---|---|---|
+| PREFLIGHT | PASS | 14 类一致性检查（39 文件） |
+| GODOT_SMOKE | PASS | 240 帧无头冒烟 + AC1–AC5 断言相位 |
+| GODOT_FUZZ | PASS | 6 批 239 帧对抗输入（seed=20260913），无脚本错误 |
+| GODOT_PLAYTEST | PASS | bot 3 局得分 380/520/600，首奖励 ≤6.4s，反馈 28/局 |
+
+- **门禁 bot 对骨架的隐性要求要提前满足**：playtest bot 随机注入所有非 ui 动作，10 秒内必须能得分、反馈密度 ≥2/局 → 谱面必须「密且早」、MISS 也挂反馈；restart 必须守卫只在结算态生效（scaffold 阶段 bot 乱按 R 永远卡歌曲开头，METRICS 分数全 0 暴露此缺陷）；paused 守卫不能挡判定测试路径。
+- **冒烟输入注入纪律**（error-signatures E-08）：噪声相位只投原始事件（Key/Mouse/Touch），动作级断言在噪声之后的独立相位做，避免相位互吞。
+- **线上移动端冒烟 mobile-web-smoke 10 项机判（首轮即绿 PASS 10/10）**：网络全通 / console 零错 / canvas 挂载 / 首帧非纯色 / 画面在动 / 触摸到达 / 触摸响应 / 音频解锁器 / 无横向溢出 / FPS≥8（实测 fps=38）。证据归档 `games/game-10/qa/mobile/`（report.json + 3 张分阶段截图）随仓库提交，preHook 证据可跨节点复用。
+- 截图目检项：四轨下落、判定线、HUD、底部四分区触控、中文字体全部正常。
+
+## 六、Web 导出与部署要点（踩坑实录）
+
+- `export_presets.cfg`：Web 预设 **`thread_support=false`**（防跨域隔离缺失导致启动失败）、720×1280 竖屏。
+- 产物落位：index.html/js/pck（2.5MB）/wasm（35MB，走对象存储通道不受 bundle 限制）/worklet；`export/web` 需入库（它是部署构建输入），而 `qa/` 与 `export/web` 要加 `.gdignore` 防证据截图混进 pck（playtest 节点实测重导出后 46 文件与线上清单一致）。
+- 壳（AppHost）：仓库根 `apphost.toml` 切 game-10 + `assets_dir`；落地页含音频手势解锁器与 `?tuning=` 调参桥；资产全相对路径 base64 文本通道。
+- **部署 POST 返回 504 ≠ 失败**：clone 含 35MB wasm 的仓库超时，但服务端已受理进入 building；此时重试会建出第二个 queued 部署（本轮即发生，同 gitRef 同内容双记录）。正确姿势：先查部署状态再决定是否重发。
+- **playtest 节点实测发现**：TuningPanel 只有定义、无任何实例化点，线上 `?tuning=1` 出不来面板（冒烟只断言调参协议纯逻辑，所以门禁全绿）——「门禁绿 ≠ 线上功能在」的典型案例。修复 = 3 行接线（commit b0e8560，在分支待下次部署生效）。
+- **回写事故复盘（已完全恢复）**：以空数组 PATCH 探测写端点，意外带真实凭据把 goal artifacts 清空；靠先前 dump 的 DB 原文重建并逐字段核对恢复。教训入模板：**禁止以破坏性载荷试探写端点**，探形状只用只读 GET。
+
+## 七、给后续节拍/音游类游戏的复用清单
+
+1. 判定器写成纯静态逻辑 + 独立 oracle 对拍 + 边界精确值表；所有判定走同一条带校准的 delta 公式。
+2. 歌曲时钟做成纯函数模式（位置=f(时间)），音频时钟接入预留单点替换；无头复现性优先于「真音频钟」——门禁能机判才是硬通货。
+3. 谱面：确定性 seed + 校验器返回可读错误；首音符 ≥ 穿屏时长；同轨 gap ≥ 2×GOOD 窗；终局先 MISS 收口再结算。
+4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
+5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
+6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
 
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
@@ -10640,6 +10940,115 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 
 ## 产品关联知识
 
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
+
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -10668,10 +11077,6 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 - 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
@@ -10809,111 +11214,6 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
 
 ## 架构设计文档
 
@@ -13250,6 +13550,81 @@ bash std-skills/godot-game-dev/scripts/input-fuzz.sh games/3d
 node std-skills/godot-game-dev/scripts/mobile-web-smoke.mjs --url https://leomac-studio.tail49399e.ts.net/apps/3d/ --out games/3d/qa/mobile-review
 curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.pck.gz.b64 | base64 -d | gunzip | shasum -a 256
 ```
+
+
+## 沉淀节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁（game-10 节奏大师 · 全四棒实录）
+
+# 节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁
+
+> 来源：需求《〈节奏大师〉音乐节拍玩法需求：四轨判定、连击收集、难度分级与移动端触控》（id=cmv0y4coa000vm94o5w4iwqso，goal=cmv0xypkw000dm94o58qf3x8j）走完「录入需求 → 谱面/WebAudio 契约调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。工作流 run=cmv0yfaqu0018m94ot8uj5z2d（四节点全 completed）。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-10`（Godot 4.3.stable），分支 `myrd/game-10-goal-cmv0xypkw000dm94o58qf3x8j`，线上 https://leomac-studio.tail49399e.ts.net/apps/game-10/（deploymentId=cmv10cg93001jm94of535yg54，commit=2ccb38e）。本文所有数值/结论取自仓库代码与门禁证据，非纸面推演。
+
+## 一、时间基准契约（节拍类的第一性问题）
+
+**结论：判定必须挂「歌曲时钟」，且音符位置必须是时间的纯函数；时钟源与判定逻辑解耦，接入音频时钟收敛为单点替换。**
+
+1. **唯一时间权威 = `scripts/conductor.gd`（Conductor，歌曲指挥）**。音符 y 坐标 = `JUDGMENT_Y − (note_time − song_time) × fall_speed`（`Conductor.note_y` 静态纯函数）。匀速、无累积漂移，从结构上杜绝「以渲染帧时间近似判定」——帧率波动只影响观感，不影响判定。
+2. **`song_time` 在固定物理步（`_physics_process`，60Hz）推进** → 无头运行（240 帧冒烟）确定可复现，这是门禁能机判 AC1/AC2 的前提。**诚实标注**：本作当前判定基准是确定性歌曲时钟，不是 `AudioServer.get_playback_position`；但契约把时钟封装为唯一推进点，正式接入音频时钟只需替换 `song_time` 推进来源，`BeatJudge` 判定逻辑零改动——「契约先行」的具体形态。
+3. **判定差值统一公式**（`lane.gd press`）：`delta_ms = (press_song_time − note_time) × 1000 + calibration_offset_ms`，正=按晚、负=按早；对同轨「时间上最近的未命中音符」求最小 |delta| 命中。窗口三档：PERFECT ±50ms / GOOD ±100ms / 超窗 MISS，窗口值放 `GameState` 调参区（TUNING_META 四键基线 50/100/1.0/0）。
+4. **延迟校准是契约一等公民**：±300ms、步长 10ms、`roundf` 量化到 10ms 后 `clampf` 钳制，`ConfigFile` 持久化（`input/calibration_offset_ms`），重启仍生效；校准以加法作用在 delta 上（冒烟 AC4 机判「步长/钳制/持久化往返」三项）。
+5. **Web 端音频解锁契约在壳层**：落地页内置音频手势解锁器（用户手势后才解锁 AudioContext，带 `__audioDebug` 取证出口），mobile-web-smoke 第 8 项「音频解锁器」机判此契约；数值调参走 `?tuning=` URL 桥（面板接线修复生效前可 `?tuning=<JSON>` 直传）。详见关联知识《Godot 4 Web 导出移动端触屏虚拟摇杆与 AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）。
+
+## 二、节拍判定实现与机判（AC1 / AC2 / AC5）
+
+- **`scripts/judge.gd`（BeatJudge）是纯逻辑 `RefCounted`**：静态 `classify(delta_ms, perfect_ms, good_ms)`，取 |Δ| 两级比较、PERFECT 优先，不持有任何节点 → 可无头直判。判定层「超窗不吞音符」：press 结果为 MISS 时不吞音符不惩罚（emit `lane_pressed_empty`），音符仍可被后续按键命中；空按返回 -1 同样不惩罚。这使「同轨相邻音符判定互不吞噬」在两层同时成立（判定层不吞 + 谱面层限距，见 §三）。
+- **AC1 机判（tests/smoke.gd AC1 相位）**：①1000 组带时间戳模拟输入（−300..+300ms 均匀扫窗 + 50% 随机取反方向）与**独立 oracle 对拍**（oracle 是需求窗口定义的第二实现，防同源盲区），要求 100% 一致，且三档判定必须全部出现（防分类器退化）；②边界精确值表：`0/±50→PERFECT`，`±50.001/±100→GOOD`，`±100.001/300→MISS`，边界含入档、略超即降档。
+- **AC2 机判**：命中序列逐事件重放，max_combo 与得分和重放计算 **0 误差**；MISS 后 combo 立即归零（打印日志佐证行，冒烟里确认真实输出）；终局收口 MISS 同样触发归零。
+- **AC5 机判**：结算页总分 = `PERFECT×100 + GOOD×60` 可复算，各判定计数、最大连击与页面文本逐项一致；**权重进交付配置表 `score_weights`**，AC3 相位同时机判代码权重与配置表一致，防权重漂移无人拦截。
+- **变异测试验证断言拦截力**：全绿后故意把 GOOD 权重改成 61 → 冒烟 FAIL → 还原。断言「声称能拦的缺陷」必须被证明真能拦住，这一步建议进所有数值契约的沉淀模板。
+
+## 三、谱面与难度分级契约（AC3）
+
+- **确定性生成**（`scripts/chart.gd`）：`seed = 20261010 + difficulty`，同难度必出同谱面（门禁可复现）；均匀轮转 + 随机抖动选轨，四轨负载均衡又确定。
+- **首音符时刻约束**：`FIRST_NOTE_TIME_S = 3.8s` ≥ 最慢档（Easy 300px/s）穿过全屏时长 `(1040−(−80))/300 ≈ 3.73s`。否则开局首个音符已在屏幕中央而非从顶端落入——这是 scaffold 阶段实测修掉的时序缺陷。
+- **同轨最小间隔 `MIN_LANE_GAP_S = 0.24s`**（> 2×GOOD 窗 0.2s）：generate 时同轨太近自动顺延；validate 五项校验（轨道号 0..3 / 时间升序 / 时间落在 `[0, song_duration]` / 同轨间隔达标 / 非空），违规返回**可读字符串**（可断言可定位）。
+- **交付配置表 `config/difficulties.json`**：meta 含 `judge_windows_ms`/`score_weights`/`song_duration_s`；四档 value+min+max 区间——Easy 300px/s·1.10s → Normal 380·0.85 → Hard 470·0.62 → Expert 560·0.46（速度升、间隔降，密度单调梯度）。**生效源是代码内 `DIFFICULTY_TABLE`**，AC3 冒烟相位机判「代码表 vs 配置表逐档奇偶校验 + 速度/密度梯度 + 每档谱面生成+校验通过 + 结算页切档生效 + 重开后按新难度加载谱面奇偶校验」，两头脱节 = FAIL。
+- **终局收口**：song_time 越过 `end_time`（最后音符 + 1s 收尾静默）时，先把全部未命中音符按 MISS 收口（`flush_misses`）再 emit `finished`——保证结算计数完整，否则尾音符合被静默漏计。
+
+## 四、移动端触控契约（AC4 工程内部指标）
+
+- **触摸是动作的「生产者」**：`TouchActionButton`（extends TouchScreenButton）把 `InputEventAction` 注入 `Input.parse_input_event`，游戏逻辑只读 InputMap 动作名（`lane_1..4` / `restart` / `diff_next` / `diff_prev`），键盘（D/F/J/K）与触摸同路径互不感知；TouchScreenButton 按 touch index 跟踪各自触点 → 四指并发各按钮独立响应；桌面无触摸屏自动不响应，无需手动屏蔽。
+- **触控 UI 可见性纪律**：仅 `is_touchscreen_available()` 时显示。
+- **热区不重叠**（implement 阶段实测修掉的移动端误触缺陷）：工具行（校准/重开/难度，y≈1066–1126）与四轨触控带（y≈1150–1280）分离两带；冒烟 AC4 机判「四分区齐全且沿底部连续铺满 + 工具按钮与分区零重叠 + 可见性纪律」。
+- **两个 Godot API 坑**：① TouchScreenButton 原生已有 `action` 属性，自定义 `var action` 会 Parse Error → 必须改名（本作用 `action_name`）；② TouchScreenButton 没有 `text` 属性 → 用子 Label 手动居中，且 `mouse_filter = MOUSE_FILTER_IGNORE` 防吞触摸。
+- **如实标注**：AC4 全量指标（iOS/Android 各 ≥2 台真机、四指并发 1000 次 0 丢触、触控到判定中位延迟 ≤80ms）本轮未做真机验证，模拟器/无头门禁只能覆盖结构性与逻辑性子集；真机抽查留给用户试玩，试玩指引与四问量表已落 `games/game-10/qa/playtest-kit.md`。
+
+## 五、双门禁体系：工程内四门禁 + 线上移动端冒烟
+
+**工程内（与平台门禁同源，脚本在 `std-skills/godot-game-dev/scripts/` 六件套，未自造未改写；`verify.sh` 纯调用器范式）：**
+
+| 门禁 | 本轮结果 | 说明 |
+|---|---|---|
+| PREFLIGHT | PASS | 14 类一致性检查（39 文件） |
+| GODOT_SMOKE | PASS | 240 帧无头冒烟 + AC1–AC5 断言相位 |
+| GODOT_FUZZ | PASS | 6 批 239 帧对抗输入（seed=20260913），无脚本错误 |
+| GODOT_PLAYTEST | PASS | bot 3 局得分 380/520/600，首奖励 ≤6.4s，反馈 28/局 |
+
+- **门禁 bot 对骨架的隐性要求要提前满足**：playtest bot 随机注入所有非 ui 动作，10 秒内必须能得分、反馈密度 ≥2/局 → 谱面必须「密且早」、MISS 也挂反馈；restart 必须守卫只在结算态生效（scaffold 阶段 bot 乱按 R 永远卡歌曲开头，METRICS 分数全 0 暴露此缺陷）；paused 守卫不能挡判定测试路径。
+- **冒烟输入注入纪律**（error-signatures E-08）：噪声相位只投原始事件（Key/Mouse/Touch），动作级断言在噪声之后的独立相位做，避免相位互吞。
+- **线上移动端冒烟 mobile-web-smoke 10 项机判（首轮即绿 PASS 10/10）**：网络全通 / console 零错 / canvas 挂载 / 首帧非纯色 / 画面在动 / 触摸到达 / 触摸响应 / 音频解锁器 / 无横向溢出 / FPS≥8（实测 fps=38）。证据归档 `games/game-10/qa/mobile/`（report.json + 3 张分阶段截图）随仓库提交，preHook 证据可跨节点复用。
+- 截图目检项：四轨下落、判定线、HUD、底部四分区触控、中文字体全部正常。
+
+## 六、Web 导出与部署要点（踩坑实录）
+
+- `export_presets.cfg`：Web 预设 **`thread_support=false`**（防跨域隔离缺失导致启动失败）、720×1280 竖屏。
+- 产物落位：index.html/js/pck（2.5MB）/wasm（35MB，走对象存储通道不受 bundle 限制）/worklet；`export/web` 需入库（它是部署构建输入），而 `qa/` 与 `export/web` 要加 `.gdignore` 防证据截图混进 pck（playtest 节点实测重导出后 46 文件与线上清单一致）。
+- 壳（AppHost）：仓库根 `apphost.toml` 切 game-10 + `assets_dir`；落地页含音频手势解锁器与 `?tuning=` 调参桥；资产全相对路径 base64 文本通道。
+- **部署 POST 返回 504 ≠ 失败**：clone 含 35MB wasm 的仓库超时，但服务端已受理进入 building；此时重试会建出第二个 queued 部署（本轮即发生，同 gitRef 同内容双记录）。正确姿势：先查部署状态再决定是否重发。
+- **playtest 节点实测发现**：TuningPanel 只有定义、无任何实例化点，线上 `?tuning=1` 出不来面板（冒烟只断言调参协议纯逻辑，所以门禁全绿）——「门禁绿 ≠ 线上功能在」的典型案例。修复 = 3 行接线（commit b0e8560，在分支待下次部署生效）。
+- **回写事故复盘（已完全恢复）**：以空数组 PATCH 探测写端点，意外带真实凭据把 goal artifacts 清空；靠先前 dump 的 DB 原文重建并逐字段核对恢复。教训入模板：**禁止以破坏性载荷试探写端点**，探形状只用只读 GET。
+
+## 七、给后续节拍/音游类游戏的复用清单
+
+1. 判定器写成纯静态逻辑 + 独立 oracle 对拍 + 边界精确值表；所有判定走同一条带校准的 delta 公式。
+2. 歌曲时钟做成纯函数模式（位置=f(时间)），音频时钟接入预留单点替换；无头复现性优先于「真音频钟」——门禁能机判才是硬通货。
+3. 谱面：确定性 seed + 校验器返回可读错误；首音符 ≥ 穿屏时长；同轨 gap ≥ 2×GOOD 窗；终局先 MISS 收口再结算。
+4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
+5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
+6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
 
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
@@ -13301,6 +13676,115 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
+
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -13329,10 +13813,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 - 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
@@ -13470,111 +13950,6 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
 
 ## 架构设计文档
 
@@ -15911,6 +16286,81 @@ bash std-skills/godot-game-dev/scripts/input-fuzz.sh games/3d
 node std-skills/godot-game-dev/scripts/mobile-web-smoke.mjs --url https://leomac-studio.tail49399e.ts.net/apps/3d/ --out games/3d/qa/mobile-review
 curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.pck.gz.b64 | base64 -d | gunzip | shasum -a 256
 ```
+
+
+## 沉淀节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁（game-10 节奏大师 · 全四棒实录）
+
+# 节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁
+
+> 来源：需求《〈节奏大师〉音乐节拍玩法需求：四轨判定、连击收集、难度分级与移动端触控》（id=cmv0y4coa000vm94o5w4iwqso，goal=cmv0xypkw000dm94o58qf3x8j）走完「录入需求 → 谱面/WebAudio 契约调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。工作流 run=cmv0yfaqu0018m94ot8uj5z2d（四节点全 completed）。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-10`（Godot 4.3.stable），分支 `myrd/game-10-goal-cmv0xypkw000dm94o58qf3x8j`，线上 https://leomac-studio.tail49399e.ts.net/apps/game-10/（deploymentId=cmv10cg93001jm94of535yg54，commit=2ccb38e）。本文所有数值/结论取自仓库代码与门禁证据，非纸面推演。
+
+## 一、时间基准契约（节拍类的第一性问题）
+
+**结论：判定必须挂「歌曲时钟」，且音符位置必须是时间的纯函数；时钟源与判定逻辑解耦，接入音频时钟收敛为单点替换。**
+
+1. **唯一时间权威 = `scripts/conductor.gd`（Conductor，歌曲指挥）**。音符 y 坐标 = `JUDGMENT_Y − (note_time − song_time) × fall_speed`（`Conductor.note_y` 静态纯函数）。匀速、无累积漂移，从结构上杜绝「以渲染帧时间近似判定」——帧率波动只影响观感，不影响判定。
+2. **`song_time` 在固定物理步（`_physics_process`，60Hz）推进** → 无头运行（240 帧冒烟）确定可复现，这是门禁能机判 AC1/AC2 的前提。**诚实标注**：本作当前判定基准是确定性歌曲时钟，不是 `AudioServer.get_playback_position`；但契约把时钟封装为唯一推进点，正式接入音频时钟只需替换 `song_time` 推进来源，`BeatJudge` 判定逻辑零改动——「契约先行」的具体形态。
+3. **判定差值统一公式**（`lane.gd press`）：`delta_ms = (press_song_time − note_time) × 1000 + calibration_offset_ms`，正=按晚、负=按早；对同轨「时间上最近的未命中音符」求最小 |delta| 命中。窗口三档：PERFECT ±50ms / GOOD ±100ms / 超窗 MISS，窗口值放 `GameState` 调参区（TUNING_META 四键基线 50/100/1.0/0）。
+4. **延迟校准是契约一等公民**：±300ms、步长 10ms、`roundf` 量化到 10ms 后 `clampf` 钳制，`ConfigFile` 持久化（`input/calibration_offset_ms`），重启仍生效；校准以加法作用在 delta 上（冒烟 AC4 机判「步长/钳制/持久化往返」三项）。
+5. **Web 端音频解锁契约在壳层**：落地页内置音频手势解锁器（用户手势后才解锁 AudioContext，带 `__audioDebug` 取证出口），mobile-web-smoke 第 8 项「音频解锁器」机判此契约；数值调参走 `?tuning=` URL 桥（面板接线修复生效前可 `?tuning=<JSON>` 直传）。详见关联知识《Godot 4 Web 导出移动端触屏虚拟摇杆与 AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）。
+
+## 二、节拍判定实现与机判（AC1 / AC2 / AC5）
+
+- **`scripts/judge.gd`（BeatJudge）是纯逻辑 `RefCounted`**：静态 `classify(delta_ms, perfect_ms, good_ms)`，取 |Δ| 两级比较、PERFECT 优先，不持有任何节点 → 可无头直判。判定层「超窗不吞音符」：press 结果为 MISS 时不吞音符不惩罚（emit `lane_pressed_empty`），音符仍可被后续按键命中；空按返回 -1 同样不惩罚。这使「同轨相邻音符判定互不吞噬」在两层同时成立（判定层不吞 + 谱面层限距，见 §三）。
+- **AC1 机判（tests/smoke.gd AC1 相位）**：①1000 组带时间戳模拟输入（−300..+300ms 均匀扫窗 + 50% 随机取反方向）与**独立 oracle 对拍**（oracle 是需求窗口定义的第二实现，防同源盲区），要求 100% 一致，且三档判定必须全部出现（防分类器退化）；②边界精确值表：`0/±50→PERFECT`，`±50.001/±100→GOOD`，`±100.001/300→MISS`，边界含入档、略超即降档。
+- **AC2 机判**：命中序列逐事件重放，max_combo 与得分和重放计算 **0 误差**；MISS 后 combo 立即归零（打印日志佐证行，冒烟里确认真实输出）；终局收口 MISS 同样触发归零。
+- **AC5 机判**：结算页总分 = `PERFECT×100 + GOOD×60` 可复算，各判定计数、最大连击与页面文本逐项一致；**权重进交付配置表 `score_weights`**，AC3 相位同时机判代码权重与配置表一致，防权重漂移无人拦截。
+- **变异测试验证断言拦截力**：全绿后故意把 GOOD 权重改成 61 → 冒烟 FAIL → 还原。断言「声称能拦的缺陷」必须被证明真能拦住，这一步建议进所有数值契约的沉淀模板。
+
+## 三、谱面与难度分级契约（AC3）
+
+- **确定性生成**（`scripts/chart.gd`）：`seed = 20261010 + difficulty`，同难度必出同谱面（门禁可复现）；均匀轮转 + 随机抖动选轨，四轨负载均衡又确定。
+- **首音符时刻约束**：`FIRST_NOTE_TIME_S = 3.8s` ≥ 最慢档（Easy 300px/s）穿过全屏时长 `(1040−(−80))/300 ≈ 3.73s`。否则开局首个音符已在屏幕中央而非从顶端落入——这是 scaffold 阶段实测修掉的时序缺陷。
+- **同轨最小间隔 `MIN_LANE_GAP_S = 0.24s`**（> 2×GOOD 窗 0.2s）：generate 时同轨太近自动顺延；validate 五项校验（轨道号 0..3 / 时间升序 / 时间落在 `[0, song_duration]` / 同轨间隔达标 / 非空），违规返回**可读字符串**（可断言可定位）。
+- **交付配置表 `config/difficulties.json`**：meta 含 `judge_windows_ms`/`score_weights`/`song_duration_s`；四档 value+min+max 区间——Easy 300px/s·1.10s → Normal 380·0.85 → Hard 470·0.62 → Expert 560·0.46（速度升、间隔降，密度单调梯度）。**生效源是代码内 `DIFFICULTY_TABLE`**，AC3 冒烟相位机判「代码表 vs 配置表逐档奇偶校验 + 速度/密度梯度 + 每档谱面生成+校验通过 + 结算页切档生效 + 重开后按新难度加载谱面奇偶校验」，两头脱节 = FAIL。
+- **终局收口**：song_time 越过 `end_time`（最后音符 + 1s 收尾静默）时，先把全部未命中音符按 MISS 收口（`flush_misses`）再 emit `finished`——保证结算计数完整，否则尾音符合被静默漏计。
+
+## 四、移动端触控契约（AC4 工程内部指标）
+
+- **触摸是动作的「生产者」**：`TouchActionButton`（extends TouchScreenButton）把 `InputEventAction` 注入 `Input.parse_input_event`，游戏逻辑只读 InputMap 动作名（`lane_1..4` / `restart` / `diff_next` / `diff_prev`），键盘（D/F/J/K）与触摸同路径互不感知；TouchScreenButton 按 touch index 跟踪各自触点 → 四指并发各按钮独立响应；桌面无触摸屏自动不响应，无需手动屏蔽。
+- **触控 UI 可见性纪律**：仅 `is_touchscreen_available()` 时显示。
+- **热区不重叠**（implement 阶段实测修掉的移动端误触缺陷）：工具行（校准/重开/难度，y≈1066–1126）与四轨触控带（y≈1150–1280）分离两带；冒烟 AC4 机判「四分区齐全且沿底部连续铺满 + 工具按钮与分区零重叠 + 可见性纪律」。
+- **两个 Godot API 坑**：① TouchScreenButton 原生已有 `action` 属性，自定义 `var action` 会 Parse Error → 必须改名（本作用 `action_name`）；② TouchScreenButton 没有 `text` 属性 → 用子 Label 手动居中，且 `mouse_filter = MOUSE_FILTER_IGNORE` 防吞触摸。
+- **如实标注**：AC4 全量指标（iOS/Android 各 ≥2 台真机、四指并发 1000 次 0 丢触、触控到判定中位延迟 ≤80ms）本轮未做真机验证，模拟器/无头门禁只能覆盖结构性与逻辑性子集；真机抽查留给用户试玩，试玩指引与四问量表已落 `games/game-10/qa/playtest-kit.md`。
+
+## 五、双门禁体系：工程内四门禁 + 线上移动端冒烟
+
+**工程内（与平台门禁同源，脚本在 `std-skills/godot-game-dev/scripts/` 六件套，未自造未改写；`verify.sh` 纯调用器范式）：**
+
+| 门禁 | 本轮结果 | 说明 |
+|---|---|---|
+| PREFLIGHT | PASS | 14 类一致性检查（39 文件） |
+| GODOT_SMOKE | PASS | 240 帧无头冒烟 + AC1–AC5 断言相位 |
+| GODOT_FUZZ | PASS | 6 批 239 帧对抗输入（seed=20260913），无脚本错误 |
+| GODOT_PLAYTEST | PASS | bot 3 局得分 380/520/600，首奖励 ≤6.4s，反馈 28/局 |
+
+- **门禁 bot 对骨架的隐性要求要提前满足**：playtest bot 随机注入所有非 ui 动作，10 秒内必须能得分、反馈密度 ≥2/局 → 谱面必须「密且早」、MISS 也挂反馈；restart 必须守卫只在结算态生效（scaffold 阶段 bot 乱按 R 永远卡歌曲开头，METRICS 分数全 0 暴露此缺陷）；paused 守卫不能挡判定测试路径。
+- **冒烟输入注入纪律**（error-signatures E-08）：噪声相位只投原始事件（Key/Mouse/Touch），动作级断言在噪声之后的独立相位做，避免相位互吞。
+- **线上移动端冒烟 mobile-web-smoke 10 项机判（首轮即绿 PASS 10/10）**：网络全通 / console 零错 / canvas 挂载 / 首帧非纯色 / 画面在动 / 触摸到达 / 触摸响应 / 音频解锁器 / 无横向溢出 / FPS≥8（实测 fps=38）。证据归档 `games/game-10/qa/mobile/`（report.json + 3 张分阶段截图）随仓库提交，preHook 证据可跨节点复用。
+- 截图目检项：四轨下落、判定线、HUD、底部四分区触控、中文字体全部正常。
+
+## 六、Web 导出与部署要点（踩坑实录）
+
+- `export_presets.cfg`：Web 预设 **`thread_support=false`**（防跨域隔离缺失导致启动失败）、720×1280 竖屏。
+- 产物落位：index.html/js/pck（2.5MB）/wasm（35MB，走对象存储通道不受 bundle 限制）/worklet；`export/web` 需入库（它是部署构建输入），而 `qa/` 与 `export/web` 要加 `.gdignore` 防证据截图混进 pck（playtest 节点实测重导出后 46 文件与线上清单一致）。
+- 壳（AppHost）：仓库根 `apphost.toml` 切 game-10 + `assets_dir`；落地页含音频手势解锁器与 `?tuning=` 调参桥；资产全相对路径 base64 文本通道。
+- **部署 POST 返回 504 ≠ 失败**：clone 含 35MB wasm 的仓库超时，但服务端已受理进入 building；此时重试会建出第二个 queued 部署（本轮即发生，同 gitRef 同内容双记录）。正确姿势：先查部署状态再决定是否重发。
+- **playtest 节点实测发现**：TuningPanel 只有定义、无任何实例化点，线上 `?tuning=1` 出不来面板（冒烟只断言调参协议纯逻辑，所以门禁全绿）——「门禁绿 ≠ 线上功能在」的典型案例。修复 = 3 行接线（commit b0e8560，在分支待下次部署生效）。
+- **回写事故复盘（已完全恢复）**：以空数组 PATCH 探测写端点，意外带真实凭据把 goal artifacts 清空；靠先前 dump 的 DB 原文重建并逐字段核对恢复。教训入模板：**禁止以破坏性载荷试探写端点**，探形状只用只读 GET。
+
+## 七、给后续节拍/音游类游戏的复用清单
+
+1. 判定器写成纯静态逻辑 + 独立 oracle 对拍 + 边界精确值表；所有判定走同一条带校准的 delta 公式。
+2. 歌曲时钟做成纯函数模式（位置=f(时间)），音频时钟接入预留单点替换；无头复现性优先于「真音频钟」——门禁能机判才是硬通货。
+3. 谱面：确定性 seed + 校验器返回可读错误；首音符 ≥ 穿屏时长；同轨 gap ≥ 2×GOOD 窗；终局先 MISS 收口再结算。
+4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
+5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
+6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
 
 
 ---
@@ -15934,6 +16384,115 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
+
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -15962,10 +16521,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 - 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
@@ -16103,111 +16658,6 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
 
 ## 架构设计文档
 
@@ -18544,6 +18994,81 @@ bash std-skills/godot-game-dev/scripts/input-fuzz.sh games/3d
 node std-skills/godot-game-dev/scripts/mobile-web-smoke.mjs --url https://leomac-studio.tail49399e.ts.net/apps/3d/ --out games/3d/qa/mobile-review
 curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.pck.gz.b64 | base64 -d | gunzip | shasum -a 256
 ```
+
+
+## 沉淀节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁（game-10 节奏大师 · 全四棒实录）
+
+# 节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁
+
+> 来源：需求《〈节奏大师〉音乐节拍玩法需求：四轨判定、连击收集、难度分级与移动端触控》（id=cmv0y4coa000vm94o5w4iwqso，goal=cmv0xypkw000dm94o58qf3x8j）走完「录入需求 → 谱面/WebAudio 契约调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。工作流 run=cmv0yfaqu0018m94ot8uj5z2d（四节点全 completed）。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-10`（Godot 4.3.stable），分支 `myrd/game-10-goal-cmv0xypkw000dm94o58qf3x8j`，线上 https://leomac-studio.tail49399e.ts.net/apps/game-10/（deploymentId=cmv10cg93001jm94of535yg54，commit=2ccb38e）。本文所有数值/结论取自仓库代码与门禁证据，非纸面推演。
+
+## 一、时间基准契约（节拍类的第一性问题）
+
+**结论：判定必须挂「歌曲时钟」，且音符位置必须是时间的纯函数；时钟源与判定逻辑解耦，接入音频时钟收敛为单点替换。**
+
+1. **唯一时间权威 = `scripts/conductor.gd`（Conductor，歌曲指挥）**。音符 y 坐标 = `JUDGMENT_Y − (note_time − song_time) × fall_speed`（`Conductor.note_y` 静态纯函数）。匀速、无累积漂移，从结构上杜绝「以渲染帧时间近似判定」——帧率波动只影响观感，不影响判定。
+2. **`song_time` 在固定物理步（`_physics_process`，60Hz）推进** → 无头运行（240 帧冒烟）确定可复现，这是门禁能机判 AC1/AC2 的前提。**诚实标注**：本作当前判定基准是确定性歌曲时钟，不是 `AudioServer.get_playback_position`；但契约把时钟封装为唯一推进点，正式接入音频时钟只需替换 `song_time` 推进来源，`BeatJudge` 判定逻辑零改动——「契约先行」的具体形态。
+3. **判定差值统一公式**（`lane.gd press`）：`delta_ms = (press_song_time − note_time) × 1000 + calibration_offset_ms`，正=按晚、负=按早；对同轨「时间上最近的未命中音符」求最小 |delta| 命中。窗口三档：PERFECT ±50ms / GOOD ±100ms / 超窗 MISS，窗口值放 `GameState` 调参区（TUNING_META 四键基线 50/100/1.0/0）。
+4. **延迟校准是契约一等公民**：±300ms、步长 10ms、`roundf` 量化到 10ms 后 `clampf` 钳制，`ConfigFile` 持久化（`input/calibration_offset_ms`），重启仍生效；校准以加法作用在 delta 上（冒烟 AC4 机判「步长/钳制/持久化往返」三项）。
+5. **Web 端音频解锁契约在壳层**：落地页内置音频手势解锁器（用户手势后才解锁 AudioContext，带 `__audioDebug` 取证出口），mobile-web-smoke 第 8 项「音频解锁器」机判此契约；数值调参走 `?tuning=` URL 桥（面板接线修复生效前可 `?tuning=<JSON>` 直传）。详见关联知识《Godot 4 Web 导出移动端触屏虚拟摇杆与 AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）。
+
+## 二、节拍判定实现与机判（AC1 / AC2 / AC5）
+
+- **`scripts/judge.gd`（BeatJudge）是纯逻辑 `RefCounted`**：静态 `classify(delta_ms, perfect_ms, good_ms)`，取 |Δ| 两级比较、PERFECT 优先，不持有任何节点 → 可无头直判。判定层「超窗不吞音符」：press 结果为 MISS 时不吞音符不惩罚（emit `lane_pressed_empty`），音符仍可被后续按键命中；空按返回 -1 同样不惩罚。这使「同轨相邻音符判定互不吞噬」在两层同时成立（判定层不吞 + 谱面层限距，见 §三）。
+- **AC1 机判（tests/smoke.gd AC1 相位）**：①1000 组带时间戳模拟输入（−300..+300ms 均匀扫窗 + 50% 随机取反方向）与**独立 oracle 对拍**（oracle 是需求窗口定义的第二实现，防同源盲区），要求 100% 一致，且三档判定必须全部出现（防分类器退化）；②边界精确值表：`0/±50→PERFECT`，`±50.001/±100→GOOD`，`±100.001/300→MISS`，边界含入档、略超即降档。
+- **AC2 机判**：命中序列逐事件重放，max_combo 与得分和重放计算 **0 误差**；MISS 后 combo 立即归零（打印日志佐证行，冒烟里确认真实输出）；终局收口 MISS 同样触发归零。
+- **AC5 机判**：结算页总分 = `PERFECT×100 + GOOD×60` 可复算，各判定计数、最大连击与页面文本逐项一致；**权重进交付配置表 `score_weights`**，AC3 相位同时机判代码权重与配置表一致，防权重漂移无人拦截。
+- **变异测试验证断言拦截力**：全绿后故意把 GOOD 权重改成 61 → 冒烟 FAIL → 还原。断言「声称能拦的缺陷」必须被证明真能拦住，这一步建议进所有数值契约的沉淀模板。
+
+## 三、谱面与难度分级契约（AC3）
+
+- **确定性生成**（`scripts/chart.gd`）：`seed = 20261010 + difficulty`，同难度必出同谱面（门禁可复现）；均匀轮转 + 随机抖动选轨，四轨负载均衡又确定。
+- **首音符时刻约束**：`FIRST_NOTE_TIME_S = 3.8s` ≥ 最慢档（Easy 300px/s）穿过全屏时长 `(1040−(−80))/300 ≈ 3.73s`。否则开局首个音符已在屏幕中央而非从顶端落入——这是 scaffold 阶段实测修掉的时序缺陷。
+- **同轨最小间隔 `MIN_LANE_GAP_S = 0.24s`**（> 2×GOOD 窗 0.2s）：generate 时同轨太近自动顺延；validate 五项校验（轨道号 0..3 / 时间升序 / 时间落在 `[0, song_duration]` / 同轨间隔达标 / 非空），违规返回**可读字符串**（可断言可定位）。
+- **交付配置表 `config/difficulties.json`**：meta 含 `judge_windows_ms`/`score_weights`/`song_duration_s`；四档 value+min+max 区间——Easy 300px/s·1.10s → Normal 380·0.85 → Hard 470·0.62 → Expert 560·0.46（速度升、间隔降，密度单调梯度）。**生效源是代码内 `DIFFICULTY_TABLE`**，AC3 冒烟相位机判「代码表 vs 配置表逐档奇偶校验 + 速度/密度梯度 + 每档谱面生成+校验通过 + 结算页切档生效 + 重开后按新难度加载谱面奇偶校验」，两头脱节 = FAIL。
+- **终局收口**：song_time 越过 `end_time`（最后音符 + 1s 收尾静默）时，先把全部未命中音符按 MISS 收口（`flush_misses`）再 emit `finished`——保证结算计数完整，否则尾音符合被静默漏计。
+
+## 四、移动端触控契约（AC4 工程内部指标）
+
+- **触摸是动作的「生产者」**：`TouchActionButton`（extends TouchScreenButton）把 `InputEventAction` 注入 `Input.parse_input_event`，游戏逻辑只读 InputMap 动作名（`lane_1..4` / `restart` / `diff_next` / `diff_prev`），键盘（D/F/J/K）与触摸同路径互不感知；TouchScreenButton 按 touch index 跟踪各自触点 → 四指并发各按钮独立响应；桌面无触摸屏自动不响应，无需手动屏蔽。
+- **触控 UI 可见性纪律**：仅 `is_touchscreen_available()` 时显示。
+- **热区不重叠**（implement 阶段实测修掉的移动端误触缺陷）：工具行（校准/重开/难度，y≈1066–1126）与四轨触控带（y≈1150–1280）分离两带；冒烟 AC4 机判「四分区齐全且沿底部连续铺满 + 工具按钮与分区零重叠 + 可见性纪律」。
+- **两个 Godot API 坑**：① TouchScreenButton 原生已有 `action` 属性，自定义 `var action` 会 Parse Error → 必须改名（本作用 `action_name`）；② TouchScreenButton 没有 `text` 属性 → 用子 Label 手动居中，且 `mouse_filter = MOUSE_FILTER_IGNORE` 防吞触摸。
+- **如实标注**：AC4 全量指标（iOS/Android 各 ≥2 台真机、四指并发 1000 次 0 丢触、触控到判定中位延迟 ≤80ms）本轮未做真机验证，模拟器/无头门禁只能覆盖结构性与逻辑性子集；真机抽查留给用户试玩，试玩指引与四问量表已落 `games/game-10/qa/playtest-kit.md`。
+
+## 五、双门禁体系：工程内四门禁 + 线上移动端冒烟
+
+**工程内（与平台门禁同源，脚本在 `std-skills/godot-game-dev/scripts/` 六件套，未自造未改写；`verify.sh` 纯调用器范式）：**
+
+| 门禁 | 本轮结果 | 说明 |
+|---|---|---|
+| PREFLIGHT | PASS | 14 类一致性检查（39 文件） |
+| GODOT_SMOKE | PASS | 240 帧无头冒烟 + AC1–AC5 断言相位 |
+| GODOT_FUZZ | PASS | 6 批 239 帧对抗输入（seed=20260913），无脚本错误 |
+| GODOT_PLAYTEST | PASS | bot 3 局得分 380/520/600，首奖励 ≤6.4s，反馈 28/局 |
+
+- **门禁 bot 对骨架的隐性要求要提前满足**：playtest bot 随机注入所有非 ui 动作，10 秒内必须能得分、反馈密度 ≥2/局 → 谱面必须「密且早」、MISS 也挂反馈；restart 必须守卫只在结算态生效（scaffold 阶段 bot 乱按 R 永远卡歌曲开头，METRICS 分数全 0 暴露此缺陷）；paused 守卫不能挡判定测试路径。
+- **冒烟输入注入纪律**（error-signatures E-08）：噪声相位只投原始事件（Key/Mouse/Touch），动作级断言在噪声之后的独立相位做，避免相位互吞。
+- **线上移动端冒烟 mobile-web-smoke 10 项机判（首轮即绿 PASS 10/10）**：网络全通 / console 零错 / canvas 挂载 / 首帧非纯色 / 画面在动 / 触摸到达 / 触摸响应 / 音频解锁器 / 无横向溢出 / FPS≥8（实测 fps=38）。证据归档 `games/game-10/qa/mobile/`（report.json + 3 张分阶段截图）随仓库提交，preHook 证据可跨节点复用。
+- 截图目检项：四轨下落、判定线、HUD、底部四分区触控、中文字体全部正常。
+
+## 六、Web 导出与部署要点（踩坑实录）
+
+- `export_presets.cfg`：Web 预设 **`thread_support=false`**（防跨域隔离缺失导致启动失败）、720×1280 竖屏。
+- 产物落位：index.html/js/pck（2.5MB）/wasm（35MB，走对象存储通道不受 bundle 限制）/worklet；`export/web` 需入库（它是部署构建输入），而 `qa/` 与 `export/web` 要加 `.gdignore` 防证据截图混进 pck（playtest 节点实测重导出后 46 文件与线上清单一致）。
+- 壳（AppHost）：仓库根 `apphost.toml` 切 game-10 + `assets_dir`；落地页含音频手势解锁器与 `?tuning=` 调参桥；资产全相对路径 base64 文本通道。
+- **部署 POST 返回 504 ≠ 失败**：clone 含 35MB wasm 的仓库超时，但服务端已受理进入 building；此时重试会建出第二个 queued 部署（本轮即发生，同 gitRef 同内容双记录）。正确姿势：先查部署状态再决定是否重发。
+- **playtest 节点实测发现**：TuningPanel 只有定义、无任何实例化点，线上 `?tuning=1` 出不来面板（冒烟只断言调参协议纯逻辑，所以门禁全绿）——「门禁绿 ≠ 线上功能在」的典型案例。修复 = 3 行接线（commit b0e8560，在分支待下次部署生效）。
+- **回写事故复盘（已完全恢复）**：以空数组 PATCH 探测写端点，意外带真实凭据把 goal artifacts 清空；靠先前 dump 的 DB 原文重建并逐字段核对恢复。教训入模板：**禁止以破坏性载荷试探写端点**，探形状只用只读 GET。
+
+## 七、给后续节拍/音游类游戏的复用清单
+
+1. 判定器写成纯静态逻辑 + 独立 oracle 对拍 + 边界精确值表；所有判定走同一条带校准的 delta 公式。
+2. 歌曲时钟做成纯函数模式（位置=f(时间)），音频时钟接入预留单点替换；无头复现性优先于「真音频钟」——门禁能机判才是硬通货。
+3. 谱面：确定性 seed + 校验器返回可读错误；首音符 ≥ 穿屏时长；同轨 gap ≥ 2×GOOD 窗；终局先 MISS 收口再结算。
+4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
+5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
+6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
 
 
 ---
@@ -18567,6 +19092,115 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
+
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -18595,10 +19229,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 - 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
@@ -18736,111 +19366,6 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
 
 ## 架构设计文档
 
@@ -21177,6 +21702,81 @@ bash std-skills/godot-game-dev/scripts/input-fuzz.sh games/3d
 node std-skills/godot-game-dev/scripts/mobile-web-smoke.mjs --url https://leomac-studio.tail49399e.ts.net/apps/3d/ --out games/3d/qa/mobile-review
 curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.pck.gz.b64 | base64 -d | gunzip | shasum -a 256
 ```
+
+
+## 沉淀节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁（game-10 节奏大师 · 全四棒实录）
+
+# 节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁
+
+> 来源：需求《〈节奏大师〉音乐节拍玩法需求：四轨判定、连击收集、难度分级与移动端触控》（id=cmv0y4coa000vm94o5w4iwqso，goal=cmv0xypkw000dm94o58qf3x8j）走完「录入需求 → 谱面/WebAudio 契约调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。工作流 run=cmv0yfaqu0018m94ot8uj5z2d（四节点全 completed）。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-10`（Godot 4.3.stable），分支 `myrd/game-10-goal-cmv0xypkw000dm94o58qf3x8j`，线上 https://leomac-studio.tail49399e.ts.net/apps/game-10/（deploymentId=cmv10cg93001jm94of535yg54，commit=2ccb38e）。本文所有数值/结论取自仓库代码与门禁证据，非纸面推演。
+
+## 一、时间基准契约（节拍类的第一性问题）
+
+**结论：判定必须挂「歌曲时钟」，且音符位置必须是时间的纯函数；时钟源与判定逻辑解耦，接入音频时钟收敛为单点替换。**
+
+1. **唯一时间权威 = `scripts/conductor.gd`（Conductor，歌曲指挥）**。音符 y 坐标 = `JUDGMENT_Y − (note_time − song_time) × fall_speed`（`Conductor.note_y` 静态纯函数）。匀速、无累积漂移，从结构上杜绝「以渲染帧时间近似判定」——帧率波动只影响观感，不影响判定。
+2. **`song_time` 在固定物理步（`_physics_process`，60Hz）推进** → 无头运行（240 帧冒烟）确定可复现，这是门禁能机判 AC1/AC2 的前提。**诚实标注**：本作当前判定基准是确定性歌曲时钟，不是 `AudioServer.get_playback_position`；但契约把时钟封装为唯一推进点，正式接入音频时钟只需替换 `song_time` 推进来源，`BeatJudge` 判定逻辑零改动——「契约先行」的具体形态。
+3. **判定差值统一公式**（`lane.gd press`）：`delta_ms = (press_song_time − note_time) × 1000 + calibration_offset_ms`，正=按晚、负=按早；对同轨「时间上最近的未命中音符」求最小 |delta| 命中。窗口三档：PERFECT ±50ms / GOOD ±100ms / 超窗 MISS，窗口值放 `GameState` 调参区（TUNING_META 四键基线 50/100/1.0/0）。
+4. **延迟校准是契约一等公民**：±300ms、步长 10ms、`roundf` 量化到 10ms 后 `clampf` 钳制，`ConfigFile` 持久化（`input/calibration_offset_ms`），重启仍生效；校准以加法作用在 delta 上（冒烟 AC4 机判「步长/钳制/持久化往返」三项）。
+5. **Web 端音频解锁契约在壳层**：落地页内置音频手势解锁器（用户手势后才解锁 AudioContext，带 `__audioDebug` 取证出口），mobile-web-smoke 第 8 项「音频解锁器」机判此契约；数值调参走 `?tuning=` URL 桥（面板接线修复生效前可 `?tuning=<JSON>` 直传）。详见关联知识《Godot 4 Web 导出移动端触屏虚拟摇杆与 AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）。
+
+## 二、节拍判定实现与机判（AC1 / AC2 / AC5）
+
+- **`scripts/judge.gd`（BeatJudge）是纯逻辑 `RefCounted`**：静态 `classify(delta_ms, perfect_ms, good_ms)`，取 |Δ| 两级比较、PERFECT 优先，不持有任何节点 → 可无头直判。判定层「超窗不吞音符」：press 结果为 MISS 时不吞音符不惩罚（emit `lane_pressed_empty`），音符仍可被后续按键命中；空按返回 -1 同样不惩罚。这使「同轨相邻音符判定互不吞噬」在两层同时成立（判定层不吞 + 谱面层限距，见 §三）。
+- **AC1 机判（tests/smoke.gd AC1 相位）**：①1000 组带时间戳模拟输入（−300..+300ms 均匀扫窗 + 50% 随机取反方向）与**独立 oracle 对拍**（oracle 是需求窗口定义的第二实现，防同源盲区），要求 100% 一致，且三档判定必须全部出现（防分类器退化）；②边界精确值表：`0/±50→PERFECT`，`±50.001/±100→GOOD`，`±100.001/300→MISS`，边界含入档、略超即降档。
+- **AC2 机判**：命中序列逐事件重放，max_combo 与得分和重放计算 **0 误差**；MISS 后 combo 立即归零（打印日志佐证行，冒烟里确认真实输出）；终局收口 MISS 同样触发归零。
+- **AC5 机判**：结算页总分 = `PERFECT×100 + GOOD×60` 可复算，各判定计数、最大连击与页面文本逐项一致；**权重进交付配置表 `score_weights`**，AC3 相位同时机判代码权重与配置表一致，防权重漂移无人拦截。
+- **变异测试验证断言拦截力**：全绿后故意把 GOOD 权重改成 61 → 冒烟 FAIL → 还原。断言「声称能拦的缺陷」必须被证明真能拦住，这一步建议进所有数值契约的沉淀模板。
+
+## 三、谱面与难度分级契约（AC3）
+
+- **确定性生成**（`scripts/chart.gd`）：`seed = 20261010 + difficulty`，同难度必出同谱面（门禁可复现）；均匀轮转 + 随机抖动选轨，四轨负载均衡又确定。
+- **首音符时刻约束**：`FIRST_NOTE_TIME_S = 3.8s` ≥ 最慢档（Easy 300px/s）穿过全屏时长 `(1040−(−80))/300 ≈ 3.73s`。否则开局首个音符已在屏幕中央而非从顶端落入——这是 scaffold 阶段实测修掉的时序缺陷。
+- **同轨最小间隔 `MIN_LANE_GAP_S = 0.24s`**（> 2×GOOD 窗 0.2s）：generate 时同轨太近自动顺延；validate 五项校验（轨道号 0..3 / 时间升序 / 时间落在 `[0, song_duration]` / 同轨间隔达标 / 非空），违规返回**可读字符串**（可断言可定位）。
+- **交付配置表 `config/difficulties.json`**：meta 含 `judge_windows_ms`/`score_weights`/`song_duration_s`；四档 value+min+max 区间——Easy 300px/s·1.10s → Normal 380·0.85 → Hard 470·0.62 → Expert 560·0.46（速度升、间隔降，密度单调梯度）。**生效源是代码内 `DIFFICULTY_TABLE`**，AC3 冒烟相位机判「代码表 vs 配置表逐档奇偶校验 + 速度/密度梯度 + 每档谱面生成+校验通过 + 结算页切档生效 + 重开后按新难度加载谱面奇偶校验」，两头脱节 = FAIL。
+- **终局收口**：song_time 越过 `end_time`（最后音符 + 1s 收尾静默）时，先把全部未命中音符按 MISS 收口（`flush_misses`）再 emit `finished`——保证结算计数完整，否则尾音符合被静默漏计。
+
+## 四、移动端触控契约（AC4 工程内部指标）
+
+- **触摸是动作的「生产者」**：`TouchActionButton`（extends TouchScreenButton）把 `InputEventAction` 注入 `Input.parse_input_event`，游戏逻辑只读 InputMap 动作名（`lane_1..4` / `restart` / `diff_next` / `diff_prev`），键盘（D/F/J/K）与触摸同路径互不感知；TouchScreenButton 按 touch index 跟踪各自触点 → 四指并发各按钮独立响应；桌面无触摸屏自动不响应，无需手动屏蔽。
+- **触控 UI 可见性纪律**：仅 `is_touchscreen_available()` 时显示。
+- **热区不重叠**（implement 阶段实测修掉的移动端误触缺陷）：工具行（校准/重开/难度，y≈1066–1126）与四轨触控带（y≈1150–1280）分离两带；冒烟 AC4 机判「四分区齐全且沿底部连续铺满 + 工具按钮与分区零重叠 + 可见性纪律」。
+- **两个 Godot API 坑**：① TouchScreenButton 原生已有 `action` 属性，自定义 `var action` 会 Parse Error → 必须改名（本作用 `action_name`）；② TouchScreenButton 没有 `text` 属性 → 用子 Label 手动居中，且 `mouse_filter = MOUSE_FILTER_IGNORE` 防吞触摸。
+- **如实标注**：AC4 全量指标（iOS/Android 各 ≥2 台真机、四指并发 1000 次 0 丢触、触控到判定中位延迟 ≤80ms）本轮未做真机验证，模拟器/无头门禁只能覆盖结构性与逻辑性子集；真机抽查留给用户试玩，试玩指引与四问量表已落 `games/game-10/qa/playtest-kit.md`。
+
+## 五、双门禁体系：工程内四门禁 + 线上移动端冒烟
+
+**工程内（与平台门禁同源，脚本在 `std-skills/godot-game-dev/scripts/` 六件套，未自造未改写；`verify.sh` 纯调用器范式）：**
+
+| 门禁 | 本轮结果 | 说明 |
+|---|---|---|
+| PREFLIGHT | PASS | 14 类一致性检查（39 文件） |
+| GODOT_SMOKE | PASS | 240 帧无头冒烟 + AC1–AC5 断言相位 |
+| GODOT_FUZZ | PASS | 6 批 239 帧对抗输入（seed=20260913），无脚本错误 |
+| GODOT_PLAYTEST | PASS | bot 3 局得分 380/520/600，首奖励 ≤6.4s，反馈 28/局 |
+
+- **门禁 bot 对骨架的隐性要求要提前满足**：playtest bot 随机注入所有非 ui 动作，10 秒内必须能得分、反馈密度 ≥2/局 → 谱面必须「密且早」、MISS 也挂反馈；restart 必须守卫只在结算态生效（scaffold 阶段 bot 乱按 R 永远卡歌曲开头，METRICS 分数全 0 暴露此缺陷）；paused 守卫不能挡判定测试路径。
+- **冒烟输入注入纪律**（error-signatures E-08）：噪声相位只投原始事件（Key/Mouse/Touch），动作级断言在噪声之后的独立相位做，避免相位互吞。
+- **线上移动端冒烟 mobile-web-smoke 10 项机判（首轮即绿 PASS 10/10）**：网络全通 / console 零错 / canvas 挂载 / 首帧非纯色 / 画面在动 / 触摸到达 / 触摸响应 / 音频解锁器 / 无横向溢出 / FPS≥8（实测 fps=38）。证据归档 `games/game-10/qa/mobile/`（report.json + 3 张分阶段截图）随仓库提交，preHook 证据可跨节点复用。
+- 截图目检项：四轨下落、判定线、HUD、底部四分区触控、中文字体全部正常。
+
+## 六、Web 导出与部署要点（踩坑实录）
+
+- `export_presets.cfg`：Web 预设 **`thread_support=false`**（防跨域隔离缺失导致启动失败）、720×1280 竖屏。
+- 产物落位：index.html/js/pck（2.5MB）/wasm（35MB，走对象存储通道不受 bundle 限制）/worklet；`export/web` 需入库（它是部署构建输入），而 `qa/` 与 `export/web` 要加 `.gdignore` 防证据截图混进 pck（playtest 节点实测重导出后 46 文件与线上清单一致）。
+- 壳（AppHost）：仓库根 `apphost.toml` 切 game-10 + `assets_dir`；落地页含音频手势解锁器与 `?tuning=` 调参桥；资产全相对路径 base64 文本通道。
+- **部署 POST 返回 504 ≠ 失败**：clone 含 35MB wasm 的仓库超时，但服务端已受理进入 building；此时重试会建出第二个 queued 部署（本轮即发生，同 gitRef 同内容双记录）。正确姿势：先查部署状态再决定是否重发。
+- **playtest 节点实测发现**：TuningPanel 只有定义、无任何实例化点，线上 `?tuning=1` 出不来面板（冒烟只断言调参协议纯逻辑，所以门禁全绿）——「门禁绿 ≠ 线上功能在」的典型案例。修复 = 3 行接线（commit b0e8560，在分支待下次部署生效）。
+- **回写事故复盘（已完全恢复）**：以空数组 PATCH 探测写端点，意外带真实凭据把 goal artifacts 清空；靠先前 dump 的 DB 原文重建并逐字段核对恢复。教训入模板：**禁止以破坏性载荷试探写端点**，探形状只用只读 GET。
+
+## 七、给后续节拍/音游类游戏的复用清单
+
+1. 判定器写成纯静态逻辑 + 独立 oracle 对拍 + 边界精确值表；所有判定走同一条带校准的 delta 公式。
+2. 歌曲时钟做成纯函数模式（位置=f(时间)），音频时钟接入预留单点替换；无头复现性优先于「真音频钟」——门禁能机判才是硬通货。
+3. 谱面：确定性 seed + 校验器返回可读错误；首音符 ≥ 穿屏时长；同轨 gap ≥ 2×GOOD 窗；终局先 MISS 收口再结算。
+4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
+5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
+6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
 
 
 ---
@@ -21200,6 +21800,115 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
+
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -21228,10 +21937,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 - 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
@@ -21369,111 +22074,6 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
 
 ## 架构设计文档
 
@@ -23810,6 +24410,81 @@ bash std-skills/godot-game-dev/scripts/input-fuzz.sh games/3d
 node std-skills/godot-game-dev/scripts/mobile-web-smoke.mjs --url https://leomac-studio.tail49399e.ts.net/apps/3d/ --out games/3d/qa/mobile-review
 curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.pck.gz.b64 | base64 -d | gunzip | shasum -a 256
 ```
+
+
+## 沉淀节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁（game-10 节奏大师 · 全四棒实录）
+
+# 节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁
+
+> 来源：需求《〈节奏大师〉音乐节拍玩法需求：四轨判定、连击收集、难度分级与移动端触控》（id=cmv0y4coa000vm94o5w4iwqso，goal=cmv0xypkw000dm94o58qf3x8j）走完「录入需求 → 谱面/WebAudio 契约调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。工作流 run=cmv0yfaqu0018m94ot8uj5z2d（四节点全 completed）。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-10`（Godot 4.3.stable），分支 `myrd/game-10-goal-cmv0xypkw000dm94o58qf3x8j`，线上 https://leomac-studio.tail49399e.ts.net/apps/game-10/（deploymentId=cmv10cg93001jm94of535yg54，commit=2ccb38e）。本文所有数值/结论取自仓库代码与门禁证据，非纸面推演。
+
+## 一、时间基准契约（节拍类的第一性问题）
+
+**结论：判定必须挂「歌曲时钟」，且音符位置必须是时间的纯函数；时钟源与判定逻辑解耦，接入音频时钟收敛为单点替换。**
+
+1. **唯一时间权威 = `scripts/conductor.gd`（Conductor，歌曲指挥）**。音符 y 坐标 = `JUDGMENT_Y − (note_time − song_time) × fall_speed`（`Conductor.note_y` 静态纯函数）。匀速、无累积漂移，从结构上杜绝「以渲染帧时间近似判定」——帧率波动只影响观感，不影响判定。
+2. **`song_time` 在固定物理步（`_physics_process`，60Hz）推进** → 无头运行（240 帧冒烟）确定可复现，这是门禁能机判 AC1/AC2 的前提。**诚实标注**：本作当前判定基准是确定性歌曲时钟，不是 `AudioServer.get_playback_position`；但契约把时钟封装为唯一推进点，正式接入音频时钟只需替换 `song_time` 推进来源，`BeatJudge` 判定逻辑零改动——「契约先行」的具体形态。
+3. **判定差值统一公式**（`lane.gd press`）：`delta_ms = (press_song_time − note_time) × 1000 + calibration_offset_ms`，正=按晚、负=按早；对同轨「时间上最近的未命中音符」求最小 |delta| 命中。窗口三档：PERFECT ±50ms / GOOD ±100ms / 超窗 MISS，窗口值放 `GameState` 调参区（TUNING_META 四键基线 50/100/1.0/0）。
+4. **延迟校准是契约一等公民**：±300ms、步长 10ms、`roundf` 量化到 10ms 后 `clampf` 钳制，`ConfigFile` 持久化（`input/calibration_offset_ms`），重启仍生效；校准以加法作用在 delta 上（冒烟 AC4 机判「步长/钳制/持久化往返」三项）。
+5. **Web 端音频解锁契约在壳层**：落地页内置音频手势解锁器（用户手势后才解锁 AudioContext，带 `__audioDebug` 取证出口），mobile-web-smoke 第 8 项「音频解锁器」机判此契约；数值调参走 `?tuning=` URL 桥（面板接线修复生效前可 `?tuning=<JSON>` 直传）。详见关联知识《Godot 4 Web 导出移动端触屏虚拟摇杆与 AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）。
+
+## 二、节拍判定实现与机判（AC1 / AC2 / AC5）
+
+- **`scripts/judge.gd`（BeatJudge）是纯逻辑 `RefCounted`**：静态 `classify(delta_ms, perfect_ms, good_ms)`，取 |Δ| 两级比较、PERFECT 优先，不持有任何节点 → 可无头直判。判定层「超窗不吞音符」：press 结果为 MISS 时不吞音符不惩罚（emit `lane_pressed_empty`），音符仍可被后续按键命中；空按返回 -1 同样不惩罚。这使「同轨相邻音符判定互不吞噬」在两层同时成立（判定层不吞 + 谱面层限距，见 §三）。
+- **AC1 机判（tests/smoke.gd AC1 相位）**：①1000 组带时间戳模拟输入（−300..+300ms 均匀扫窗 + 50% 随机取反方向）与**独立 oracle 对拍**（oracle 是需求窗口定义的第二实现，防同源盲区），要求 100% 一致，且三档判定必须全部出现（防分类器退化）；②边界精确值表：`0/±50→PERFECT`，`±50.001/±100→GOOD`，`±100.001/300→MISS`，边界含入档、略超即降档。
+- **AC2 机判**：命中序列逐事件重放，max_combo 与得分和重放计算 **0 误差**；MISS 后 combo 立即归零（打印日志佐证行，冒烟里确认真实输出）；终局收口 MISS 同样触发归零。
+- **AC5 机判**：结算页总分 = `PERFECT×100 + GOOD×60` 可复算，各判定计数、最大连击与页面文本逐项一致；**权重进交付配置表 `score_weights`**，AC3 相位同时机判代码权重与配置表一致，防权重漂移无人拦截。
+- **变异测试验证断言拦截力**：全绿后故意把 GOOD 权重改成 61 → 冒烟 FAIL → 还原。断言「声称能拦的缺陷」必须被证明真能拦住，这一步建议进所有数值契约的沉淀模板。
+
+## 三、谱面与难度分级契约（AC3）
+
+- **确定性生成**（`scripts/chart.gd`）：`seed = 20261010 + difficulty`，同难度必出同谱面（门禁可复现）；均匀轮转 + 随机抖动选轨，四轨负载均衡又确定。
+- **首音符时刻约束**：`FIRST_NOTE_TIME_S = 3.8s` ≥ 最慢档（Easy 300px/s）穿过全屏时长 `(1040−(−80))/300 ≈ 3.73s`。否则开局首个音符已在屏幕中央而非从顶端落入——这是 scaffold 阶段实测修掉的时序缺陷。
+- **同轨最小间隔 `MIN_LANE_GAP_S = 0.24s`**（> 2×GOOD 窗 0.2s）：generate 时同轨太近自动顺延；validate 五项校验（轨道号 0..3 / 时间升序 / 时间落在 `[0, song_duration]` / 同轨间隔达标 / 非空），违规返回**可读字符串**（可断言可定位）。
+- **交付配置表 `config/difficulties.json`**：meta 含 `judge_windows_ms`/`score_weights`/`song_duration_s`；四档 value+min+max 区间——Easy 300px/s·1.10s → Normal 380·0.85 → Hard 470·0.62 → Expert 560·0.46（速度升、间隔降，密度单调梯度）。**生效源是代码内 `DIFFICULTY_TABLE`**，AC3 冒烟相位机判「代码表 vs 配置表逐档奇偶校验 + 速度/密度梯度 + 每档谱面生成+校验通过 + 结算页切档生效 + 重开后按新难度加载谱面奇偶校验」，两头脱节 = FAIL。
+- **终局收口**：song_time 越过 `end_time`（最后音符 + 1s 收尾静默）时，先把全部未命中音符按 MISS 收口（`flush_misses`）再 emit `finished`——保证结算计数完整，否则尾音符合被静默漏计。
+
+## 四、移动端触控契约（AC4 工程内部指标）
+
+- **触摸是动作的「生产者」**：`TouchActionButton`（extends TouchScreenButton）把 `InputEventAction` 注入 `Input.parse_input_event`，游戏逻辑只读 InputMap 动作名（`lane_1..4` / `restart` / `diff_next` / `diff_prev`），键盘（D/F/J/K）与触摸同路径互不感知；TouchScreenButton 按 touch index 跟踪各自触点 → 四指并发各按钮独立响应；桌面无触摸屏自动不响应，无需手动屏蔽。
+- **触控 UI 可见性纪律**：仅 `is_touchscreen_available()` 时显示。
+- **热区不重叠**（implement 阶段实测修掉的移动端误触缺陷）：工具行（校准/重开/难度，y≈1066–1126）与四轨触控带（y≈1150–1280）分离两带；冒烟 AC4 机判「四分区齐全且沿底部连续铺满 + 工具按钮与分区零重叠 + 可见性纪律」。
+- **两个 Godot API 坑**：① TouchScreenButton 原生已有 `action` 属性，自定义 `var action` 会 Parse Error → 必须改名（本作用 `action_name`）；② TouchScreenButton 没有 `text` 属性 → 用子 Label 手动居中，且 `mouse_filter = MOUSE_FILTER_IGNORE` 防吞触摸。
+- **如实标注**：AC4 全量指标（iOS/Android 各 ≥2 台真机、四指并发 1000 次 0 丢触、触控到判定中位延迟 ≤80ms）本轮未做真机验证，模拟器/无头门禁只能覆盖结构性与逻辑性子集；真机抽查留给用户试玩，试玩指引与四问量表已落 `games/game-10/qa/playtest-kit.md`。
+
+## 五、双门禁体系：工程内四门禁 + 线上移动端冒烟
+
+**工程内（与平台门禁同源，脚本在 `std-skills/godot-game-dev/scripts/` 六件套，未自造未改写；`verify.sh` 纯调用器范式）：**
+
+| 门禁 | 本轮结果 | 说明 |
+|---|---|---|
+| PREFLIGHT | PASS | 14 类一致性检查（39 文件） |
+| GODOT_SMOKE | PASS | 240 帧无头冒烟 + AC1–AC5 断言相位 |
+| GODOT_FUZZ | PASS | 6 批 239 帧对抗输入（seed=20260913），无脚本错误 |
+| GODOT_PLAYTEST | PASS | bot 3 局得分 380/520/600，首奖励 ≤6.4s，反馈 28/局 |
+
+- **门禁 bot 对骨架的隐性要求要提前满足**：playtest bot 随机注入所有非 ui 动作，10 秒内必须能得分、反馈密度 ≥2/局 → 谱面必须「密且早」、MISS 也挂反馈；restart 必须守卫只在结算态生效（scaffold 阶段 bot 乱按 R 永远卡歌曲开头，METRICS 分数全 0 暴露此缺陷）；paused 守卫不能挡判定测试路径。
+- **冒烟输入注入纪律**（error-signatures E-08）：噪声相位只投原始事件（Key/Mouse/Touch），动作级断言在噪声之后的独立相位做，避免相位互吞。
+- **线上移动端冒烟 mobile-web-smoke 10 项机判（首轮即绿 PASS 10/10）**：网络全通 / console 零错 / canvas 挂载 / 首帧非纯色 / 画面在动 / 触摸到达 / 触摸响应 / 音频解锁器 / 无横向溢出 / FPS≥8（实测 fps=38）。证据归档 `games/game-10/qa/mobile/`（report.json + 3 张分阶段截图）随仓库提交，preHook 证据可跨节点复用。
+- 截图目检项：四轨下落、判定线、HUD、底部四分区触控、中文字体全部正常。
+
+## 六、Web 导出与部署要点（踩坑实录）
+
+- `export_presets.cfg`：Web 预设 **`thread_support=false`**（防跨域隔离缺失导致启动失败）、720×1280 竖屏。
+- 产物落位：index.html/js/pck（2.5MB）/wasm（35MB，走对象存储通道不受 bundle 限制）/worklet；`export/web` 需入库（它是部署构建输入），而 `qa/` 与 `export/web` 要加 `.gdignore` 防证据截图混进 pck（playtest 节点实测重导出后 46 文件与线上清单一致）。
+- 壳（AppHost）：仓库根 `apphost.toml` 切 game-10 + `assets_dir`；落地页含音频手势解锁器与 `?tuning=` 调参桥；资产全相对路径 base64 文本通道。
+- **部署 POST 返回 504 ≠ 失败**：clone 含 35MB wasm 的仓库超时，但服务端已受理进入 building；此时重试会建出第二个 queued 部署（本轮即发生，同 gitRef 同内容双记录）。正确姿势：先查部署状态再决定是否重发。
+- **playtest 节点实测发现**：TuningPanel 只有定义、无任何实例化点，线上 `?tuning=1` 出不来面板（冒烟只断言调参协议纯逻辑，所以门禁全绿）——「门禁绿 ≠ 线上功能在」的典型案例。修复 = 3 行接线（commit b0e8560，在分支待下次部署生效）。
+- **回写事故复盘（已完全恢复）**：以空数组 PATCH 探测写端点，意外带真实凭据把 goal artifacts 清空；靠先前 dump 的 DB 原文重建并逐字段核对恢复。教训入模板：**禁止以破坏性载荷试探写端点**，探形状只用只读 GET。
+
+## 七、给后续节拍/音游类游戏的复用清单
+
+1. 判定器写成纯静态逻辑 + 独立 oracle 对拍 + 边界精确值表；所有判定走同一条带校准的 delta 公式。
+2. 歌曲时钟做成纯函数模式（位置=f(时间)），音频时钟接入预留单点替换；无头复现性优先于「真音频钟」——门禁能机判才是硬通货。
+3. 谱面：确定性 seed + 校验器返回可读错误；首音符 ≥ 穿屏时长；同轨 gap ≥ 2×GOOD 窗；终局先 MISS 收口再结算。
+4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
+5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
+6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
 
 
 ---
@@ -23841,6 +24516,115 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 
 ## 产品关联知识
 
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
+
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -23869,10 +24653,6 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 - 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
@@ -24010,111 +24790,6 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
 
 ## 架构设计文档
 
@@ -26451,6 +27126,81 @@ bash std-skills/godot-game-dev/scripts/input-fuzz.sh games/3d
 node std-skills/godot-game-dev/scripts/mobile-web-smoke.mjs --url https://leomac-studio.tail49399e.ts.net/apps/3d/ --out games/3d/qa/mobile-review
 curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.pck.gz.b64 | base64 -d | gunzip | shasum -a 256
 ```
+
+
+## 沉淀节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁（game-10 节奏大师 · 全四棒实录）
+
+# 节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁
+
+> 来源：需求《〈节奏大师〉音乐节拍玩法需求：四轨判定、连击收集、难度分级与移动端触控》（id=cmv0y4coa000vm94o5w4iwqso，goal=cmv0xypkw000dm94o58qf3x8j）走完「录入需求 → 谱面/WebAudio 契约调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。工作流 run=cmv0yfaqu0018m94ot8uj5z2d（四节点全 completed）。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-10`（Godot 4.3.stable），分支 `myrd/game-10-goal-cmv0xypkw000dm94o58qf3x8j`，线上 https://leomac-studio.tail49399e.ts.net/apps/game-10/（deploymentId=cmv10cg93001jm94of535yg54，commit=2ccb38e）。本文所有数值/结论取自仓库代码与门禁证据，非纸面推演。
+
+## 一、时间基准契约（节拍类的第一性问题）
+
+**结论：判定必须挂「歌曲时钟」，且音符位置必须是时间的纯函数；时钟源与判定逻辑解耦，接入音频时钟收敛为单点替换。**
+
+1. **唯一时间权威 = `scripts/conductor.gd`（Conductor，歌曲指挥）**。音符 y 坐标 = `JUDGMENT_Y − (note_time − song_time) × fall_speed`（`Conductor.note_y` 静态纯函数）。匀速、无累积漂移，从结构上杜绝「以渲染帧时间近似判定」——帧率波动只影响观感，不影响判定。
+2. **`song_time` 在固定物理步（`_physics_process`，60Hz）推进** → 无头运行（240 帧冒烟）确定可复现，这是门禁能机判 AC1/AC2 的前提。**诚实标注**：本作当前判定基准是确定性歌曲时钟，不是 `AudioServer.get_playback_position`；但契约把时钟封装为唯一推进点，正式接入音频时钟只需替换 `song_time` 推进来源，`BeatJudge` 判定逻辑零改动——「契约先行」的具体形态。
+3. **判定差值统一公式**（`lane.gd press`）：`delta_ms = (press_song_time − note_time) × 1000 + calibration_offset_ms`，正=按晚、负=按早；对同轨「时间上最近的未命中音符」求最小 |delta| 命中。窗口三档：PERFECT ±50ms / GOOD ±100ms / 超窗 MISS，窗口值放 `GameState` 调参区（TUNING_META 四键基线 50/100/1.0/0）。
+4. **延迟校准是契约一等公民**：±300ms、步长 10ms、`roundf` 量化到 10ms 后 `clampf` 钳制，`ConfigFile` 持久化（`input/calibration_offset_ms`），重启仍生效；校准以加法作用在 delta 上（冒烟 AC4 机判「步长/钳制/持久化往返」三项）。
+5. **Web 端音频解锁契约在壳层**：落地页内置音频手势解锁器（用户手势后才解锁 AudioContext，带 `__audioDebug` 取证出口），mobile-web-smoke 第 8 项「音频解锁器」机判此契约；数值调参走 `?tuning=` URL 桥（面板接线修复生效前可 `?tuning=<JSON>` 直传）。详见关联知识《Godot 4 Web 导出移动端触屏虚拟摇杆与 AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）。
+
+## 二、节拍判定实现与机判（AC1 / AC2 / AC5）
+
+- **`scripts/judge.gd`（BeatJudge）是纯逻辑 `RefCounted`**：静态 `classify(delta_ms, perfect_ms, good_ms)`，取 |Δ| 两级比较、PERFECT 优先，不持有任何节点 → 可无头直判。判定层「超窗不吞音符」：press 结果为 MISS 时不吞音符不惩罚（emit `lane_pressed_empty`），音符仍可被后续按键命中；空按返回 -1 同样不惩罚。这使「同轨相邻音符判定互不吞噬」在两层同时成立（判定层不吞 + 谱面层限距，见 §三）。
+- **AC1 机判（tests/smoke.gd AC1 相位）**：①1000 组带时间戳模拟输入（−300..+300ms 均匀扫窗 + 50% 随机取反方向）与**独立 oracle 对拍**（oracle 是需求窗口定义的第二实现，防同源盲区），要求 100% 一致，且三档判定必须全部出现（防分类器退化）；②边界精确值表：`0/±50→PERFECT`，`±50.001/±100→GOOD`，`±100.001/300→MISS`，边界含入档、略超即降档。
+- **AC2 机判**：命中序列逐事件重放，max_combo 与得分和重放计算 **0 误差**；MISS 后 combo 立即归零（打印日志佐证行，冒烟里确认真实输出）；终局收口 MISS 同样触发归零。
+- **AC5 机判**：结算页总分 = `PERFECT×100 + GOOD×60` 可复算，各判定计数、最大连击与页面文本逐项一致；**权重进交付配置表 `score_weights`**，AC3 相位同时机判代码权重与配置表一致，防权重漂移无人拦截。
+- **变异测试验证断言拦截力**：全绿后故意把 GOOD 权重改成 61 → 冒烟 FAIL → 还原。断言「声称能拦的缺陷」必须被证明真能拦住，这一步建议进所有数值契约的沉淀模板。
+
+## 三、谱面与难度分级契约（AC3）
+
+- **确定性生成**（`scripts/chart.gd`）：`seed = 20261010 + difficulty`，同难度必出同谱面（门禁可复现）；均匀轮转 + 随机抖动选轨，四轨负载均衡又确定。
+- **首音符时刻约束**：`FIRST_NOTE_TIME_S = 3.8s` ≥ 最慢档（Easy 300px/s）穿过全屏时长 `(1040−(−80))/300 ≈ 3.73s`。否则开局首个音符已在屏幕中央而非从顶端落入——这是 scaffold 阶段实测修掉的时序缺陷。
+- **同轨最小间隔 `MIN_LANE_GAP_S = 0.24s`**（> 2×GOOD 窗 0.2s）：generate 时同轨太近自动顺延；validate 五项校验（轨道号 0..3 / 时间升序 / 时间落在 `[0, song_duration]` / 同轨间隔达标 / 非空），违规返回**可读字符串**（可断言可定位）。
+- **交付配置表 `config/difficulties.json`**：meta 含 `judge_windows_ms`/`score_weights`/`song_duration_s`；四档 value+min+max 区间——Easy 300px/s·1.10s → Normal 380·0.85 → Hard 470·0.62 → Expert 560·0.46（速度升、间隔降，密度单调梯度）。**生效源是代码内 `DIFFICULTY_TABLE`**，AC3 冒烟相位机判「代码表 vs 配置表逐档奇偶校验 + 速度/密度梯度 + 每档谱面生成+校验通过 + 结算页切档生效 + 重开后按新难度加载谱面奇偶校验」，两头脱节 = FAIL。
+- **终局收口**：song_time 越过 `end_time`（最后音符 + 1s 收尾静默）时，先把全部未命中音符按 MISS 收口（`flush_misses`）再 emit `finished`——保证结算计数完整，否则尾音符合被静默漏计。
+
+## 四、移动端触控契约（AC4 工程内部指标）
+
+- **触摸是动作的「生产者」**：`TouchActionButton`（extends TouchScreenButton）把 `InputEventAction` 注入 `Input.parse_input_event`，游戏逻辑只读 InputMap 动作名（`lane_1..4` / `restart` / `diff_next` / `diff_prev`），键盘（D/F/J/K）与触摸同路径互不感知；TouchScreenButton 按 touch index 跟踪各自触点 → 四指并发各按钮独立响应；桌面无触摸屏自动不响应，无需手动屏蔽。
+- **触控 UI 可见性纪律**：仅 `is_touchscreen_available()` 时显示。
+- **热区不重叠**（implement 阶段实测修掉的移动端误触缺陷）：工具行（校准/重开/难度，y≈1066–1126）与四轨触控带（y≈1150–1280）分离两带；冒烟 AC4 机判「四分区齐全且沿底部连续铺满 + 工具按钮与分区零重叠 + 可见性纪律」。
+- **两个 Godot API 坑**：① TouchScreenButton 原生已有 `action` 属性，自定义 `var action` 会 Parse Error → 必须改名（本作用 `action_name`）；② TouchScreenButton 没有 `text` 属性 → 用子 Label 手动居中，且 `mouse_filter = MOUSE_FILTER_IGNORE` 防吞触摸。
+- **如实标注**：AC4 全量指标（iOS/Android 各 ≥2 台真机、四指并发 1000 次 0 丢触、触控到判定中位延迟 ≤80ms）本轮未做真机验证，模拟器/无头门禁只能覆盖结构性与逻辑性子集；真机抽查留给用户试玩，试玩指引与四问量表已落 `games/game-10/qa/playtest-kit.md`。
+
+## 五、双门禁体系：工程内四门禁 + 线上移动端冒烟
+
+**工程内（与平台门禁同源，脚本在 `std-skills/godot-game-dev/scripts/` 六件套，未自造未改写；`verify.sh` 纯调用器范式）：**
+
+| 门禁 | 本轮结果 | 说明 |
+|---|---|---|
+| PREFLIGHT | PASS | 14 类一致性检查（39 文件） |
+| GODOT_SMOKE | PASS | 240 帧无头冒烟 + AC1–AC5 断言相位 |
+| GODOT_FUZZ | PASS | 6 批 239 帧对抗输入（seed=20260913），无脚本错误 |
+| GODOT_PLAYTEST | PASS | bot 3 局得分 380/520/600，首奖励 ≤6.4s，反馈 28/局 |
+
+- **门禁 bot 对骨架的隐性要求要提前满足**：playtest bot 随机注入所有非 ui 动作，10 秒内必须能得分、反馈密度 ≥2/局 → 谱面必须「密且早」、MISS 也挂反馈；restart 必须守卫只在结算态生效（scaffold 阶段 bot 乱按 R 永远卡歌曲开头，METRICS 分数全 0 暴露此缺陷）；paused 守卫不能挡判定测试路径。
+- **冒烟输入注入纪律**（error-signatures E-08）：噪声相位只投原始事件（Key/Mouse/Touch），动作级断言在噪声之后的独立相位做，避免相位互吞。
+- **线上移动端冒烟 mobile-web-smoke 10 项机判（首轮即绿 PASS 10/10）**：网络全通 / console 零错 / canvas 挂载 / 首帧非纯色 / 画面在动 / 触摸到达 / 触摸响应 / 音频解锁器 / 无横向溢出 / FPS≥8（实测 fps=38）。证据归档 `games/game-10/qa/mobile/`（report.json + 3 张分阶段截图）随仓库提交，preHook 证据可跨节点复用。
+- 截图目检项：四轨下落、判定线、HUD、底部四分区触控、中文字体全部正常。
+
+## 六、Web 导出与部署要点（踩坑实录）
+
+- `export_presets.cfg`：Web 预设 **`thread_support=false`**（防跨域隔离缺失导致启动失败）、720×1280 竖屏。
+- 产物落位：index.html/js/pck（2.5MB）/wasm（35MB，走对象存储通道不受 bundle 限制）/worklet；`export/web` 需入库（它是部署构建输入），而 `qa/` 与 `export/web` 要加 `.gdignore` 防证据截图混进 pck（playtest 节点实测重导出后 46 文件与线上清单一致）。
+- 壳（AppHost）：仓库根 `apphost.toml` 切 game-10 + `assets_dir`；落地页含音频手势解锁器与 `?tuning=` 调参桥；资产全相对路径 base64 文本通道。
+- **部署 POST 返回 504 ≠ 失败**：clone 含 35MB wasm 的仓库超时，但服务端已受理进入 building；此时重试会建出第二个 queued 部署（本轮即发生，同 gitRef 同内容双记录）。正确姿势：先查部署状态再决定是否重发。
+- **playtest 节点实测发现**：TuningPanel 只有定义、无任何实例化点，线上 `?tuning=1` 出不来面板（冒烟只断言调参协议纯逻辑，所以门禁全绿）——「门禁绿 ≠ 线上功能在」的典型案例。修复 = 3 行接线（commit b0e8560，在分支待下次部署生效）。
+- **回写事故复盘（已完全恢复）**：以空数组 PATCH 探测写端点，意外带真实凭据把 goal artifacts 清空；靠先前 dump 的 DB 原文重建并逐字段核对恢复。教训入模板：**禁止以破坏性载荷试探写端点**，探形状只用只读 GET。
+
+## 七、给后续节拍/音游类游戏的复用清单
+
+1. 判定器写成纯静态逻辑 + 独立 oracle 对拍 + 边界精确值表；所有判定走同一条带校准的 delta 公式。
+2. 歌曲时钟做成纯函数模式（位置=f(时间)），音频时钟接入预留单点替换；无头复现性优先于「真音频钟」——门禁能机判才是硬通货。
+3. 谱面：确定性 seed + 校验器返回可读错误；首音符 ≥ 穿屏时长；同轨 gap ≥ 2×GOOD 窗；终局先 MISS 收口再结算。
+4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
+5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
+6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
 
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
@@ -26502,6 +27252,115 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
+
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -26530,10 +27389,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 - 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
@@ -26671,111 +27526,6 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
 
 ## 架构设计文档
 
@@ -29112,4 +29862,79 @@ bash std-skills/godot-game-dev/scripts/input-fuzz.sh games/3d
 node std-skills/godot-game-dev/scripts/mobile-web-smoke.mjs --url https://leomac-studio.tail49399e.ts.net/apps/3d/ --out games/3d/qa/mobile-review
 curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.pck.gz.b64 | base64 -d | gunzip | shasum -a 256
 ```
+
+
+## 沉淀节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁（game-10 节奏大师 · 全四棒实录）
+
+# 节拍类游戏 Godot Web 门禁实践：音频契约 · 节拍判定 · 移动端冒烟门禁
+
+> 来源：需求《〈节奏大师〉音乐节拍玩法需求：四轨判定、连击收集、难度分级与移动端触控》（id=cmv0y4coa000vm94o5w4iwqso，goal=cmv0xypkw000dm94o58qf3x8j）走完「录入需求 → 谱面/WebAudio 契约调研 → 小游戏工坊四棒（scaffold→implement→deploy→playtest）」全链后的沉淀。工作流 run=cmv0yfaqu0018m94ot8uj5z2d（四节点全 completed）。仓库 github.com/hl3w22bupt/myrd-playground，工程 `games/game-10`（Godot 4.3.stable），分支 `myrd/game-10-goal-cmv0xypkw000dm94o58qf3x8j`，线上 https://leomac-studio.tail49399e.ts.net/apps/game-10/（deploymentId=cmv10cg93001jm94of535yg54，commit=2ccb38e）。本文所有数值/结论取自仓库代码与门禁证据，非纸面推演。
+
+## 一、时间基准契约（节拍类的第一性问题）
+
+**结论：判定必须挂「歌曲时钟」，且音符位置必须是时间的纯函数；时钟源与判定逻辑解耦，接入音频时钟收敛为单点替换。**
+
+1. **唯一时间权威 = `scripts/conductor.gd`（Conductor，歌曲指挥）**。音符 y 坐标 = `JUDGMENT_Y − (note_time − song_time) × fall_speed`（`Conductor.note_y` 静态纯函数）。匀速、无累积漂移，从结构上杜绝「以渲染帧时间近似判定」——帧率波动只影响观感，不影响判定。
+2. **`song_time` 在固定物理步（`_physics_process`，60Hz）推进** → 无头运行（240 帧冒烟）确定可复现，这是门禁能机判 AC1/AC2 的前提。**诚实标注**：本作当前判定基准是确定性歌曲时钟，不是 `AudioServer.get_playback_position`；但契约把时钟封装为唯一推进点，正式接入音频时钟只需替换 `song_time` 推进来源，`BeatJudge` 判定逻辑零改动——「契约先行」的具体形态。
+3. **判定差值统一公式**（`lane.gd press`）：`delta_ms = (press_song_time − note_time) × 1000 + calibration_offset_ms`，正=按晚、负=按早；对同轨「时间上最近的未命中音符」求最小 |delta| 命中。窗口三档：PERFECT ±50ms / GOOD ±100ms / 超窗 MISS，窗口值放 `GameState` 调参区（TUNING_META 四键基线 50/100/1.0/0）。
+4. **延迟校准是契约一等公民**：±300ms、步长 10ms、`roundf` 量化到 10ms 后 `clampf` 钳制，`ConfigFile` 持久化（`input/calibration_offset_ms`），重启仍生效；校准以加法作用在 delta 上（冒烟 AC4 机判「步长/钳制/持久化往返」三项）。
+5. **Web 端音频解锁契约在壳层**：落地页内置音频手势解锁器（用户手势后才解锁 AudioContext，带 `__audioDebug` 取证出口），mobile-web-smoke 第 8 项「音频解锁器」机判此契约；数值调参走 `?tuning=` URL 桥（面板接线修复生效前可 `?tuning=<JSON>` 直传）。详见关联知识《Godot 4 Web 导出移动端触屏虚拟摇杆与 AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）。
+
+## 二、节拍判定实现与机判（AC1 / AC2 / AC5）
+
+- **`scripts/judge.gd`（BeatJudge）是纯逻辑 `RefCounted`**：静态 `classify(delta_ms, perfect_ms, good_ms)`，取 |Δ| 两级比较、PERFECT 优先，不持有任何节点 → 可无头直判。判定层「超窗不吞音符」：press 结果为 MISS 时不吞音符不惩罚（emit `lane_pressed_empty`），音符仍可被后续按键命中；空按返回 -1 同样不惩罚。这使「同轨相邻音符判定互不吞噬」在两层同时成立（判定层不吞 + 谱面层限距，见 §三）。
+- **AC1 机判（tests/smoke.gd AC1 相位）**：①1000 组带时间戳模拟输入（−300..+300ms 均匀扫窗 + 50% 随机取反方向）与**独立 oracle 对拍**（oracle 是需求窗口定义的第二实现，防同源盲区），要求 100% 一致，且三档判定必须全部出现（防分类器退化）；②边界精确值表：`0/±50→PERFECT`，`±50.001/±100→GOOD`，`±100.001/300→MISS`，边界含入档、略超即降档。
+- **AC2 机判**：命中序列逐事件重放，max_combo 与得分和重放计算 **0 误差**；MISS 后 combo 立即归零（打印日志佐证行，冒烟里确认真实输出）；终局收口 MISS 同样触发归零。
+- **AC5 机判**：结算页总分 = `PERFECT×100 + GOOD×60` 可复算，各判定计数、最大连击与页面文本逐项一致；**权重进交付配置表 `score_weights`**，AC3 相位同时机判代码权重与配置表一致，防权重漂移无人拦截。
+- **变异测试验证断言拦截力**：全绿后故意把 GOOD 权重改成 61 → 冒烟 FAIL → 还原。断言「声称能拦的缺陷」必须被证明真能拦住，这一步建议进所有数值契约的沉淀模板。
+
+## 三、谱面与难度分级契约（AC3）
+
+- **确定性生成**（`scripts/chart.gd`）：`seed = 20261010 + difficulty`，同难度必出同谱面（门禁可复现）；均匀轮转 + 随机抖动选轨，四轨负载均衡又确定。
+- **首音符时刻约束**：`FIRST_NOTE_TIME_S = 3.8s` ≥ 最慢档（Easy 300px/s）穿过全屏时长 `(1040−(−80))/300 ≈ 3.73s`。否则开局首个音符已在屏幕中央而非从顶端落入——这是 scaffold 阶段实测修掉的时序缺陷。
+- **同轨最小间隔 `MIN_LANE_GAP_S = 0.24s`**（> 2×GOOD 窗 0.2s）：generate 时同轨太近自动顺延；validate 五项校验（轨道号 0..3 / 时间升序 / 时间落在 `[0, song_duration]` / 同轨间隔达标 / 非空），违规返回**可读字符串**（可断言可定位）。
+- **交付配置表 `config/difficulties.json`**：meta 含 `judge_windows_ms`/`score_weights`/`song_duration_s`；四档 value+min+max 区间——Easy 300px/s·1.10s → Normal 380·0.85 → Hard 470·0.62 → Expert 560·0.46（速度升、间隔降，密度单调梯度）。**生效源是代码内 `DIFFICULTY_TABLE`**，AC3 冒烟相位机判「代码表 vs 配置表逐档奇偶校验 + 速度/密度梯度 + 每档谱面生成+校验通过 + 结算页切档生效 + 重开后按新难度加载谱面奇偶校验」，两头脱节 = FAIL。
+- **终局收口**：song_time 越过 `end_time`（最后音符 + 1s 收尾静默）时，先把全部未命中音符按 MISS 收口（`flush_misses`）再 emit `finished`——保证结算计数完整，否则尾音符合被静默漏计。
+
+## 四、移动端触控契约（AC4 工程内部指标）
+
+- **触摸是动作的「生产者」**：`TouchActionButton`（extends TouchScreenButton）把 `InputEventAction` 注入 `Input.parse_input_event`，游戏逻辑只读 InputMap 动作名（`lane_1..4` / `restart` / `diff_next` / `diff_prev`），键盘（D/F/J/K）与触摸同路径互不感知；TouchScreenButton 按 touch index 跟踪各自触点 → 四指并发各按钮独立响应；桌面无触摸屏自动不响应，无需手动屏蔽。
+- **触控 UI 可见性纪律**：仅 `is_touchscreen_available()` 时显示。
+- **热区不重叠**（implement 阶段实测修掉的移动端误触缺陷）：工具行（校准/重开/难度，y≈1066–1126）与四轨触控带（y≈1150–1280）分离两带；冒烟 AC4 机判「四分区齐全且沿底部连续铺满 + 工具按钮与分区零重叠 + 可见性纪律」。
+- **两个 Godot API 坑**：① TouchScreenButton 原生已有 `action` 属性，自定义 `var action` 会 Parse Error → 必须改名（本作用 `action_name`）；② TouchScreenButton 没有 `text` 属性 → 用子 Label 手动居中，且 `mouse_filter = MOUSE_FILTER_IGNORE` 防吞触摸。
+- **如实标注**：AC4 全量指标（iOS/Android 各 ≥2 台真机、四指并发 1000 次 0 丢触、触控到判定中位延迟 ≤80ms）本轮未做真机验证，模拟器/无头门禁只能覆盖结构性与逻辑性子集；真机抽查留给用户试玩，试玩指引与四问量表已落 `games/game-10/qa/playtest-kit.md`。
+
+## 五、双门禁体系：工程内四门禁 + 线上移动端冒烟
+
+**工程内（与平台门禁同源，脚本在 `std-skills/godot-game-dev/scripts/` 六件套，未自造未改写；`verify.sh` 纯调用器范式）：**
+
+| 门禁 | 本轮结果 | 说明 |
+|---|---|---|
+| PREFLIGHT | PASS | 14 类一致性检查（39 文件） |
+| GODOT_SMOKE | PASS | 240 帧无头冒烟 + AC1–AC5 断言相位 |
+| GODOT_FUZZ | PASS | 6 批 239 帧对抗输入（seed=20260913），无脚本错误 |
+| GODOT_PLAYTEST | PASS | bot 3 局得分 380/520/600，首奖励 ≤6.4s，反馈 28/局 |
+
+- **门禁 bot 对骨架的隐性要求要提前满足**：playtest bot 随机注入所有非 ui 动作，10 秒内必须能得分、反馈密度 ≥2/局 → 谱面必须「密且早」、MISS 也挂反馈；restart 必须守卫只在结算态生效（scaffold 阶段 bot 乱按 R 永远卡歌曲开头，METRICS 分数全 0 暴露此缺陷）；paused 守卫不能挡判定测试路径。
+- **冒烟输入注入纪律**（error-signatures E-08）：噪声相位只投原始事件（Key/Mouse/Touch），动作级断言在噪声之后的独立相位做，避免相位互吞。
+- **线上移动端冒烟 mobile-web-smoke 10 项机判（首轮即绿 PASS 10/10）**：网络全通 / console 零错 / canvas 挂载 / 首帧非纯色 / 画面在动 / 触摸到达 / 触摸响应 / 音频解锁器 / 无横向溢出 / FPS≥8（实测 fps=38）。证据归档 `games/game-10/qa/mobile/`（report.json + 3 张分阶段截图）随仓库提交，preHook 证据可跨节点复用。
+- 截图目检项：四轨下落、判定线、HUD、底部四分区触控、中文字体全部正常。
+
+## 六、Web 导出与部署要点（踩坑实录）
+
+- `export_presets.cfg`：Web 预设 **`thread_support=false`**（防跨域隔离缺失导致启动失败）、720×1280 竖屏。
+- 产物落位：index.html/js/pck（2.5MB）/wasm（35MB，走对象存储通道不受 bundle 限制）/worklet；`export/web` 需入库（它是部署构建输入），而 `qa/` 与 `export/web` 要加 `.gdignore` 防证据截图混进 pck（playtest 节点实测重导出后 46 文件与线上清单一致）。
+- 壳（AppHost）：仓库根 `apphost.toml` 切 game-10 + `assets_dir`；落地页含音频手势解锁器与 `?tuning=` 调参桥；资产全相对路径 base64 文本通道。
+- **部署 POST 返回 504 ≠ 失败**：clone 含 35MB wasm 的仓库超时，但服务端已受理进入 building；此时重试会建出第二个 queued 部署（本轮即发生，同 gitRef 同内容双记录）。正确姿势：先查部署状态再决定是否重发。
+- **playtest 节点实测发现**：TuningPanel 只有定义、无任何实例化点，线上 `?tuning=1` 出不来面板（冒烟只断言调参协议纯逻辑，所以门禁全绿）——「门禁绿 ≠ 线上功能在」的典型案例。修复 = 3 行接线（commit b0e8560，在分支待下次部署生效）。
+- **回写事故复盘（已完全恢复）**：以空数组 PATCH 探测写端点，意外带真实凭据把 goal artifacts 清空；靠先前 dump 的 DB 原文重建并逐字段核对恢复。教训入模板：**禁止以破坏性载荷试探写端点**，探形状只用只读 GET。
+
+## 七、给后续节拍/音游类游戏的复用清单
+
+1. 判定器写成纯静态逻辑 + 独立 oracle 对拍 + 边界精确值表；所有判定走同一条带校准的 delta 公式。
+2. 歌曲时钟做成纯函数模式（位置=f(时间)），音频时钟接入预留单点替换；无头复现性优先于「真音频钟」——门禁能机判才是硬通货。
+3. 谱面：确定性 seed + 校验器返回可读错误；首音符 ≥ 穿屏时长；同轨 gap ≥ 2×GOOD 窗；终局先 MISS 收口再结算。
+4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
+5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
+6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
 

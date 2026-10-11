@@ -1,0 +1,1 @@
+object_url=http://localhost:9000/myrd/runs/cmv305l80000zm90464ys0lys/xinban-v0.8/xinban-v0.8-web.tar.gz

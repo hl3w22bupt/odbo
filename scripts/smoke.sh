@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 心伴 v0.7 · 一条命令全链路冒烟（01-38 兼容基线 + 39-42 近7日周报）
+# 心伴 v0.8 · 一条命令全链路冒烟（01-38 兼容基线 + 39-42 近7日周报 + 43-45 自然周周期报告）
 # 用法：npm run smoke
 # 可用环境变量：XINBAN_SMOKE_PORT（默认 13888）、KEEP_SMOKE_DIR=1（保留临时目录）
 set -euo pipefail
@@ -399,4 +399,23 @@ green '41 周报用户可见状态契约'
 (cd "$ROOT/apps/server" && npx vitest run -t 'degrades the weekly report when persistence or aggregation fails' src/routes/chat.routes.test.ts >/dev/null)
 green '42 周报聚合失败安全降级'
 
-green "心伴 v0.7 冒烟通过：$PASS 项 / 42 项"
+# ---------- v0.8 增量段：自然周周期情绪报告最小版 ----------
+period_report="$(http GET "/api/v1/conversations/$CONVERSATION_ID/mood-period-report" "$TOKEN")"
+if printf '%s' "$period_report" | jq -e '.data.available == true and .data.degraded == false and .data.totalDays == 7 and .data.period != null and .data.period.id != null and .data.coverageDays >= 1 and (.data.moods | length) == .data.coverageDays and ([.data.moods[].count] | add) == 2 and .data.summary.sampleSize == 2 and .data.summary.counts == {"positive":0,"neutral":0,"negative":2} and .data.summary.trend == "STABLE"' >/dev/null; then
+  green '43 自然周周期报告读取修正后样本并披露覆盖率'
+else
+  red "❌ 周期报告契约失败（body=$period_report）"
+fi
+
+fresh_period="$(http GET "/api/v1/conversations/$FRESH_CONVERSATION_ID/mood-period-report" "$TOKEN")"
+if printf '%s' "$fresh_period" | jq -e '.data.available == true and .data.degraded == false and .data.period != null and .data.coverageDays == 0 and .data.totalDays == 7 and .data.moods == [] and .data.summary == null' >/dev/null; then
+  green '44 空周期返回合法空结构'
+else
+  red "❌ 周期报告空态失败（body=$fresh_period）"
+fi
+
+(cd "$ROOT/apps/server" && npx vitest run src/lib/moodPeriodReport.test.ts >/dev/null)
+(cd "$ROOT/apps/server" && npx vitest run -t 'degrades the period report and logs loudly when persistence or aggregation fails' src/routes/chat.routes.test.ts >/dev/null)
+green '45 周期报告纯函数口径与降级契约'
+
+green "心伴 v0.8 冒烟通过：$PASS 项 / 45 项"

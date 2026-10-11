@@ -1,0 +1,59 @@
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv305l80000zm90464ys0lys/apps/server
+
+stderr | src/routes/chat.routes.test.ts > chat v0.8 natural-week period mood report > rejects cross-user or missing conversations with the defined 404 error
+[2026-10-11T00:06:51.859Z] [ERROR] [chat] period mood report degraded {"err":"TypeError: Cannot read properties of undefined (reading 'filter')","conversationId":"conv_1"}
+
+stdout | src/routes/chat.routes.test.ts
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+
+ ❯ src/routes/chat.routes.test.ts (22 tests | 1 failed | 21 skipped) 6ms
+     × rejects cross-user or missing conversations with the defined 404 error 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/routes/chat.routes.test.ts > chat v0.8 natural-week period mood report > rejects cross-user or missing conversations with the defined 404 error
+AssertionError: promise resolved "{ status_code: 200, …(2) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "body": {
++     "code": "OK",
++     "data": {
++       "available": false,
++       "conversationId": "conv_1",
++       "coverageDays": 0,
++       "degraded": true,
++       "moods": [],
++       "period": null,
++       "summary": null,
++       "totalDays": 7,
++     },
++     "message": "ok",
++   },
++   "headers": {
++     "content-type": "application/json; charset=utf-8",
++   },
++   "status_code": 200,
+  }
+
+ ❯ src/routes/chat.routes.test.ts:568:7
+    566|     await expect(handlers.get('chat::conversation-period-report')!(
+    567|       readContext(conversationId),
+    568|     )).rejects.toMatchObject({
+       |       ^
+    569|       statusCode: 404,
+    570|       code: 'NOT_FOUND',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 21 skipped (22)
+   Start at  08:06:51
+   Duration  221ms (transform 80ms, setup 0ms, import 135ms, tests 6ms, environment 0ms)
+

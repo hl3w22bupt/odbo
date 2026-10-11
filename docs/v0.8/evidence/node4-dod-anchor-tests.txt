@@ -1,0 +1,5 @@
+src/lib/moodPeriodReport.test.ts | aggregates a natural week with per-day coverage and excludes missing days without zero fill | verbatim_hits=1
+src/lib/moodPeriodReport.test.ts | returns the legal empty period structure field by field when the week has no valid points | verbatim_hits=1
+src/routes/chat.routes.test.ts | degrades the period report and logs loudly when persistence or aggregation fails | verbatim_hits=1
+src/routes/chat.routes.test.ts | exposes the natural week period mood report read API | verbatim_hits=1
+src/routes/chat.routes.test.ts | reads persisted corrections into the period report | verbatim_hits=1

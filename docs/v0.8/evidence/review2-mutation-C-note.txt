@@ -1,0 +1,4 @@
+mutation C: 移除 conversationPeriodMoodReport 越权守卫 (chat.ts)
+expect: T4 新测试变红
+actual: exit=1 AssertionError promise resolved 200 instead of rejecting
+HEAD-at-mutation: c488aca+working-tree; restored-after: yes (tracked diff = test file only)

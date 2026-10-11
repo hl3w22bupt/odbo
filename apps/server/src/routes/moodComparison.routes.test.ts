@@ -195,6 +195,40 @@ describe('mood period comparison and CSV export', () => {
     expect(one.trendPairs).toEqual([])
   })
 
+  it('distinguishes one empty period from overall partial completeness', async () => {
+    const rows = twoCycleRows()
+    mockSource({
+      memoryRows: rows.memoryRows,
+      moodRows: rows.moodRows.filter((row) => row.id === 'current'),
+      correctionRows: [],
+    })
+    const res = await handlers.get('chat::conversation-period-comparison')!(context(conversationId, { periods: '2' }))
+    const data = res.body.data as any
+    expect(data.periods[0]).toMatchObject({
+      empty: true,
+      aggregateValues: {
+        count: null,
+        positive: null,
+        neutral: null,
+        negative: null,
+        averageScore: null,
+      },
+      completeness: { expectedPoints: 5, actualPoints: 0, ratio: 0, status: 'EMPTY' },
+    })
+    expect(data.periods[1].completeness).toEqual({
+      expectedPoints: 5,
+      actualPoints: 5,
+      ratio: 1,
+      status: 'COMPLETE',
+    })
+    expect(data.completeness).toEqual({
+      expectedPoints: 10,
+      actualPoints: 5,
+      ratio: 0.5,
+      status: 'PARTIAL',
+    })
+  })
+
   it('aligns weekly boundaries across a Gregorian year boundary', async () => {
     vi.setSystemTime(new Date('2026-01-06T02:00:00.000Z'))
     mockSource({ memoryRows: [], moodRows: [], correctionRows: [] })

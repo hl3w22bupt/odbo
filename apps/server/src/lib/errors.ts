@@ -18,6 +18,9 @@ export type ErrorCode =
   | 'SMS_RATE_LIMITED'
   | 'INVALID_CODE'
   | 'PAYMENT_ERROR'
+  | 'IMPORT_VERSION_MISSING'
+  | 'IMPORT_VERSION_UNSUPPORTED'
+  | 'IMPORT_SCHEMA_REJECTED'
 
 export class AppError extends Error {
   readonly statusCode: number

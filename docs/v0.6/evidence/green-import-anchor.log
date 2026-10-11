@@ -1,0 +1,24 @@
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmuyq23k10021m93ew3n6padp/apps/server
+
+ ✓ src/lib/importData.test.ts > json import schema gate > test_import_missing_version_rejects_whole_batch 1ms
+ ✓ src/lib/importData.test.ts > json import schema gate > test_import_higher_version_rejects_whole_batch 0ms
+ ✓ src/lib/importData.test.ts > json import schema gate > test_import_invalid_record_rejects_schema_without_partial_plan 0ms
+ ✓ src/lib/importData.test.ts > json import schema gate > test_import_valid_payload_keeps_frozen_envelope 1ms
+stdout | src/routes/import.persistence.test.ts
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+
+ ✓ src/routes/import.persistence.test.ts > json import schema gate > test_import_missing_version_rejects_whole_batch 1ms
+ ✓ src/routes/import.persistence.test.ts > json import schema gate > test_import_higher_version_rejects_whole_batch 0ms
+ ✓ src/routes/import.persistence.test.ts > json import schema gate > test_import_invalid_record_rejects_schema_without_partial_plan 0ms
+ ✓ src/routes/import.persistence.test.ts > json import schema gate > test_import_valid_payload_keeps_frozen_envelope 1ms
+ ✓ src/routes/import.persistence.test.ts > json import persistence > test_import_roundtrip_and_idempotent_anchor 31ms
+ ✓ src/routes/import.persistence.test.ts > json import persistence > test_import_missing_or_higher_version_rejects_without_write 1ms
+ ✓ src/routes/import.persistence.test.ts > json import persistence > test_import_schema_rejection_is_whole_batch_and_record_skip_is_isolated 3ms
+
+ Test Files  2 passed (2)
+      Tests  11 passed (11)
+   Start at  07:26:51
+   Duration  950ms (transform 100ms, setup 0ms, import 71ms, tests 835ms, environment 0ms)
+
+GREEN_EXIT=0

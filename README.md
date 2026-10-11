@@ -1,5 +1,7 @@
 # 心伴 v0.1（可运行 / 可演示 / 可验收）
 
+> 当前增量基线：v0.6 JSON 备份导入；v0.5 冒烟 01-31 作为兼容段保留。
+
 心伴是面向单身中老年男性用户的 AI 情感陪伴原型。v0.1 只交付并冻结主链路：
 
 **注册/登录 → 选择角色 → 发送消息并收到回复 → SQLite 持久化 → Expo Web 展示**
@@ -47,7 +49,7 @@ EXPO_PUBLIC_API_URL=http://127.0.0.1:13888 npx expo start --web
 | 业务 handlers | `apps/server/src/routes` | auth/users/characters/chat 等主链路；商业化等表外能力不验收 |
 | 路由适配 | `apps/server/src/http.ts` | 同一 handler 支持 standalone 与 iii 注册 |
 | 持久化 | `apps/server/prisma` | SQLite schema、seed、用户/会话/消息/配额/JWT 会话 |
-| 冒烟 | `scripts/smoke.sh` | 临时数据库、真实 HTTP、服务重启、13 项断言 |
+| 冒烟 | `scripts/smoke.sh` | 临时数据库、真实 HTTP、服务重启、38 项断言 |
 | 情绪持久化 | `apps/server/src/lib/emotion.ts` | 会话情绪伴生态 CRUD、坏数据兼容、写失败降级 |
 | v0.2 验收 | `scripts/persistence-v02.sh` / `scripts/deploy-v02.sh` | 重启一致性与工作流 deploy 复验 |
 | 情绪修正/导出 | `apps/server/src/lib/moodCorrections.ts`、`apps/server/src/routes/export.ts` | 追加式修正 latest-wins、JSON 用户数据导出 |

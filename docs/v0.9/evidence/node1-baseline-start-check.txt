@@ -1,0 +1,2 @@
+health_http=200 health_pid=81771
+start_gate=1

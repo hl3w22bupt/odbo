@@ -14,7 +14,7 @@
 | 6 | 导出元信息 | `X-Report-Row-Count=10` 与解析数据行一致（不含表头）；generatedAt 仅断存在 + ISO regex | ☑ |
 | 7 | 降级 | 注入 source 连续失败两次：对比 200 degraded；CSV JSON `attempts=2`；单周期失败 CSV 可用 5 行 + partial/degraded 双头 | ☑ |
 | 8 | 死测试余量 | 四口径 grep=0（`node4-dead-test-scan.log`） | ☑ |
-| 9 | deploy 冒烟 | 节点 5 执行 46/46 后回填 | ☐→节点5 |
+| 9 | deploy 冒烟 | 部署后 smoke 46/46、persist 9/9、deploy replay build/start/test=0 | ☑ |
 
 补强：QA 发现 DoD3 初始证据未充分区分「一个周期空」和「整体空」，追加 `distinguishes one empty period...`，13/13 绿（`node4-dod-anchor-tests.log`）。
 
@@ -45,4 +45,4 @@
 
 ## 5. 结论
 
-QA 通过（DoD 1-8 ☑，第 9 条待节点 5 deploy 冒烟回填后闭环）。
+QA 通过（DoD 1-9 ☑；deploy 冒烟闭环由节点 5 留证）。

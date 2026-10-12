@@ -1,0 +1,14 @@
+# v0.9 Node4 scope/diff/dead gates
+UTC: 2026-10-12T23:23:11Z
+## schema diff (expect empty)
+schema_diff_rc=0
+## v0.7 render touch check (expect no tracked diff)
+## dead-test category scan
+\.skip\(=0
+\.only\(=0
+xit\(=0
+xdescribe\(=0
+test\.todo\(=0
+it\.todo\(=0
+dead_total=0
+## additive file audit

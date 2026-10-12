@@ -174,6 +174,42 @@ export interface MoodWeeklyReportResult {
   report: MoodWeeklyReport | null;
 }
 
+export type PeriodCompleteness = 'FULL' | 'PARTIAL' | 'EMPTY';
+
+export interface PeriodMetrics {
+  periodId: string;
+  from: string;
+  to: string;
+  sampleSize: number;
+  coverageDays: number;
+  totalDays: number;
+  averageScore: number;
+  completeness: PeriodCompleteness;
+}
+
+export interface PeriodTrendValues {
+  currentAverage: number;
+  previousAverage: number;
+  deltaScore: number;
+}
+
+export interface PeriodCompletenessMark {
+  current: PeriodCompleteness;
+  previous: PeriodCompleteness;
+  overall: PeriodCompleteness;
+}
+
+export interface PeriodComparisonResult {
+  available: boolean;
+  degraded: boolean;
+  periodId: string;
+  previousPeriodId: string;
+  current: PeriodMetrics;
+  previous: PeriodMetrics;
+  trend: PeriodTrendValues;
+  completeness: PeriodCompletenessMark;
+}
+
 export interface QuotaStatus {
   used: number;
   limit: number;

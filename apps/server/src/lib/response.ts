@@ -15,6 +15,8 @@ export interface HttpResponse {
   status_code: number
   headers: Record<string, string>
   body: ApiEnvelope<unknown>
+  /** standalone HTTP runtime专用：设置后绕过 JSON envelope 原样输出（例如 CSV）。 */
+  rawBody?: string
 }
 
 export function ok<T>(data: T, message = 'ok'): HttpResponse {
@@ -82,4 +84,18 @@ export function clientIp(headers: Record<string, string | string[] | undefined>)
   const cf = headers['cf-connecting-ip']
   if (typeof cf === 'string') return cf
   return undefined
+}
+
+export function rawContent(
+  content: string,
+  contentType: string,
+  extraHeaders: Record<string, string> = {},
+  message = 'ok',
+): HttpResponse {
+  return {
+    status_code: 200,
+    headers: { 'content-type': contentType, ...extraHeaders },
+    body: { code: 'OK', message, data: { encoding: 'utf8', byteLength: Buffer.byteLength(content) } },
+    rawBody: content,
+  }
 }

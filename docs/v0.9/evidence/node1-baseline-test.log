@@ -1,0 +1,61 @@
+
+> xinban-v01@1.0.0 test
+> cd apps/server && npm test && cd ../mobile && npm test
+
+
+> @xinban/server@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv5v1t68001gm9qq29ip34bm/apps/server
+
+stdout | src/routes/chat.routes.test.ts
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+
+ ❯ src/routes/chat.routes.test.ts (22 tests | 1 failed) 13ms
+     × reads persisted corrections into the period report 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/routes/chat.routes.test.ts > chat v0.8 natural-week period mood report > reads persisted corrections into the period report
+AssertionError: expected { conversationId: 'conv_1', …(7) } to match object { conversationId: 'conv_1', …(5) }
+(5 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "available": true,
+    "conversationId": "conv_1",
+-   "coverageDays": 2,
++   "coverageDays": 0,
+    "degraded": false,
+-   "summary": {
+-     "counts": {
+-       "negative": 2,
+-       "neutral": 0,
+-       "positive": 0,
+-     },
+-     "sampleSize": 2,
+-     "trend": "STABLE",
+-   },
++   "summary": null,
+    "totalDays": 7,
+  }
+
+ ❯ src/routes/chat.routes.test.ts:526:27
+    524|     const res = await handlers.get('chat::conversation-period-report')…
+    525|     expect(res.status_code).toBe(200)
+    526|     expect(res.body.data).toMatchObject({
+       |                           ^
+    527|       conversationId,
+    528|       available: true,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 16 passed (17)
+      Tests  1 failed | 81 passed (82)
+   Start at  07:08:54
+   Duration  1.11s (transform 838ms, setup 0ms, import 1.36s, tests 1.91s, environment 1ms)
+

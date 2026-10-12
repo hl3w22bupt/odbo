@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 心伴 v0.8 · 一条命令全链路冒烟（01-38 兼容基线 + 39-42 近7日周报 + 43-45 自然周周期报告）
+# 心伴 v0.9 · 一条命令全链路冒烟（01-38 兼容基线 + 39-42 周报 + 43-45 周期报告 + 46-48 多周期对比/CSV）
 # 用法：npm run smoke
 # 可用环境变量：XINBAN_SMOKE_PORT（默认 13888）、KEEP_SMOKE_DIR=1（保留临时目录）
 set -euo pipefail
@@ -418,4 +418,32 @@ fi
 (cd "$ROOT/apps/server" && npx vitest run -t 'degrades the period report and logs loudly when persistence or aggregation fails' src/routes/chat.routes.test.ts >/dev/null)
 green '45 周期报告纯函数口径与降级契约'
 
-green "心伴 v0.8 冒烟通过：$PASS 项 / 45 项"
+# ---------- v0.9 增量段：多周期对比与周期 CSV ----------
+period_id="$(printf '%s' "$period_report" | jq -r '.data.period.id')"
+comparison="$(http GET "/api/v1/periods/$period_id/comparison" "$TOKEN")"
+if jq -e '.data.available == true and .data.degraded == false and .data.periodId == $pid and .data.previousPeriodId != $pid and .data.current.sampleSize == 2 and .data.current.coverageDays == 1 and .data.current.completeness == "PARTIAL" and .data.previous.sampleSize == 0 and .data.previous.coverageDays == 0 and .data.previous.completeness == "EMPTY" and ([.data.trend.currentAverage,.data.trend.previousAverage,.data.trend.deltaScore] | all(type == "number")) and .data.completeness.overall == "PARTIAL"' --arg pid "$period_id" "$BODY" >/dev/null; then
+  green '46 多周期对比输出趋势三值与完整度'
+else
+  red "❌ 多周期对比契约失败（period=$period_id body=${comparison}）"
+fi
+
+csv_file="$RUN_DIR/period.csv"
+csv_status="$(curl -sS -m 20 -o "$csv_file" -w '%{http_code}' "$BASE/api/v1/periods/$period_id/report.csv" -H "Authorization: Bearer $TOKEN")"
+csv_header='period_id,date,available,degraded,from,to,positive,neutral,negative,sample_size,average_score,coverage_days,total_days,completeness'
+csv_rows="$(tr -d '\r' < "$csv_file" | wc -l | tr -d ' ')"
+if [ "$csv_status" = 200 ]   && [ "$(head -1 "$csv_file" | tr -d '\r')" = "$csv_header" ]   && [ "$csv_rows" = 2 ]   && ! grep -qiE 'row.?_?count' "$csv_file"; then
+  green '47 周期 CSV 固定列序且不含行数元信息'
+else
+  red "❌ 周期 CSV 契约失败（status=$csv_status rows=$csv_rows header=$(head -1 "$csv_file")）"
+fi
+
+previous_id="$(printf '%s' "$comparison" | jq -r '.data.previousPeriodId')"
+empty_csv_status="$(curl -sS -m 20 -o "$csv_file" -w '%{http_code}' "$BASE/api/v1/periods/$previous_id/report.csv" -H "Authorization: Bearer $TOKEN")"
+empty_csv_rows="$(tr -d '\r' < "$csv_file" | wc -l | tr -d ' ')"
+if [ "$empty_csv_status" = 200 ]   && [ "$(head -1 "$csv_file" | tr -d '\r')" = "$csv_header" ]   && [ "$empty_csv_rows" = 1 ]   && ! grep -qiE 'row.?_?count' "$csv_file"; then
+  green '48 空周期 CSV 仅表头且无行数元信息'
+else
+  red "❌ 空周期 CSV 失败（status=$empty_csv_status rows=$empty_csv_rows）"
+fi
+
+green "心伴 v0.9 冒烟通过：$PASS 项 / 48 项"

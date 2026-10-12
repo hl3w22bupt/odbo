@@ -1,0 +1,38 @@
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv5v1t68001gm9qq29ip34bm/apps/server
+
+ ❯ src/lib/periodCsv.test.ts (0 test)
+ ❯ src/lib/periodComparison.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/periodComparison.test.ts [ src/lib/periodComparison.test.ts ]
+Error: Cannot find module './periodComparison.js' imported from /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv5v1t68001gm9qq29ip34bm/apps/server/src/lib/periodComparison.test.ts
+ ❯ src/lib/periodComparison.test.ts:3:1
+      1| import { describe, expect, it } from 'vitest'
+      2| import { readableMoodPeriodReport } from './moodPeriodReport.js'
+      3| import { compareMoodPeriods, periodComparisonDegraded } from './period…
+       | ^
+      4| import type { MemoryReadContract, MoodTimelineContract } from './conve…
+      5|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/lib/periodCsv.test.ts [ src/lib/periodCsv.test.ts ]
+Error: Cannot find module './periodCsv.js' imported from /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv5v1t68001gm9qq29ip34bm/apps/server/src/lib/periodCsv.test.ts
+ ❯ src/lib/periodCsv.test.ts:3:1
+      1| import { describe, expect, it } from 'vitest'
+      2| import { readableMoodPeriodReport } from './moodPeriodReport.js'
+      3| import { PERIOD_CSV_COLUMNS, moodPeriodReportCsv } from './periodCsv.j…
+       | ^
+      4| import type { MemoryReadContract, MoodTimelineContract } from './conve…
+      5|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  no tests
+   Start at  07:14:54
+   Duration  113ms (transform 35ms, setup 0ms, import 0ms, tests 0ms, environment 0ms)
+

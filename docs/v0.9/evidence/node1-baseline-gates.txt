@@ -1,0 +1,15 @@
+# v0.10 Node1 baseline gates (frozen v0.8 HEAD)
+UTC: 2026-10-12T23:07:05Z
+HEAD: e62507502672c85ba3ce0eba835931ba531a6897
+BASELINE_DECISION=PENDING
+
+test_rc=127
+build_rc=127
+smoke_rc=1
+persist_rc=0
+setup_rc=0
+## setup-restored rerun
+test_rc=1
+build_rc=0
+smoke_rc=0
+persist_rc=0

@@ -68,7 +68,8 @@ async function loadSource(conversationId: string, userId: string): Promise<Compa
     prisma.moodSnapshot.findMany({
       where: { conversationId },
       orderBy: { createdAt: 'asc' },
-      take: 1000,
+      // 多取一行使第 1001 行可见：否则 length 恒 ≤1000，413 超限判定生产不可达（VERIFICATION AC-13 修复）
+      take: CSV_EXPORT_ROW_LIMIT + 1,
     }),
     prisma.moodCorrection.findMany({
       where: { conversationId, userId },

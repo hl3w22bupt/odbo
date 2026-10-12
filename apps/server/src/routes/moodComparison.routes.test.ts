@@ -343,4 +343,11 @@ describe('mood period comparison and CSV export', () => {
     await expect(handlers.get('chat::conversation-period-comparison-csv')!(context(conversationId)))
       .rejects.toMatchObject({ code: 'CSV_EXPORT_TOO_LARGE', statusCode: 413, message: expect.stringContaining('limit=1000') })
   })
+
+  it('pulls one row beyond the frozen limit so the 413 guard is reachable in production', async () => {
+    mockSource()
+    await handlers.get('chat::conversation-period-comparison-csv')!(context(conversationId))
+    const call = prismaMock.moodSnapshot.findMany.mock.calls[0][0] as { take?: number }
+    expect(call.take).toBe(1001)
+  })
 })

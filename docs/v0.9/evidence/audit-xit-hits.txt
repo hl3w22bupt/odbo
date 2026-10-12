@@ -1,0 +1,5 @@
+apps/server/src/index.ts:61:    process.exit(0)
+apps/server/src/index.ts:66:    process.exit(0)
+apps/server/src/index.ts:72:  process.exit(1)
+apps/server/src/localServer.ts:140:    server.close(() => process.exit(0))
+apps/server/src/localServer.ts:141:    setTimeout(() => process.exit(0), 2_000).unref()

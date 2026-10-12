@@ -29,115 +29,6 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 
 ## 产品关联知识
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
-
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -167,9 +58,9 @@ negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内�
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
-## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
-修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -303,6 +194,115 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+
+修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
 
 ## 架构设计文档
 
@@ -2714,6 +2714,125 @@ curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.
 4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
 5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
 6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
+
+
+## [H4] 提案漏斗消费停滞滞留观察：pending 29 距熔断线 30 仅差 1、approved=0，根因在人审消费侧（承接 L4 在池提案，不重复立案） 2026-W41
+
+v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 两案 cmutkyiz8/cmutkyiyb，7 天零动作）、approved=0、最老积压 pendingDays=64、已越 escalate 线 27、距 breaker 线 30 仅差 1（触发即暂停全局自动分析，项目级降级 drain 续跑）。代码面告警→曝光→熔断链路完备（approval-sla.ts:19-27 阈值在位、scheduler.ts:293-309 console+持久化事件双出口、platform-health-section.tsx:378-394 前端徽标），『sla_alert 仍 console-only』旧口径被体检师证伪、红队确认；停滞根因收窄为人审消费侧零动作。v2 轮同主题提案 cmunjmm5r（L4）在池未动，按『不重复立案』纪律转滞留观察；维持 approval-sla.ts:12/:131『只提醒、绝不自动 approve/apply』边界红线，不产出放宽护栏建议。
+
+## [H6] error:null 静默失败 2 条挂验证观察：自愈双路（启动+周期 5 分钟）在位运转，残余=failed 写入路径 error 字段形态不一 2026-W41
+
+本期 error=null 2/73 条（v3 期『量最大』→ 本期 2 条，方向向好未清零；其中 ≥1 条 agentName='真机试玩验收' playtest 类）。自愈机制实锤在位且运转：index.ts:371-374 启动 + :578/:588 周期（5 分钟）双路 cleanupStaleTrajectories 操作 agentExecutionTrajectory（engine.ts:399-435），failures.json 实测 2 条『僵尸轨迹…周期自愈清理为 failed』即运转产出（平台自愈规范『无自愈覆盖』旧口径反转，体检师自纠+红队确认）。残余疑点：某 failed 写入路径置 failed 时不携带 error（与 :422/:432 两种 error 必填形态不一致），2 条与 SIGINT/SIGTERM/僵尸共 7 条字段邻接形态异于其余 66 条。n=2 样本不足：维持挂验证（台账 L6），不销案不升级；『审计 failed 写入点保证 error 必填』的工程化修复待样本量达标或定位到具体路径后转 bug_ticket。
+
+## MyRD 自进化周报 2026-W41
+
+# MyRD 自进化周报 2026-W41
+
+> 窗口 2026-10-04 → 2026-10-11 · 数据锚 health.json generatedAt=2026-10-11T07:18:43.499Z（三份采集件一致）
+> 产出节点：④首席研究员（口径整合+环比结论+双轨立案）；输入：①数据侦探（findings-delta-v3 + 台账 v4 + hypotheses H1-H9）、②体检师（findings-audited 9 条）、③红队（findings-verified 9 条裁决）
+> as-of-SHA：体检师取证 head=907df40（07:30:55Z）→ 红队复核 head=e81f3ae（07:49:22Z workflow auto-commit 漂移，红队在漂移后工作区逐行亲读自证行号有效，最大偏差 ≤3 行）；**base SHA(10/4)=unavailable**（详见「数据缺口」节，如实上报不编造）
+
+---
+
+## 一、本周结论摘要
+
+本周平台**整体向好但含一次 P0 级异动事件**：总体任务成功率 0.718→0.865（+20.5%，样本 38 达门槛，红队复算 ✓）、workflow 成功率 1.0（26/26 零失败）、benchmark 86.33→87.25（+1.1%，回落条款未触发）、实体级失败 tasks 22→5 / goals 15→5 / workflowRuns 1→0。
+
+异动主因为 **10/7 单日 429 配额级联**：73 条失败轨迹中 62 条集中 10/7 UTC T07-T08 两小时窗（首席 `-o` 复算：429 全文 81 处、10/7 当天 63 条、agentType workflow 49/goal_master 11/goal_delegate 10，勾稽 73 ✓），同一批游戏开发 workflow 与 goal 编排全灭——外部配额事件 × 调度韧性缺口（退避 40s 封顶 vs 小时级配额窗 + 配额签名域无编排级熔断）。goal 型成功率两期持平 0.5 与该事件同源（轨迹级 21 条失败中 17 条落窗且全 429 系）。
+
+第二紧迫项是**进化闭环自身的停摆风险**：提案池 pending 29 距熔断线 30 仅差 1、approved=0、v3 两案 7 天零动作、最老积压 64 天——告警通路经体检师+红队双重复核为完备，停滞根因收窄为**人审消费侧零动作**。
+
+红队裁决：**9 条假设全部 Confirmed、Refuted=0、Uncertain=0**（红队对体检师 3 处表述做了措辞修正，见第五节）。收敛 top3 短板：**H1 配额韧性（P1）> H4+台账 审批消费停滞（P2，紧迫度最高）> H9 自愈规范文档滞后（P2，防重复立案加速熔断）**。
+
+## 二、环比分项结论（预注册 rubric：恶化=异动+验证成立/复核坐实；持平=无超阈值或样本不足；改善=向好+复测/复核任一佐证）
+
+| 指标 | 上期→本期 | 判定 | 依据 |
+|---|---|---|---|
+| overallTaskSuccessRate | 0.718→0.865 (+20.5%) | **改善** | 样本 38≥5 门槛；红队手算复算 ✓；benchmark 同向佐证 |
+| workflow 成功率 | 0.870→1.0 (+15%) | **改善** | 26/26 零失败，红队复算 ✓ |
+| goal 成功率 | 0.5→0.5 (deltaPct=0) | **持平**（分类型小分母 total=10·仅方向参考） | 唯二未改善口径之一；同源归因 H1/H2 已坐实（轨迹级） |
+| 实体级失败 tasks/goals/workflowRuns | 22→5 / 15→5 / 1→0 | **改善** | platform-health 实体级口径，红队复算 ✓ |
+| 轨迹级失败（failures.json） | 73 条（62 条 10/7 配额级联） | **恶化**（异动+红队验证成立） | 首轮轨迹级基线；注意与实体级口径**禁止直接对读**（H3） |
+| benchmark | 86.33→87.25 (+1.1%) | **改善** | 上升且无回落；纪律：即便回落也只查执行侧，不产出放宽护栏建议 |
+| 提案漏斗 pending | 27→29（approved=0） | **恶化** | 四方读数对齐+红队复算 ✓；已越 escalate=27，距 breaker=30 差 1 |
+| 负反馈率 / express_lane | null+no-data / null | **持平**（零样本，不设目标） | 观测缺口（H7）：采集管道代码面无缺维，评分行为未发生 |
+| 验证/选择层三指标 | 0/0（两期同） | **持平**（结构性存量缺口） | 机制在仓流量缺失（H8），承接在池提案滞留观察 |
+| bugClosureDays | 无前值→19.5 | **待验证** | 单值不可环比，不设目标不下结论 |
+
+阈值口径：沿用 v3 集合（周级样本门槛 ≥5，本期 activity.tasks=38 通过；分类型小分母逐条标注；零样本不下异动结论），①本轮未提议新分位阈值，④复核采用。
+
+**过程指标首录（v3 公式零改动，本轮值即 v5 环比基线；样本不足只记分布、不设目标）**
+- 转化率 = 达「已执行·未验收」及以上立案数 / 当轮总立案数（销案 0 与误报 0 不入分母）= **0/7 = 0%**（若仅按 v3 当轮新立案 L1/L2 计亦为 0/2=0%）
+- 滞留环节 = 台账状态分布：未动 5（全部滞留在**审批消费侧**）+ 进行中(挂验证) 2；台账时间戳齐备（pendingDays/createdAt 在采集件内），时长维度无需标待验证（bugClosureDays 除外）
+
+## 三、v3 立案闭环追踪（台账 v4 摘要，完整版见 findings-ledger-v4.json）
+
+| caseId | proposalId | 主题 | 状态 | 证据 |
+|---|---|---|---|---|
+| L1 | cmutkyiz8… | 提案池去重与消费闭环标准（v3 新立案） | **未动** | pending/appliedAt=null/pendingDays=6；approved=0 |
+| L2 | cmutkyiyb… | 验证/选择层接线标准 v2（v3 新立案） | **未动** | 同上；acceptanceTests.total 仍 0、gateVerifiedRunRate 仍 0 |
+| L3 | cmupfhl8n… | 验证/选择层接线标准 v1（v2 立案） | **未动** | pendingDays=9，与 L2 同主题防重复立案 |
+| L4 | cmunjmm5r… | 提案漏斗行动牵引（v2 立案） | **未动** | pendingDays=11；其所针对的消费停滞本期继续为真 |
+| L5 | cmuhtbg1v… | V0 执行端工具配置定稿 | **未动** | pendingDays=15 |
+| L6 | （疑点 H4→本轮 H6） | error:null 静默失败 | **进行中（挂验证）** | 本期 2/73 条，向好未清零；n=2 维持挂验证 |
+| L7 | （疑点 H5·v3 编号） | v3 疑点 H5 | **进行中（挂验证·定义待补录）** | ⚠️ v3 台账底稿未随本 worktree 数据包采集，原始定义与判据缺失，按纪律不编造、原样保留 |
+
+台账 summary：7 条 = 未动 5 + 进行中 2；本轮无「已验收」条目 → 红队「已验收抽验」队列为空（如实记录）；H4/H5（v3 编号）与滞留提案无新证据 → **转「滞留观察」，不重复立案**。
+
+## 四、Confirmed 短板清单（9/9，定级以红队裁决为准）
+
+| ID | 定级 | 动作 | 短板与根因（证据均为红队逐行亲读+首席关键数字复算） |
+|---|---|---|---|
+| H1 | P1 | bug_ticket | **429 配额级联**：retry-utils.ts:15/:42-43/:67-69 重试 3 次上限+退避 10/20/40s 封顶，对小时级配额窗量级错配 3 个数量级；配额签名域无编排级熔断（其它域熔断在位）；62 条失败集中 10/7 T07-T08，T08 簇 durationMs≈180s 与「70s 退避+3 次执行」耗尽形状吻合；error 自带恢复锚点 21:31:45，10/8 起清零 |
+| H2 | P2 | bug_ticket（与 H1 同工单承接） | **goal 0.5 持平同源**：goals.ts:4659 agentType 注册实锤；21 条 goal 型失败 17 条落窗全 429 系（红队交叉表，修正体检师「21 条全同窗」）；实体级归属挂 DB 预注册验证 |
+| H3 | P2 | evolution_proposal | **73 vs 10 口径差**：轨迹级（analyzer.ts:491 status≠completed，含在途/重试）vs 实体级（index.ts:118 status='failed'）三重不同源（表/谓词/粒度），7.3 倍差为口径必然非采集缺陷 → 口径对照表文档化 + 两口径禁止直接对读 |
+| H4 | P2 | knowledge_only（滞留观察） | **提案漏斗消费停滞**：approved=0、pending 29 差 1 触熔断、v3 两案 7 天零动作、最老 64 天；告警链路完备（console+事件+API+前端徽标），根因=人审消费侧零动作；v2 同主题 L4 在池，不重复立案；维持「绝不自动 approve/apply」边界红线 |
+| H5 | P3 | bug_ticket | **stderr 噪音漏网**：stripCliStderrNoise 共享工具+专项测试在位（红队推翻体检师「未收口」表述），仍有 2 条 unrecognized_model 漏网 → 存在未接入路径（嫌疑点 benchmark.ts:396 非 143 分支）；n=2 仅方向参考 |
+| H6 | P3 | knowledge_only（挂验证） | **error:null 2 条**：自愈双路（启动+周期 5min）实锤在位且运转（2 条僵尸自愈签名即产出证据）；残余=某 failed 写入路径 error 字段形态不一；n=2 挂验证不销案不升级 |
+| H7 | P3 | none（观测缺口登记） | **express_lane 零样本+负反馈 no-data**：全类型同 groupBy、采样管道在位启动即跑 → 缺口在行为侧非采集缺维；预注册升级条款留档（若 expressLaneRun 有记录而 Task 无终态→P1 复立） |
+| H8 | P3 | none（滞留观察） | **验证/选择层三指标持续缺失（三连期）**：口径+契约测试均在仓，0 值=流量未经过；承接 L2/L3；解除条件=下期任一分母>0 |
+| H9 | P2 | evolution_proposal | **自愈规范文档滞后（本轮新立）**：CLAUDE.md:297-298 宣称无自愈覆盖/无运行期检测，代码实况为启动+周期双路自愈且在运转（三方逐字比对）；风险链=过时结论→重复立案→加速熔断（29/30）+误导新 Agent 先验 |
+
+## 五、被红队否决的条目与原因
+
+**本周 Refuted=0**。红队产出 3 处措辞修正（对上游结论的精化，非否决）：
+1. H5「过滤逻辑散点未收口共享工具」被推翻 → 实测 stripCliStderrNoise 已是共享工具且主路径接入，问题重述为「存在未接入路径」；
+2. H2「21 条 goal 型失败全同窗」修正为「17/21 同窗」（81% 集中反而强化配额主签名结论）；
+3. H1「无编排级熔断」精化为「配额签名域无编排级熔断（reject 死锁/提案水位/goal 审视三处其它域熔断在位）」。
+另：①侦探对 H4 的「sla_alert 疑似 console-only」怀疑被体检师源码取证证伪（双出口在位），红队确认。
+
+## 六、Uncertain / 待复核 / 下周关注
+
+**Uncertain=0**（红队全部裁决 Confirmed；H7/H8 为 Confirmed+actionType=none，归入滞留观察而非立案，符合纪律）。
+
+待复核清单：
+- H2 实体级归属（5 个 failed goal 时间戳是否落配额窗）——无 DB 通道，挂预注册证伪条款；
+- H7 expressLaneRun/ArtifactRating 窗口行数 DB 级终裁——同上；
+- H3 次要缺口：failures.json 具体 HTTP 导出端点未逐字定位（不影响主结论）；
+- L7（v3 疑点 H5）原始定义缺失，需回捞 v3 台账底稿补录；
+- 本轮与 v3 疑点编号存在重排（v3-H4(error:null)→本轮 H6/L6；本轮 H5=unrecognized_model 与 L7 所指 v3-H5 是否同物无法确认）——已如实标注，不强行合并。
+
+下周建议关注点（含 failures.json 近 7 天失败签名「失败族二分」）：
+1. **审批池熔断是下周第一风险**：pending 29 差 1 触发即暂停全局自动分析——届时本工作流自身数据源断供。建议消费侧批审会话优先消化 reminder 桶最老两案（pendingDays 57/63）；提示：L4 同主题提案在池，勿重复立案；
+2. **H1/H2 工单落地复测**：下期观察同签名（429·1310/1302）是否再现级联——复测证据是「已验收」的唯一准入；
+3. **失败族二分基线**：族 A 环境/外部配额族 66/73（90.4% = 429×62+SIGINT×2+SIGTERM×1+ConnLost×1）vs 族 B 平台自身族 7/73（9.6% = error:null×2+僵尸×2+300s 卡死×1+unrec×2）。若族 A 占比回落而族 B 上升，关注重心切换到轨迹生命周期域（H5/H6 汇合处）；
+4. **H9 提案应用后**跟踪「自愈缺失」类重复立案是否归零（其自身是熔断加速因子）；
+5. H8 解除条件：gateVerifiedRunRate 分母>0 或 acceptanceTests.total>0 任一出现即解除「持续缺失」定性；反向（应用后仍 0）则升级「应用无效」；
+6. L6 若定位到具体 null 写入路径或样本量达标（≥5），按 H6 预注册条款转 bug_ticket；
+7. benchmark 回落条款纪律延续：回落只查执行侧原因，绝不产出放宽护栏/评测标准类建议；
+8. 双 SHA 机制改进：base SHA 缺口根源是 worktree 当日克隆无历史深度——建议工作流在①节点或数据包采集时固定记录 base/head 双 SHA（详见下节）。
+
+## 七、数据缺口与边界如实上报
+
+1. **双 SHA 缺口**：baseSha(10/4)=unavailable——本 worktree 为 10/11 当日克隆（clone base 7c05521），本地无 10/4 引用与历史深度，10/4→10/11 git diff 无法本地执行；①节点亦无 git/Bash 通道。全部证据为 as-of-head 快照实测（体检师 907df40 / 红队 e81f3ae，漂移为 07:49:22Z workflow auto-commit，红队在漂移后逐行亲读自证行号有效）。不编造 SHA（Verification P1/P4）。
+2. **本节点无 Bash**：git commit 无法由本节点执行，report.md/actions.json 以 Write 落盘于 `.myrd/self-evolution/`，commit 与导出由 deploy 节点（具备相应通道）补做——与③红队 toolBoundary 先例一致。
+3. **DB/HTTP 通道不可用**：实体级归因类核验按「不可得」如实标注（见待复核清单），未伪造。
+4. v3 台账底稿未随本 worktree 数据包采集（appliedLast30d=9 说明池外有应用发生，但在池采集件无法核对对应关系，不虚构逐条回填）。
+5. 本轮未观测到「非项目成员/0 仓库」类平台异常；三份采集件均无 `{"unavailable":true}` 占位，未触发「读不到≠断更」条款；未引用 127.0.0.1:7456 探针项；进化内核（guardrail/policies/边界合同）强度不在体检范围，全文无放宽护栏类发现。
+
+## 八、衔接声明
+
+本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
 
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
@@ -2768,115 +2887,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
-
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -2906,9 +2916,9 @@ negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内�
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
-## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
-修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -3042,6 +3052,115 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+
+修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
 
 ## 架构设计文档
 
@@ -5453,6 +5572,125 @@ curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.
 4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
 5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
 6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
+
+
+## [H4] 提案漏斗消费停滞滞留观察：pending 29 距熔断线 30 仅差 1、approved=0，根因在人审消费侧（承接 L4 在池提案，不重复立案） 2026-W41
+
+v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 两案 cmutkyiz8/cmutkyiyb，7 天零动作）、approved=0、最老积压 pendingDays=64、已越 escalate 线 27、距 breaker 线 30 仅差 1（触发即暂停全局自动分析，项目级降级 drain 续跑）。代码面告警→曝光→熔断链路完备（approval-sla.ts:19-27 阈值在位、scheduler.ts:293-309 console+持久化事件双出口、platform-health-section.tsx:378-394 前端徽标），『sla_alert 仍 console-only』旧口径被体检师证伪、红队确认；停滞根因收窄为人审消费侧零动作。v2 轮同主题提案 cmunjmm5r（L4）在池未动，按『不重复立案』纪律转滞留观察；维持 approval-sla.ts:12/:131『只提醒、绝不自动 approve/apply』边界红线，不产出放宽护栏建议。
+
+## [H6] error:null 静默失败 2 条挂验证观察：自愈双路（启动+周期 5 分钟）在位运转，残余=failed 写入路径 error 字段形态不一 2026-W41
+
+本期 error=null 2/73 条（v3 期『量最大』→ 本期 2 条，方向向好未清零；其中 ≥1 条 agentName='真机试玩验收' playtest 类）。自愈机制实锤在位且运转：index.ts:371-374 启动 + :578/:588 周期（5 分钟）双路 cleanupStaleTrajectories 操作 agentExecutionTrajectory（engine.ts:399-435），failures.json 实测 2 条『僵尸轨迹…周期自愈清理为 failed』即运转产出（平台自愈规范『无自愈覆盖』旧口径反转，体检师自纠+红队确认）。残余疑点：某 failed 写入路径置 failed 时不携带 error（与 :422/:432 两种 error 必填形态不一致），2 条与 SIGINT/SIGTERM/僵尸共 7 条字段邻接形态异于其余 66 条。n=2 样本不足：维持挂验证（台账 L6），不销案不升级；『审计 failed 写入点保证 error 必填』的工程化修复待样本量达标或定位到具体路径后转 bug_ticket。
+
+## MyRD 自进化周报 2026-W41
+
+# MyRD 自进化周报 2026-W41
+
+> 窗口 2026-10-04 → 2026-10-11 · 数据锚 health.json generatedAt=2026-10-11T07:18:43.499Z（三份采集件一致）
+> 产出节点：④首席研究员（口径整合+环比结论+双轨立案）；输入：①数据侦探（findings-delta-v3 + 台账 v4 + hypotheses H1-H9）、②体检师（findings-audited 9 条）、③红队（findings-verified 9 条裁决）
+> as-of-SHA：体检师取证 head=907df40（07:30:55Z）→ 红队复核 head=e81f3ae（07:49:22Z workflow auto-commit 漂移，红队在漂移后工作区逐行亲读自证行号有效，最大偏差 ≤3 行）；**base SHA(10/4)=unavailable**（详见「数据缺口」节，如实上报不编造）
+
+---
+
+## 一、本周结论摘要
+
+本周平台**整体向好但含一次 P0 级异动事件**：总体任务成功率 0.718→0.865（+20.5%，样本 38 达门槛，红队复算 ✓）、workflow 成功率 1.0（26/26 零失败）、benchmark 86.33→87.25（+1.1%，回落条款未触发）、实体级失败 tasks 22→5 / goals 15→5 / workflowRuns 1→0。
+
+异动主因为 **10/7 单日 429 配额级联**：73 条失败轨迹中 62 条集中 10/7 UTC T07-T08 两小时窗（首席 `-o` 复算：429 全文 81 处、10/7 当天 63 条、agentType workflow 49/goal_master 11/goal_delegate 10，勾稽 73 ✓），同一批游戏开发 workflow 与 goal 编排全灭——外部配额事件 × 调度韧性缺口（退避 40s 封顶 vs 小时级配额窗 + 配额签名域无编排级熔断）。goal 型成功率两期持平 0.5 与该事件同源（轨迹级 21 条失败中 17 条落窗且全 429 系）。
+
+第二紧迫项是**进化闭环自身的停摆风险**：提案池 pending 29 距熔断线 30 仅差 1、approved=0、v3 两案 7 天零动作、最老积压 64 天——告警通路经体检师+红队双重复核为完备，停滞根因收窄为**人审消费侧零动作**。
+
+红队裁决：**9 条假设全部 Confirmed、Refuted=0、Uncertain=0**（红队对体检师 3 处表述做了措辞修正，见第五节）。收敛 top3 短板：**H1 配额韧性（P1）> H4+台账 审批消费停滞（P2，紧迫度最高）> H9 自愈规范文档滞后（P2，防重复立案加速熔断）**。
+
+## 二、环比分项结论（预注册 rubric：恶化=异动+验证成立/复核坐实；持平=无超阈值或样本不足；改善=向好+复测/复核任一佐证）
+
+| 指标 | 上期→本期 | 判定 | 依据 |
+|---|---|---|---|
+| overallTaskSuccessRate | 0.718→0.865 (+20.5%) | **改善** | 样本 38≥5 门槛；红队手算复算 ✓；benchmark 同向佐证 |
+| workflow 成功率 | 0.870→1.0 (+15%) | **改善** | 26/26 零失败，红队复算 ✓ |
+| goal 成功率 | 0.5→0.5 (deltaPct=0) | **持平**（分类型小分母 total=10·仅方向参考） | 唯二未改善口径之一；同源归因 H1/H2 已坐实（轨迹级） |
+| 实体级失败 tasks/goals/workflowRuns | 22→5 / 15→5 / 1→0 | **改善** | platform-health 实体级口径，红队复算 ✓ |
+| 轨迹级失败（failures.json） | 73 条（62 条 10/7 配额级联） | **恶化**（异动+红队验证成立） | 首轮轨迹级基线；注意与实体级口径**禁止直接对读**（H3） |
+| benchmark | 86.33→87.25 (+1.1%) | **改善** | 上升且无回落；纪律：即便回落也只查执行侧，不产出放宽护栏建议 |
+| 提案漏斗 pending | 27→29（approved=0） | **恶化** | 四方读数对齐+红队复算 ✓；已越 escalate=27，距 breaker=30 差 1 |
+| 负反馈率 / express_lane | null+no-data / null | **持平**（零样本，不设目标） | 观测缺口（H7）：采集管道代码面无缺维，评分行为未发生 |
+| 验证/选择层三指标 | 0/0（两期同） | **持平**（结构性存量缺口） | 机制在仓流量缺失（H8），承接在池提案滞留观察 |
+| bugClosureDays | 无前值→19.5 | **待验证** | 单值不可环比，不设目标不下结论 |
+
+阈值口径：沿用 v3 集合（周级样本门槛 ≥5，本期 activity.tasks=38 通过；分类型小分母逐条标注；零样本不下异动结论），①本轮未提议新分位阈值，④复核采用。
+
+**过程指标首录（v3 公式零改动，本轮值即 v5 环比基线；样本不足只记分布、不设目标）**
+- 转化率 = 达「已执行·未验收」及以上立案数 / 当轮总立案数（销案 0 与误报 0 不入分母）= **0/7 = 0%**（若仅按 v3 当轮新立案 L1/L2 计亦为 0/2=0%）
+- 滞留环节 = 台账状态分布：未动 5（全部滞留在**审批消费侧**）+ 进行中(挂验证) 2；台账时间戳齐备（pendingDays/createdAt 在采集件内），时长维度无需标待验证（bugClosureDays 除外）
+
+## 三、v3 立案闭环追踪（台账 v4 摘要，完整版见 findings-ledger-v4.json）
+
+| caseId | proposalId | 主题 | 状态 | 证据 |
+|---|---|---|---|---|
+| L1 | cmutkyiz8… | 提案池去重与消费闭环标准（v3 新立案） | **未动** | pending/appliedAt=null/pendingDays=6；approved=0 |
+| L2 | cmutkyiyb… | 验证/选择层接线标准 v2（v3 新立案） | **未动** | 同上；acceptanceTests.total 仍 0、gateVerifiedRunRate 仍 0 |
+| L3 | cmupfhl8n… | 验证/选择层接线标准 v1（v2 立案） | **未动** | pendingDays=9，与 L2 同主题防重复立案 |
+| L4 | cmunjmm5r… | 提案漏斗行动牵引（v2 立案） | **未动** | pendingDays=11；其所针对的消费停滞本期继续为真 |
+| L5 | cmuhtbg1v… | V0 执行端工具配置定稿 | **未动** | pendingDays=15 |
+| L6 | （疑点 H4→本轮 H6） | error:null 静默失败 | **进行中（挂验证）** | 本期 2/73 条，向好未清零；n=2 维持挂验证 |
+| L7 | （疑点 H5·v3 编号） | v3 疑点 H5 | **进行中（挂验证·定义待补录）** | ⚠️ v3 台账底稿未随本 worktree 数据包采集，原始定义与判据缺失，按纪律不编造、原样保留 |
+
+台账 summary：7 条 = 未动 5 + 进行中 2；本轮无「已验收」条目 → 红队「已验收抽验」队列为空（如实记录）；H4/H5（v3 编号）与滞留提案无新证据 → **转「滞留观察」，不重复立案**。
+
+## 四、Confirmed 短板清单（9/9，定级以红队裁决为准）
+
+| ID | 定级 | 动作 | 短板与根因（证据均为红队逐行亲读+首席关键数字复算） |
+|---|---|---|---|
+| H1 | P1 | bug_ticket | **429 配额级联**：retry-utils.ts:15/:42-43/:67-69 重试 3 次上限+退避 10/20/40s 封顶，对小时级配额窗量级错配 3 个数量级；配额签名域无编排级熔断（其它域熔断在位）；62 条失败集中 10/7 T07-T08，T08 簇 durationMs≈180s 与「70s 退避+3 次执行」耗尽形状吻合；error 自带恢复锚点 21:31:45，10/8 起清零 |
+| H2 | P2 | bug_ticket（与 H1 同工单承接） | **goal 0.5 持平同源**：goals.ts:4659 agentType 注册实锤；21 条 goal 型失败 17 条落窗全 429 系（红队交叉表，修正体检师「21 条全同窗」）；实体级归属挂 DB 预注册验证 |
+| H3 | P2 | evolution_proposal | **73 vs 10 口径差**：轨迹级（analyzer.ts:491 status≠completed，含在途/重试）vs 实体级（index.ts:118 status='failed'）三重不同源（表/谓词/粒度），7.3 倍差为口径必然非采集缺陷 → 口径对照表文档化 + 两口径禁止直接对读 |
+| H4 | P2 | knowledge_only（滞留观察） | **提案漏斗消费停滞**：approved=0、pending 29 差 1 触熔断、v3 两案 7 天零动作、最老 64 天；告警链路完备（console+事件+API+前端徽标），根因=人审消费侧零动作；v2 同主题 L4 在池，不重复立案；维持「绝不自动 approve/apply」边界红线 |
+| H5 | P3 | bug_ticket | **stderr 噪音漏网**：stripCliStderrNoise 共享工具+专项测试在位（红队推翻体检师「未收口」表述），仍有 2 条 unrecognized_model 漏网 → 存在未接入路径（嫌疑点 benchmark.ts:396 非 143 分支）；n=2 仅方向参考 |
+| H6 | P3 | knowledge_only（挂验证） | **error:null 2 条**：自愈双路（启动+周期 5min）实锤在位且运转（2 条僵尸自愈签名即产出证据）；残余=某 failed 写入路径 error 字段形态不一；n=2 挂验证不销案不升级 |
+| H7 | P3 | none（观测缺口登记） | **express_lane 零样本+负反馈 no-data**：全类型同 groupBy、采样管道在位启动即跑 → 缺口在行为侧非采集缺维；预注册升级条款留档（若 expressLaneRun 有记录而 Task 无终态→P1 复立） |
+| H8 | P3 | none（滞留观察） | **验证/选择层三指标持续缺失（三连期）**：口径+契约测试均在仓，0 值=流量未经过；承接 L2/L3；解除条件=下期任一分母>0 |
+| H9 | P2 | evolution_proposal | **自愈规范文档滞后（本轮新立）**：CLAUDE.md:297-298 宣称无自愈覆盖/无运行期检测，代码实况为启动+周期双路自愈且在运转（三方逐字比对）；风险链=过时结论→重复立案→加速熔断（29/30）+误导新 Agent 先验 |
+
+## 五、被红队否决的条目与原因
+
+**本周 Refuted=0**。红队产出 3 处措辞修正（对上游结论的精化，非否决）：
+1. H5「过滤逻辑散点未收口共享工具」被推翻 → 实测 stripCliStderrNoise 已是共享工具且主路径接入，问题重述为「存在未接入路径」；
+2. H2「21 条 goal 型失败全同窗」修正为「17/21 同窗」（81% 集中反而强化配额主签名结论）；
+3. H1「无编排级熔断」精化为「配额签名域无编排级熔断（reject 死锁/提案水位/goal 审视三处其它域熔断在位）」。
+另：①侦探对 H4 的「sla_alert 疑似 console-only」怀疑被体检师源码取证证伪（双出口在位），红队确认。
+
+## 六、Uncertain / 待复核 / 下周关注
+
+**Uncertain=0**（红队全部裁决 Confirmed；H7/H8 为 Confirmed+actionType=none，归入滞留观察而非立案，符合纪律）。
+
+待复核清单：
+- H2 实体级归属（5 个 failed goal 时间戳是否落配额窗）——无 DB 通道，挂预注册证伪条款；
+- H7 expressLaneRun/ArtifactRating 窗口行数 DB 级终裁——同上；
+- H3 次要缺口：failures.json 具体 HTTP 导出端点未逐字定位（不影响主结论）；
+- L7（v3 疑点 H5）原始定义缺失，需回捞 v3 台账底稿补录；
+- 本轮与 v3 疑点编号存在重排（v3-H4(error:null)→本轮 H6/L6；本轮 H5=unrecognized_model 与 L7 所指 v3-H5 是否同物无法确认）——已如实标注，不强行合并。
+
+下周建议关注点（含 failures.json 近 7 天失败签名「失败族二分」）：
+1. **审批池熔断是下周第一风险**：pending 29 差 1 触发即暂停全局自动分析——届时本工作流自身数据源断供。建议消费侧批审会话优先消化 reminder 桶最老两案（pendingDays 57/63）；提示：L4 同主题提案在池，勿重复立案；
+2. **H1/H2 工单落地复测**：下期观察同签名（429·1310/1302）是否再现级联——复测证据是「已验收」的唯一准入；
+3. **失败族二分基线**：族 A 环境/外部配额族 66/73（90.4% = 429×62+SIGINT×2+SIGTERM×1+ConnLost×1）vs 族 B 平台自身族 7/73（9.6% = error:null×2+僵尸×2+300s 卡死×1+unrec×2）。若族 A 占比回落而族 B 上升，关注重心切换到轨迹生命周期域（H5/H6 汇合处）；
+4. **H9 提案应用后**跟踪「自愈缺失」类重复立案是否归零（其自身是熔断加速因子）；
+5. H8 解除条件：gateVerifiedRunRate 分母>0 或 acceptanceTests.total>0 任一出现即解除「持续缺失」定性；反向（应用后仍 0）则升级「应用无效」；
+6. L6 若定位到具体 null 写入路径或样本量达标（≥5），按 H6 预注册条款转 bug_ticket；
+7. benchmark 回落条款纪律延续：回落只查执行侧原因，绝不产出放宽护栏/评测标准类建议；
+8. 双 SHA 机制改进：base SHA 缺口根源是 worktree 当日克隆无历史深度——建议工作流在①节点或数据包采集时固定记录 base/head 双 SHA（详见下节）。
+
+## 七、数据缺口与边界如实上报
+
+1. **双 SHA 缺口**：baseSha(10/4)=unavailable——本 worktree 为 10/11 当日克隆（clone base 7c05521），本地无 10/4 引用与历史深度，10/4→10/11 git diff 无法本地执行；①节点亦无 git/Bash 通道。全部证据为 as-of-head 快照实测（体检师 907df40 / 红队 e81f3ae，漂移为 07:49:22Z workflow auto-commit，红队在漂移后逐行亲读自证行号有效）。不编造 SHA（Verification P1/P4）。
+2. **本节点无 Bash**：git commit 无法由本节点执行，report.md/actions.json 以 Write 落盘于 `.myrd/self-evolution/`，commit 与导出由 deploy 节点（具备相应通道）补做——与③红队 toolBoundary 先例一致。
+3. **DB/HTTP 通道不可用**：实体级归因类核验按「不可得」如实标注（见待复核清单），未伪造。
+4. v3 台账底稿未随本 worktree 数据包采集（appliedLast30d=9 说明池外有应用发生，但在池采集件无法核对对应关系，不虚构逐条回填）。
+5. 本轮未观测到「非项目成员/0 仓库」类平台异常；三份采集件均无 `{"unavailable":true}` 占位，未触发「读不到≠断更」条款；未引用 127.0.0.1:7456 探针项；进化内核（guardrail/policies/边界合同）强度不在体检范围，全文无放宽护栏类发现。
+
+## 八、衔接声明
+
+本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
 
 
 ---
@@ -5476,115 +5714,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
-
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -5614,9 +5743,9 @@ negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内�
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
-## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
-修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -5750,6 +5879,115 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+
+修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
 
 ## 架构设计文档
 
@@ -8161,6 +8399,125 @@ curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.
 4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
 5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
 6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
+
+
+## [H4] 提案漏斗消费停滞滞留观察：pending 29 距熔断线 30 仅差 1、approved=0，根因在人审消费侧（承接 L4 在池提案，不重复立案） 2026-W41
+
+v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 两案 cmutkyiz8/cmutkyiyb，7 天零动作）、approved=0、最老积压 pendingDays=64、已越 escalate 线 27、距 breaker 线 30 仅差 1（触发即暂停全局自动分析，项目级降级 drain 续跑）。代码面告警→曝光→熔断链路完备（approval-sla.ts:19-27 阈值在位、scheduler.ts:293-309 console+持久化事件双出口、platform-health-section.tsx:378-394 前端徽标），『sla_alert 仍 console-only』旧口径被体检师证伪、红队确认；停滞根因收窄为人审消费侧零动作。v2 轮同主题提案 cmunjmm5r（L4）在池未动，按『不重复立案』纪律转滞留观察；维持 approval-sla.ts:12/:131『只提醒、绝不自动 approve/apply』边界红线，不产出放宽护栏建议。
+
+## [H6] error:null 静默失败 2 条挂验证观察：自愈双路（启动+周期 5 分钟）在位运转，残余=failed 写入路径 error 字段形态不一 2026-W41
+
+本期 error=null 2/73 条（v3 期『量最大』→ 本期 2 条，方向向好未清零；其中 ≥1 条 agentName='真机试玩验收' playtest 类）。自愈机制实锤在位且运转：index.ts:371-374 启动 + :578/:588 周期（5 分钟）双路 cleanupStaleTrajectories 操作 agentExecutionTrajectory（engine.ts:399-435），failures.json 实测 2 条『僵尸轨迹…周期自愈清理为 failed』即运转产出（平台自愈规范『无自愈覆盖』旧口径反转，体检师自纠+红队确认）。残余疑点：某 failed 写入路径置 failed 时不携带 error（与 :422/:432 两种 error 必填形态不一致），2 条与 SIGINT/SIGTERM/僵尸共 7 条字段邻接形态异于其余 66 条。n=2 样本不足：维持挂验证（台账 L6），不销案不升级；『审计 failed 写入点保证 error 必填』的工程化修复待样本量达标或定位到具体路径后转 bug_ticket。
+
+## MyRD 自进化周报 2026-W41
+
+# MyRD 自进化周报 2026-W41
+
+> 窗口 2026-10-04 → 2026-10-11 · 数据锚 health.json generatedAt=2026-10-11T07:18:43.499Z（三份采集件一致）
+> 产出节点：④首席研究员（口径整合+环比结论+双轨立案）；输入：①数据侦探（findings-delta-v3 + 台账 v4 + hypotheses H1-H9）、②体检师（findings-audited 9 条）、③红队（findings-verified 9 条裁决）
+> as-of-SHA：体检师取证 head=907df40（07:30:55Z）→ 红队复核 head=e81f3ae（07:49:22Z workflow auto-commit 漂移，红队在漂移后工作区逐行亲读自证行号有效，最大偏差 ≤3 行）；**base SHA(10/4)=unavailable**（详见「数据缺口」节，如实上报不编造）
+
+---
+
+## 一、本周结论摘要
+
+本周平台**整体向好但含一次 P0 级异动事件**：总体任务成功率 0.718→0.865（+20.5%，样本 38 达门槛，红队复算 ✓）、workflow 成功率 1.0（26/26 零失败）、benchmark 86.33→87.25（+1.1%，回落条款未触发）、实体级失败 tasks 22→5 / goals 15→5 / workflowRuns 1→0。
+
+异动主因为 **10/7 单日 429 配额级联**：73 条失败轨迹中 62 条集中 10/7 UTC T07-T08 两小时窗（首席 `-o` 复算：429 全文 81 处、10/7 当天 63 条、agentType workflow 49/goal_master 11/goal_delegate 10，勾稽 73 ✓），同一批游戏开发 workflow 与 goal 编排全灭——外部配额事件 × 调度韧性缺口（退避 40s 封顶 vs 小时级配额窗 + 配额签名域无编排级熔断）。goal 型成功率两期持平 0.5 与该事件同源（轨迹级 21 条失败中 17 条落窗且全 429 系）。
+
+第二紧迫项是**进化闭环自身的停摆风险**：提案池 pending 29 距熔断线 30 仅差 1、approved=0、v3 两案 7 天零动作、最老积压 64 天——告警通路经体检师+红队双重复核为完备，停滞根因收窄为**人审消费侧零动作**。
+
+红队裁决：**9 条假设全部 Confirmed、Refuted=0、Uncertain=0**（红队对体检师 3 处表述做了措辞修正，见第五节）。收敛 top3 短板：**H1 配额韧性（P1）> H4+台账 审批消费停滞（P2，紧迫度最高）> H9 自愈规范文档滞后（P2，防重复立案加速熔断）**。
+
+## 二、环比分项结论（预注册 rubric：恶化=异动+验证成立/复核坐实；持平=无超阈值或样本不足；改善=向好+复测/复核任一佐证）
+
+| 指标 | 上期→本期 | 判定 | 依据 |
+|---|---|---|---|
+| overallTaskSuccessRate | 0.718→0.865 (+20.5%) | **改善** | 样本 38≥5 门槛；红队手算复算 ✓；benchmark 同向佐证 |
+| workflow 成功率 | 0.870→1.0 (+15%) | **改善** | 26/26 零失败，红队复算 ✓ |
+| goal 成功率 | 0.5→0.5 (deltaPct=0) | **持平**（分类型小分母 total=10·仅方向参考） | 唯二未改善口径之一；同源归因 H1/H2 已坐实（轨迹级） |
+| 实体级失败 tasks/goals/workflowRuns | 22→5 / 15→5 / 1→0 | **改善** | platform-health 实体级口径，红队复算 ✓ |
+| 轨迹级失败（failures.json） | 73 条（62 条 10/7 配额级联） | **恶化**（异动+红队验证成立） | 首轮轨迹级基线；注意与实体级口径**禁止直接对读**（H3） |
+| benchmark | 86.33→87.25 (+1.1%) | **改善** | 上升且无回落；纪律：即便回落也只查执行侧，不产出放宽护栏建议 |
+| 提案漏斗 pending | 27→29（approved=0） | **恶化** | 四方读数对齐+红队复算 ✓；已越 escalate=27，距 breaker=30 差 1 |
+| 负反馈率 / express_lane | null+no-data / null | **持平**（零样本，不设目标） | 观测缺口（H7）：采集管道代码面无缺维，评分行为未发生 |
+| 验证/选择层三指标 | 0/0（两期同） | **持平**（结构性存量缺口） | 机制在仓流量缺失（H8），承接在池提案滞留观察 |
+| bugClosureDays | 无前值→19.5 | **待验证** | 单值不可环比，不设目标不下结论 |
+
+阈值口径：沿用 v3 集合（周级样本门槛 ≥5，本期 activity.tasks=38 通过；分类型小分母逐条标注；零样本不下异动结论），①本轮未提议新分位阈值，④复核采用。
+
+**过程指标首录（v3 公式零改动，本轮值即 v5 环比基线；样本不足只记分布、不设目标）**
+- 转化率 = 达「已执行·未验收」及以上立案数 / 当轮总立案数（销案 0 与误报 0 不入分母）= **0/7 = 0%**（若仅按 v3 当轮新立案 L1/L2 计亦为 0/2=0%）
+- 滞留环节 = 台账状态分布：未动 5（全部滞留在**审批消费侧**）+ 进行中(挂验证) 2；台账时间戳齐备（pendingDays/createdAt 在采集件内），时长维度无需标待验证（bugClosureDays 除外）
+
+## 三、v3 立案闭环追踪（台账 v4 摘要，完整版见 findings-ledger-v4.json）
+
+| caseId | proposalId | 主题 | 状态 | 证据 |
+|---|---|---|---|---|
+| L1 | cmutkyiz8… | 提案池去重与消费闭环标准（v3 新立案） | **未动** | pending/appliedAt=null/pendingDays=6；approved=0 |
+| L2 | cmutkyiyb… | 验证/选择层接线标准 v2（v3 新立案） | **未动** | 同上；acceptanceTests.total 仍 0、gateVerifiedRunRate 仍 0 |
+| L3 | cmupfhl8n… | 验证/选择层接线标准 v1（v2 立案） | **未动** | pendingDays=9，与 L2 同主题防重复立案 |
+| L4 | cmunjmm5r… | 提案漏斗行动牵引（v2 立案） | **未动** | pendingDays=11；其所针对的消费停滞本期继续为真 |
+| L5 | cmuhtbg1v… | V0 执行端工具配置定稿 | **未动** | pendingDays=15 |
+| L6 | （疑点 H4→本轮 H6） | error:null 静默失败 | **进行中（挂验证）** | 本期 2/73 条，向好未清零；n=2 维持挂验证 |
+| L7 | （疑点 H5·v3 编号） | v3 疑点 H5 | **进行中（挂验证·定义待补录）** | ⚠️ v3 台账底稿未随本 worktree 数据包采集，原始定义与判据缺失，按纪律不编造、原样保留 |
+
+台账 summary：7 条 = 未动 5 + 进行中 2；本轮无「已验收」条目 → 红队「已验收抽验」队列为空（如实记录）；H4/H5（v3 编号）与滞留提案无新证据 → **转「滞留观察」，不重复立案**。
+
+## 四、Confirmed 短板清单（9/9，定级以红队裁决为准）
+
+| ID | 定级 | 动作 | 短板与根因（证据均为红队逐行亲读+首席关键数字复算） |
+|---|---|---|---|
+| H1 | P1 | bug_ticket | **429 配额级联**：retry-utils.ts:15/:42-43/:67-69 重试 3 次上限+退避 10/20/40s 封顶，对小时级配额窗量级错配 3 个数量级；配额签名域无编排级熔断（其它域熔断在位）；62 条失败集中 10/7 T07-T08，T08 簇 durationMs≈180s 与「70s 退避+3 次执行」耗尽形状吻合；error 自带恢复锚点 21:31:45，10/8 起清零 |
+| H2 | P2 | bug_ticket（与 H1 同工单承接） | **goal 0.5 持平同源**：goals.ts:4659 agentType 注册实锤；21 条 goal 型失败 17 条落窗全 429 系（红队交叉表，修正体检师「21 条全同窗」）；实体级归属挂 DB 预注册验证 |
+| H3 | P2 | evolution_proposal | **73 vs 10 口径差**：轨迹级（analyzer.ts:491 status≠completed，含在途/重试）vs 实体级（index.ts:118 status='failed'）三重不同源（表/谓词/粒度），7.3 倍差为口径必然非采集缺陷 → 口径对照表文档化 + 两口径禁止直接对读 |
+| H4 | P2 | knowledge_only（滞留观察） | **提案漏斗消费停滞**：approved=0、pending 29 差 1 触熔断、v3 两案 7 天零动作、最老 64 天；告警链路完备（console+事件+API+前端徽标），根因=人审消费侧零动作；v2 同主题 L4 在池，不重复立案；维持「绝不自动 approve/apply」边界红线 |
+| H5 | P3 | bug_ticket | **stderr 噪音漏网**：stripCliStderrNoise 共享工具+专项测试在位（红队推翻体检师「未收口」表述），仍有 2 条 unrecognized_model 漏网 → 存在未接入路径（嫌疑点 benchmark.ts:396 非 143 分支）；n=2 仅方向参考 |
+| H6 | P3 | knowledge_only（挂验证） | **error:null 2 条**：自愈双路（启动+周期 5min）实锤在位且运转（2 条僵尸自愈签名即产出证据）；残余=某 failed 写入路径 error 字段形态不一；n=2 挂验证不销案不升级 |
+| H7 | P3 | none（观测缺口登记） | **express_lane 零样本+负反馈 no-data**：全类型同 groupBy、采样管道在位启动即跑 → 缺口在行为侧非采集缺维；预注册升级条款留档（若 expressLaneRun 有记录而 Task 无终态→P1 复立） |
+| H8 | P3 | none（滞留观察） | **验证/选择层三指标持续缺失（三连期）**：口径+契约测试均在仓，0 值=流量未经过；承接 L2/L3；解除条件=下期任一分母>0 |
+| H9 | P2 | evolution_proposal | **自愈规范文档滞后（本轮新立）**：CLAUDE.md:297-298 宣称无自愈覆盖/无运行期检测，代码实况为启动+周期双路自愈且在运转（三方逐字比对）；风险链=过时结论→重复立案→加速熔断（29/30）+误导新 Agent 先验 |
+
+## 五、被红队否决的条目与原因
+
+**本周 Refuted=0**。红队产出 3 处措辞修正（对上游结论的精化，非否决）：
+1. H5「过滤逻辑散点未收口共享工具」被推翻 → 实测 stripCliStderrNoise 已是共享工具且主路径接入，问题重述为「存在未接入路径」；
+2. H2「21 条 goal 型失败全同窗」修正为「17/21 同窗」（81% 集中反而强化配额主签名结论）；
+3. H1「无编排级熔断」精化为「配额签名域无编排级熔断（reject 死锁/提案水位/goal 审视三处其它域熔断在位）」。
+另：①侦探对 H4 的「sla_alert 疑似 console-only」怀疑被体检师源码取证证伪（双出口在位），红队确认。
+
+## 六、Uncertain / 待复核 / 下周关注
+
+**Uncertain=0**（红队全部裁决 Confirmed；H7/H8 为 Confirmed+actionType=none，归入滞留观察而非立案，符合纪律）。
+
+待复核清单：
+- H2 实体级归属（5 个 failed goal 时间戳是否落配额窗）——无 DB 通道，挂预注册证伪条款；
+- H7 expressLaneRun/ArtifactRating 窗口行数 DB 级终裁——同上；
+- H3 次要缺口：failures.json 具体 HTTP 导出端点未逐字定位（不影响主结论）；
+- L7（v3 疑点 H5）原始定义缺失，需回捞 v3 台账底稿补录；
+- 本轮与 v3 疑点编号存在重排（v3-H4(error:null)→本轮 H6/L6；本轮 H5=unrecognized_model 与 L7 所指 v3-H5 是否同物无法确认）——已如实标注，不强行合并。
+
+下周建议关注点（含 failures.json 近 7 天失败签名「失败族二分」）：
+1. **审批池熔断是下周第一风险**：pending 29 差 1 触发即暂停全局自动分析——届时本工作流自身数据源断供。建议消费侧批审会话优先消化 reminder 桶最老两案（pendingDays 57/63）；提示：L4 同主题提案在池，勿重复立案；
+2. **H1/H2 工单落地复测**：下期观察同签名（429·1310/1302）是否再现级联——复测证据是「已验收」的唯一准入；
+3. **失败族二分基线**：族 A 环境/外部配额族 66/73（90.4% = 429×62+SIGINT×2+SIGTERM×1+ConnLost×1）vs 族 B 平台自身族 7/73（9.6% = error:null×2+僵尸×2+300s 卡死×1+unrec×2）。若族 A 占比回落而族 B 上升，关注重心切换到轨迹生命周期域（H5/H6 汇合处）；
+4. **H9 提案应用后**跟踪「自愈缺失」类重复立案是否归零（其自身是熔断加速因子）；
+5. H8 解除条件：gateVerifiedRunRate 分母>0 或 acceptanceTests.total>0 任一出现即解除「持续缺失」定性；反向（应用后仍 0）则升级「应用无效」；
+6. L6 若定位到具体 null 写入路径或样本量达标（≥5），按 H6 预注册条款转 bug_ticket；
+7. benchmark 回落条款纪律延续：回落只查执行侧原因，绝不产出放宽护栏/评测标准类建议；
+8. 双 SHA 机制改进：base SHA 缺口根源是 worktree 当日克隆无历史深度——建议工作流在①节点或数据包采集时固定记录 base/head 双 SHA（详见下节）。
+
+## 七、数据缺口与边界如实上报
+
+1. **双 SHA 缺口**：baseSha(10/4)=unavailable——本 worktree 为 10/11 当日克隆（clone base 7c05521），本地无 10/4 引用与历史深度，10/4→10/11 git diff 无法本地执行；①节点亦无 git/Bash 通道。全部证据为 as-of-head 快照实测（体检师 907df40 / 红队 e81f3ae，漂移为 07:49:22Z workflow auto-commit，红队在漂移后逐行亲读自证行号有效）。不编造 SHA（Verification P1/P4）。
+2. **本节点无 Bash**：git commit 无法由本节点执行，report.md/actions.json 以 Write 落盘于 `.myrd/self-evolution/`，commit 与导出由 deploy 节点（具备相应通道）补做——与③红队 toolBoundary 先例一致。
+3. **DB/HTTP 通道不可用**：实体级归因类核验按「不可得」如实标注（见待复核清单），未伪造。
+4. v3 台账底稿未随本 worktree 数据包采集（appliedLast30d=9 说明池外有应用发生，但在池采集件无法核对对应关系，不虚构逐条回填）。
+5. 本轮未观测到「非项目成员/0 仓库」类平台异常；三份采集件均无 `{"unavailable":true}` 占位，未触发「读不到≠断更」条款；未引用 127.0.0.1:7456 探针项；进化内核（guardrail/policies/边界合同）强度不在体检范围，全文无放宽护栏类发现。
+
+## 八、衔接声明
+
+本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
 
 
 ---
@@ -8194,115 +8551,6 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 
 ## 产品关联知识
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
-
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -8332,9 +8580,9 @@ negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内�
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
-## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
-修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -8468,6 +8716,115 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+
+修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
 
 ## 架构设计文档
 
@@ -10879,6 +11236,125 @@ curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.
 4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
 5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
 6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
+
+
+## [H4] 提案漏斗消费停滞滞留观察：pending 29 距熔断线 30 仅差 1、approved=0，根因在人审消费侧（承接 L4 在池提案，不重复立案） 2026-W41
+
+v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 两案 cmutkyiz8/cmutkyiyb，7 天零动作）、approved=0、最老积压 pendingDays=64、已越 escalate 线 27、距 breaker 线 30 仅差 1（触发即暂停全局自动分析，项目级降级 drain 续跑）。代码面告警→曝光→熔断链路完备（approval-sla.ts:19-27 阈值在位、scheduler.ts:293-309 console+持久化事件双出口、platform-health-section.tsx:378-394 前端徽标），『sla_alert 仍 console-only』旧口径被体检师证伪、红队确认；停滞根因收窄为人审消费侧零动作。v2 轮同主题提案 cmunjmm5r（L4）在池未动，按『不重复立案』纪律转滞留观察；维持 approval-sla.ts:12/:131『只提醒、绝不自动 approve/apply』边界红线，不产出放宽护栏建议。
+
+## [H6] error:null 静默失败 2 条挂验证观察：自愈双路（启动+周期 5 分钟）在位运转，残余=failed 写入路径 error 字段形态不一 2026-W41
+
+本期 error=null 2/73 条（v3 期『量最大』→ 本期 2 条，方向向好未清零；其中 ≥1 条 agentName='真机试玩验收' playtest 类）。自愈机制实锤在位且运转：index.ts:371-374 启动 + :578/:588 周期（5 分钟）双路 cleanupStaleTrajectories 操作 agentExecutionTrajectory（engine.ts:399-435），failures.json 实测 2 条『僵尸轨迹…周期自愈清理为 failed』即运转产出（平台自愈规范『无自愈覆盖』旧口径反转，体检师自纠+红队确认）。残余疑点：某 failed 写入路径置 failed 时不携带 error（与 :422/:432 两种 error 必填形态不一致），2 条与 SIGINT/SIGTERM/僵尸共 7 条字段邻接形态异于其余 66 条。n=2 样本不足：维持挂验证（台账 L6），不销案不升级；『审计 failed 写入点保证 error 必填』的工程化修复待样本量达标或定位到具体路径后转 bug_ticket。
+
+## MyRD 自进化周报 2026-W41
+
+# MyRD 自进化周报 2026-W41
+
+> 窗口 2026-10-04 → 2026-10-11 · 数据锚 health.json generatedAt=2026-10-11T07:18:43.499Z（三份采集件一致）
+> 产出节点：④首席研究员（口径整合+环比结论+双轨立案）；输入：①数据侦探（findings-delta-v3 + 台账 v4 + hypotheses H1-H9）、②体检师（findings-audited 9 条）、③红队（findings-verified 9 条裁决）
+> as-of-SHA：体检师取证 head=907df40（07:30:55Z）→ 红队复核 head=e81f3ae（07:49:22Z workflow auto-commit 漂移，红队在漂移后工作区逐行亲读自证行号有效，最大偏差 ≤3 行）；**base SHA(10/4)=unavailable**（详见「数据缺口」节，如实上报不编造）
+
+---
+
+## 一、本周结论摘要
+
+本周平台**整体向好但含一次 P0 级异动事件**：总体任务成功率 0.718→0.865（+20.5%，样本 38 达门槛，红队复算 ✓）、workflow 成功率 1.0（26/26 零失败）、benchmark 86.33→87.25（+1.1%，回落条款未触发）、实体级失败 tasks 22→5 / goals 15→5 / workflowRuns 1→0。
+
+异动主因为 **10/7 单日 429 配额级联**：73 条失败轨迹中 62 条集中 10/7 UTC T07-T08 两小时窗（首席 `-o` 复算：429 全文 81 处、10/7 当天 63 条、agentType workflow 49/goal_master 11/goal_delegate 10，勾稽 73 ✓），同一批游戏开发 workflow 与 goal 编排全灭——外部配额事件 × 调度韧性缺口（退避 40s 封顶 vs 小时级配额窗 + 配额签名域无编排级熔断）。goal 型成功率两期持平 0.5 与该事件同源（轨迹级 21 条失败中 17 条落窗且全 429 系）。
+
+第二紧迫项是**进化闭环自身的停摆风险**：提案池 pending 29 距熔断线 30 仅差 1、approved=0、v3 两案 7 天零动作、最老积压 64 天——告警通路经体检师+红队双重复核为完备，停滞根因收窄为**人审消费侧零动作**。
+
+红队裁决：**9 条假设全部 Confirmed、Refuted=0、Uncertain=0**（红队对体检师 3 处表述做了措辞修正，见第五节）。收敛 top3 短板：**H1 配额韧性（P1）> H4+台账 审批消费停滞（P2，紧迫度最高）> H9 自愈规范文档滞后（P2，防重复立案加速熔断）**。
+
+## 二、环比分项结论（预注册 rubric：恶化=异动+验证成立/复核坐实；持平=无超阈值或样本不足；改善=向好+复测/复核任一佐证）
+
+| 指标 | 上期→本期 | 判定 | 依据 |
+|---|---|---|---|
+| overallTaskSuccessRate | 0.718→0.865 (+20.5%) | **改善** | 样本 38≥5 门槛；红队手算复算 ✓；benchmark 同向佐证 |
+| workflow 成功率 | 0.870→1.0 (+15%) | **改善** | 26/26 零失败，红队复算 ✓ |
+| goal 成功率 | 0.5→0.5 (deltaPct=0) | **持平**（分类型小分母 total=10·仅方向参考） | 唯二未改善口径之一；同源归因 H1/H2 已坐实（轨迹级） |
+| 实体级失败 tasks/goals/workflowRuns | 22→5 / 15→5 / 1→0 | **改善** | platform-health 实体级口径，红队复算 ✓ |
+| 轨迹级失败（failures.json） | 73 条（62 条 10/7 配额级联） | **恶化**（异动+红队验证成立） | 首轮轨迹级基线；注意与实体级口径**禁止直接对读**（H3） |
+| benchmark | 86.33→87.25 (+1.1%) | **改善** | 上升且无回落；纪律：即便回落也只查执行侧，不产出放宽护栏建议 |
+| 提案漏斗 pending | 27→29（approved=0） | **恶化** | 四方读数对齐+红队复算 ✓；已越 escalate=27，距 breaker=30 差 1 |
+| 负反馈率 / express_lane | null+no-data / null | **持平**（零样本，不设目标） | 观测缺口（H7）：采集管道代码面无缺维，评分行为未发生 |
+| 验证/选择层三指标 | 0/0（两期同） | **持平**（结构性存量缺口） | 机制在仓流量缺失（H8），承接在池提案滞留观察 |
+| bugClosureDays | 无前值→19.5 | **待验证** | 单值不可环比，不设目标不下结论 |
+
+阈值口径：沿用 v3 集合（周级样本门槛 ≥5，本期 activity.tasks=38 通过；分类型小分母逐条标注；零样本不下异动结论），①本轮未提议新分位阈值，④复核采用。
+
+**过程指标首录（v3 公式零改动，本轮值即 v5 环比基线；样本不足只记分布、不设目标）**
+- 转化率 = 达「已执行·未验收」及以上立案数 / 当轮总立案数（销案 0 与误报 0 不入分母）= **0/7 = 0%**（若仅按 v3 当轮新立案 L1/L2 计亦为 0/2=0%）
+- 滞留环节 = 台账状态分布：未动 5（全部滞留在**审批消费侧**）+ 进行中(挂验证) 2；台账时间戳齐备（pendingDays/createdAt 在采集件内），时长维度无需标待验证（bugClosureDays 除外）
+
+## 三、v3 立案闭环追踪（台账 v4 摘要，完整版见 findings-ledger-v4.json）
+
+| caseId | proposalId | 主题 | 状态 | 证据 |
+|---|---|---|---|---|
+| L1 | cmutkyiz8… | 提案池去重与消费闭环标准（v3 新立案） | **未动** | pending/appliedAt=null/pendingDays=6；approved=0 |
+| L2 | cmutkyiyb… | 验证/选择层接线标准 v2（v3 新立案） | **未动** | 同上；acceptanceTests.total 仍 0、gateVerifiedRunRate 仍 0 |
+| L3 | cmupfhl8n… | 验证/选择层接线标准 v1（v2 立案） | **未动** | pendingDays=9，与 L2 同主题防重复立案 |
+| L4 | cmunjmm5r… | 提案漏斗行动牵引（v2 立案） | **未动** | pendingDays=11；其所针对的消费停滞本期继续为真 |
+| L5 | cmuhtbg1v… | V0 执行端工具配置定稿 | **未动** | pendingDays=15 |
+| L6 | （疑点 H4→本轮 H6） | error:null 静默失败 | **进行中（挂验证）** | 本期 2/73 条，向好未清零；n=2 维持挂验证 |
+| L7 | （疑点 H5·v3 编号） | v3 疑点 H5 | **进行中（挂验证·定义待补录）** | ⚠️ v3 台账底稿未随本 worktree 数据包采集，原始定义与判据缺失，按纪律不编造、原样保留 |
+
+台账 summary：7 条 = 未动 5 + 进行中 2；本轮无「已验收」条目 → 红队「已验收抽验」队列为空（如实记录）；H4/H5（v3 编号）与滞留提案无新证据 → **转「滞留观察」，不重复立案**。
+
+## 四、Confirmed 短板清单（9/9，定级以红队裁决为准）
+
+| ID | 定级 | 动作 | 短板与根因（证据均为红队逐行亲读+首席关键数字复算） |
+|---|---|---|---|
+| H1 | P1 | bug_ticket | **429 配额级联**：retry-utils.ts:15/:42-43/:67-69 重试 3 次上限+退避 10/20/40s 封顶，对小时级配额窗量级错配 3 个数量级；配额签名域无编排级熔断（其它域熔断在位）；62 条失败集中 10/7 T07-T08，T08 簇 durationMs≈180s 与「70s 退避+3 次执行」耗尽形状吻合；error 自带恢复锚点 21:31:45，10/8 起清零 |
+| H2 | P2 | bug_ticket（与 H1 同工单承接） | **goal 0.5 持平同源**：goals.ts:4659 agentType 注册实锤；21 条 goal 型失败 17 条落窗全 429 系（红队交叉表，修正体检师「21 条全同窗」）；实体级归属挂 DB 预注册验证 |
+| H3 | P2 | evolution_proposal | **73 vs 10 口径差**：轨迹级（analyzer.ts:491 status≠completed，含在途/重试）vs 实体级（index.ts:118 status='failed'）三重不同源（表/谓词/粒度），7.3 倍差为口径必然非采集缺陷 → 口径对照表文档化 + 两口径禁止直接对读 |
+| H4 | P2 | knowledge_only（滞留观察） | **提案漏斗消费停滞**：approved=0、pending 29 差 1 触熔断、v3 两案 7 天零动作、最老 64 天；告警链路完备（console+事件+API+前端徽标），根因=人审消费侧零动作；v2 同主题 L4 在池，不重复立案；维持「绝不自动 approve/apply」边界红线 |
+| H5 | P3 | bug_ticket | **stderr 噪音漏网**：stripCliStderrNoise 共享工具+专项测试在位（红队推翻体检师「未收口」表述），仍有 2 条 unrecognized_model 漏网 → 存在未接入路径（嫌疑点 benchmark.ts:396 非 143 分支）；n=2 仅方向参考 |
+| H6 | P3 | knowledge_only（挂验证） | **error:null 2 条**：自愈双路（启动+周期 5min）实锤在位且运转（2 条僵尸自愈签名即产出证据）；残余=某 failed 写入路径 error 字段形态不一；n=2 挂验证不销案不升级 |
+| H7 | P3 | none（观测缺口登记） | **express_lane 零样本+负反馈 no-data**：全类型同 groupBy、采样管道在位启动即跑 → 缺口在行为侧非采集缺维；预注册升级条款留档（若 expressLaneRun 有记录而 Task 无终态→P1 复立） |
+| H8 | P3 | none（滞留观察） | **验证/选择层三指标持续缺失（三连期）**：口径+契约测试均在仓，0 值=流量未经过；承接 L2/L3；解除条件=下期任一分母>0 |
+| H9 | P2 | evolution_proposal | **自愈规范文档滞后（本轮新立）**：CLAUDE.md:297-298 宣称无自愈覆盖/无运行期检测，代码实况为启动+周期双路自愈且在运转（三方逐字比对）；风险链=过时结论→重复立案→加速熔断（29/30）+误导新 Agent 先验 |
+
+## 五、被红队否决的条目与原因
+
+**本周 Refuted=0**。红队产出 3 处措辞修正（对上游结论的精化，非否决）：
+1. H5「过滤逻辑散点未收口共享工具」被推翻 → 实测 stripCliStderrNoise 已是共享工具且主路径接入，问题重述为「存在未接入路径」；
+2. H2「21 条 goal 型失败全同窗」修正为「17/21 同窗」（81% 集中反而强化配额主签名结论）；
+3. H1「无编排级熔断」精化为「配额签名域无编排级熔断（reject 死锁/提案水位/goal 审视三处其它域熔断在位）」。
+另：①侦探对 H4 的「sla_alert 疑似 console-only」怀疑被体检师源码取证证伪（双出口在位），红队确认。
+
+## 六、Uncertain / 待复核 / 下周关注
+
+**Uncertain=0**（红队全部裁决 Confirmed；H7/H8 为 Confirmed+actionType=none，归入滞留观察而非立案，符合纪律）。
+
+待复核清单：
+- H2 实体级归属（5 个 failed goal 时间戳是否落配额窗）——无 DB 通道，挂预注册证伪条款；
+- H7 expressLaneRun/ArtifactRating 窗口行数 DB 级终裁——同上；
+- H3 次要缺口：failures.json 具体 HTTP 导出端点未逐字定位（不影响主结论）；
+- L7（v3 疑点 H5）原始定义缺失，需回捞 v3 台账底稿补录；
+- 本轮与 v3 疑点编号存在重排（v3-H4(error:null)→本轮 H6/L6；本轮 H5=unrecognized_model 与 L7 所指 v3-H5 是否同物无法确认）——已如实标注，不强行合并。
+
+下周建议关注点（含 failures.json 近 7 天失败签名「失败族二分」）：
+1. **审批池熔断是下周第一风险**：pending 29 差 1 触发即暂停全局自动分析——届时本工作流自身数据源断供。建议消费侧批审会话优先消化 reminder 桶最老两案（pendingDays 57/63）；提示：L4 同主题提案在池，勿重复立案；
+2. **H1/H2 工单落地复测**：下期观察同签名（429·1310/1302）是否再现级联——复测证据是「已验收」的唯一准入；
+3. **失败族二分基线**：族 A 环境/外部配额族 66/73（90.4% = 429×62+SIGINT×2+SIGTERM×1+ConnLost×1）vs 族 B 平台自身族 7/73（9.6% = error:null×2+僵尸×2+300s 卡死×1+unrec×2）。若族 A 占比回落而族 B 上升，关注重心切换到轨迹生命周期域（H5/H6 汇合处）；
+4. **H9 提案应用后**跟踪「自愈缺失」类重复立案是否归零（其自身是熔断加速因子）；
+5. H8 解除条件：gateVerifiedRunRate 分母>0 或 acceptanceTests.total>0 任一出现即解除「持续缺失」定性；反向（应用后仍 0）则升级「应用无效」；
+6. L6 若定位到具体 null 写入路径或样本量达标（≥5），按 H6 预注册条款转 bug_ticket；
+7. benchmark 回落条款纪律延续：回落只查执行侧原因，绝不产出放宽护栏/评测标准类建议；
+8. 双 SHA 机制改进：base SHA 缺口根源是 worktree 当日克隆无历史深度——建议工作流在①节点或数据包采集时固定记录 base/head 双 SHA（详见下节）。
+
+## 七、数据缺口与边界如实上报
+
+1. **双 SHA 缺口**：baseSha(10/4)=unavailable——本 worktree 为 10/11 当日克隆（clone base 7c05521），本地无 10/4 引用与历史深度，10/4→10/11 git diff 无法本地执行；①节点亦无 git/Bash 通道。全部证据为 as-of-head 快照实测（体检师 907df40 / 红队 e81f3ae，漂移为 07:49:22Z workflow auto-commit，红队在漂移后逐行亲读自证行号有效）。不编造 SHA（Verification P1/P4）。
+2. **本节点无 Bash**：git commit 无法由本节点执行，report.md/actions.json 以 Write 落盘于 `.myrd/self-evolution/`，commit 与导出由 deploy 节点（具备相应通道）补做——与③红队 toolBoundary 先例一致。
+3. **DB/HTTP 通道不可用**：实体级归因类核验按「不可得」如实标注（见待复核清单），未伪造。
+4. v3 台账底稿未随本 worktree 数据包采集（appliedLast30d=9 说明池外有应用发生，但在池采集件无法核对对应关系，不虚构逐条回填）。
+5. 本轮未观测到「非项目成员/0 仓库」类平台异常；三份采集件均无 `{"unavailable":true}` 占位，未触发「读不到≠断更」条款；未引用 127.0.0.1:7456 探针项；进化内核（guardrail/policies/边界合同）强度不在体检范围，全文无放宽护栏类发现。
+
+## 八、衔接声明
+
+本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
 
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
@@ -10940,115 +11416,6 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 
 ## 产品关联知识
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
-
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -11078,9 +11445,9 @@ negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内�
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
-## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
-修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -11214,6 +11581,115 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+
+修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
 
 ## 架构设计文档
 
@@ -13625,6 +14101,125 @@ curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.
 4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
 5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
 6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
+
+
+## [H4] 提案漏斗消费停滞滞留观察：pending 29 距熔断线 30 仅差 1、approved=0，根因在人审消费侧（承接 L4 在池提案，不重复立案） 2026-W41
+
+v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 两案 cmutkyiz8/cmutkyiyb，7 天零动作）、approved=0、最老积压 pendingDays=64、已越 escalate 线 27、距 breaker 线 30 仅差 1（触发即暂停全局自动分析，项目级降级 drain 续跑）。代码面告警→曝光→熔断链路完备（approval-sla.ts:19-27 阈值在位、scheduler.ts:293-309 console+持久化事件双出口、platform-health-section.tsx:378-394 前端徽标），『sla_alert 仍 console-only』旧口径被体检师证伪、红队确认；停滞根因收窄为人审消费侧零动作。v2 轮同主题提案 cmunjmm5r（L4）在池未动，按『不重复立案』纪律转滞留观察；维持 approval-sla.ts:12/:131『只提醒、绝不自动 approve/apply』边界红线，不产出放宽护栏建议。
+
+## [H6] error:null 静默失败 2 条挂验证观察：自愈双路（启动+周期 5 分钟）在位运转，残余=failed 写入路径 error 字段形态不一 2026-W41
+
+本期 error=null 2/73 条（v3 期『量最大』→ 本期 2 条，方向向好未清零；其中 ≥1 条 agentName='真机试玩验收' playtest 类）。自愈机制实锤在位且运转：index.ts:371-374 启动 + :578/:588 周期（5 分钟）双路 cleanupStaleTrajectories 操作 agentExecutionTrajectory（engine.ts:399-435），failures.json 实测 2 条『僵尸轨迹…周期自愈清理为 failed』即运转产出（平台自愈规范『无自愈覆盖』旧口径反转，体检师自纠+红队确认）。残余疑点：某 failed 写入路径置 failed 时不携带 error（与 :422/:432 两种 error 必填形态不一致），2 条与 SIGINT/SIGTERM/僵尸共 7 条字段邻接形态异于其余 66 条。n=2 样本不足：维持挂验证（台账 L6），不销案不升级；『审计 failed 写入点保证 error 必填』的工程化修复待样本量达标或定位到具体路径后转 bug_ticket。
+
+## MyRD 自进化周报 2026-W41
+
+# MyRD 自进化周报 2026-W41
+
+> 窗口 2026-10-04 → 2026-10-11 · 数据锚 health.json generatedAt=2026-10-11T07:18:43.499Z（三份采集件一致）
+> 产出节点：④首席研究员（口径整合+环比结论+双轨立案）；输入：①数据侦探（findings-delta-v3 + 台账 v4 + hypotheses H1-H9）、②体检师（findings-audited 9 条）、③红队（findings-verified 9 条裁决）
+> as-of-SHA：体检师取证 head=907df40（07:30:55Z）→ 红队复核 head=e81f3ae（07:49:22Z workflow auto-commit 漂移，红队在漂移后工作区逐行亲读自证行号有效，最大偏差 ≤3 行）；**base SHA(10/4)=unavailable**（详见「数据缺口」节，如实上报不编造）
+
+---
+
+## 一、本周结论摘要
+
+本周平台**整体向好但含一次 P0 级异动事件**：总体任务成功率 0.718→0.865（+20.5%，样本 38 达门槛，红队复算 ✓）、workflow 成功率 1.0（26/26 零失败）、benchmark 86.33→87.25（+1.1%，回落条款未触发）、实体级失败 tasks 22→5 / goals 15→5 / workflowRuns 1→0。
+
+异动主因为 **10/7 单日 429 配额级联**：73 条失败轨迹中 62 条集中 10/7 UTC T07-T08 两小时窗（首席 `-o` 复算：429 全文 81 处、10/7 当天 63 条、agentType workflow 49/goal_master 11/goal_delegate 10，勾稽 73 ✓），同一批游戏开发 workflow 与 goal 编排全灭——外部配额事件 × 调度韧性缺口（退避 40s 封顶 vs 小时级配额窗 + 配额签名域无编排级熔断）。goal 型成功率两期持平 0.5 与该事件同源（轨迹级 21 条失败中 17 条落窗且全 429 系）。
+
+第二紧迫项是**进化闭环自身的停摆风险**：提案池 pending 29 距熔断线 30 仅差 1、approved=0、v3 两案 7 天零动作、最老积压 64 天——告警通路经体检师+红队双重复核为完备，停滞根因收窄为**人审消费侧零动作**。
+
+红队裁决：**9 条假设全部 Confirmed、Refuted=0、Uncertain=0**（红队对体检师 3 处表述做了措辞修正，见第五节）。收敛 top3 短板：**H1 配额韧性（P1）> H4+台账 审批消费停滞（P2，紧迫度最高）> H9 自愈规范文档滞后（P2，防重复立案加速熔断）**。
+
+## 二、环比分项结论（预注册 rubric：恶化=异动+验证成立/复核坐实；持平=无超阈值或样本不足；改善=向好+复测/复核任一佐证）
+
+| 指标 | 上期→本期 | 判定 | 依据 |
+|---|---|---|---|
+| overallTaskSuccessRate | 0.718→0.865 (+20.5%) | **改善** | 样本 38≥5 门槛；红队手算复算 ✓；benchmark 同向佐证 |
+| workflow 成功率 | 0.870→1.0 (+15%) | **改善** | 26/26 零失败，红队复算 ✓ |
+| goal 成功率 | 0.5→0.5 (deltaPct=0) | **持平**（分类型小分母 total=10·仅方向参考） | 唯二未改善口径之一；同源归因 H1/H2 已坐实（轨迹级） |
+| 实体级失败 tasks/goals/workflowRuns | 22→5 / 15→5 / 1→0 | **改善** | platform-health 实体级口径，红队复算 ✓ |
+| 轨迹级失败（failures.json） | 73 条（62 条 10/7 配额级联） | **恶化**（异动+红队验证成立） | 首轮轨迹级基线；注意与实体级口径**禁止直接对读**（H3） |
+| benchmark | 86.33→87.25 (+1.1%) | **改善** | 上升且无回落；纪律：即便回落也只查执行侧，不产出放宽护栏建议 |
+| 提案漏斗 pending | 27→29（approved=0） | **恶化** | 四方读数对齐+红队复算 ✓；已越 escalate=27，距 breaker=30 差 1 |
+| 负反馈率 / express_lane | null+no-data / null | **持平**（零样本，不设目标） | 观测缺口（H7）：采集管道代码面无缺维，评分行为未发生 |
+| 验证/选择层三指标 | 0/0（两期同） | **持平**（结构性存量缺口） | 机制在仓流量缺失（H8），承接在池提案滞留观察 |
+| bugClosureDays | 无前值→19.5 | **待验证** | 单值不可环比，不设目标不下结论 |
+
+阈值口径：沿用 v3 集合（周级样本门槛 ≥5，本期 activity.tasks=38 通过；分类型小分母逐条标注；零样本不下异动结论），①本轮未提议新分位阈值，④复核采用。
+
+**过程指标首录（v3 公式零改动，本轮值即 v5 环比基线；样本不足只记分布、不设目标）**
+- 转化率 = 达「已执行·未验收」及以上立案数 / 当轮总立案数（销案 0 与误报 0 不入分母）= **0/7 = 0%**（若仅按 v3 当轮新立案 L1/L2 计亦为 0/2=0%）
+- 滞留环节 = 台账状态分布：未动 5（全部滞留在**审批消费侧**）+ 进行中(挂验证) 2；台账时间戳齐备（pendingDays/createdAt 在采集件内），时长维度无需标待验证（bugClosureDays 除外）
+
+## 三、v3 立案闭环追踪（台账 v4 摘要，完整版见 findings-ledger-v4.json）
+
+| caseId | proposalId | 主题 | 状态 | 证据 |
+|---|---|---|---|---|
+| L1 | cmutkyiz8… | 提案池去重与消费闭环标准（v3 新立案） | **未动** | pending/appliedAt=null/pendingDays=6；approved=0 |
+| L2 | cmutkyiyb… | 验证/选择层接线标准 v2（v3 新立案） | **未动** | 同上；acceptanceTests.total 仍 0、gateVerifiedRunRate 仍 0 |
+| L3 | cmupfhl8n… | 验证/选择层接线标准 v1（v2 立案） | **未动** | pendingDays=9，与 L2 同主题防重复立案 |
+| L4 | cmunjmm5r… | 提案漏斗行动牵引（v2 立案） | **未动** | pendingDays=11；其所针对的消费停滞本期继续为真 |
+| L5 | cmuhtbg1v… | V0 执行端工具配置定稿 | **未动** | pendingDays=15 |
+| L6 | （疑点 H4→本轮 H6） | error:null 静默失败 | **进行中（挂验证）** | 本期 2/73 条，向好未清零；n=2 维持挂验证 |
+| L7 | （疑点 H5·v3 编号） | v3 疑点 H5 | **进行中（挂验证·定义待补录）** | ⚠️ v3 台账底稿未随本 worktree 数据包采集，原始定义与判据缺失，按纪律不编造、原样保留 |
+
+台账 summary：7 条 = 未动 5 + 进行中 2；本轮无「已验收」条目 → 红队「已验收抽验」队列为空（如实记录）；H4/H5（v3 编号）与滞留提案无新证据 → **转「滞留观察」，不重复立案**。
+
+## 四、Confirmed 短板清单（9/9，定级以红队裁决为准）
+
+| ID | 定级 | 动作 | 短板与根因（证据均为红队逐行亲读+首席关键数字复算） |
+|---|---|---|---|
+| H1 | P1 | bug_ticket | **429 配额级联**：retry-utils.ts:15/:42-43/:67-69 重试 3 次上限+退避 10/20/40s 封顶，对小时级配额窗量级错配 3 个数量级；配额签名域无编排级熔断（其它域熔断在位）；62 条失败集中 10/7 T07-T08，T08 簇 durationMs≈180s 与「70s 退避+3 次执行」耗尽形状吻合；error 自带恢复锚点 21:31:45，10/8 起清零 |
+| H2 | P2 | bug_ticket（与 H1 同工单承接） | **goal 0.5 持平同源**：goals.ts:4659 agentType 注册实锤；21 条 goal 型失败 17 条落窗全 429 系（红队交叉表，修正体检师「21 条全同窗」）；实体级归属挂 DB 预注册验证 |
+| H3 | P2 | evolution_proposal | **73 vs 10 口径差**：轨迹级（analyzer.ts:491 status≠completed，含在途/重试）vs 实体级（index.ts:118 status='failed'）三重不同源（表/谓词/粒度），7.3 倍差为口径必然非采集缺陷 → 口径对照表文档化 + 两口径禁止直接对读 |
+| H4 | P2 | knowledge_only（滞留观察） | **提案漏斗消费停滞**：approved=0、pending 29 差 1 触熔断、v3 两案 7 天零动作、最老 64 天；告警链路完备（console+事件+API+前端徽标），根因=人审消费侧零动作；v2 同主题 L4 在池，不重复立案；维持「绝不自动 approve/apply」边界红线 |
+| H5 | P3 | bug_ticket | **stderr 噪音漏网**：stripCliStderrNoise 共享工具+专项测试在位（红队推翻体检师「未收口」表述），仍有 2 条 unrecognized_model 漏网 → 存在未接入路径（嫌疑点 benchmark.ts:396 非 143 分支）；n=2 仅方向参考 |
+| H6 | P3 | knowledge_only（挂验证） | **error:null 2 条**：自愈双路（启动+周期 5min）实锤在位且运转（2 条僵尸自愈签名即产出证据）；残余=某 failed 写入路径 error 字段形态不一；n=2 挂验证不销案不升级 |
+| H7 | P3 | none（观测缺口登记） | **express_lane 零样本+负反馈 no-data**：全类型同 groupBy、采样管道在位启动即跑 → 缺口在行为侧非采集缺维；预注册升级条款留档（若 expressLaneRun 有记录而 Task 无终态→P1 复立） |
+| H8 | P3 | none（滞留观察） | **验证/选择层三指标持续缺失（三连期）**：口径+契约测试均在仓，0 值=流量未经过；承接 L2/L3；解除条件=下期任一分母>0 |
+| H9 | P2 | evolution_proposal | **自愈规范文档滞后（本轮新立）**：CLAUDE.md:297-298 宣称无自愈覆盖/无运行期检测，代码实况为启动+周期双路自愈且在运转（三方逐字比对）；风险链=过时结论→重复立案→加速熔断（29/30）+误导新 Agent 先验 |
+
+## 五、被红队否决的条目与原因
+
+**本周 Refuted=0**。红队产出 3 处措辞修正（对上游结论的精化，非否决）：
+1. H5「过滤逻辑散点未收口共享工具」被推翻 → 实测 stripCliStderrNoise 已是共享工具且主路径接入，问题重述为「存在未接入路径」；
+2. H2「21 条 goal 型失败全同窗」修正为「17/21 同窗」（81% 集中反而强化配额主签名结论）；
+3. H1「无编排级熔断」精化为「配额签名域无编排级熔断（reject 死锁/提案水位/goal 审视三处其它域熔断在位）」。
+另：①侦探对 H4 的「sla_alert 疑似 console-only」怀疑被体检师源码取证证伪（双出口在位），红队确认。
+
+## 六、Uncertain / 待复核 / 下周关注
+
+**Uncertain=0**（红队全部裁决 Confirmed；H7/H8 为 Confirmed+actionType=none，归入滞留观察而非立案，符合纪律）。
+
+待复核清单：
+- H2 实体级归属（5 个 failed goal 时间戳是否落配额窗）——无 DB 通道，挂预注册证伪条款；
+- H7 expressLaneRun/ArtifactRating 窗口行数 DB 级终裁——同上；
+- H3 次要缺口：failures.json 具体 HTTP 导出端点未逐字定位（不影响主结论）；
+- L7（v3 疑点 H5）原始定义缺失，需回捞 v3 台账底稿补录；
+- 本轮与 v3 疑点编号存在重排（v3-H4(error:null)→本轮 H6/L6；本轮 H5=unrecognized_model 与 L7 所指 v3-H5 是否同物无法确认）——已如实标注，不强行合并。
+
+下周建议关注点（含 failures.json 近 7 天失败签名「失败族二分」）：
+1. **审批池熔断是下周第一风险**：pending 29 差 1 触发即暂停全局自动分析——届时本工作流自身数据源断供。建议消费侧批审会话优先消化 reminder 桶最老两案（pendingDays 57/63）；提示：L4 同主题提案在池，勿重复立案；
+2. **H1/H2 工单落地复测**：下期观察同签名（429·1310/1302）是否再现级联——复测证据是「已验收」的唯一准入；
+3. **失败族二分基线**：族 A 环境/外部配额族 66/73（90.4% = 429×62+SIGINT×2+SIGTERM×1+ConnLost×1）vs 族 B 平台自身族 7/73（9.6% = error:null×2+僵尸×2+300s 卡死×1+unrec×2）。若族 A 占比回落而族 B 上升，关注重心切换到轨迹生命周期域（H5/H6 汇合处）；
+4. **H9 提案应用后**跟踪「自愈缺失」类重复立案是否归零（其自身是熔断加速因子）；
+5. H8 解除条件：gateVerifiedRunRate 分母>0 或 acceptanceTests.total>0 任一出现即解除「持续缺失」定性；反向（应用后仍 0）则升级「应用无效」；
+6. L6 若定位到具体 null 写入路径或样本量达标（≥5），按 H6 预注册条款转 bug_ticket；
+7. benchmark 回落条款纪律延续：回落只查执行侧原因，绝不产出放宽护栏/评测标准类建议；
+8. 双 SHA 机制改进：base SHA 缺口根源是 worktree 当日克隆无历史深度——建议工作流在①节点或数据包采集时固定记录 base/head 双 SHA（详见下节）。
+
+## 七、数据缺口与边界如实上报
+
+1. **双 SHA 缺口**：baseSha(10/4)=unavailable——本 worktree 为 10/11 当日克隆（clone base 7c05521），本地无 10/4 引用与历史深度，10/4→10/11 git diff 无法本地执行；①节点亦无 git/Bash 通道。全部证据为 as-of-head 快照实测（体检师 907df40 / 红队 e81f3ae，漂移为 07:49:22Z workflow auto-commit，红队在漂移后逐行亲读自证行号有效）。不编造 SHA（Verification P1/P4）。
+2. **本节点无 Bash**：git commit 无法由本节点执行，report.md/actions.json 以 Write 落盘于 `.myrd/self-evolution/`，commit 与导出由 deploy 节点（具备相应通道）补做——与③红队 toolBoundary 先例一致。
+3. **DB/HTTP 通道不可用**：实体级归因类核验按「不可得」如实标注（见待复核清单），未伪造。
+4. v3 台账底稿未随本 worktree 数据包采集（appliedLast30d=9 说明池外有应用发生，但在池采集件无法核对对应关系，不虚构逐条回填）。
+5. 本轮未观测到「非项目成员/0 仓库」类平台异常；三份采集件均无 `{"unavailable":true}` 占位，未触发「读不到≠断更」条款；未引用 127.0.0.1:7456 探针项；进化内核（guardrail/policies/边界合同）强度不在体检范围，全文无放宽护栏类发现。
+
+## 八、衔接声明
+
+本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
 
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
@@ -13676,115 +14271,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
-
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -13814,9 +14300,9 @@ negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内�
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
-## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
-修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -13950,6 +14436,115 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+
+修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
 
 ## 架构设计文档
 
@@ -16361,6 +16956,125 @@ curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.
 4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
 5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
 6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
+
+
+## [H4] 提案漏斗消费停滞滞留观察：pending 29 距熔断线 30 仅差 1、approved=0，根因在人审消费侧（承接 L4 在池提案，不重复立案） 2026-W41
+
+v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 两案 cmutkyiz8/cmutkyiyb，7 天零动作）、approved=0、最老积压 pendingDays=64、已越 escalate 线 27、距 breaker 线 30 仅差 1（触发即暂停全局自动分析，项目级降级 drain 续跑）。代码面告警→曝光→熔断链路完备（approval-sla.ts:19-27 阈值在位、scheduler.ts:293-309 console+持久化事件双出口、platform-health-section.tsx:378-394 前端徽标），『sla_alert 仍 console-only』旧口径被体检师证伪、红队确认；停滞根因收窄为人审消费侧零动作。v2 轮同主题提案 cmunjmm5r（L4）在池未动，按『不重复立案』纪律转滞留观察；维持 approval-sla.ts:12/:131『只提醒、绝不自动 approve/apply』边界红线，不产出放宽护栏建议。
+
+## [H6] error:null 静默失败 2 条挂验证观察：自愈双路（启动+周期 5 分钟）在位运转，残余=failed 写入路径 error 字段形态不一 2026-W41
+
+本期 error=null 2/73 条（v3 期『量最大』→ 本期 2 条，方向向好未清零；其中 ≥1 条 agentName='真机试玩验收' playtest 类）。自愈机制实锤在位且运转：index.ts:371-374 启动 + :578/:588 周期（5 分钟）双路 cleanupStaleTrajectories 操作 agentExecutionTrajectory（engine.ts:399-435），failures.json 实测 2 条『僵尸轨迹…周期自愈清理为 failed』即运转产出（平台自愈规范『无自愈覆盖』旧口径反转，体检师自纠+红队确认）。残余疑点：某 failed 写入路径置 failed 时不携带 error（与 :422/:432 两种 error 必填形态不一致），2 条与 SIGINT/SIGTERM/僵尸共 7 条字段邻接形态异于其余 66 条。n=2 样本不足：维持挂验证（台账 L6），不销案不升级；『审计 failed 写入点保证 error 必填』的工程化修复待样本量达标或定位到具体路径后转 bug_ticket。
+
+## MyRD 自进化周报 2026-W41
+
+# MyRD 自进化周报 2026-W41
+
+> 窗口 2026-10-04 → 2026-10-11 · 数据锚 health.json generatedAt=2026-10-11T07:18:43.499Z（三份采集件一致）
+> 产出节点：④首席研究员（口径整合+环比结论+双轨立案）；输入：①数据侦探（findings-delta-v3 + 台账 v4 + hypotheses H1-H9）、②体检师（findings-audited 9 条）、③红队（findings-verified 9 条裁决）
+> as-of-SHA：体检师取证 head=907df40（07:30:55Z）→ 红队复核 head=e81f3ae（07:49:22Z workflow auto-commit 漂移，红队在漂移后工作区逐行亲读自证行号有效，最大偏差 ≤3 行）；**base SHA(10/4)=unavailable**（详见「数据缺口」节，如实上报不编造）
+
+---
+
+## 一、本周结论摘要
+
+本周平台**整体向好但含一次 P0 级异动事件**：总体任务成功率 0.718→0.865（+20.5%，样本 38 达门槛，红队复算 ✓）、workflow 成功率 1.0（26/26 零失败）、benchmark 86.33→87.25（+1.1%，回落条款未触发）、实体级失败 tasks 22→5 / goals 15→5 / workflowRuns 1→0。
+
+异动主因为 **10/7 单日 429 配额级联**：73 条失败轨迹中 62 条集中 10/7 UTC T07-T08 两小时窗（首席 `-o` 复算：429 全文 81 处、10/7 当天 63 条、agentType workflow 49/goal_master 11/goal_delegate 10，勾稽 73 ✓），同一批游戏开发 workflow 与 goal 编排全灭——外部配额事件 × 调度韧性缺口（退避 40s 封顶 vs 小时级配额窗 + 配额签名域无编排级熔断）。goal 型成功率两期持平 0.5 与该事件同源（轨迹级 21 条失败中 17 条落窗且全 429 系）。
+
+第二紧迫项是**进化闭环自身的停摆风险**：提案池 pending 29 距熔断线 30 仅差 1、approved=0、v3 两案 7 天零动作、最老积压 64 天——告警通路经体检师+红队双重复核为完备，停滞根因收窄为**人审消费侧零动作**。
+
+红队裁决：**9 条假设全部 Confirmed、Refuted=0、Uncertain=0**（红队对体检师 3 处表述做了措辞修正，见第五节）。收敛 top3 短板：**H1 配额韧性（P1）> H4+台账 审批消费停滞（P2，紧迫度最高）> H9 自愈规范文档滞后（P2，防重复立案加速熔断）**。
+
+## 二、环比分项结论（预注册 rubric：恶化=异动+验证成立/复核坐实；持平=无超阈值或样本不足；改善=向好+复测/复核任一佐证）
+
+| 指标 | 上期→本期 | 判定 | 依据 |
+|---|---|---|---|
+| overallTaskSuccessRate | 0.718→0.865 (+20.5%) | **改善** | 样本 38≥5 门槛；红队手算复算 ✓；benchmark 同向佐证 |
+| workflow 成功率 | 0.870→1.0 (+15%) | **改善** | 26/26 零失败，红队复算 ✓ |
+| goal 成功率 | 0.5→0.5 (deltaPct=0) | **持平**（分类型小分母 total=10·仅方向参考） | 唯二未改善口径之一；同源归因 H1/H2 已坐实（轨迹级） |
+| 实体级失败 tasks/goals/workflowRuns | 22→5 / 15→5 / 1→0 | **改善** | platform-health 实体级口径，红队复算 ✓ |
+| 轨迹级失败（failures.json） | 73 条（62 条 10/7 配额级联） | **恶化**（异动+红队验证成立） | 首轮轨迹级基线；注意与实体级口径**禁止直接对读**（H3） |
+| benchmark | 86.33→87.25 (+1.1%) | **改善** | 上升且无回落；纪律：即便回落也只查执行侧，不产出放宽护栏建议 |
+| 提案漏斗 pending | 27→29（approved=0） | **恶化** | 四方读数对齐+红队复算 ✓；已越 escalate=27，距 breaker=30 差 1 |
+| 负反馈率 / express_lane | null+no-data / null | **持平**（零样本，不设目标） | 观测缺口（H7）：采集管道代码面无缺维，评分行为未发生 |
+| 验证/选择层三指标 | 0/0（两期同） | **持平**（结构性存量缺口） | 机制在仓流量缺失（H8），承接在池提案滞留观察 |
+| bugClosureDays | 无前值→19.5 | **待验证** | 单值不可环比，不设目标不下结论 |
+
+阈值口径：沿用 v3 集合（周级样本门槛 ≥5，本期 activity.tasks=38 通过；分类型小分母逐条标注；零样本不下异动结论），①本轮未提议新分位阈值，④复核采用。
+
+**过程指标首录（v3 公式零改动，本轮值即 v5 环比基线；样本不足只记分布、不设目标）**
+- 转化率 = 达「已执行·未验收」及以上立案数 / 当轮总立案数（销案 0 与误报 0 不入分母）= **0/7 = 0%**（若仅按 v3 当轮新立案 L1/L2 计亦为 0/2=0%）
+- 滞留环节 = 台账状态分布：未动 5（全部滞留在**审批消费侧**）+ 进行中(挂验证) 2；台账时间戳齐备（pendingDays/createdAt 在采集件内），时长维度无需标待验证（bugClosureDays 除外）
+
+## 三、v3 立案闭环追踪（台账 v4 摘要，完整版见 findings-ledger-v4.json）
+
+| caseId | proposalId | 主题 | 状态 | 证据 |
+|---|---|---|---|---|
+| L1 | cmutkyiz8… | 提案池去重与消费闭环标准（v3 新立案） | **未动** | pending/appliedAt=null/pendingDays=6；approved=0 |
+| L2 | cmutkyiyb… | 验证/选择层接线标准 v2（v3 新立案） | **未动** | 同上；acceptanceTests.total 仍 0、gateVerifiedRunRate 仍 0 |
+| L3 | cmupfhl8n… | 验证/选择层接线标准 v1（v2 立案） | **未动** | pendingDays=9，与 L2 同主题防重复立案 |
+| L4 | cmunjmm5r… | 提案漏斗行动牵引（v2 立案） | **未动** | pendingDays=11；其所针对的消费停滞本期继续为真 |
+| L5 | cmuhtbg1v… | V0 执行端工具配置定稿 | **未动** | pendingDays=15 |
+| L6 | （疑点 H4→本轮 H6） | error:null 静默失败 | **进行中（挂验证）** | 本期 2/73 条，向好未清零；n=2 维持挂验证 |
+| L7 | （疑点 H5·v3 编号） | v3 疑点 H5 | **进行中（挂验证·定义待补录）** | ⚠️ v3 台账底稿未随本 worktree 数据包采集，原始定义与判据缺失，按纪律不编造、原样保留 |
+
+台账 summary：7 条 = 未动 5 + 进行中 2；本轮无「已验收」条目 → 红队「已验收抽验」队列为空（如实记录）；H4/H5（v3 编号）与滞留提案无新证据 → **转「滞留观察」，不重复立案**。
+
+## 四、Confirmed 短板清单（9/9，定级以红队裁决为准）
+
+| ID | 定级 | 动作 | 短板与根因（证据均为红队逐行亲读+首席关键数字复算） |
+|---|---|---|---|
+| H1 | P1 | bug_ticket | **429 配额级联**：retry-utils.ts:15/:42-43/:67-69 重试 3 次上限+退避 10/20/40s 封顶，对小时级配额窗量级错配 3 个数量级；配额签名域无编排级熔断（其它域熔断在位）；62 条失败集中 10/7 T07-T08，T08 簇 durationMs≈180s 与「70s 退避+3 次执行」耗尽形状吻合；error 自带恢复锚点 21:31:45，10/8 起清零 |
+| H2 | P2 | bug_ticket（与 H1 同工单承接） | **goal 0.5 持平同源**：goals.ts:4659 agentType 注册实锤；21 条 goal 型失败 17 条落窗全 429 系（红队交叉表，修正体检师「21 条全同窗」）；实体级归属挂 DB 预注册验证 |
+| H3 | P2 | evolution_proposal | **73 vs 10 口径差**：轨迹级（analyzer.ts:491 status≠completed，含在途/重试）vs 实体级（index.ts:118 status='failed'）三重不同源（表/谓词/粒度），7.3 倍差为口径必然非采集缺陷 → 口径对照表文档化 + 两口径禁止直接对读 |
+| H4 | P2 | knowledge_only（滞留观察） | **提案漏斗消费停滞**：approved=0、pending 29 差 1 触熔断、v3 两案 7 天零动作、最老 64 天；告警链路完备（console+事件+API+前端徽标），根因=人审消费侧零动作；v2 同主题 L4 在池，不重复立案；维持「绝不自动 approve/apply」边界红线 |
+| H5 | P3 | bug_ticket | **stderr 噪音漏网**：stripCliStderrNoise 共享工具+专项测试在位（红队推翻体检师「未收口」表述），仍有 2 条 unrecognized_model 漏网 → 存在未接入路径（嫌疑点 benchmark.ts:396 非 143 分支）；n=2 仅方向参考 |
+| H6 | P3 | knowledge_only（挂验证） | **error:null 2 条**：自愈双路（启动+周期 5min）实锤在位且运转（2 条僵尸自愈签名即产出证据）；残余=某 failed 写入路径 error 字段形态不一；n=2 挂验证不销案不升级 |
+| H7 | P3 | none（观测缺口登记） | **express_lane 零样本+负反馈 no-data**：全类型同 groupBy、采样管道在位启动即跑 → 缺口在行为侧非采集缺维；预注册升级条款留档（若 expressLaneRun 有记录而 Task 无终态→P1 复立） |
+| H8 | P3 | none（滞留观察） | **验证/选择层三指标持续缺失（三连期）**：口径+契约测试均在仓，0 值=流量未经过；承接 L2/L3；解除条件=下期任一分母>0 |
+| H9 | P2 | evolution_proposal | **自愈规范文档滞后（本轮新立）**：CLAUDE.md:297-298 宣称无自愈覆盖/无运行期检测，代码实况为启动+周期双路自愈且在运转（三方逐字比对）；风险链=过时结论→重复立案→加速熔断（29/30）+误导新 Agent 先验 |
+
+## 五、被红队否决的条目与原因
+
+**本周 Refuted=0**。红队产出 3 处措辞修正（对上游结论的精化，非否决）：
+1. H5「过滤逻辑散点未收口共享工具」被推翻 → 实测 stripCliStderrNoise 已是共享工具且主路径接入，问题重述为「存在未接入路径」；
+2. H2「21 条 goal 型失败全同窗」修正为「17/21 同窗」（81% 集中反而强化配额主签名结论）；
+3. H1「无编排级熔断」精化为「配额签名域无编排级熔断（reject 死锁/提案水位/goal 审视三处其它域熔断在位）」。
+另：①侦探对 H4 的「sla_alert 疑似 console-only」怀疑被体检师源码取证证伪（双出口在位），红队确认。
+
+## 六、Uncertain / 待复核 / 下周关注
+
+**Uncertain=0**（红队全部裁决 Confirmed；H7/H8 为 Confirmed+actionType=none，归入滞留观察而非立案，符合纪律）。
+
+待复核清单：
+- H2 实体级归属（5 个 failed goal 时间戳是否落配额窗）——无 DB 通道，挂预注册证伪条款；
+- H7 expressLaneRun/ArtifactRating 窗口行数 DB 级终裁——同上；
+- H3 次要缺口：failures.json 具体 HTTP 导出端点未逐字定位（不影响主结论）；
+- L7（v3 疑点 H5）原始定义缺失，需回捞 v3 台账底稿补录；
+- 本轮与 v3 疑点编号存在重排（v3-H4(error:null)→本轮 H6/L6；本轮 H5=unrecognized_model 与 L7 所指 v3-H5 是否同物无法确认）——已如实标注，不强行合并。
+
+下周建议关注点（含 failures.json 近 7 天失败签名「失败族二分」）：
+1. **审批池熔断是下周第一风险**：pending 29 差 1 触发即暂停全局自动分析——届时本工作流自身数据源断供。建议消费侧批审会话优先消化 reminder 桶最老两案（pendingDays 57/63）；提示：L4 同主题提案在池，勿重复立案；
+2. **H1/H2 工单落地复测**：下期观察同签名（429·1310/1302）是否再现级联——复测证据是「已验收」的唯一准入；
+3. **失败族二分基线**：族 A 环境/外部配额族 66/73（90.4% = 429×62+SIGINT×2+SIGTERM×1+ConnLost×1）vs 族 B 平台自身族 7/73（9.6% = error:null×2+僵尸×2+300s 卡死×1+unrec×2）。若族 A 占比回落而族 B 上升，关注重心切换到轨迹生命周期域（H5/H6 汇合处）；
+4. **H9 提案应用后**跟踪「自愈缺失」类重复立案是否归零（其自身是熔断加速因子）；
+5. H8 解除条件：gateVerifiedRunRate 分母>0 或 acceptanceTests.total>0 任一出现即解除「持续缺失」定性；反向（应用后仍 0）则升级「应用无效」；
+6. L6 若定位到具体 null 写入路径或样本量达标（≥5），按 H6 预注册条款转 bug_ticket；
+7. benchmark 回落条款纪律延续：回落只查执行侧原因，绝不产出放宽护栏/评测标准类建议；
+8. 双 SHA 机制改进：base SHA 缺口根源是 worktree 当日克隆无历史深度——建议工作流在①节点或数据包采集时固定记录 base/head 双 SHA（详见下节）。
+
+## 七、数据缺口与边界如实上报
+
+1. **双 SHA 缺口**：baseSha(10/4)=unavailable——本 worktree 为 10/11 当日克隆（clone base 7c05521），本地无 10/4 引用与历史深度，10/4→10/11 git diff 无法本地执行；①节点亦无 git/Bash 通道。全部证据为 as-of-head 快照实测（体检师 907df40 / 红队 e81f3ae，漂移为 07:49:22Z workflow auto-commit，红队在漂移后逐行亲读自证行号有效）。不编造 SHA（Verification P1/P4）。
+2. **本节点无 Bash**：git commit 无法由本节点执行，report.md/actions.json 以 Write 落盘于 `.myrd/self-evolution/`，commit 与导出由 deploy 节点（具备相应通道）补做——与③红队 toolBoundary 先例一致。
+3. **DB/HTTP 通道不可用**：实体级归因类核验按「不可得」如实标注（见待复核清单），未伪造。
+4. v3 台账底稿未随本 worktree 数据包采集（appliedLast30d=9 说明池外有应用发生，但在池采集件无法核对对应关系，不虚构逐条回填）。
+5. 本轮未观测到「非项目成员/0 仓库」类平台异常；三份采集件均无 `{"unavailable":true}` 占位，未触发「读不到≠断更」条款；未引用 127.0.0.1:7456 探针项；进化内核（guardrail/policies/边界合同）强度不在体检范围，全文无放宽护栏类发现。
+
+## 八、衔接声明
+
+本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
 
 
 ---
@@ -16384,115 +17098,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
-
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -16522,9 +17127,9 @@ negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内�
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
-## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
-修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -16658,6 +17263,115 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+
+修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
 
 ## 架构设计文档
 
@@ -19069,6 +19783,125 @@ curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.
 4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
 5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
 6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
+
+
+## [H4] 提案漏斗消费停滞滞留观察：pending 29 距熔断线 30 仅差 1、approved=0，根因在人审消费侧（承接 L4 在池提案，不重复立案） 2026-W41
+
+v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 两案 cmutkyiz8/cmutkyiyb，7 天零动作）、approved=0、最老积压 pendingDays=64、已越 escalate 线 27、距 breaker 线 30 仅差 1（触发即暂停全局自动分析，项目级降级 drain 续跑）。代码面告警→曝光→熔断链路完备（approval-sla.ts:19-27 阈值在位、scheduler.ts:293-309 console+持久化事件双出口、platform-health-section.tsx:378-394 前端徽标），『sla_alert 仍 console-only』旧口径被体检师证伪、红队确认；停滞根因收窄为人审消费侧零动作。v2 轮同主题提案 cmunjmm5r（L4）在池未动，按『不重复立案』纪律转滞留观察；维持 approval-sla.ts:12/:131『只提醒、绝不自动 approve/apply』边界红线，不产出放宽护栏建议。
+
+## [H6] error:null 静默失败 2 条挂验证观察：自愈双路（启动+周期 5 分钟）在位运转，残余=failed 写入路径 error 字段形态不一 2026-W41
+
+本期 error=null 2/73 条（v3 期『量最大』→ 本期 2 条，方向向好未清零；其中 ≥1 条 agentName='真机试玩验收' playtest 类）。自愈机制实锤在位且运转：index.ts:371-374 启动 + :578/:588 周期（5 分钟）双路 cleanupStaleTrajectories 操作 agentExecutionTrajectory（engine.ts:399-435），failures.json 实测 2 条『僵尸轨迹…周期自愈清理为 failed』即运转产出（平台自愈规范『无自愈覆盖』旧口径反转，体检师自纠+红队确认）。残余疑点：某 failed 写入路径置 failed 时不携带 error（与 :422/:432 两种 error 必填形态不一致），2 条与 SIGINT/SIGTERM/僵尸共 7 条字段邻接形态异于其余 66 条。n=2 样本不足：维持挂验证（台账 L6），不销案不升级；『审计 failed 写入点保证 error 必填』的工程化修复待样本量达标或定位到具体路径后转 bug_ticket。
+
+## MyRD 自进化周报 2026-W41
+
+# MyRD 自进化周报 2026-W41
+
+> 窗口 2026-10-04 → 2026-10-11 · 数据锚 health.json generatedAt=2026-10-11T07:18:43.499Z（三份采集件一致）
+> 产出节点：④首席研究员（口径整合+环比结论+双轨立案）；输入：①数据侦探（findings-delta-v3 + 台账 v4 + hypotheses H1-H9）、②体检师（findings-audited 9 条）、③红队（findings-verified 9 条裁决）
+> as-of-SHA：体检师取证 head=907df40（07:30:55Z）→ 红队复核 head=e81f3ae（07:49:22Z workflow auto-commit 漂移，红队在漂移后工作区逐行亲读自证行号有效，最大偏差 ≤3 行）；**base SHA(10/4)=unavailable**（详见「数据缺口」节，如实上报不编造）
+
+---
+
+## 一、本周结论摘要
+
+本周平台**整体向好但含一次 P0 级异动事件**：总体任务成功率 0.718→0.865（+20.5%，样本 38 达门槛，红队复算 ✓）、workflow 成功率 1.0（26/26 零失败）、benchmark 86.33→87.25（+1.1%，回落条款未触发）、实体级失败 tasks 22→5 / goals 15→5 / workflowRuns 1→0。
+
+异动主因为 **10/7 单日 429 配额级联**：73 条失败轨迹中 62 条集中 10/7 UTC T07-T08 两小时窗（首席 `-o` 复算：429 全文 81 处、10/7 当天 63 条、agentType workflow 49/goal_master 11/goal_delegate 10，勾稽 73 ✓），同一批游戏开发 workflow 与 goal 编排全灭——外部配额事件 × 调度韧性缺口（退避 40s 封顶 vs 小时级配额窗 + 配额签名域无编排级熔断）。goal 型成功率两期持平 0.5 与该事件同源（轨迹级 21 条失败中 17 条落窗且全 429 系）。
+
+第二紧迫项是**进化闭环自身的停摆风险**：提案池 pending 29 距熔断线 30 仅差 1、approved=0、v3 两案 7 天零动作、最老积压 64 天——告警通路经体检师+红队双重复核为完备，停滞根因收窄为**人审消费侧零动作**。
+
+红队裁决：**9 条假设全部 Confirmed、Refuted=0、Uncertain=0**（红队对体检师 3 处表述做了措辞修正，见第五节）。收敛 top3 短板：**H1 配额韧性（P1）> H4+台账 审批消费停滞（P2，紧迫度最高）> H9 自愈规范文档滞后（P2，防重复立案加速熔断）**。
+
+## 二、环比分项结论（预注册 rubric：恶化=异动+验证成立/复核坐实；持平=无超阈值或样本不足；改善=向好+复测/复核任一佐证）
+
+| 指标 | 上期→本期 | 判定 | 依据 |
+|---|---|---|---|
+| overallTaskSuccessRate | 0.718→0.865 (+20.5%) | **改善** | 样本 38≥5 门槛；红队手算复算 ✓；benchmark 同向佐证 |
+| workflow 成功率 | 0.870→1.0 (+15%) | **改善** | 26/26 零失败，红队复算 ✓ |
+| goal 成功率 | 0.5→0.5 (deltaPct=0) | **持平**（分类型小分母 total=10·仅方向参考） | 唯二未改善口径之一；同源归因 H1/H2 已坐实（轨迹级） |
+| 实体级失败 tasks/goals/workflowRuns | 22→5 / 15→5 / 1→0 | **改善** | platform-health 实体级口径，红队复算 ✓ |
+| 轨迹级失败（failures.json） | 73 条（62 条 10/7 配额级联） | **恶化**（异动+红队验证成立） | 首轮轨迹级基线；注意与实体级口径**禁止直接对读**（H3） |
+| benchmark | 86.33→87.25 (+1.1%) | **改善** | 上升且无回落；纪律：即便回落也只查执行侧，不产出放宽护栏建议 |
+| 提案漏斗 pending | 27→29（approved=0） | **恶化** | 四方读数对齐+红队复算 ✓；已越 escalate=27，距 breaker=30 差 1 |
+| 负反馈率 / express_lane | null+no-data / null | **持平**（零样本，不设目标） | 观测缺口（H7）：采集管道代码面无缺维，评分行为未发生 |
+| 验证/选择层三指标 | 0/0（两期同） | **持平**（结构性存量缺口） | 机制在仓流量缺失（H8），承接在池提案滞留观察 |
+| bugClosureDays | 无前值→19.5 | **待验证** | 单值不可环比，不设目标不下结论 |
+
+阈值口径：沿用 v3 集合（周级样本门槛 ≥5，本期 activity.tasks=38 通过；分类型小分母逐条标注；零样本不下异动结论），①本轮未提议新分位阈值，④复核采用。
+
+**过程指标首录（v3 公式零改动，本轮值即 v5 环比基线；样本不足只记分布、不设目标）**
+- 转化率 = 达「已执行·未验收」及以上立案数 / 当轮总立案数（销案 0 与误报 0 不入分母）= **0/7 = 0%**（若仅按 v3 当轮新立案 L1/L2 计亦为 0/2=0%）
+- 滞留环节 = 台账状态分布：未动 5（全部滞留在**审批消费侧**）+ 进行中(挂验证) 2；台账时间戳齐备（pendingDays/createdAt 在采集件内），时长维度无需标待验证（bugClosureDays 除外）
+
+## 三、v3 立案闭环追踪（台账 v4 摘要，完整版见 findings-ledger-v4.json）
+
+| caseId | proposalId | 主题 | 状态 | 证据 |
+|---|---|---|---|---|
+| L1 | cmutkyiz8… | 提案池去重与消费闭环标准（v3 新立案） | **未动** | pending/appliedAt=null/pendingDays=6；approved=0 |
+| L2 | cmutkyiyb… | 验证/选择层接线标准 v2（v3 新立案） | **未动** | 同上；acceptanceTests.total 仍 0、gateVerifiedRunRate 仍 0 |
+| L3 | cmupfhl8n… | 验证/选择层接线标准 v1（v2 立案） | **未动** | pendingDays=9，与 L2 同主题防重复立案 |
+| L4 | cmunjmm5r… | 提案漏斗行动牵引（v2 立案） | **未动** | pendingDays=11；其所针对的消费停滞本期继续为真 |
+| L5 | cmuhtbg1v… | V0 执行端工具配置定稿 | **未动** | pendingDays=15 |
+| L6 | （疑点 H4→本轮 H6） | error:null 静默失败 | **进行中（挂验证）** | 本期 2/73 条，向好未清零；n=2 维持挂验证 |
+| L7 | （疑点 H5·v3 编号） | v3 疑点 H5 | **进行中（挂验证·定义待补录）** | ⚠️ v3 台账底稿未随本 worktree 数据包采集，原始定义与判据缺失，按纪律不编造、原样保留 |
+
+台账 summary：7 条 = 未动 5 + 进行中 2；本轮无「已验收」条目 → 红队「已验收抽验」队列为空（如实记录）；H4/H5（v3 编号）与滞留提案无新证据 → **转「滞留观察」，不重复立案**。
+
+## 四、Confirmed 短板清单（9/9，定级以红队裁决为准）
+
+| ID | 定级 | 动作 | 短板与根因（证据均为红队逐行亲读+首席关键数字复算） |
+|---|---|---|---|
+| H1 | P1 | bug_ticket | **429 配额级联**：retry-utils.ts:15/:42-43/:67-69 重试 3 次上限+退避 10/20/40s 封顶，对小时级配额窗量级错配 3 个数量级；配额签名域无编排级熔断（其它域熔断在位）；62 条失败集中 10/7 T07-T08，T08 簇 durationMs≈180s 与「70s 退避+3 次执行」耗尽形状吻合；error 自带恢复锚点 21:31:45，10/8 起清零 |
+| H2 | P2 | bug_ticket（与 H1 同工单承接） | **goal 0.5 持平同源**：goals.ts:4659 agentType 注册实锤；21 条 goal 型失败 17 条落窗全 429 系（红队交叉表，修正体检师「21 条全同窗」）；实体级归属挂 DB 预注册验证 |
+| H3 | P2 | evolution_proposal | **73 vs 10 口径差**：轨迹级（analyzer.ts:491 status≠completed，含在途/重试）vs 实体级（index.ts:118 status='failed'）三重不同源（表/谓词/粒度），7.3 倍差为口径必然非采集缺陷 → 口径对照表文档化 + 两口径禁止直接对读 |
+| H4 | P2 | knowledge_only（滞留观察） | **提案漏斗消费停滞**：approved=0、pending 29 差 1 触熔断、v3 两案 7 天零动作、最老 64 天；告警链路完备（console+事件+API+前端徽标），根因=人审消费侧零动作；v2 同主题 L4 在池，不重复立案；维持「绝不自动 approve/apply」边界红线 |
+| H5 | P3 | bug_ticket | **stderr 噪音漏网**：stripCliStderrNoise 共享工具+专项测试在位（红队推翻体检师「未收口」表述），仍有 2 条 unrecognized_model 漏网 → 存在未接入路径（嫌疑点 benchmark.ts:396 非 143 分支）；n=2 仅方向参考 |
+| H6 | P3 | knowledge_only（挂验证） | **error:null 2 条**：自愈双路（启动+周期 5min）实锤在位且运转（2 条僵尸自愈签名即产出证据）；残余=某 failed 写入路径 error 字段形态不一；n=2 挂验证不销案不升级 |
+| H7 | P3 | none（观测缺口登记） | **express_lane 零样本+负反馈 no-data**：全类型同 groupBy、采样管道在位启动即跑 → 缺口在行为侧非采集缺维；预注册升级条款留档（若 expressLaneRun 有记录而 Task 无终态→P1 复立） |
+| H8 | P3 | none（滞留观察） | **验证/选择层三指标持续缺失（三连期）**：口径+契约测试均在仓，0 值=流量未经过；承接 L2/L3；解除条件=下期任一分母>0 |
+| H9 | P2 | evolution_proposal | **自愈规范文档滞后（本轮新立）**：CLAUDE.md:297-298 宣称无自愈覆盖/无运行期检测，代码实况为启动+周期双路自愈且在运转（三方逐字比对）；风险链=过时结论→重复立案→加速熔断（29/30）+误导新 Agent 先验 |
+
+## 五、被红队否决的条目与原因
+
+**本周 Refuted=0**。红队产出 3 处措辞修正（对上游结论的精化，非否决）：
+1. H5「过滤逻辑散点未收口共享工具」被推翻 → 实测 stripCliStderrNoise 已是共享工具且主路径接入，问题重述为「存在未接入路径」；
+2. H2「21 条 goal 型失败全同窗」修正为「17/21 同窗」（81% 集中反而强化配额主签名结论）；
+3. H1「无编排级熔断」精化为「配额签名域无编排级熔断（reject 死锁/提案水位/goal 审视三处其它域熔断在位）」。
+另：①侦探对 H4 的「sla_alert 疑似 console-only」怀疑被体检师源码取证证伪（双出口在位），红队确认。
+
+## 六、Uncertain / 待复核 / 下周关注
+
+**Uncertain=0**（红队全部裁决 Confirmed；H7/H8 为 Confirmed+actionType=none，归入滞留观察而非立案，符合纪律）。
+
+待复核清单：
+- H2 实体级归属（5 个 failed goal 时间戳是否落配额窗）——无 DB 通道，挂预注册证伪条款；
+- H7 expressLaneRun/ArtifactRating 窗口行数 DB 级终裁——同上；
+- H3 次要缺口：failures.json 具体 HTTP 导出端点未逐字定位（不影响主结论）；
+- L7（v3 疑点 H5）原始定义缺失，需回捞 v3 台账底稿补录；
+- 本轮与 v3 疑点编号存在重排（v3-H4(error:null)→本轮 H6/L6；本轮 H5=unrecognized_model 与 L7 所指 v3-H5 是否同物无法确认）——已如实标注，不强行合并。
+
+下周建议关注点（含 failures.json 近 7 天失败签名「失败族二分」）：
+1. **审批池熔断是下周第一风险**：pending 29 差 1 触发即暂停全局自动分析——届时本工作流自身数据源断供。建议消费侧批审会话优先消化 reminder 桶最老两案（pendingDays 57/63）；提示：L4 同主题提案在池，勿重复立案；
+2. **H1/H2 工单落地复测**：下期观察同签名（429·1310/1302）是否再现级联——复测证据是「已验收」的唯一准入；
+3. **失败族二分基线**：族 A 环境/外部配额族 66/73（90.4% = 429×62+SIGINT×2+SIGTERM×1+ConnLost×1）vs 族 B 平台自身族 7/73（9.6% = error:null×2+僵尸×2+300s 卡死×1+unrec×2）。若族 A 占比回落而族 B 上升，关注重心切换到轨迹生命周期域（H5/H6 汇合处）；
+4. **H9 提案应用后**跟踪「自愈缺失」类重复立案是否归零（其自身是熔断加速因子）；
+5. H8 解除条件：gateVerifiedRunRate 分母>0 或 acceptanceTests.total>0 任一出现即解除「持续缺失」定性；反向（应用后仍 0）则升级「应用无效」；
+6. L6 若定位到具体 null 写入路径或样本量达标（≥5），按 H6 预注册条款转 bug_ticket；
+7. benchmark 回落条款纪律延续：回落只查执行侧原因，绝不产出放宽护栏/评测标准类建议；
+8. 双 SHA 机制改进：base SHA 缺口根源是 worktree 当日克隆无历史深度——建议工作流在①节点或数据包采集时固定记录 base/head 双 SHA（详见下节）。
+
+## 七、数据缺口与边界如实上报
+
+1. **双 SHA 缺口**：baseSha(10/4)=unavailable——本 worktree 为 10/11 当日克隆（clone base 7c05521），本地无 10/4 引用与历史深度，10/4→10/11 git diff 无法本地执行；①节点亦无 git/Bash 通道。全部证据为 as-of-head 快照实测（体检师 907df40 / 红队 e81f3ae，漂移为 07:49:22Z workflow auto-commit，红队在漂移后逐行亲读自证行号有效）。不编造 SHA（Verification P1/P4）。
+2. **本节点无 Bash**：git commit 无法由本节点执行，report.md/actions.json 以 Write 落盘于 `.myrd/self-evolution/`，commit 与导出由 deploy 节点（具备相应通道）补做——与③红队 toolBoundary 先例一致。
+3. **DB/HTTP 通道不可用**：实体级归因类核验按「不可得」如实标注（见待复核清单），未伪造。
+4. v3 台账底稿未随本 worktree 数据包采集（appliedLast30d=9 说明池外有应用发生，但在池采集件无法核对对应关系，不虚构逐条回填）。
+5. 本轮未观测到「非项目成员/0 仓库」类平台异常；三份采集件均无 `{"unavailable":true}` 占位，未触发「读不到≠断更」条款；未引用 127.0.0.1:7456 探针项；进化内核（guardrail/policies/边界合同）强度不在体检范围，全文无放宽护栏类发现。
+
+## 八、衔接声明
+
+本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
 
 
 ---
@@ -19092,115 +19925,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
-
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -19230,9 +19954,9 @@ negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内�
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
-## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
-修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -19366,6 +20090,115 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+
+修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
 
 ## 架构设计文档
 
@@ -21777,6 +22610,125 @@ curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.
 4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
 5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
 6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
+
+
+## [H4] 提案漏斗消费停滞滞留观察：pending 29 距熔断线 30 仅差 1、approved=0，根因在人审消费侧（承接 L4 在池提案，不重复立案） 2026-W41
+
+v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 两案 cmutkyiz8/cmutkyiyb，7 天零动作）、approved=0、最老积压 pendingDays=64、已越 escalate 线 27、距 breaker 线 30 仅差 1（触发即暂停全局自动分析，项目级降级 drain 续跑）。代码面告警→曝光→熔断链路完备（approval-sla.ts:19-27 阈值在位、scheduler.ts:293-309 console+持久化事件双出口、platform-health-section.tsx:378-394 前端徽标），『sla_alert 仍 console-only』旧口径被体检师证伪、红队确认；停滞根因收窄为人审消费侧零动作。v2 轮同主题提案 cmunjmm5r（L4）在池未动，按『不重复立案』纪律转滞留观察；维持 approval-sla.ts:12/:131『只提醒、绝不自动 approve/apply』边界红线，不产出放宽护栏建议。
+
+## [H6] error:null 静默失败 2 条挂验证观察：自愈双路（启动+周期 5 分钟）在位运转，残余=failed 写入路径 error 字段形态不一 2026-W41
+
+本期 error=null 2/73 条（v3 期『量最大』→ 本期 2 条，方向向好未清零；其中 ≥1 条 agentName='真机试玩验收' playtest 类）。自愈机制实锤在位且运转：index.ts:371-374 启动 + :578/:588 周期（5 分钟）双路 cleanupStaleTrajectories 操作 agentExecutionTrajectory（engine.ts:399-435），failures.json 实测 2 条『僵尸轨迹…周期自愈清理为 failed』即运转产出（平台自愈规范『无自愈覆盖』旧口径反转，体检师自纠+红队确认）。残余疑点：某 failed 写入路径置 failed 时不携带 error（与 :422/:432 两种 error 必填形态不一致），2 条与 SIGINT/SIGTERM/僵尸共 7 条字段邻接形态异于其余 66 条。n=2 样本不足：维持挂验证（台账 L6），不销案不升级；『审计 failed 写入点保证 error 必填』的工程化修复待样本量达标或定位到具体路径后转 bug_ticket。
+
+## MyRD 自进化周报 2026-W41
+
+# MyRD 自进化周报 2026-W41
+
+> 窗口 2026-10-04 → 2026-10-11 · 数据锚 health.json generatedAt=2026-10-11T07:18:43.499Z（三份采集件一致）
+> 产出节点：④首席研究员（口径整合+环比结论+双轨立案）；输入：①数据侦探（findings-delta-v3 + 台账 v4 + hypotheses H1-H9）、②体检师（findings-audited 9 条）、③红队（findings-verified 9 条裁决）
+> as-of-SHA：体检师取证 head=907df40（07:30:55Z）→ 红队复核 head=e81f3ae（07:49:22Z workflow auto-commit 漂移，红队在漂移后工作区逐行亲读自证行号有效，最大偏差 ≤3 行）；**base SHA(10/4)=unavailable**（详见「数据缺口」节，如实上报不编造）
+
+---
+
+## 一、本周结论摘要
+
+本周平台**整体向好但含一次 P0 级异动事件**：总体任务成功率 0.718→0.865（+20.5%，样本 38 达门槛，红队复算 ✓）、workflow 成功率 1.0（26/26 零失败）、benchmark 86.33→87.25（+1.1%，回落条款未触发）、实体级失败 tasks 22→5 / goals 15→5 / workflowRuns 1→0。
+
+异动主因为 **10/7 单日 429 配额级联**：73 条失败轨迹中 62 条集中 10/7 UTC T07-T08 两小时窗（首席 `-o` 复算：429 全文 81 处、10/7 当天 63 条、agentType workflow 49/goal_master 11/goal_delegate 10，勾稽 73 ✓），同一批游戏开发 workflow 与 goal 编排全灭——外部配额事件 × 调度韧性缺口（退避 40s 封顶 vs 小时级配额窗 + 配额签名域无编排级熔断）。goal 型成功率两期持平 0.5 与该事件同源（轨迹级 21 条失败中 17 条落窗且全 429 系）。
+
+第二紧迫项是**进化闭环自身的停摆风险**：提案池 pending 29 距熔断线 30 仅差 1、approved=0、v3 两案 7 天零动作、最老积压 64 天——告警通路经体检师+红队双重复核为完备，停滞根因收窄为**人审消费侧零动作**。
+
+红队裁决：**9 条假设全部 Confirmed、Refuted=0、Uncertain=0**（红队对体检师 3 处表述做了措辞修正，见第五节）。收敛 top3 短板：**H1 配额韧性（P1）> H4+台账 审批消费停滞（P2，紧迫度最高）> H9 自愈规范文档滞后（P2，防重复立案加速熔断）**。
+
+## 二、环比分项结论（预注册 rubric：恶化=异动+验证成立/复核坐实；持平=无超阈值或样本不足；改善=向好+复测/复核任一佐证）
+
+| 指标 | 上期→本期 | 判定 | 依据 |
+|---|---|---|---|
+| overallTaskSuccessRate | 0.718→0.865 (+20.5%) | **改善** | 样本 38≥5 门槛；红队手算复算 ✓；benchmark 同向佐证 |
+| workflow 成功率 | 0.870→1.0 (+15%) | **改善** | 26/26 零失败，红队复算 ✓ |
+| goal 成功率 | 0.5→0.5 (deltaPct=0) | **持平**（分类型小分母 total=10·仅方向参考） | 唯二未改善口径之一；同源归因 H1/H2 已坐实（轨迹级） |
+| 实体级失败 tasks/goals/workflowRuns | 22→5 / 15→5 / 1→0 | **改善** | platform-health 实体级口径，红队复算 ✓ |
+| 轨迹级失败（failures.json） | 73 条（62 条 10/7 配额级联） | **恶化**（异动+红队验证成立） | 首轮轨迹级基线；注意与实体级口径**禁止直接对读**（H3） |
+| benchmark | 86.33→87.25 (+1.1%) | **改善** | 上升且无回落；纪律：即便回落也只查执行侧，不产出放宽护栏建议 |
+| 提案漏斗 pending | 27→29（approved=0） | **恶化** | 四方读数对齐+红队复算 ✓；已越 escalate=27，距 breaker=30 差 1 |
+| 负反馈率 / express_lane | null+no-data / null | **持平**（零样本，不设目标） | 观测缺口（H7）：采集管道代码面无缺维，评分行为未发生 |
+| 验证/选择层三指标 | 0/0（两期同） | **持平**（结构性存量缺口） | 机制在仓流量缺失（H8），承接在池提案滞留观察 |
+| bugClosureDays | 无前值→19.5 | **待验证** | 单值不可环比，不设目标不下结论 |
+
+阈值口径：沿用 v3 集合（周级样本门槛 ≥5，本期 activity.tasks=38 通过；分类型小分母逐条标注；零样本不下异动结论），①本轮未提议新分位阈值，④复核采用。
+
+**过程指标首录（v3 公式零改动，本轮值即 v5 环比基线；样本不足只记分布、不设目标）**
+- 转化率 = 达「已执行·未验收」及以上立案数 / 当轮总立案数（销案 0 与误报 0 不入分母）= **0/7 = 0%**（若仅按 v3 当轮新立案 L1/L2 计亦为 0/2=0%）
+- 滞留环节 = 台账状态分布：未动 5（全部滞留在**审批消费侧**）+ 进行中(挂验证) 2；台账时间戳齐备（pendingDays/createdAt 在采集件内），时长维度无需标待验证（bugClosureDays 除外）
+
+## 三、v3 立案闭环追踪（台账 v4 摘要，完整版见 findings-ledger-v4.json）
+
+| caseId | proposalId | 主题 | 状态 | 证据 |
+|---|---|---|---|---|
+| L1 | cmutkyiz8… | 提案池去重与消费闭环标准（v3 新立案） | **未动** | pending/appliedAt=null/pendingDays=6；approved=0 |
+| L2 | cmutkyiyb… | 验证/选择层接线标准 v2（v3 新立案） | **未动** | 同上；acceptanceTests.total 仍 0、gateVerifiedRunRate 仍 0 |
+| L3 | cmupfhl8n… | 验证/选择层接线标准 v1（v2 立案） | **未动** | pendingDays=9，与 L2 同主题防重复立案 |
+| L4 | cmunjmm5r… | 提案漏斗行动牵引（v2 立案） | **未动** | pendingDays=11；其所针对的消费停滞本期继续为真 |
+| L5 | cmuhtbg1v… | V0 执行端工具配置定稿 | **未动** | pendingDays=15 |
+| L6 | （疑点 H4→本轮 H6） | error:null 静默失败 | **进行中（挂验证）** | 本期 2/73 条，向好未清零；n=2 维持挂验证 |
+| L7 | （疑点 H5·v3 编号） | v3 疑点 H5 | **进行中（挂验证·定义待补录）** | ⚠️ v3 台账底稿未随本 worktree 数据包采集，原始定义与判据缺失，按纪律不编造、原样保留 |
+
+台账 summary：7 条 = 未动 5 + 进行中 2；本轮无「已验收」条目 → 红队「已验收抽验」队列为空（如实记录）；H4/H5（v3 编号）与滞留提案无新证据 → **转「滞留观察」，不重复立案**。
+
+## 四、Confirmed 短板清单（9/9，定级以红队裁决为准）
+
+| ID | 定级 | 动作 | 短板与根因（证据均为红队逐行亲读+首席关键数字复算） |
+|---|---|---|---|
+| H1 | P1 | bug_ticket | **429 配额级联**：retry-utils.ts:15/:42-43/:67-69 重试 3 次上限+退避 10/20/40s 封顶，对小时级配额窗量级错配 3 个数量级；配额签名域无编排级熔断（其它域熔断在位）；62 条失败集中 10/7 T07-T08，T08 簇 durationMs≈180s 与「70s 退避+3 次执行」耗尽形状吻合；error 自带恢复锚点 21:31:45，10/8 起清零 |
+| H2 | P2 | bug_ticket（与 H1 同工单承接） | **goal 0.5 持平同源**：goals.ts:4659 agentType 注册实锤；21 条 goal 型失败 17 条落窗全 429 系（红队交叉表，修正体检师「21 条全同窗」）；实体级归属挂 DB 预注册验证 |
+| H3 | P2 | evolution_proposal | **73 vs 10 口径差**：轨迹级（analyzer.ts:491 status≠completed，含在途/重试）vs 实体级（index.ts:118 status='failed'）三重不同源（表/谓词/粒度），7.3 倍差为口径必然非采集缺陷 → 口径对照表文档化 + 两口径禁止直接对读 |
+| H4 | P2 | knowledge_only（滞留观察） | **提案漏斗消费停滞**：approved=0、pending 29 差 1 触熔断、v3 两案 7 天零动作、最老 64 天；告警链路完备（console+事件+API+前端徽标），根因=人审消费侧零动作；v2 同主题 L4 在池，不重复立案；维持「绝不自动 approve/apply」边界红线 |
+| H5 | P3 | bug_ticket | **stderr 噪音漏网**：stripCliStderrNoise 共享工具+专项测试在位（红队推翻体检师「未收口」表述），仍有 2 条 unrecognized_model 漏网 → 存在未接入路径（嫌疑点 benchmark.ts:396 非 143 分支）；n=2 仅方向参考 |
+| H6 | P3 | knowledge_only（挂验证） | **error:null 2 条**：自愈双路（启动+周期 5min）实锤在位且运转（2 条僵尸自愈签名即产出证据）；残余=某 failed 写入路径 error 字段形态不一；n=2 挂验证不销案不升级 |
+| H7 | P3 | none（观测缺口登记） | **express_lane 零样本+负反馈 no-data**：全类型同 groupBy、采样管道在位启动即跑 → 缺口在行为侧非采集缺维；预注册升级条款留档（若 expressLaneRun 有记录而 Task 无终态→P1 复立） |
+| H8 | P3 | none（滞留观察） | **验证/选择层三指标持续缺失（三连期）**：口径+契约测试均在仓，0 值=流量未经过；承接 L2/L3；解除条件=下期任一分母>0 |
+| H9 | P2 | evolution_proposal | **自愈规范文档滞后（本轮新立）**：CLAUDE.md:297-298 宣称无自愈覆盖/无运行期检测，代码实况为启动+周期双路自愈且在运转（三方逐字比对）；风险链=过时结论→重复立案→加速熔断（29/30）+误导新 Agent 先验 |
+
+## 五、被红队否决的条目与原因
+
+**本周 Refuted=0**。红队产出 3 处措辞修正（对上游结论的精化，非否决）：
+1. H5「过滤逻辑散点未收口共享工具」被推翻 → 实测 stripCliStderrNoise 已是共享工具且主路径接入，问题重述为「存在未接入路径」；
+2. H2「21 条 goal 型失败全同窗」修正为「17/21 同窗」（81% 集中反而强化配额主签名结论）；
+3. H1「无编排级熔断」精化为「配额签名域无编排级熔断（reject 死锁/提案水位/goal 审视三处其它域熔断在位）」。
+另：①侦探对 H4 的「sla_alert 疑似 console-only」怀疑被体检师源码取证证伪（双出口在位），红队确认。
+
+## 六、Uncertain / 待复核 / 下周关注
+
+**Uncertain=0**（红队全部裁决 Confirmed；H7/H8 为 Confirmed+actionType=none，归入滞留观察而非立案，符合纪律）。
+
+待复核清单：
+- H2 实体级归属（5 个 failed goal 时间戳是否落配额窗）——无 DB 通道，挂预注册证伪条款；
+- H7 expressLaneRun/ArtifactRating 窗口行数 DB 级终裁——同上；
+- H3 次要缺口：failures.json 具体 HTTP 导出端点未逐字定位（不影响主结论）；
+- L7（v3 疑点 H5）原始定义缺失，需回捞 v3 台账底稿补录；
+- 本轮与 v3 疑点编号存在重排（v3-H4(error:null)→本轮 H6/L6；本轮 H5=unrecognized_model 与 L7 所指 v3-H5 是否同物无法确认）——已如实标注，不强行合并。
+
+下周建议关注点（含 failures.json 近 7 天失败签名「失败族二分」）：
+1. **审批池熔断是下周第一风险**：pending 29 差 1 触发即暂停全局自动分析——届时本工作流自身数据源断供。建议消费侧批审会话优先消化 reminder 桶最老两案（pendingDays 57/63）；提示：L4 同主题提案在池，勿重复立案；
+2. **H1/H2 工单落地复测**：下期观察同签名（429·1310/1302）是否再现级联——复测证据是「已验收」的唯一准入；
+3. **失败族二分基线**：族 A 环境/外部配额族 66/73（90.4% = 429×62+SIGINT×2+SIGTERM×1+ConnLost×1）vs 族 B 平台自身族 7/73（9.6% = error:null×2+僵尸×2+300s 卡死×1+unrec×2）。若族 A 占比回落而族 B 上升，关注重心切换到轨迹生命周期域（H5/H6 汇合处）；
+4. **H9 提案应用后**跟踪「自愈缺失」类重复立案是否归零（其自身是熔断加速因子）；
+5. H8 解除条件：gateVerifiedRunRate 分母>0 或 acceptanceTests.total>0 任一出现即解除「持续缺失」定性；反向（应用后仍 0）则升级「应用无效」；
+6. L6 若定位到具体 null 写入路径或样本量达标（≥5），按 H6 预注册条款转 bug_ticket；
+7. benchmark 回落条款纪律延续：回落只查执行侧原因，绝不产出放宽护栏/评测标准类建议；
+8. 双 SHA 机制改进：base SHA 缺口根源是 worktree 当日克隆无历史深度——建议工作流在①节点或数据包采集时固定记录 base/head 双 SHA（详见下节）。
+
+## 七、数据缺口与边界如实上报
+
+1. **双 SHA 缺口**：baseSha(10/4)=unavailable——本 worktree 为 10/11 当日克隆（clone base 7c05521），本地无 10/4 引用与历史深度，10/4→10/11 git diff 无法本地执行；①节点亦无 git/Bash 通道。全部证据为 as-of-head 快照实测（体检师 907df40 / 红队 e81f3ae，漂移为 07:49:22Z workflow auto-commit，红队在漂移后逐行亲读自证行号有效）。不编造 SHA（Verification P1/P4）。
+2. **本节点无 Bash**：git commit 无法由本节点执行，report.md/actions.json 以 Write 落盘于 `.myrd/self-evolution/`，commit 与导出由 deploy 节点（具备相应通道）补做——与③红队 toolBoundary 先例一致。
+3. **DB/HTTP 通道不可用**：实体级归因类核验按「不可得」如实标注（见待复核清单），未伪造。
+4. v3 台账底稿未随本 worktree 数据包采集（appliedLast30d=9 说明池外有应用发生，但在池采集件无法核对对应关系，不虚构逐条回填）。
+5. 本轮未观测到「非项目成员/0 仓库」类平台异常；三份采集件均无 `{"unavailable":true}` 占位，未触发「读不到≠断更」条款；未引用 127.0.0.1:7456 探针项；进化内核（guardrail/policies/边界合同）强度不在体检范围，全文无放宽护栏类发现。
+
+## 八、衔接声明
+
+本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
 
 
 ---
@@ -21800,115 +22752,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
-
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -21938,9 +22781,9 @@ negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内�
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
-## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
-修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -22074,6 +22917,115 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+
+修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
 
 ## 架构设计文档
 
@@ -24485,6 +25437,125 @@ curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.
 4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
 5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
 6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
+
+
+## [H4] 提案漏斗消费停滞滞留观察：pending 29 距熔断线 30 仅差 1、approved=0，根因在人审消费侧（承接 L4 在池提案，不重复立案） 2026-W41
+
+v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 两案 cmutkyiz8/cmutkyiyb，7 天零动作）、approved=0、最老积压 pendingDays=64、已越 escalate 线 27、距 breaker 线 30 仅差 1（触发即暂停全局自动分析，项目级降级 drain 续跑）。代码面告警→曝光→熔断链路完备（approval-sla.ts:19-27 阈值在位、scheduler.ts:293-309 console+持久化事件双出口、platform-health-section.tsx:378-394 前端徽标），『sla_alert 仍 console-only』旧口径被体检师证伪、红队确认；停滞根因收窄为人审消费侧零动作。v2 轮同主题提案 cmunjmm5r（L4）在池未动，按『不重复立案』纪律转滞留观察；维持 approval-sla.ts:12/:131『只提醒、绝不自动 approve/apply』边界红线，不产出放宽护栏建议。
+
+## [H6] error:null 静默失败 2 条挂验证观察：自愈双路（启动+周期 5 分钟）在位运转，残余=failed 写入路径 error 字段形态不一 2026-W41
+
+本期 error=null 2/73 条（v3 期『量最大』→ 本期 2 条，方向向好未清零；其中 ≥1 条 agentName='真机试玩验收' playtest 类）。自愈机制实锤在位且运转：index.ts:371-374 启动 + :578/:588 周期（5 分钟）双路 cleanupStaleTrajectories 操作 agentExecutionTrajectory（engine.ts:399-435），failures.json 实测 2 条『僵尸轨迹…周期自愈清理为 failed』即运转产出（平台自愈规范『无自愈覆盖』旧口径反转，体检师自纠+红队确认）。残余疑点：某 failed 写入路径置 failed 时不携带 error（与 :422/:432 两种 error 必填形态不一致），2 条与 SIGINT/SIGTERM/僵尸共 7 条字段邻接形态异于其余 66 条。n=2 样本不足：维持挂验证（台账 L6），不销案不升级；『审计 failed 写入点保证 error 必填』的工程化修复待样本量达标或定位到具体路径后转 bug_ticket。
+
+## MyRD 自进化周报 2026-W41
+
+# MyRD 自进化周报 2026-W41
+
+> 窗口 2026-10-04 → 2026-10-11 · 数据锚 health.json generatedAt=2026-10-11T07:18:43.499Z（三份采集件一致）
+> 产出节点：④首席研究员（口径整合+环比结论+双轨立案）；输入：①数据侦探（findings-delta-v3 + 台账 v4 + hypotheses H1-H9）、②体检师（findings-audited 9 条）、③红队（findings-verified 9 条裁决）
+> as-of-SHA：体检师取证 head=907df40（07:30:55Z）→ 红队复核 head=e81f3ae（07:49:22Z workflow auto-commit 漂移，红队在漂移后工作区逐行亲读自证行号有效，最大偏差 ≤3 行）；**base SHA(10/4)=unavailable**（详见「数据缺口」节，如实上报不编造）
+
+---
+
+## 一、本周结论摘要
+
+本周平台**整体向好但含一次 P0 级异动事件**：总体任务成功率 0.718→0.865（+20.5%，样本 38 达门槛，红队复算 ✓）、workflow 成功率 1.0（26/26 零失败）、benchmark 86.33→87.25（+1.1%，回落条款未触发）、实体级失败 tasks 22→5 / goals 15→5 / workflowRuns 1→0。
+
+异动主因为 **10/7 单日 429 配额级联**：73 条失败轨迹中 62 条集中 10/7 UTC T07-T08 两小时窗（首席 `-o` 复算：429 全文 81 处、10/7 当天 63 条、agentType workflow 49/goal_master 11/goal_delegate 10，勾稽 73 ✓），同一批游戏开发 workflow 与 goal 编排全灭——外部配额事件 × 调度韧性缺口（退避 40s 封顶 vs 小时级配额窗 + 配额签名域无编排级熔断）。goal 型成功率两期持平 0.5 与该事件同源（轨迹级 21 条失败中 17 条落窗且全 429 系）。
+
+第二紧迫项是**进化闭环自身的停摆风险**：提案池 pending 29 距熔断线 30 仅差 1、approved=0、v3 两案 7 天零动作、最老积压 64 天——告警通路经体检师+红队双重复核为完备，停滞根因收窄为**人审消费侧零动作**。
+
+红队裁决：**9 条假设全部 Confirmed、Refuted=0、Uncertain=0**（红队对体检师 3 处表述做了措辞修正，见第五节）。收敛 top3 短板：**H1 配额韧性（P1）> H4+台账 审批消费停滞（P2，紧迫度最高）> H9 自愈规范文档滞后（P2，防重复立案加速熔断）**。
+
+## 二、环比分项结论（预注册 rubric：恶化=异动+验证成立/复核坐实；持平=无超阈值或样本不足；改善=向好+复测/复核任一佐证）
+
+| 指标 | 上期→本期 | 判定 | 依据 |
+|---|---|---|---|
+| overallTaskSuccessRate | 0.718→0.865 (+20.5%) | **改善** | 样本 38≥5 门槛；红队手算复算 ✓；benchmark 同向佐证 |
+| workflow 成功率 | 0.870→1.0 (+15%) | **改善** | 26/26 零失败，红队复算 ✓ |
+| goal 成功率 | 0.5→0.5 (deltaPct=0) | **持平**（分类型小分母 total=10·仅方向参考） | 唯二未改善口径之一；同源归因 H1/H2 已坐实（轨迹级） |
+| 实体级失败 tasks/goals/workflowRuns | 22→5 / 15→5 / 1→0 | **改善** | platform-health 实体级口径，红队复算 ✓ |
+| 轨迹级失败（failures.json） | 73 条（62 条 10/7 配额级联） | **恶化**（异动+红队验证成立） | 首轮轨迹级基线；注意与实体级口径**禁止直接对读**（H3） |
+| benchmark | 86.33→87.25 (+1.1%) | **改善** | 上升且无回落；纪律：即便回落也只查执行侧，不产出放宽护栏建议 |
+| 提案漏斗 pending | 27→29（approved=0） | **恶化** | 四方读数对齐+红队复算 ✓；已越 escalate=27，距 breaker=30 差 1 |
+| 负反馈率 / express_lane | null+no-data / null | **持平**（零样本，不设目标） | 观测缺口（H7）：采集管道代码面无缺维，评分行为未发生 |
+| 验证/选择层三指标 | 0/0（两期同） | **持平**（结构性存量缺口） | 机制在仓流量缺失（H8），承接在池提案滞留观察 |
+| bugClosureDays | 无前值→19.5 | **待验证** | 单值不可环比，不设目标不下结论 |
+
+阈值口径：沿用 v3 集合（周级样本门槛 ≥5，本期 activity.tasks=38 通过；分类型小分母逐条标注；零样本不下异动结论），①本轮未提议新分位阈值，④复核采用。
+
+**过程指标首录（v3 公式零改动，本轮值即 v5 环比基线；样本不足只记分布、不设目标）**
+- 转化率 = 达「已执行·未验收」及以上立案数 / 当轮总立案数（销案 0 与误报 0 不入分母）= **0/7 = 0%**（若仅按 v3 当轮新立案 L1/L2 计亦为 0/2=0%）
+- 滞留环节 = 台账状态分布：未动 5（全部滞留在**审批消费侧**）+ 进行中(挂验证) 2；台账时间戳齐备（pendingDays/createdAt 在采集件内），时长维度无需标待验证（bugClosureDays 除外）
+
+## 三、v3 立案闭环追踪（台账 v4 摘要，完整版见 findings-ledger-v4.json）
+
+| caseId | proposalId | 主题 | 状态 | 证据 |
+|---|---|---|---|---|
+| L1 | cmutkyiz8… | 提案池去重与消费闭环标准（v3 新立案） | **未动** | pending/appliedAt=null/pendingDays=6；approved=0 |
+| L2 | cmutkyiyb… | 验证/选择层接线标准 v2（v3 新立案） | **未动** | 同上；acceptanceTests.total 仍 0、gateVerifiedRunRate 仍 0 |
+| L3 | cmupfhl8n… | 验证/选择层接线标准 v1（v2 立案） | **未动** | pendingDays=9，与 L2 同主题防重复立案 |
+| L4 | cmunjmm5r… | 提案漏斗行动牵引（v2 立案） | **未动** | pendingDays=11；其所针对的消费停滞本期继续为真 |
+| L5 | cmuhtbg1v… | V0 执行端工具配置定稿 | **未动** | pendingDays=15 |
+| L6 | （疑点 H4→本轮 H6） | error:null 静默失败 | **进行中（挂验证）** | 本期 2/73 条，向好未清零；n=2 维持挂验证 |
+| L7 | （疑点 H5·v3 编号） | v3 疑点 H5 | **进行中（挂验证·定义待补录）** | ⚠️ v3 台账底稿未随本 worktree 数据包采集，原始定义与判据缺失，按纪律不编造、原样保留 |
+
+台账 summary：7 条 = 未动 5 + 进行中 2；本轮无「已验收」条目 → 红队「已验收抽验」队列为空（如实记录）；H4/H5（v3 编号）与滞留提案无新证据 → **转「滞留观察」，不重复立案**。
+
+## 四、Confirmed 短板清单（9/9，定级以红队裁决为准）
+
+| ID | 定级 | 动作 | 短板与根因（证据均为红队逐行亲读+首席关键数字复算） |
+|---|---|---|---|
+| H1 | P1 | bug_ticket | **429 配额级联**：retry-utils.ts:15/:42-43/:67-69 重试 3 次上限+退避 10/20/40s 封顶，对小时级配额窗量级错配 3 个数量级；配额签名域无编排级熔断（其它域熔断在位）；62 条失败集中 10/7 T07-T08，T08 簇 durationMs≈180s 与「70s 退避+3 次执行」耗尽形状吻合；error 自带恢复锚点 21:31:45，10/8 起清零 |
+| H2 | P2 | bug_ticket（与 H1 同工单承接） | **goal 0.5 持平同源**：goals.ts:4659 agentType 注册实锤；21 条 goal 型失败 17 条落窗全 429 系（红队交叉表，修正体检师「21 条全同窗」）；实体级归属挂 DB 预注册验证 |
+| H3 | P2 | evolution_proposal | **73 vs 10 口径差**：轨迹级（analyzer.ts:491 status≠completed，含在途/重试）vs 实体级（index.ts:118 status='failed'）三重不同源（表/谓词/粒度），7.3 倍差为口径必然非采集缺陷 → 口径对照表文档化 + 两口径禁止直接对读 |
+| H4 | P2 | knowledge_only（滞留观察） | **提案漏斗消费停滞**：approved=0、pending 29 差 1 触熔断、v3 两案 7 天零动作、最老 64 天；告警链路完备（console+事件+API+前端徽标），根因=人审消费侧零动作；v2 同主题 L4 在池，不重复立案；维持「绝不自动 approve/apply」边界红线 |
+| H5 | P3 | bug_ticket | **stderr 噪音漏网**：stripCliStderrNoise 共享工具+专项测试在位（红队推翻体检师「未收口」表述），仍有 2 条 unrecognized_model 漏网 → 存在未接入路径（嫌疑点 benchmark.ts:396 非 143 分支）；n=2 仅方向参考 |
+| H6 | P3 | knowledge_only（挂验证） | **error:null 2 条**：自愈双路（启动+周期 5min）实锤在位且运转（2 条僵尸自愈签名即产出证据）；残余=某 failed 写入路径 error 字段形态不一；n=2 挂验证不销案不升级 |
+| H7 | P3 | none（观测缺口登记） | **express_lane 零样本+负反馈 no-data**：全类型同 groupBy、采样管道在位启动即跑 → 缺口在行为侧非采集缺维；预注册升级条款留档（若 expressLaneRun 有记录而 Task 无终态→P1 复立） |
+| H8 | P3 | none（滞留观察） | **验证/选择层三指标持续缺失（三连期）**：口径+契约测试均在仓，0 值=流量未经过；承接 L2/L3；解除条件=下期任一分母>0 |
+| H9 | P2 | evolution_proposal | **自愈规范文档滞后（本轮新立）**：CLAUDE.md:297-298 宣称无自愈覆盖/无运行期检测，代码实况为启动+周期双路自愈且在运转（三方逐字比对）；风险链=过时结论→重复立案→加速熔断（29/30）+误导新 Agent 先验 |
+
+## 五、被红队否决的条目与原因
+
+**本周 Refuted=0**。红队产出 3 处措辞修正（对上游结论的精化，非否决）：
+1. H5「过滤逻辑散点未收口共享工具」被推翻 → 实测 stripCliStderrNoise 已是共享工具且主路径接入，问题重述为「存在未接入路径」；
+2. H2「21 条 goal 型失败全同窗」修正为「17/21 同窗」（81% 集中反而强化配额主签名结论）；
+3. H1「无编排级熔断」精化为「配额签名域无编排级熔断（reject 死锁/提案水位/goal 审视三处其它域熔断在位）」。
+另：①侦探对 H4 的「sla_alert 疑似 console-only」怀疑被体检师源码取证证伪（双出口在位），红队确认。
+
+## 六、Uncertain / 待复核 / 下周关注
+
+**Uncertain=0**（红队全部裁决 Confirmed；H7/H8 为 Confirmed+actionType=none，归入滞留观察而非立案，符合纪律）。
+
+待复核清单：
+- H2 实体级归属（5 个 failed goal 时间戳是否落配额窗）——无 DB 通道，挂预注册证伪条款；
+- H7 expressLaneRun/ArtifactRating 窗口行数 DB 级终裁——同上；
+- H3 次要缺口：failures.json 具体 HTTP 导出端点未逐字定位（不影响主结论）；
+- L7（v3 疑点 H5）原始定义缺失，需回捞 v3 台账底稿补录；
+- 本轮与 v3 疑点编号存在重排（v3-H4(error:null)→本轮 H6/L6；本轮 H5=unrecognized_model 与 L7 所指 v3-H5 是否同物无法确认）——已如实标注，不强行合并。
+
+下周建议关注点（含 failures.json 近 7 天失败签名「失败族二分」）：
+1. **审批池熔断是下周第一风险**：pending 29 差 1 触发即暂停全局自动分析——届时本工作流自身数据源断供。建议消费侧批审会话优先消化 reminder 桶最老两案（pendingDays 57/63）；提示：L4 同主题提案在池，勿重复立案；
+2. **H1/H2 工单落地复测**：下期观察同签名（429·1310/1302）是否再现级联——复测证据是「已验收」的唯一准入；
+3. **失败族二分基线**：族 A 环境/外部配额族 66/73（90.4% = 429×62+SIGINT×2+SIGTERM×1+ConnLost×1）vs 族 B 平台自身族 7/73（9.6% = error:null×2+僵尸×2+300s 卡死×1+unrec×2）。若族 A 占比回落而族 B 上升，关注重心切换到轨迹生命周期域（H5/H6 汇合处）；
+4. **H9 提案应用后**跟踪「自愈缺失」类重复立案是否归零（其自身是熔断加速因子）；
+5. H8 解除条件：gateVerifiedRunRate 分母>0 或 acceptanceTests.total>0 任一出现即解除「持续缺失」定性；反向（应用后仍 0）则升级「应用无效」；
+6. L6 若定位到具体 null 写入路径或样本量达标（≥5），按 H6 预注册条款转 bug_ticket；
+7. benchmark 回落条款纪律延续：回落只查执行侧原因，绝不产出放宽护栏/评测标准类建议；
+8. 双 SHA 机制改进：base SHA 缺口根源是 worktree 当日克隆无历史深度——建议工作流在①节点或数据包采集时固定记录 base/head 双 SHA（详见下节）。
+
+## 七、数据缺口与边界如实上报
+
+1. **双 SHA 缺口**：baseSha(10/4)=unavailable——本 worktree 为 10/11 当日克隆（clone base 7c05521），本地无 10/4 引用与历史深度，10/4→10/11 git diff 无法本地执行；①节点亦无 git/Bash 通道。全部证据为 as-of-head 快照实测（体检师 907df40 / 红队 e81f3ae，漂移为 07:49:22Z workflow auto-commit，红队在漂移后逐行亲读自证行号有效）。不编造 SHA（Verification P1/P4）。
+2. **本节点无 Bash**：git commit 无法由本节点执行，report.md/actions.json 以 Write 落盘于 `.myrd/self-evolution/`，commit 与导出由 deploy 节点（具备相应通道）补做——与③红队 toolBoundary 先例一致。
+3. **DB/HTTP 通道不可用**：实体级归因类核验按「不可得」如实标注（见待复核清单），未伪造。
+4. v3 台账底稿未随本 worktree 数据包采集（appliedLast30d=9 说明池外有应用发生，但在池采集件无法核对对应关系，不虚构逐条回填）。
+5. 本轮未观测到「非项目成员/0 仓库」类平台异常；三份采集件均无 `{"unavailable":true}` 占位，未触发「读不到≠断更」条款；未引用 127.0.0.1:7456 探针项；进化内核（guardrail/policies/边界合同）强度不在体检范围，全文无放宽护栏类发现。
+
+## 八、衔接声明
+
+本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
 
 
 ---
@@ -24516,115 +25587,6 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 
 ## 产品关联知识
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
-
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -24654,9 +25616,9 @@ negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内�
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
-## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
-修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -24790,6 +25752,115 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+
+修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
 
 ## 架构设计文档
 
@@ -27201,6 +28272,125 @@ curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.
 4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
 5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
 6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
+
+
+## [H4] 提案漏斗消费停滞滞留观察：pending 29 距熔断线 30 仅差 1、approved=0，根因在人审消费侧（承接 L4 在池提案，不重复立案） 2026-W41
+
+v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 两案 cmutkyiz8/cmutkyiyb，7 天零动作）、approved=0、最老积压 pendingDays=64、已越 escalate 线 27、距 breaker 线 30 仅差 1（触发即暂停全局自动分析，项目级降级 drain 续跑）。代码面告警→曝光→熔断链路完备（approval-sla.ts:19-27 阈值在位、scheduler.ts:293-309 console+持久化事件双出口、platform-health-section.tsx:378-394 前端徽标），『sla_alert 仍 console-only』旧口径被体检师证伪、红队确认；停滞根因收窄为人审消费侧零动作。v2 轮同主题提案 cmunjmm5r（L4）在池未动，按『不重复立案』纪律转滞留观察；维持 approval-sla.ts:12/:131『只提醒、绝不自动 approve/apply』边界红线，不产出放宽护栏建议。
+
+## [H6] error:null 静默失败 2 条挂验证观察：自愈双路（启动+周期 5 分钟）在位运转，残余=failed 写入路径 error 字段形态不一 2026-W41
+
+本期 error=null 2/73 条（v3 期『量最大』→ 本期 2 条，方向向好未清零；其中 ≥1 条 agentName='真机试玩验收' playtest 类）。自愈机制实锤在位且运转：index.ts:371-374 启动 + :578/:588 周期（5 分钟）双路 cleanupStaleTrajectories 操作 agentExecutionTrajectory（engine.ts:399-435），failures.json 实测 2 条『僵尸轨迹…周期自愈清理为 failed』即运转产出（平台自愈规范『无自愈覆盖』旧口径反转，体检师自纠+红队确认）。残余疑点：某 failed 写入路径置 failed 时不携带 error（与 :422/:432 两种 error 必填形态不一致），2 条与 SIGINT/SIGTERM/僵尸共 7 条字段邻接形态异于其余 66 条。n=2 样本不足：维持挂验证（台账 L6），不销案不升级；『审计 failed 写入点保证 error 必填』的工程化修复待样本量达标或定位到具体路径后转 bug_ticket。
+
+## MyRD 自进化周报 2026-W41
+
+# MyRD 自进化周报 2026-W41
+
+> 窗口 2026-10-04 → 2026-10-11 · 数据锚 health.json generatedAt=2026-10-11T07:18:43.499Z（三份采集件一致）
+> 产出节点：④首席研究员（口径整合+环比结论+双轨立案）；输入：①数据侦探（findings-delta-v3 + 台账 v4 + hypotheses H1-H9）、②体检师（findings-audited 9 条）、③红队（findings-verified 9 条裁决）
+> as-of-SHA：体检师取证 head=907df40（07:30:55Z）→ 红队复核 head=e81f3ae（07:49:22Z workflow auto-commit 漂移，红队在漂移后工作区逐行亲读自证行号有效，最大偏差 ≤3 行）；**base SHA(10/4)=unavailable**（详见「数据缺口」节，如实上报不编造）
+
+---
+
+## 一、本周结论摘要
+
+本周平台**整体向好但含一次 P0 级异动事件**：总体任务成功率 0.718→0.865（+20.5%，样本 38 达门槛，红队复算 ✓）、workflow 成功率 1.0（26/26 零失败）、benchmark 86.33→87.25（+1.1%，回落条款未触发）、实体级失败 tasks 22→5 / goals 15→5 / workflowRuns 1→0。
+
+异动主因为 **10/7 单日 429 配额级联**：73 条失败轨迹中 62 条集中 10/7 UTC T07-T08 两小时窗（首席 `-o` 复算：429 全文 81 处、10/7 当天 63 条、agentType workflow 49/goal_master 11/goal_delegate 10，勾稽 73 ✓），同一批游戏开发 workflow 与 goal 编排全灭——外部配额事件 × 调度韧性缺口（退避 40s 封顶 vs 小时级配额窗 + 配额签名域无编排级熔断）。goal 型成功率两期持平 0.5 与该事件同源（轨迹级 21 条失败中 17 条落窗且全 429 系）。
+
+第二紧迫项是**进化闭环自身的停摆风险**：提案池 pending 29 距熔断线 30 仅差 1、approved=0、v3 两案 7 天零动作、最老积压 64 天——告警通路经体检师+红队双重复核为完备，停滞根因收窄为**人审消费侧零动作**。
+
+红队裁决：**9 条假设全部 Confirmed、Refuted=0、Uncertain=0**（红队对体检师 3 处表述做了措辞修正，见第五节）。收敛 top3 短板：**H1 配额韧性（P1）> H4+台账 审批消费停滞（P2，紧迫度最高）> H9 自愈规范文档滞后（P2，防重复立案加速熔断）**。
+
+## 二、环比分项结论（预注册 rubric：恶化=异动+验证成立/复核坐实；持平=无超阈值或样本不足；改善=向好+复测/复核任一佐证）
+
+| 指标 | 上期→本期 | 判定 | 依据 |
+|---|---|---|---|
+| overallTaskSuccessRate | 0.718→0.865 (+20.5%) | **改善** | 样本 38≥5 门槛；红队手算复算 ✓；benchmark 同向佐证 |
+| workflow 成功率 | 0.870→1.0 (+15%) | **改善** | 26/26 零失败，红队复算 ✓ |
+| goal 成功率 | 0.5→0.5 (deltaPct=0) | **持平**（分类型小分母 total=10·仅方向参考） | 唯二未改善口径之一；同源归因 H1/H2 已坐实（轨迹级） |
+| 实体级失败 tasks/goals/workflowRuns | 22→5 / 15→5 / 1→0 | **改善** | platform-health 实体级口径，红队复算 ✓ |
+| 轨迹级失败（failures.json） | 73 条（62 条 10/7 配额级联） | **恶化**（异动+红队验证成立） | 首轮轨迹级基线；注意与实体级口径**禁止直接对读**（H3） |
+| benchmark | 86.33→87.25 (+1.1%) | **改善** | 上升且无回落；纪律：即便回落也只查执行侧，不产出放宽护栏建议 |
+| 提案漏斗 pending | 27→29（approved=0） | **恶化** | 四方读数对齐+红队复算 ✓；已越 escalate=27，距 breaker=30 差 1 |
+| 负反馈率 / express_lane | null+no-data / null | **持平**（零样本，不设目标） | 观测缺口（H7）：采集管道代码面无缺维，评分行为未发生 |
+| 验证/选择层三指标 | 0/0（两期同） | **持平**（结构性存量缺口） | 机制在仓流量缺失（H8），承接在池提案滞留观察 |
+| bugClosureDays | 无前值→19.5 | **待验证** | 单值不可环比，不设目标不下结论 |
+
+阈值口径：沿用 v3 集合（周级样本门槛 ≥5，本期 activity.tasks=38 通过；分类型小分母逐条标注；零样本不下异动结论），①本轮未提议新分位阈值，④复核采用。
+
+**过程指标首录（v3 公式零改动，本轮值即 v5 环比基线；样本不足只记分布、不设目标）**
+- 转化率 = 达「已执行·未验收」及以上立案数 / 当轮总立案数（销案 0 与误报 0 不入分母）= **0/7 = 0%**（若仅按 v3 当轮新立案 L1/L2 计亦为 0/2=0%）
+- 滞留环节 = 台账状态分布：未动 5（全部滞留在**审批消费侧**）+ 进行中(挂验证) 2；台账时间戳齐备（pendingDays/createdAt 在采集件内），时长维度无需标待验证（bugClosureDays 除外）
+
+## 三、v3 立案闭环追踪（台账 v4 摘要，完整版见 findings-ledger-v4.json）
+
+| caseId | proposalId | 主题 | 状态 | 证据 |
+|---|---|---|---|---|
+| L1 | cmutkyiz8… | 提案池去重与消费闭环标准（v3 新立案） | **未动** | pending/appliedAt=null/pendingDays=6；approved=0 |
+| L2 | cmutkyiyb… | 验证/选择层接线标准 v2（v3 新立案） | **未动** | 同上；acceptanceTests.total 仍 0、gateVerifiedRunRate 仍 0 |
+| L3 | cmupfhl8n… | 验证/选择层接线标准 v1（v2 立案） | **未动** | pendingDays=9，与 L2 同主题防重复立案 |
+| L4 | cmunjmm5r… | 提案漏斗行动牵引（v2 立案） | **未动** | pendingDays=11；其所针对的消费停滞本期继续为真 |
+| L5 | cmuhtbg1v… | V0 执行端工具配置定稿 | **未动** | pendingDays=15 |
+| L6 | （疑点 H4→本轮 H6） | error:null 静默失败 | **进行中（挂验证）** | 本期 2/73 条，向好未清零；n=2 维持挂验证 |
+| L7 | （疑点 H5·v3 编号） | v3 疑点 H5 | **进行中（挂验证·定义待补录）** | ⚠️ v3 台账底稿未随本 worktree 数据包采集，原始定义与判据缺失，按纪律不编造、原样保留 |
+
+台账 summary：7 条 = 未动 5 + 进行中 2；本轮无「已验收」条目 → 红队「已验收抽验」队列为空（如实记录）；H4/H5（v3 编号）与滞留提案无新证据 → **转「滞留观察」，不重复立案**。
+
+## 四、Confirmed 短板清单（9/9，定级以红队裁决为准）
+
+| ID | 定级 | 动作 | 短板与根因（证据均为红队逐行亲读+首席关键数字复算） |
+|---|---|---|---|
+| H1 | P1 | bug_ticket | **429 配额级联**：retry-utils.ts:15/:42-43/:67-69 重试 3 次上限+退避 10/20/40s 封顶，对小时级配额窗量级错配 3 个数量级；配额签名域无编排级熔断（其它域熔断在位）；62 条失败集中 10/7 T07-T08，T08 簇 durationMs≈180s 与「70s 退避+3 次执行」耗尽形状吻合；error 自带恢复锚点 21:31:45，10/8 起清零 |
+| H2 | P2 | bug_ticket（与 H1 同工单承接） | **goal 0.5 持平同源**：goals.ts:4659 agentType 注册实锤；21 条 goal 型失败 17 条落窗全 429 系（红队交叉表，修正体检师「21 条全同窗」）；实体级归属挂 DB 预注册验证 |
+| H3 | P2 | evolution_proposal | **73 vs 10 口径差**：轨迹级（analyzer.ts:491 status≠completed，含在途/重试）vs 实体级（index.ts:118 status='failed'）三重不同源（表/谓词/粒度），7.3 倍差为口径必然非采集缺陷 → 口径对照表文档化 + 两口径禁止直接对读 |
+| H4 | P2 | knowledge_only（滞留观察） | **提案漏斗消费停滞**：approved=0、pending 29 差 1 触熔断、v3 两案 7 天零动作、最老 64 天；告警链路完备（console+事件+API+前端徽标），根因=人审消费侧零动作；v2 同主题 L4 在池，不重复立案；维持「绝不自动 approve/apply」边界红线 |
+| H5 | P3 | bug_ticket | **stderr 噪音漏网**：stripCliStderrNoise 共享工具+专项测试在位（红队推翻体检师「未收口」表述），仍有 2 条 unrecognized_model 漏网 → 存在未接入路径（嫌疑点 benchmark.ts:396 非 143 分支）；n=2 仅方向参考 |
+| H6 | P3 | knowledge_only（挂验证） | **error:null 2 条**：自愈双路（启动+周期 5min）实锤在位且运转（2 条僵尸自愈签名即产出证据）；残余=某 failed 写入路径 error 字段形态不一；n=2 挂验证不销案不升级 |
+| H7 | P3 | none（观测缺口登记） | **express_lane 零样本+负反馈 no-data**：全类型同 groupBy、采样管道在位启动即跑 → 缺口在行为侧非采集缺维；预注册升级条款留档（若 expressLaneRun 有记录而 Task 无终态→P1 复立） |
+| H8 | P3 | none（滞留观察） | **验证/选择层三指标持续缺失（三连期）**：口径+契约测试均在仓，0 值=流量未经过；承接 L2/L3；解除条件=下期任一分母>0 |
+| H9 | P2 | evolution_proposal | **自愈规范文档滞后（本轮新立）**：CLAUDE.md:297-298 宣称无自愈覆盖/无运行期检测，代码实况为启动+周期双路自愈且在运转（三方逐字比对）；风险链=过时结论→重复立案→加速熔断（29/30）+误导新 Agent 先验 |
+
+## 五、被红队否决的条目与原因
+
+**本周 Refuted=0**。红队产出 3 处措辞修正（对上游结论的精化，非否决）：
+1. H5「过滤逻辑散点未收口共享工具」被推翻 → 实测 stripCliStderrNoise 已是共享工具且主路径接入，问题重述为「存在未接入路径」；
+2. H2「21 条 goal 型失败全同窗」修正为「17/21 同窗」（81% 集中反而强化配额主签名结论）；
+3. H1「无编排级熔断」精化为「配额签名域无编排级熔断（reject 死锁/提案水位/goal 审视三处其它域熔断在位）」。
+另：①侦探对 H4 的「sla_alert 疑似 console-only」怀疑被体检师源码取证证伪（双出口在位），红队确认。
+
+## 六、Uncertain / 待复核 / 下周关注
+
+**Uncertain=0**（红队全部裁决 Confirmed；H7/H8 为 Confirmed+actionType=none，归入滞留观察而非立案，符合纪律）。
+
+待复核清单：
+- H2 实体级归属（5 个 failed goal 时间戳是否落配额窗）——无 DB 通道，挂预注册证伪条款；
+- H7 expressLaneRun/ArtifactRating 窗口行数 DB 级终裁——同上；
+- H3 次要缺口：failures.json 具体 HTTP 导出端点未逐字定位（不影响主结论）；
+- L7（v3 疑点 H5）原始定义缺失，需回捞 v3 台账底稿补录；
+- 本轮与 v3 疑点编号存在重排（v3-H4(error:null)→本轮 H6/L6；本轮 H5=unrecognized_model 与 L7 所指 v3-H5 是否同物无法确认）——已如实标注，不强行合并。
+
+下周建议关注点（含 failures.json 近 7 天失败签名「失败族二分」）：
+1. **审批池熔断是下周第一风险**：pending 29 差 1 触发即暂停全局自动分析——届时本工作流自身数据源断供。建议消费侧批审会话优先消化 reminder 桶最老两案（pendingDays 57/63）；提示：L4 同主题提案在池，勿重复立案；
+2. **H1/H2 工单落地复测**：下期观察同签名（429·1310/1302）是否再现级联——复测证据是「已验收」的唯一准入；
+3. **失败族二分基线**：族 A 环境/外部配额族 66/73（90.4% = 429×62+SIGINT×2+SIGTERM×1+ConnLost×1）vs 族 B 平台自身族 7/73（9.6% = error:null×2+僵尸×2+300s 卡死×1+unrec×2）。若族 A 占比回落而族 B 上升，关注重心切换到轨迹生命周期域（H5/H6 汇合处）；
+4. **H9 提案应用后**跟踪「自愈缺失」类重复立案是否归零（其自身是熔断加速因子）；
+5. H8 解除条件：gateVerifiedRunRate 分母>0 或 acceptanceTests.total>0 任一出现即解除「持续缺失」定性；反向（应用后仍 0）则升级「应用无效」；
+6. L6 若定位到具体 null 写入路径或样本量达标（≥5），按 H6 预注册条款转 bug_ticket；
+7. benchmark 回落条款纪律延续：回落只查执行侧原因，绝不产出放宽护栏/评测标准类建议；
+8. 双 SHA 机制改进：base SHA 缺口根源是 worktree 当日克隆无历史深度——建议工作流在①节点或数据包采集时固定记录 base/head 双 SHA（详见下节）。
+
+## 七、数据缺口与边界如实上报
+
+1. **双 SHA 缺口**：baseSha(10/4)=unavailable——本 worktree 为 10/11 当日克隆（clone base 7c05521），本地无 10/4 引用与历史深度，10/4→10/11 git diff 无法本地执行；①节点亦无 git/Bash 通道。全部证据为 as-of-head 快照实测（体检师 907df40 / 红队 e81f3ae，漂移为 07:49:22Z workflow auto-commit，红队在漂移后逐行亲读自证行号有效）。不编造 SHA（Verification P1/P4）。
+2. **本节点无 Bash**：git commit 无法由本节点执行，report.md/actions.json 以 Write 落盘于 `.myrd/self-evolution/`，commit 与导出由 deploy 节点（具备相应通道）补做——与③红队 toolBoundary 先例一致。
+3. **DB/HTTP 通道不可用**：实体级归因类核验按「不可得」如实标注（见待复核清单），未伪造。
+4. v3 台账底稿未随本 worktree 数据包采集（appliedLast30d=9 说明池外有应用发生，但在池采集件无法核对对应关系，不虚构逐条回填）。
+5. 本轮未观测到「非项目成员/0 仓库」类平台异常；三份采集件均无 `{"unavailable":true}` 占位，未触发「读不到≠断更」条款；未引用 127.0.0.1:7456 探针项；进化内核（guardrail/policies/边界合同）强度不在体检范围，全文无放宽护栏类发现。
+
+## 八、衔接声明
+
+本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
 
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
@@ -27252,115 +28442,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
-## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
-
-## 背景
-agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
-
-1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
-2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
-
-根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
-
-## 关键入口（权威文档与技能）
-- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
-- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
-- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
-- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
-
-## 真实结构（经源码核实）
-- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
-- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
-- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
-- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
-- **路由**：`src/routes/workflows.ts` 等。
-- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
-- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
-
-## 服务端口
-前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
-
-## 高频错误路径（不存在，务必避免）
-| 常见错误引用 | 真实对应 |
-|---|---|
-| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
-| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
-| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
-| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
-
-## 根因
-1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
-2. agent 凭记忆/推测引用路径，未做存在性核实；
-3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
-
-## 处置（核实方法）
-- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
-- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
-- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
-- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
-- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
-
-## 预防
-- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
-- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
-- 本文档随仓库结构变更应同步更新。
-
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
-## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
-
-negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
-
 ## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
 
 # 失败模式：Worker SIGINT 关闭中断
@@ -27390,9 +28471,9 @@ negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内�
 - 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
 - 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
-## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
-修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -27526,6 +28607,115 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+# MyRD 平台真实仓库结构地图、文档/技能入口与常见路径陷阱
+
+## 背景
+agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
+
+1. **文档/技能入口定位失败**：任务开始时多次通过 glob 搜索 `**/myrd*/**/SKILL.md`、`**/myrd-platform-skill*` 等模式均返回 0 命中，误判平台「为云端平台、本地无文档」（#18283），或技能未在预期目录找到（#18123），随后不得不多轮读取源码与文档才定位入口（#18282-18293）。myrd-platform-skill 是 agent 理解平台的标准入口（最近 14 天调用 4 次），但 agent 本地环境无法直接命中其正文，造成重复勘察，agent 花费约十余次观测重复勘察结构。
+2. **引用不存在的文件路径**：多会话（#18282-18293、#18596-18617）反复手工翻查源码才能定位平台结构，且 #18616/#18617 实证发现提案引用了不存在的 `frontend/lib/services/*` 与 `myagent-client.ts` 路径，导致提案被驳回、评审周期浪费。
+
+根因在于「文档与实际源码结构不一致」——仓库（典型根目录 `/Users/leo/workspace/myrd`）存在源码与编译产物并存、文档过时等问题。本文档给出经源码核实的真实入口、真实结构地图及高频错误路径，供涉及 MyRD 内部实现的任务直接使用，消除重复探索并防止错误路径再次出现，显著降低后续任务冷启动成本。
+
+## 关键入口（权威文档与技能）
+- **平台使用说明书（权威）**：`/Users/leo/workspace/myrd/docs/myrd-platform-skill.md`。注意：位于源码仓库 `docs/` 下，而非 `~/.claude/skills/`。内容覆盖：服务地址、JWT 认证、全部 API 分类、典型示例、数据模型、边界情况，并含平台进化系统架构说明。
+- **快速开始**：`/Users/leo/workspace/myrd/docs/guides/quick-start.md`（环境搭建 → 服务启动 → 注册 → 建项目 → 跑工作流）。
+- **工作流集成/部署状态**：`/Users/leo/workspace/myrd/WORKFLOW_INTEGRATION.md`、`/Users/leo/workspace/myrd/MYRD_SETUP_STATUS.md`。
+- **数据库 schema**：`/Users/leo/workspace/myrd/prisma/schema.prisma`（含 `AgentExecutionTrajectory` 模型，表名 `agent_execution_trajectories`）。
+
+## 真实结构（经源码核实）
+- **入口与自愈**：`src/index.ts`（worker 启动时执行 auto-heal，覆盖 WorkflowRun / ExpressLaneRun / channel_messages / agent status / goals / vibe workspace，**不含** agentExecutionTrajectory）。
+- **工作流引擎**：`src/services/workflow/engine.ts`（约 2626 行；含 `resume()` 约 443 行、`iterateFrom()` 约 784 行、`rerunFrom()`、`rollbackToCheckpoint()`、`sharedSetupProjectWorkspace()`；支持 DAG 执行 / 自愈 / 重试 / git checkpoint）。
+- **Coding-agent 实现**：`src/services/coding-agent/{claude-code-agent.ts, local-claude-agent.ts, remote-agent.ts, types.ts}`（其中 `claude-code-agent.ts` 含 10 分钟默认超时与进程清理逻辑）。
+- **进化系统服务**：`src/services/evolution/`（analyzer 等模块；支撑证据系统三类数据源、证据挖掘策略）。
+- **路由**：`src/routes/workflows.ts` 等。
+- **前端真实源码**：`frontend/` 目录存在，含 `app/` 与 `components/` 源码，如 `frontend/app/(dashboard)/projects/new/page.tsx`、`frontend/components/projects/run-workflow-button.tsx`。
+- **编译产物（非源码）**：`src/dist/`——仅含编译后声明/产物（如 `src/dist/lib/myagent-client.d.ts`、`src/dist/services/coding-agent/myagent-agent.d.ts`），**不是源码**。
+
+## 服务端口
+前端 :3001、后端 API :3111、streaming :4112、MyAgent :3000、数据库 :5432。
+
+## 高频错误路径（不存在，务必避免）
+| 常见错误引用 | 真实对应 |
+|---|---|
+| `frontend/lib/services/workflow/engine.ts` | `src/services/workflow/engine.ts` |
+| `frontend/lib/services/coding-agent/claude-code-agent.ts` | `src/services/coding-agent/claude-code-agent.ts` |
+| `myagent-client.ts`（作为源码） | 无此源码；仅有编译声明 `src/dist/lib/myagent-client.d.ts` |
+| 认为前端目录含业务服务代码 | `frontend/` 主要被 `node_modules` 占据；业务服务在 `src/services/` |
+
+## 根因
+1. 文档（含 `docs/guides/quick-start.md`）描述的结构与实际仓库不一致或已过时；
+2. agent 凭记忆/推测引用路径，未做存在性核实；
+3. `src/` 与 `src/dist/` 并存，把编译产物误当源码。
+
+## 处置（核实方法）
+- 引用任何路径前，先用 glob/grep 在仓库根目录确认文件存在；
+- 区分 `src/`（源码）与 `src/dist/`（编译产物），引用源码一律指向 `src/`；
+- 工作流引擎、coding-agent、evolution 等业务服务一律在 `src/services/` 下，不在 `frontend/lib/` 下；
+- 「文件不存在」的判断以 glob 返回空为唯一依据，不要依据记忆或文档；
+- 分析轨迹/进化数据时，直接读 `agent_execution_trajectories` 表与 `prisma/schema.prisma` 的 `AgentExecutionTrajectory` 模型，不要靠源码 glob 反推。
+
+## 预防
+- 涉及 MyRD 内部实现的提案/文档，落笔前对每个文件路径做一次 glob 核实；
+- 平台是本地源码 + 多 run 工作区（`/Users/leo/.myrd/workspaces/proj-myrd/run-*`）并存；run 工作区可能包含主干尚未合入的功能（如 express-lane、轨迹追踪迁移），分析时以对应 run 工作区为准；
+- 本文档随仓库结构变更应同步更新。
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
+
+## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
+
+修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
 
 ## 架构设计文档
 
@@ -29937,4 +31127,123 @@ curl -s https://leomac-studio.tail49399e.ts.net/apps/3d/api/public/assets/index.
 4. 数值契约（窗口/权重/难度表）：JSON 配置表交付 + 代码表奇偶校验 + 权重一致性机判 + 变异测试验证拦截力。
 5. 门禁：AC 逐条落成冒烟断言相位；bot 驱动门禁的要求（密谱面/守卫/反馈密度）写进骨架验收；线上 10 项移动端机判 + 证据入库随仓库提交。
 6. 关联沉淀：《Godot 4 Web 导出与 godot-smoke 门禁 + AppHost 部署全链路》（27407691-bcf8-4e73-b686-1bb8df684e5c）、《game-9 门禁实战》（36da3a87-2fe0-42be-b57a-b88c9c0fa4be）、《AudioContext 解锁规范》（82e419bb-db2e-45c6-ac11-e3c85de40455）、《3D 切苹果 壳页三件套与移动端 10 项机判》（500c5668-2e02-4d57-bed1-0bec821b2914）。
+
+
+## [H4] 提案漏斗消费停滞滞留观察：pending 29 距熔断线 30 仅差 1、approved=0，根因在人审消费侧（承接 L4 在池提案，不重复立案） 2026-W41
+
+v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 两案 cmutkyiz8/cmutkyiyb，7 天零动作）、approved=0、最老积压 pendingDays=64、已越 escalate 线 27、距 breaker 线 30 仅差 1（触发即暂停全局自动分析，项目级降级 drain 续跑）。代码面告警→曝光→熔断链路完备（approval-sla.ts:19-27 阈值在位、scheduler.ts:293-309 console+持久化事件双出口、platform-health-section.tsx:378-394 前端徽标），『sla_alert 仍 console-only』旧口径被体检师证伪、红队确认；停滞根因收窄为人审消费侧零动作。v2 轮同主题提案 cmunjmm5r（L4）在池未动，按『不重复立案』纪律转滞留观察；维持 approval-sla.ts:12/:131『只提醒、绝不自动 approve/apply』边界红线，不产出放宽护栏建议。
+
+## [H6] error:null 静默失败 2 条挂验证观察：自愈双路（启动+周期 5 分钟）在位运转，残余=failed 写入路径 error 字段形态不一 2026-W41
+
+本期 error=null 2/73 条（v3 期『量最大』→ 本期 2 条，方向向好未清零；其中 ≥1 条 agentName='真机试玩验收' playtest 类）。自愈机制实锤在位且运转：index.ts:371-374 启动 + :578/:588 周期（5 分钟）双路 cleanupStaleTrajectories 操作 agentExecutionTrajectory（engine.ts:399-435），failures.json 实测 2 条『僵尸轨迹…周期自愈清理为 failed』即运转产出（平台自愈规范『无自愈覆盖』旧口径反转，体检师自纠+红队确认）。残余疑点：某 failed 写入路径置 failed 时不携带 error（与 :422/:432 两种 error 必填形态不一致），2 条与 SIGINT/SIGTERM/僵尸共 7 条字段邻接形态异于其余 66 条。n=2 样本不足：维持挂验证（台账 L6），不销案不升级；『审计 failed 写入点保证 error 必填』的工程化修复待样本量达标或定位到具体路径后转 bug_ticket。
+
+## MyRD 自进化周报 2026-W41
+
+# MyRD 自进化周报 2026-W41
+
+> 窗口 2026-10-04 → 2026-10-11 · 数据锚 health.json generatedAt=2026-10-11T07:18:43.499Z（三份采集件一致）
+> 产出节点：④首席研究员（口径整合+环比结论+双轨立案）；输入：①数据侦探（findings-delta-v3 + 台账 v4 + hypotheses H1-H9）、②体检师（findings-audited 9 条）、③红队（findings-verified 9 条裁决）
+> as-of-SHA：体检师取证 head=907df40（07:30:55Z）→ 红队复核 head=e81f3ae（07:49:22Z workflow auto-commit 漂移，红队在漂移后工作区逐行亲读自证行号有效，最大偏差 ≤3 行）；**base SHA(10/4)=unavailable**（详见「数据缺口」节，如实上报不编造）
+
+---
+
+## 一、本周结论摘要
+
+本周平台**整体向好但含一次 P0 级异动事件**：总体任务成功率 0.718→0.865（+20.5%，样本 38 达门槛，红队复算 ✓）、workflow 成功率 1.0（26/26 零失败）、benchmark 86.33→87.25（+1.1%，回落条款未触发）、实体级失败 tasks 22→5 / goals 15→5 / workflowRuns 1→0。
+
+异动主因为 **10/7 单日 429 配额级联**：73 条失败轨迹中 62 条集中 10/7 UTC T07-T08 两小时窗（首席 `-o` 复算：429 全文 81 处、10/7 当天 63 条、agentType workflow 49/goal_master 11/goal_delegate 10，勾稽 73 ✓），同一批游戏开发 workflow 与 goal 编排全灭——外部配额事件 × 调度韧性缺口（退避 40s 封顶 vs 小时级配额窗 + 配额签名域无编排级熔断）。goal 型成功率两期持平 0.5 与该事件同源（轨迹级 21 条失败中 17 条落窗且全 429 系）。
+
+第二紧迫项是**进化闭环自身的停摆风险**：提案池 pending 29 距熔断线 30 仅差 1、approved=0、v3 两案 7 天零动作、最老积压 64 天——告警通路经体检师+红队双重复核为完备，停滞根因收窄为**人审消费侧零动作**。
+
+红队裁决：**9 条假设全部 Confirmed、Refuted=0、Uncertain=0**（红队对体检师 3 处表述做了措辞修正，见第五节）。收敛 top3 短板：**H1 配额韧性（P1）> H4+台账 审批消费停滞（P2，紧迫度最高）> H9 自愈规范文档滞后（P2，防重复立案加速熔断）**。
+
+## 二、环比分项结论（预注册 rubric：恶化=异动+验证成立/复核坐实；持平=无超阈值或样本不足；改善=向好+复测/复核任一佐证）
+
+| 指标 | 上期→本期 | 判定 | 依据 |
+|---|---|---|---|
+| overallTaskSuccessRate | 0.718→0.865 (+20.5%) | **改善** | 样本 38≥5 门槛；红队手算复算 ✓；benchmark 同向佐证 |
+| workflow 成功率 | 0.870→1.0 (+15%) | **改善** | 26/26 零失败，红队复算 ✓ |
+| goal 成功率 | 0.5→0.5 (deltaPct=0) | **持平**（分类型小分母 total=10·仅方向参考） | 唯二未改善口径之一；同源归因 H1/H2 已坐实（轨迹级） |
+| 实体级失败 tasks/goals/workflowRuns | 22→5 / 15→5 / 1→0 | **改善** | platform-health 实体级口径，红队复算 ✓ |
+| 轨迹级失败（failures.json） | 73 条（62 条 10/7 配额级联） | **恶化**（异动+红队验证成立） | 首轮轨迹级基线；注意与实体级口径**禁止直接对读**（H3） |
+| benchmark | 86.33→87.25 (+1.1%) | **改善** | 上升且无回落；纪律：即便回落也只查执行侧，不产出放宽护栏建议 |
+| 提案漏斗 pending | 27→29（approved=0） | **恶化** | 四方读数对齐+红队复算 ✓；已越 escalate=27，距 breaker=30 差 1 |
+| 负反馈率 / express_lane | null+no-data / null | **持平**（零样本，不设目标） | 观测缺口（H7）：采集管道代码面无缺维，评分行为未发生 |
+| 验证/选择层三指标 | 0/0（两期同） | **持平**（结构性存量缺口） | 机制在仓流量缺失（H8），承接在池提案滞留观察 |
+| bugClosureDays | 无前值→19.5 | **待验证** | 单值不可环比，不设目标不下结论 |
+
+阈值口径：沿用 v3 集合（周级样本门槛 ≥5，本期 activity.tasks=38 通过；分类型小分母逐条标注；零样本不下异动结论），①本轮未提议新分位阈值，④复核采用。
+
+**过程指标首录（v3 公式零改动，本轮值即 v5 环比基线；样本不足只记分布、不设目标）**
+- 转化率 = 达「已执行·未验收」及以上立案数 / 当轮总立案数（销案 0 与误报 0 不入分母）= **0/7 = 0%**（若仅按 v3 当轮新立案 L1/L2 计亦为 0/2=0%）
+- 滞留环节 = 台账状态分布：未动 5（全部滞留在**审批消费侧**）+ 进行中(挂验证) 2；台账时间戳齐备（pendingDays/createdAt 在采集件内），时长维度无需标待验证（bugClosureDays 除外）
+
+## 三、v3 立案闭环追踪（台账 v4 摘要，完整版见 findings-ledger-v4.json）
+
+| caseId | proposalId | 主题 | 状态 | 证据 |
+|---|---|---|---|---|
+| L1 | cmutkyiz8… | 提案池去重与消费闭环标准（v3 新立案） | **未动** | pending/appliedAt=null/pendingDays=6；approved=0 |
+| L2 | cmutkyiyb… | 验证/选择层接线标准 v2（v3 新立案） | **未动** | 同上；acceptanceTests.total 仍 0、gateVerifiedRunRate 仍 0 |
+| L3 | cmupfhl8n… | 验证/选择层接线标准 v1（v2 立案） | **未动** | pendingDays=9，与 L2 同主题防重复立案 |
+| L4 | cmunjmm5r… | 提案漏斗行动牵引（v2 立案） | **未动** | pendingDays=11；其所针对的消费停滞本期继续为真 |
+| L5 | cmuhtbg1v… | V0 执行端工具配置定稿 | **未动** | pendingDays=15 |
+| L6 | （疑点 H4→本轮 H6） | error:null 静默失败 | **进行中（挂验证）** | 本期 2/73 条，向好未清零；n=2 维持挂验证 |
+| L7 | （疑点 H5·v3 编号） | v3 疑点 H5 | **进行中（挂验证·定义待补录）** | ⚠️ v3 台账底稿未随本 worktree 数据包采集，原始定义与判据缺失，按纪律不编造、原样保留 |
+
+台账 summary：7 条 = 未动 5 + 进行中 2；本轮无「已验收」条目 → 红队「已验收抽验」队列为空（如实记录）；H4/H5（v3 编号）与滞留提案无新证据 → **转「滞留观察」，不重复立案**。
+
+## 四、Confirmed 短板清单（9/9，定级以红队裁决为准）
+
+| ID | 定级 | 动作 | 短板与根因（证据均为红队逐行亲读+首席关键数字复算） |
+|---|---|---|---|
+| H1 | P1 | bug_ticket | **429 配额级联**：retry-utils.ts:15/:42-43/:67-69 重试 3 次上限+退避 10/20/40s 封顶，对小时级配额窗量级错配 3 个数量级；配额签名域无编排级熔断（其它域熔断在位）；62 条失败集中 10/7 T07-T08，T08 簇 durationMs≈180s 与「70s 退避+3 次执行」耗尽形状吻合；error 自带恢复锚点 21:31:45，10/8 起清零 |
+| H2 | P2 | bug_ticket（与 H1 同工单承接） | **goal 0.5 持平同源**：goals.ts:4659 agentType 注册实锤；21 条 goal 型失败 17 条落窗全 429 系（红队交叉表，修正体检师「21 条全同窗」）；实体级归属挂 DB 预注册验证 |
+| H3 | P2 | evolution_proposal | **73 vs 10 口径差**：轨迹级（analyzer.ts:491 status≠completed，含在途/重试）vs 实体级（index.ts:118 status='failed'）三重不同源（表/谓词/粒度），7.3 倍差为口径必然非采集缺陷 → 口径对照表文档化 + 两口径禁止直接对读 |
+| H4 | P2 | knowledge_only（滞留观察） | **提案漏斗消费停滞**：approved=0、pending 29 差 1 触熔断、v3 两案 7 天零动作、最老 64 天；告警链路完备（console+事件+API+前端徽标），根因=人审消费侧零动作；v2 同主题 L4 在池，不重复立案；维持「绝不自动 approve/apply」边界红线 |
+| H5 | P3 | bug_ticket | **stderr 噪音漏网**：stripCliStderrNoise 共享工具+专项测试在位（红队推翻体检师「未收口」表述），仍有 2 条 unrecognized_model 漏网 → 存在未接入路径（嫌疑点 benchmark.ts:396 非 143 分支）；n=2 仅方向参考 |
+| H6 | P3 | knowledge_only（挂验证） | **error:null 2 条**：自愈双路（启动+周期 5min）实锤在位且运转（2 条僵尸自愈签名即产出证据）；残余=某 failed 写入路径 error 字段形态不一；n=2 挂验证不销案不升级 |
+| H7 | P3 | none（观测缺口登记） | **express_lane 零样本+负反馈 no-data**：全类型同 groupBy、采样管道在位启动即跑 → 缺口在行为侧非采集缺维；预注册升级条款留档（若 expressLaneRun 有记录而 Task 无终态→P1 复立） |
+| H8 | P3 | none（滞留观察） | **验证/选择层三指标持续缺失（三连期）**：口径+契约测试均在仓，0 值=流量未经过；承接 L2/L3；解除条件=下期任一分母>0 |
+| H9 | P2 | evolution_proposal | **自愈规范文档滞后（本轮新立）**：CLAUDE.md:297-298 宣称无自愈覆盖/无运行期检测，代码实况为启动+周期双路自愈且在运转（三方逐字比对）；风险链=过时结论→重复立案→加速熔断（29/30）+误导新 Agent 先验 |
+
+## 五、被红队否决的条目与原因
+
+**本周 Refuted=0**。红队产出 3 处措辞修正（对上游结论的精化，非否决）：
+1. H5「过滤逻辑散点未收口共享工具」被推翻 → 实测 stripCliStderrNoise 已是共享工具且主路径接入，问题重述为「存在未接入路径」；
+2. H2「21 条 goal 型失败全同窗」修正为「17/21 同窗」（81% 集中反而强化配额主签名结论）；
+3. H1「无编排级熔断」精化为「配额签名域无编排级熔断（reject 死锁/提案水位/goal 审视三处其它域熔断在位）」。
+另：①侦探对 H4 的「sla_alert 疑似 console-only」怀疑被体检师源码取证证伪（双出口在位），红队确认。
+
+## 六、Uncertain / 待复核 / 下周关注
+
+**Uncertain=0**（红队全部裁决 Confirmed；H7/H8 为 Confirmed+actionType=none，归入滞留观察而非立案，符合纪律）。
+
+待复核清单：
+- H2 实体级归属（5 个 failed goal 时间戳是否落配额窗）——无 DB 通道，挂预注册证伪条款；
+- H7 expressLaneRun/ArtifactRating 窗口行数 DB 级终裁——同上；
+- H3 次要缺口：failures.json 具体 HTTP 导出端点未逐字定位（不影响主结论）；
+- L7（v3 疑点 H5）原始定义缺失，需回捞 v3 台账底稿补录；
+- 本轮与 v3 疑点编号存在重排（v3-H4(error:null)→本轮 H6/L6；本轮 H5=unrecognized_model 与 L7 所指 v3-H5 是否同物无法确认）——已如实标注，不强行合并。
+
+下周建议关注点（含 failures.json 近 7 天失败签名「失败族二分」）：
+1. **审批池熔断是下周第一风险**：pending 29 差 1 触发即暂停全局自动分析——届时本工作流自身数据源断供。建议消费侧批审会话优先消化 reminder 桶最老两案（pendingDays 57/63）；提示：L4 同主题提案在池，勿重复立案；
+2. **H1/H2 工单落地复测**：下期观察同签名（429·1310/1302）是否再现级联——复测证据是「已验收」的唯一准入；
+3. **失败族二分基线**：族 A 环境/外部配额族 66/73（90.4% = 429×62+SIGINT×2+SIGTERM×1+ConnLost×1）vs 族 B 平台自身族 7/73（9.6% = error:null×2+僵尸×2+300s 卡死×1+unrec×2）。若族 A 占比回落而族 B 上升，关注重心切换到轨迹生命周期域（H5/H6 汇合处）；
+4. **H9 提案应用后**跟踪「自愈缺失」类重复立案是否归零（其自身是熔断加速因子）；
+5. H8 解除条件：gateVerifiedRunRate 分母>0 或 acceptanceTests.total>0 任一出现即解除「持续缺失」定性；反向（应用后仍 0）则升级「应用无效」；
+6. L6 若定位到具体 null 写入路径或样本量达标（≥5），按 H6 预注册条款转 bug_ticket；
+7. benchmark 回落条款纪律延续：回落只查执行侧原因，绝不产出放宽护栏/评测标准类建议；
+8. 双 SHA 机制改进：base SHA 缺口根源是 worktree 当日克隆无历史深度——建议工作流在①节点或数据包采集时固定记录 base/head 双 SHA（详见下节）。
+
+## 七、数据缺口与边界如实上报
+
+1. **双 SHA 缺口**：baseSha(10/4)=unavailable——本 worktree 为 10/11 当日克隆（clone base 7c05521），本地无 10/4 引用与历史深度，10/4→10/11 git diff 无法本地执行；①节点亦无 git/Bash 通道。全部证据为 as-of-head 快照实测（体检师 907df40 / 红队 e81f3ae，漂移为 07:49:22Z workflow auto-commit，红队在漂移后逐行亲读自证行号有效）。不编造 SHA（Verification P1/P4）。
+2. **本节点无 Bash**：git commit 无法由本节点执行，report.md/actions.json 以 Write 落盘于 `.myrd/self-evolution/`，commit 与导出由 deploy 节点（具备相应通道）补做——与③红队 toolBoundary 先例一致。
+3. **DB/HTTP 通道不可用**：实体级归因类核验按「不可得」如实标注（见待复核清单），未伪造。
+4. v3 台账底稿未随本 worktree 数据包采集（appliedLast30d=9 说明池外有应用发生，但在池采集件无法核对对应关系，不虚构逐条回填）。
+5. 本轮未观测到「非项目成员/0 仓库」类平台异常；三份采集件均无 `{"unavailable":true}` 占位，未触发「读不到≠断更」条款；未引用 127.0.0.1:7456 探针项；进化内核（guardrail/policies/边界合同）强度不在体检范围，全文无放宽护栏类发现。
+
+## 八、衔接声明
+
+本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
 

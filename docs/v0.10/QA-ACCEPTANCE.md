@@ -33,3 +33,7 @@
 | test | `npm test` | 0 | server 112 + mobile 46 = 158 条 |
 | smoke | `npm run smoke` | 0 | 51/51（01-48 兼容基线 + 49-51 洞察增量） |
 | persist | `npm run persist:check` | 0 | 9 项（写→kill→重启→读回一致） |
+| deploy | `npm run deploy:v02` | 0 | dist 启动 + `/health` up + 复跑 build=0/start=0/test=0 |
+| deploy 后冒烟闭环 | `npm run smoke` | 0 | 发布后复跑 51/51 exit 0 |
+
+门禁与 deploy 全量日志归档于 `evidence/gate-*.log`、`evidence/deploy-*.log`。

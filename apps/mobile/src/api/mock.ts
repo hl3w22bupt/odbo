@@ -31,6 +31,7 @@ import type {
   MoodTimelineResult,
   Order,
   PeriodComparisonResult,
+  PeriodInsightComparisonResult,
   PeriodInsightResult,
   PayResult,
   Product,
@@ -567,6 +568,28 @@ export const mockApi = {
       available: true,
       degraded: false,
       periodId,
+      insights: [],
+    };
+  },
+
+  async getPeriodInsightComparison(periodId: string, periods = 3): Promise<PeriodInsightComparisonResult> {
+    const periodIds = Array.from({ length: periods }, (_, index) => {
+      const utcMonday = Date.parse(`${periodId}T00:00:00.000Z`);
+      return new Date(utcMonday - (periods - 1 - index) * 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    });
+    return {
+      conversationId: 'mock',
+      available: true,
+      degraded: false,
+      degradedReason: null,
+      granularity: 'NATURAL_WEEK',
+      timezone: 'UTC+8',
+      targetPeriodId: periodId,
+      requestedPeriods: periods,
+      periodIds,
+      periods: periodIds.map((id) => ({
+        periodId: id, available: true, degraded: false, empty: true, insights: [],
+      })),
       insights: [],
     };
   },

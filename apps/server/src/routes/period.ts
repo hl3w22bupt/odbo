@@ -14,6 +14,10 @@ import {
 import { compareMoodPeriods, periodComparisonDegraded } from '../lib/periodComparison.js'
 import { moodPeriodReportCsv } from '../lib/periodCsv.js'
 import { buildMoodPeriodInsight, moodPeriodInsightDegraded } from '../lib/moodPeriodInsight.js'
+import {
+  buildMoodPeriodInsightComparison,
+  moodPeriodInsightComparisonDegraded,
+} from '../lib/moodPeriodInsightComparison.js'
 import { logger } from '../lib/logger.js'
 import { ok, rawContent } from '../lib/response.js'
 import {
@@ -24,6 +28,34 @@ import {
   type MemoryReadContract,
   type MoodTimelineContract,
 } from '../lib/conversationInsights.js'
+
+function requireInsightComparisonPeriodId(value: string | undefined): string {
+  if (!value || !periodBoundsFromPeriodId(value)) {
+    throw new AppError(404, 'PERIOD_INSIGHT_TARGET_NOT_FOUND', '目标周期不存在或非法', { periodId: value ?? null })
+  }
+  return value
+}
+
+function requirePeriodComparisonCount(query: Record<string, string>): number {
+  const raw = query.periods ?? '3'
+  const value = Number.parseInt(raw, 10)
+  if (!/^\d+$/.test(raw) || !Number.isInteger(value) || value < 1 || value > 3) {
+    throw new AppError(
+      400,
+      'PERIOD_INSIGHT_COUNT_REJECTED',
+      'periods 必须是 1-3 的整数',
+      { maxPeriods: 3 },
+    )
+  }
+  return value
+}
+
+function previousPeriodIds(periodId: string, count: number): string[] {
+  const utcMonday = Date.parse(`${periodId}T00:00:00.000Z`)
+  return Array.from({ length: count }, (_, index) =>
+    new Date(utcMonday - (count - 1 - index) * 7 * 24 * 3_600_000).toISOString().slice(0, 10),
+  )
+}
 
 function requirePeriodId(value: string | undefined): string {
   if (!value) throw AppError.badRequest('缺少 periodId')
@@ -137,8 +169,47 @@ async function getPeriodInsight(ctx: HttpRouteContext) {
   }
 }
 
+/** v0.11 跨周期情绪洞察：新只读端点，不改造既有 comparison/insight handler。 */
+async function getPeriodInsightComparison(ctx: HttpRouteContext) {
+  const user = await authenticate(ctx)
+  const periodId = requireInsightComparisonPeriodId(ctx.params.periodId)
+  const requestedPeriods = requirePeriodComparisonCount(ctx.query)
+  const periodIds = previousPeriodIds(periodId, requestedPeriods)
+  try {
+    const input = await scopedUserPeriodInput(user.id)
+    const reports = periodIds.map((id) => readableScopedPeriodReport(user.id, input, id))
+    const periodInsights = reports.map((report, index) =>
+      buildMoodPeriodInsight(report, input.timeline, input.memory, periodIds[index]!),
+    )
+    return ok(buildMoodPeriodInsightComparison(
+      user.id,
+      periodIds,
+      reports,
+      periodInsights,
+      input.timeline,
+      input.memory,
+    ))
+  } catch (err) {
+    if (err instanceof AppError) throw err
+    logger.error('[period] insight comparison degraded', {
+      err: String(err),
+      periodId,
+      requestedPeriods,
+      userId: user.id,
+    })
+    return ok(moodPeriodInsightComparisonDegraded(
+      user.id,
+      periodId,
+      periodIds,
+      requestedPeriods,
+      'AGGREGATION_FAILED',
+    ))
+  }
+}
+
 export function registerPeriodRoutes(router: HttpRouter): void {
   router.define('period::comparison', '/api/v1/periods/:periodId/comparison', 'GET', getPeriodComparison)
   router.define('period::csv', '/api/v1/periods/:periodId/report.csv', 'GET', getPeriodCsv)
   router.define('period::insight', '/api/v1/periods/:periodId/insight', 'GET', getPeriodInsight)
+  router.define('period::insight-comparison', '/api/v1/periods/:periodId/insight/comparison', 'GET', getPeriodInsightComparison)
 }

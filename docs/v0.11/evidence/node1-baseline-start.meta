@@ -1,0 +1,6 @@
+command=npm run server:start + curl /health
+commit=a92cd5e9f3dbe745714fe6db6e2d233e85415511
+started=2026-10-13T23:07:44Z
+finished=2026-10-13T23:07:45Z
+exit=0
+pid=12049

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 心伴 v0.10 · 一条命令全链路冒烟（01-45 兼容基线 + 46 周期对比 CSV 产物探针 + 47-49 多周期对比/CSV + 50-52 情绪洞察）
+# 心伴 v0.11 · 一条命令全链路冒烟（01-52 冻结基线 + 53-54 跨周期情绪洞察）
 # 用法：npm run smoke
 # 可用环境变量：XINBAN_SMOKE_PORT（默认 13888）、KEEP_SMOKE_DIR=1（保留临时目录）
 set -euo pipefail
@@ -509,4 +509,37 @@ grep -q '本周期还没有足够的情绪记录' "$ROOT/apps/mobile/src/compone
 (cd "$ROOT/apps/mobile" && npx vitest run -t '第 4 类判红' src/utils/moodPeriodInsight.test.ts >/dev/null)
 green '52 洞察降级契约与用户可见状态（第 4 类判红）'
 
-green "心伴 v0.10 冒烟通过：$PASS 项 / 52 项"
+# ---------- v0.11 增量段：跨周期情绪洞察 ----------
+comparison_periods=3
+cross_period_a="$(node -e "const d=new Date(Date.parse('${period_id}T00:00:00.000Z')-14*864e5);console.log(d.toISOString().slice(0,10))")"
+cross_period_b="$(node -e "const d=new Date(Date.parse('${period_id}T00:00:00.000Z')-7*864e5);console.log(d.toISOString().slice(0,10))")"
+cross_insight="$(http GET "/api/v1/periods/$period_id/insight/comparison" "$TOKEN")"
+if printf '%s' "$cross_insight" | jq -e '
+  .data.available == true and .data.degraded == false and .data.degradedReason == null and
+  .data.targetPeriodId == $pid and .data.requestedPeriods == 3 and
+  .data.periodIds == [$a,$b,$pid] and
+  [.data.periods[].empty] == [true,true,false] and
+  (.data.insights | length == 3) and
+  ([.data.insights[].type] | sort) == ["ANNOTATION_CORRELATION","DOMINANT_MOOD","PERIOD_TREND"] and
+  ([.data.insights[].status] | all(. == "EMPTY")) and
+  ([.data.insights[].reason] | all(. == "PERIOD_EMPTY")) and
+  ([.data.insights[].value] | all(. == null)) and
+  ([.data.insights[].evidence.fromPeriodId] | all(. == $a)) and
+  ([.data.insights[].evidence.toPeriodId] | all(. == $pid)) and
+  ([.data.insights[].evidence.fromSampleSize] | all(. == 0)) and
+  ([.data.insights[].evidence.toSampleSize] | all(. == 2))
+' --arg pid "$period_id" --arg a "$cross_period_a" --arg b "$cross_period_b" >/dev/null; then
+  green '53 跨周期洞察空对比输出封闭空标记与周期 A vs C'
+else
+  red "❌ 跨周期洞察契约失败（period=$period_id body=${cross_insight}）"
+fi
+
+rejected_status="$(curl -sS -m 20 -w '%{http_code}' -o "$BODY" "$BASE/api/v1/periods/$period_id/insight/comparison?periods=4" -H "Authorization: Bearer $TOKEN")"
+rejected_body="$(cat "$BODY")"
+if [ "$rejected_status" = 400 ] && printf '%s' "$rejected_body" | jq -e '.code == "PERIOD_INSIGHT_COUNT_REJECTED"' >/dev/null; then
+  green '54 跨周期洞察超限参数专用拒绝'
+else
+  red "❌ 跨周期洞察参数拒绝失败（status=$rejected_status body=${rejected_body}）"
+fi
+
+green "心伴 v0.11 冒烟通过：$PASS 项 / 54 项"

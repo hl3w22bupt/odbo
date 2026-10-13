@@ -1,0 +1,118 @@
+
+> xinban-v01@1.0.0 deploy:v02
+> ./scripts/deploy-v02.sh
+
+== deploy build ==
+
+> xinban-v01@1.0.0 build
+> cd apps/server && npm run build && cd ../mobile && npm run typecheck && EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-http://127.0.0.1:3888} npm run export -- --platform web --output-dir dist-web --clear
+
+
+> @xinban/server@1.0.0 build
+> tsc -p tsconfig.build.json
+
+
+> xinban-ai-mobile@1.0.0 typecheck
+> tsc --noEmit
+
+
+> xinban-ai-mobile@1.0.0 export
+> expo export --platform web --output-dir dist-web --clear
+
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Web Bundled 2552ms index.ts (338 modules)
+
+› web bundles (1):
+_expo/static/js/web/index-af6edeafdae880db245b3a0c78e76c43.js (674KB)
+
+› Files (3):
+favicon.ico (15KB)
+index.html (1.2KB)
+metadata.json (49B)
+
+Exported: dist-web
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": SQLite database "xinban-deploy-v02.db" at "file:./data/xinban-deploy-v02.db"
+
+The database is already in sync with the Prisma schema.
+
+== deploy start ==
+deploy /health: 0
+== post-deploy rerun: build ==
+
+> xinban-v01@1.0.0 build
+> cd apps/server && npm run build && cd ../mobile && npm run typecheck && EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-http://127.0.0.1:3888} npm run export -- --platform web --output-dir dist-web --clear
+
+
+> @xinban/server@1.0.0 build
+> tsc -p tsconfig.build.json
+
+
+> xinban-ai-mobile@1.0.0 typecheck
+> tsc --noEmit
+
+
+> xinban-ai-mobile@1.0.0 export
+> expo export --platform web --output-dir dist-web --clear
+
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Web Bundled 2521ms index.ts (338 modules)
+
+› web bundles (1):
+_expo/static/js/web/index-af6edeafdae880db245b3a0c78e76c43.js (674KB)
+
+› Files (3):
+favicon.ico (15KB)
+index.html (1.2KB)
+metadata.json (49B)
+
+Exported: dist-web
+build exit: 0
+== post-deploy rerun: start ==
+start /health: 0
+start exit: 0
+== post-deploy rerun: test ==
+
+> xinban-v01@1.0.0 test
+> cd apps/server && npm test && cd ../mobile && npm test
+
+
+> @xinban/server@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv5v1t68001gm9qq29ip34bm/apps/server
+
+
+ Test Files  21 passed (21)
+      Tests  112 passed (112)
+   Start at  08:02:09
+   Duration  1.25s (transform 942ms, setup 0ms, import 1.52s, tests 2.28s, environment 1ms)
+
+
+> xinban-ai-mobile@1.0.0 test
+> vitest run
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv5v1t68001gm9qq29ip34bm/apps/mobile
+
+
+ Test Files  7 passed (7)
+      Tests  46 passed (46)
+   Start at  08:02:10
+   Duration  148ms (transform 189ms, setup 0ms, import 242ms, tests 33ms, environment 0ms)
+
+test exit: 0
+
+心伴 v0.2 deploy 复验：build=0 start=0 test=0
+DEPLOY_EXIT=0

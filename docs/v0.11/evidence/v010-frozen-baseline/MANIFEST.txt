@@ -1,0 +1,13 @@
+archived_at=2026-10-13T23:08:52Z
+commit=a92cd5e9f3dbe745714fe6db6e2d233e85415511
+source=docs/v0.10/evidence
+files=gate-build.log,gate-test.log,gate-smoke.log,gate-persist.log,deploy-post-smoke.log,deploy-v02.log,verification-report.json
+purpose=v0.11 regression comparison baseline
+2b0bf0ed02f1c67ff0c5d86696fce99009f70b80c76bb40c4c07f9dc50ebbea4  docs/v0.11/evidence/v010-frozen-baseline/MANIFEST.txt
+b845b3248179dda8d65891eda68abc5336924a9da2ba67f4e46a5a684f387cbb  docs/v0.11/evidence/v010-frozen-baseline/deploy-post-smoke.log
+69775649e174a19289b7ae6d6466d88026963799e3dc70ca0769ac9c2be159c2  docs/v0.11/evidence/v010-frozen-baseline/deploy-v02.log
+bbb41079bb57e58e0d88b832681c2f79d2f8daf79421f53f0efbdf6b445a5fc8  docs/v0.11/evidence/v010-frozen-baseline/gate-build.log
+346a1a19a3a24af87cf0f5805273cdf6e658b481b4a303f8184674c93cf30bb6  docs/v0.11/evidence/v010-frozen-baseline/gate-persist.log
+89a4c8b9e70569f6497cb1a214a53e55f6b7fb2880acaccfc3f30b241c4d8032  docs/v0.11/evidence/v010-frozen-baseline/gate-smoke.log
+24a2010a5e9e40fbb1341c13388e7b1bb84af941bf1f5fbfeab4b4825f17a3b8  docs/v0.11/evidence/v010-frozen-baseline/gate-test.log
+e3a9ab004a0e506623eb68615da12cedc15eae4ddc22c8c351e1ec7d0ca3d197  docs/v0.11/evidence/v010-frozen-baseline/verification-report.json

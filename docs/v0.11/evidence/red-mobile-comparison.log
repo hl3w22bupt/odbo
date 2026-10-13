@@ -1,0 +1,28 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv7ahqpj0029joty9f7s35tx/apps/mobile
+
+ ❯ src/utils/moodPeriodInsightComparison.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/utils/moodPeriodInsightComparison.test.ts [ src/utils/moodPeriodInsightComparison.test.ts ]
+Error: Cannot find module './moodPeriodInsightComparison' imported from /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv7ahqpj0029joty9f7s35tx/apps/mobile/src/utils/moodPeriodInsightComparison.test.ts
+ ❯ src/utils/moodPeriodInsightComparison.test.ts:3:1
+      1| import { describe, expect, it } from 'vitest'
+      2| import type { PeriodInsightComparisonResult } from '../types'
+      3| import { periodInsightComparisonViewState } from './moodPeriodInsightC…
+       | ^
+      4|
+      5| function result(overrides: Partial<PeriodInsightComparisonResult> = {}…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  07:17:36
+   Duration  98ms (transform 11ms, setup 0ms, import 0ms, tests 0ms, environment 0ms)
+

@@ -35,3 +35,39 @@
 - comparison item 空原因：`PERIOD_EMPTY / METRIC_MISSING / ZERO_BASE`。
 - 整体降级原因：`SOURCE_DEGRADED / AGGREGATION_FAILED`。
 - 未知第 4 类在 mobile 视图整体判 degraded，不展示半可信脏结构。
+
+---
+
+# R2 · 独立验收复核（本轮，commit `183b202`，证据 `evidence/r2/`）
+
+上轮 T1-T12 锚点**逐条实测重跑**，全部复核通过；下表为 R2 复跑实测（不采信上轮打勾表）：
+
+| # | 验收锚点 | R2 实测证据 | 状态 |
+|---|---|---|---|
+| T1 | `golden：A vs C 三类映射与周期趋势值级断言` | `gate-test.log` server 140 passed 含该用例；golden 文案「主导情绪记录数上升趋势 +100%。」逐字断言实测存在（`moodPeriodInsightComparison.test.ts:124`） | ✓ |
+| T2 | ±5% 阈值边界 | `0 / +0.05 / -0.05 → STABLE/UP/DOWN` 用例实测存在（`test.ts:153-172`） | ✓ |
+| T3-T5 | 空态矩阵 ①②③ | 用例实测存在且断言 `EMPTY/PERIOD_EMPTY/value=null`、全空 `[true,true,true]`（`test.ts:196-236`） | ✓ |
+| T6 | ④聚合失败降级 | route 用例 `degrades aggregation failures...` + `errorSpy` 调用一次断言实测存在（`periodInsightComparison.routes.test.ts:135-154`） | ✓ |
+| T7-T8 | ⑤超限/非法参 | route 400/404 专用码用例实测存在；smoke 54 实测绿（`gate-smoke.log`） | ✓ |
+| T9 | 3 类封顶 | server `PERIOD_INSIGHT_TYPES` 长度 3 断言 + mobile 第 4 类判红用例实测存在 | ✓ |
+| T10 | 冻结契约零漂移 | REVIEW R2.2 三重证明（套件计数一致 + e2e 逐行比对零漂移 + 门禁全绿） | ✓ |
+| T11 | additive/schema/死测试 | R2 自证：schema diff=0 行、边界 grep 干净、死测试=0 | ✓ |
+| T12 | 持久化 | `r2/gate-persist.log` 9/9，exit 0（07:32:55–07:32:59） | ✓ |
+
+## R2 门禁真实结果（四要素：命令 / 锚点 / 时间戳 / SHA，证据 `evidence/r2/`）
+
+| 门禁 | 命令 | 结果 | 输出锚点 | 时间戳 |
+|---|---|---|---|---|
+| build | `npm run build` | exit 0 | `Exported: dist-web` | 07:32:38–07:32:43 |
+| start | `npm run server:start` + curl `/health` | `status="up"` / `mode="standalone"` | `health.json`；路由注册含 `insight/comparison` | 07:34:41–07:34:45 |
+| test | `npm test` | exit 0；140+49 | `Test Files 24 passed / 8 passed` | 07:32:43–07:32:45 |
+| smoke | `npm run smoke` | exit 0；54/54 | `✅ 心伴 v0.11 冒烟通过：54 项 / 54 项` | 07:32:45–07:32:55 |
+| persist | `npm run persist:check` | exit 0；9/9 | `9 项，exit=0` | 07:32:55–07:32:59 |
+| deploy | `npm run deploy:v02` | exit 0 | `build=0 start=0 test=0` | `deploy-v02.meta` 07:47:30 |
+| deploy 后 smoke | `npm run smoke` | exit 0；54/54 | `deploy-post-smoke.log` | `deploy-post-smoke.meta` 07:47:40 |
+
+全部命令于 commit `183b2020886dce4bd0082fd6e6ba2379b305a13a` 下执行。
+
+## R2 结论
+
+**CERTIFIED 级复核通过**：五节点（基线复核 → 范围冻结 → 实现 → 质量验收 → deploy 闭环）在 R2 独立重放全部成立，无阻塞漂移、无死测试、无契约违约。

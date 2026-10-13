@@ -7,55 +7,27 @@
 > vitest run
 
 
- RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv5v1t68001gm9qq29ip34bm/apps/server
-
-stdout | src/routes/chat.routes.test.ts
-◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
-
- ❯ src/routes/chat.routes.test.ts (22 tests | 1 failed) 13ms
-     × reads persisted corrections into the period report 5ms
-
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
-
- FAIL  src/routes/chat.routes.test.ts > chat v0.8 natural-week period mood report > reads persisted corrections into the period report
-AssertionError: expected { conversationId: 'conv_1', …(7) } to match object { conversationId: 'conv_1', …(5) }
-(5 matching properties omitted from actual)
-
-- Expected
-+ Received
-
-  {
-    "available": true,
-    "conversationId": "conv_1",
--   "coverageDays": 2,
-+   "coverageDays": 0,
-    "degraded": false,
--   "summary": {
--     "counts": {
--       "negative": 2,
--       "neutral": 0,
--       "positive": 0,
--     },
--     "sampleSize": 2,
--     "trend": "STABLE",
--   },
-+   "summary": null,
-    "totalDays": 7,
-  }
-
- ❯ src/routes/chat.routes.test.ts:526:27
-    524|     const res = await handlers.get('chat::conversation-period-report')…
-    525|     expect(res.status_code).toBe(200)
-    526|     expect(res.body.data).toMatchObject({
-       |                           ^
-    527|       conversationId,
-    528|       available: true,
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv4foce10012m9p8zj3mf3ls/apps/server
 
 
- Test Files  1 failed | 16 passed (17)
-      Tests  1 failed | 81 passed (82)
-   Start at  07:08:54
-   Duration  1.11s (transform 838ms, setup 0ms, import 1.36s, tests 1.91s, environment 1ms)
+ Test Files  17 passed (17)
+      Tests  82 passed (82)
+   Start at  07:11:41
+   Duration  1.04s (transform 905ms, setup 0ms, import 1.39s, tests 1.84s, environment 1ms)
+
+
+> xinban-ai-mobile@1.0.0 test
+> vitest run
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv4foce10012m9p8zj3mf3ls/apps/mobile
+
+
+ Test Files  5 passed (5)
+      Tests  33 passed (33)
+   Start at  07:11:43
+   Duration  139ms (transform 111ms, setup 0ms, import 145ms, tests 25ms, environment 0ms)
 

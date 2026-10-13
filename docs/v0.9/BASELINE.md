@@ -1,29 +1,33 @@
-# 心伴 v0.9 · 节点 1 基线硬门槛复核
+# 心伴 v0.9 基线确认
 
-## 1. 结论：v0.9 实质未落地，触发备选切换
+基线锚点：`e625075`（v0.8 五节点闭环合入 main，当前交付分支 `myrd/v09-csv-deploy-v08-cmv4foce10012m9p8zj3mf3ls`）。
 
-- `docs/v0.9/` 不存在；全仓检索无「多周期对比」「CSV 导出」实现或冻结文档。
-- `origin/main`、本地分支与 tag 均无 v0.9 提交；HEAD 为 v0.8 终审交付 `e625075`。
-- 因此「对比端点趋势三值 + 完整度标记」与「CSV 固定列序 + 无行数元信息」两组三证据 AND 均不成立。
-- 按任务冻结规则切换 P0：**v0.9 增量还账（多周期对比 + CSV 导出）**，暂缓 v0.10 insight，不做零准备扩需求。
+## 1. 承接结论
 
-## 2. v0.8 真实基线
+- 承接 v0.8 五节点闭环：build / start / test / smoke / persist / persistence:v02 本机复跑全绿。
+- v0.8 装配六项机判与「装配阻塞销案不重开」结论只做事实承接；本版不重开轨迹渲染争议。
+- v0.7 轨迹渲染冻结口径全程不触碰；本版所有新能力均为读侧增量，不新增 schema 写入，不改既有主链路写入。
 
-执行环境首次门禁失败：`vitest` / `tsc` 不存在，属工作区依赖未安装漂移；先执行 `npm run setup`，再复跑。
+## 2. 基线复跑与漂移处置
 
-| 门禁 | 结果 | 证据 |
-|---|---|---|
-| setup | rc=0 | `evidence/node1-setup.log` |
-| npm test | 首跑 rc=127（依赖漂移）；修复基线用例时间漂移后局部复跑 rc=0 | `evidence/node1-baseline-test.log` |
-| npm run build | rc=0（依赖修复后） | `evidence/node1-baseline-build.log` |
-| npm run smoke | rc=0，45/45（依赖修复后） | `evidence/node1-baseline-smoke.log` |
-| npm run persist:check | rc=0，9/9 | `evidence/node1-baseline-persist.log` |
+| 门 | 命令 | 结果 | 留证 |
+|---|---|---|---|
+| setup | `npm run setup` | exit 0 | `node1-baseline-setup.log` / `.exit` |
+| build | `npm run build` | exit 0；server tsc + mobile typecheck + Web 336 modules | `node1-baseline-build.log` / `.exit` |
+| start | `node dist/localServer.js` + `/health` | HTTP 200，`status=up` | `node1-baseline-start.log`、`node1-baseline-health.json` |
+| test（首轮） | `npm test` | exit 1；server 82 中 1 条假失败 | `node1-baseline-test.log` 首轮被复跑覆盖前已在下条修复留证 |
+| 基线修复 | `npm test -- chat.routes.test.ts` | exit 0；22/22 | `node1-baseline-repair-test.log` |
+| test（修复） | `npm test` | exit 0；server 82 + mobile 33 | `node1-baseline-test.log` / `.exit` |
+| smoke | `npm run smoke` | exit 0；45/45 | `node1-baseline-smoke.log` / `.exit` |
+| persist | `npm run persist:check` | exit 0；9/9 | `node1-baseline-persist.log` / `.exit` |
+| persistence:v02 | `npm run persistence:v02` | exit 0；18/18 | `node1-baseline-persist-v02.log` / `.exit` |
+| 死测试 | 四口径 grep | 0 | `node1-dead-test-scan.log` |
+| schema diff | `git diff e625075 -- '*schema.prisma*'` | 0 行 | `node1-schema-diff.log` |
 
-### 阻塞级漂移与先修
+**唯一漂移与修复**：`chat.routes.test.ts > reads persisted corrections into the period report` 的固定样本是 2026-10-07 所在周；进入 2026-10-12 后跨自然周，而路由契约按服务端当前 `now` 取周，造成时间相关假失败。处置只冻结该测试时钟（`vi.useFakeTimers` / `vi.useRealTimers`），不改 v0.8 服务口径。判定为「修复续用」，不重建基线。
 
-1. 工作区未安装依赖：`setup` 还原，不改动业务代码。
-2. `chat.routes.test.ts > reads persisted corrections into the period report` 使用固定 `2026-10-07`，当前自然周已漂移导致 1/82 挂。修复为按真实 now 计算当前东八区周一，并在当前周期内生成两条样本；路由契约与生产代码未改。
+## 3. 停车场承接
 
-## 3. 判定
-
-v0.8 属「修复续用」而非重建：build/start 语义、45 项 smoke、持久化门禁均能恢复全绿；v0.9 是全新还账增量，不覆写 v0.8 资产。
+- 轨迹增强 P1：驻留；闸门仍为交互断言基建补齐，且不得触 v0.7 冻结口径。
+- PDF 导出：驻留。
+- v0.7 在册 minor 与历史候选：仅按四条标准复核，未满足不入主线。

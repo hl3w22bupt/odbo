@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 心伴 v0.10 · 一条命令全链路冒烟（01-38 兼容基线 + 39-42 周报 + 43-45 周期报告 + 46-48 多周期对比/CSV + 49-51 情绪洞察）
+# 心伴 v0.10 · 一条命令全链路冒烟（01-45 兼容基线 + 46 周期对比 CSV 产物探针 + 47-49 多周期对比/CSV + 50-52 情绪洞察）
 # 用法：npm run smoke
 # 可用环境变量：XINBAN_SMOKE_PORT（默认 13888）、KEEP_SMOKE_DIR=1（保留临时目录）
 set -euo pipefail
@@ -418,11 +418,43 @@ fi
 (cd "$ROOT/apps/server" && npx vitest run -t 'degrades the period report and logs loudly when persistence or aggregation fails' src/routes/chat.routes.test.ts >/dev/null)
 green '45 周期报告纯函数口径与降级契约'
 
+# ---------- v0.9 增量段：周期对比 CSV 导出产物探针 ----------
+CSV_BODY="${RUN_DIR}/comparison.csv"
+CSV_HEADERS="${RUN_DIR}/comparison.headers"
+csv_status="$(curl -sS -m 20 -o "$CSV_BODY" -D "$CSV_HEADERS" -w '%{http_code}' "$BASE/api/v1/conversations/$CONVERSATION_ID/mood-period-comparison/export.csv?periods=2" -H "Authorization: Bearer $TOKEN")"
+csv_row_count="$(awk 'BEGIN{IGNORECASE=1} /^x-report-row-count:/{gsub("\r",""); print $2; exit}' "$CSV_HEADERS")"
+csv_generated="$(awk 'BEGIN{IGNORECASE=1} /^x-report-generated-at:/{gsub("\r",""); print $2; exit}' "$CSV_HEADERS")"
+csv_content_type="$(sed -n 's/^[Cc]ontent-[Tt]ype:[[:space:]]*//p' "$CSV_HEADERS" | head -1 | tr -d '\r')"
+csv_ok="$(CSV_BODY="$CSV_BODY" node - <<'NODE'
+const fs = require('fs')
+const raw = fs.readFileSync(process.env.CSV_BODY, 'utf8')
+const text = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw
+const lines = text.trim().split(/\r?\n/)
+const rows = lines.slice(1).map(line => line.split(','))
+const expected = [
+  ['period_id', 'date', 'dimension', 'value'],
+  ['count', 'positive', 'neutral', 'negative', 'averageScore'],
+]
+process.stdout.write(String(
+  raw.charCodeAt(0) === 0xfeff &&
+  lines[0] === expected[0].join(',') &&
+  rows.length === 5 &&
+  rows.every(row => row.length === 4) &&
+  rows.map(row => row[2]).every((dimension, index) => dimension === expected[1][index])
+))
+NODE
+)"
+if [ "$csv_status" = 200 ] && [ "$csv_row_count" = 5 ] && [ "$csv_ok" = true ]   && printf '%s' "$csv_generated" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$'   && [ "$csv_content_type" = 'text/csv; charset=utf-8' ]; then
+  green '46 周期对比 CSV 导出产物探针'
+else
+  red "❌ CSV 导出探针失败（status=$csv_status rows=$csv_row_count ok=$csv_ok type=$csv_content_type generated=${csv_generated-}）"
+fi
+
 # ---------- v0.9 增量段：多周期对比与周期 CSV ----------
 period_id="$(printf '%s' "$period_report" | jq -r '.data.period.id')"
 comparison="$(http GET "/api/v1/periods/$period_id/comparison" "$TOKEN")"
 if jq -e '.data.available == true and .data.degraded == false and .data.periodId == $pid and .data.previousPeriodId != $pid and .data.current.sampleSize == 2 and .data.current.coverageDays == 1 and .data.current.completeness == "PARTIAL" and .data.previous.sampleSize == 0 and .data.previous.coverageDays == 0 and .data.previous.completeness == "EMPTY" and ([.data.trend.currentAverage,.data.trend.previousAverage,.data.trend.deltaScore] | all(type == "number")) and .data.completeness.overall == "PARTIAL"' --arg pid "$period_id" "$BODY" >/dev/null; then
-  green '46 多周期对比输出趋势三值与完整度'
+  green '47 多周期对比输出趋势三值与完整度'
 else
   red "❌ 多周期对比契约失败（period=$period_id body=${comparison}）"
 fi
@@ -432,7 +464,7 @@ csv_status="$(curl -sS -m 20 -o "$csv_file" -w '%{http_code}' "$BASE/api/v1/peri
 csv_header='period_id,date,available,degraded,from,to,positive,neutral,negative,sample_size,average_score,coverage_days,total_days,completeness'
 csv_rows="$(tr -d '\r' < "$csv_file" | wc -l | tr -d ' ')"
 if [ "$csv_status" = 200 ]   && [ "$(head -1 "$csv_file" | tr -d '\r')" = "$csv_header" ]   && [ "$csv_rows" = 2 ]   && ! grep -qiE 'row.?_?count' "$csv_file"; then
-  green '47 周期 CSV 固定列序且不含行数元信息'
+  green '48 周期 CSV 固定列序且不含行数元信息'
 else
   red "❌ 周期 CSV 契约失败（status=$csv_status rows=$csv_rows header=$(head -1 "$csv_file")）"
 fi
@@ -441,7 +473,7 @@ previous_id="$(printf '%s' "$comparison" | jq -r '.data.previousPeriodId')"
 empty_csv_status="$(curl -sS -m 20 -o "$csv_file" -w '%{http_code}' "$BASE/api/v1/periods/$previous_id/report.csv" -H "Authorization: Bearer $TOKEN")"
 empty_csv_rows="$(tr -d '\r' < "$csv_file" | wc -l | tr -d ' ')"
 if [ "$empty_csv_status" = 200 ]   && [ "$(head -1 "$csv_file" | tr -d '\r')" = "$csv_header" ]   && [ "$empty_csv_rows" = 1 ]   && ! grep -qiE 'row.?_?count' "$csv_file"; then
-  green '48 空周期 CSV 仅表头且无行数元信息'
+  green '49 空周期 CSV 仅表头且无行数元信息'
 else
   red "❌ 空周期 CSV 失败（status=$empty_csv_status rows=$empty_csv_rows）"
 fi
@@ -449,7 +481,7 @@ fi
 # ---------- v0.10 增量段：单周期情绪洞察（三类封顶） ----------
 empty_insight="$(http GET "/api/v1/periods/$previous_id/insight" "$TOKEN")"
 if printf '%s' "$empty_insight" | jq -e '.data.available == true and .data.degraded == false and .data.periodId == $pid and .data.insights == []' --arg pid "$previous_id" >/dev/null; then
-  green '49 空周期洞察返回合法空结构'
+  green '50 空周期洞察返回合法空结构'
 else
   red "❌ 空周期洞察失败（period=$previous_id body=${empty_insight}）"
 fi
@@ -465,7 +497,7 @@ if printf '%s' "$period_insight" | jq -e '
   (.data.insights[] | select(.type == "ANNOTATION_CORRELATION") | .value == {"correctedSamples":1,"sampleSize":2}) and
   ([.data.insights[].message] | all(length > 0))
 ' --arg pid "$period_id" >/dev/null; then
-  green '50 当前周期洞察输出与规则重算一致的值级结论'
+  green '51 当前周期洞察输出与规则重算一致的值级结论'
 else
   red "❌ 周期洞察契约失败（period=$period_id body=${period_insight}）"
 fi
@@ -475,6 +507,6 @@ fi
 grep -q '情绪洞察暂不可用' "$ROOT/apps/mobile/src/components/MoodPeriodInsightPanel.tsx"
 grep -q '本周期还没有足够的情绪记录' "$ROOT/apps/mobile/src/components/MoodPeriodInsightPanel.tsx"
 (cd "$ROOT/apps/mobile" && npx vitest run -t '第 4 类判红' src/utils/moodPeriodInsight.test.ts >/dev/null)
-green '51 洞察降级契约与用户可见状态（第 4 类判红）'
+green '52 洞察降级契约与用户可见状态（第 4 类判红）'
 
-green "心伴 v0.10 冒烟通过：$PASS 项 / 51 项"
+green "心伴 v0.10 冒烟通过：$PASS 项 / 52 项"

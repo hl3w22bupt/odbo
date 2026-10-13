@@ -2,38 +2,38 @@
 > xinban-v01@1.0.0 smoke
 > ./scripts/smoke.sh
 
-◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
 Loaded Prisma config from prisma.config.ts.
 
 Prisma schema loaded from prisma/schema.prisma.
 
-✔ Generated Prisma Client (7.9.1) to ./src/generated/prisma in 79ms
+✔ Generated Prisma Client (7.9.1) to ./src/generated/prisma in 77ms
 
-◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
 Loaded Prisma config from prisma.config.ts.
 
 Prisma schema loaded from prisma/schema.prisma.
-Datasource "db": SQLite database "xinban-smoke.db" at "file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-smoke.rYqAuB/xinban-smoke.db"
+Datasource "db": SQLite database "xinban-smoke.db" at "file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-smoke.gM7RGO/xinban-smoke.db"
 
-SQLite database xinban-smoke.db created at file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-smoke.rYqAuB/xinban-smoke.db
+SQLite database xinban-smoke.db created at file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-smoke.gM7RGO/xinban-smoke.db
 
-🚀  Your database is now in sync with your Prisma schema. Done in 32ms
+🚀  Your database is now in sync with your Prisma schema. Done in 29ms
 
 
 > @xinban/server@1.0.0 prisma:seed
 > tsx prisma/seed.ts
 
-◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
-[2026-10-12T23:25:33.503Z] [INFO] 开始初始化种子数据…
-[2026-10-12T23:25:33.573Z] [INFO] 角色已创建：林晚晴（温婉知己 · FREE）
-[2026-10-12T23:25:33.574Z] [INFO] 角色已创建：阿秀（爽朗直爽 · FREE）
-[2026-10-12T23:25:33.574Z] [INFO] 角色已创建：小满（俏皮灵动 · VIP）
-[2026-10-12T23:25:33.575Z] [INFO] 角色已创建：苏雅（成熟通透 · VIP）
-[2026-10-12T23:25:33.579Z] [INFO] 商品已创建：5 个
-[2026-10-12T23:25:33.583Z] [INFO] 礼物已创建：5 个
-[2026-10-12T23:25:33.589Z] [INFO] 管理账号就绪：13800000000（role=ADMIN）
-[2026-10-12T23:25:33.591Z] [INFO] 敏感词已创建：4 条
-[2026-10-12T23:25:33.591Z] [INFO] 种子数据初始化完成 ✔
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+[2026-10-11T23:27:53.334Z] [INFO] 开始初始化种子数据…
+[2026-10-11T23:27:53.400Z] [INFO] 角色已创建：林晚晴（温婉知己 · FREE）
+[2026-10-11T23:27:53.401Z] [INFO] 角色已创建：阿秀（爽朗直爽 · FREE）
+[2026-10-11T23:27:53.402Z] [INFO] 角色已创建：小满（俏皮灵动 · VIP）
+[2026-10-11T23:27:53.403Z] [INFO] 角色已创建：苏雅（成熟通透 · VIP）
+[2026-10-11T23:27:53.406Z] [INFO] 商品已创建：5 个
+[2026-10-11T23:27:53.410Z] [INFO] 礼物已创建：5 个
+[2026-10-11T23:27:53.416Z] [INFO] 管理账号就绪：13800000000（role=ADMIN）
+[2026-10-11T23:27:53.418Z] [INFO] 敏感词已创建：4 条
+[2026-10-11T23:27:53.418Z] [INFO] 种子数据初始化完成 ✔
 [32m✅ 01 健康检查[0m
 [32m✅ 02 发送验证码[0m
 [32m✅ 03 注册并登录[0m
@@ -85,7 +85,5 @@ Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
 [32m✅ 43 自然周周期报告读取修正后样本并披露覆盖率[0m
 [32m✅ 44 空周期返回合法空结构[0m
 [32m✅ 45 周期报告纯函数口径与降级契约[0m
-[32m✅ 46 多周期对比输出趋势三值与完整度[0m
-[32m✅ 47 周期 CSV 固定列序且不含行数元信息[0m
-[32m✅ 48 空周期 CSV 仅表头且无行数元信息[0m
-[32m✅ 心伴 v0.9 冒烟通过：48 项 / 48 项[0m
+[32m✅ 46 周期对比 CSV 导出产物探针[0m
+[32m✅ 心伴 v0.9 冒烟通过：46 项 / 46 项[0m

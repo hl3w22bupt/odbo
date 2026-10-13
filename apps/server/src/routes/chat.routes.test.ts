@@ -473,14 +473,10 @@ describe('chat v0.8 natural-week period mood report', () => {
   })
 
   it('reads persisted corrections into the period report', async () => {
-    // 基线漂移修复：路由使用真实 now 计算自然周，测试样本必须与当前周期同步生成。
-    const now = Date.now()
+    // 路由契约使用服务端 now；固定样本测试必须同步冻结时钟，避免跨自然周后基线假失败。
+    vi.useFakeTimers({ now: new Date('2026-10-07T02:00:00.000Z') })
+    const now = Date.parse('2026-10-07T02:00:00.000Z')
     const day = 86_400_000
-    const cstOffset = 8 * 3_600_000
-    const shiftedNow = now + cstOffset
-    const dayStartShifted = Math.floor(shiftedNow / day) * day
-    const mondayShifted = dayStartShifted - ((new Date(dayStartShifted).getUTCDay() + 6) % 7) * day
-    const mondayUtc = mondayShifted - cstOffset
     prismaMock.conversation.findFirst.mockResolvedValue({ id: conversationId, userId: 'user_1' })
     prismaMock.conversationMemory.findMany.mockResolvedValue([
       {
@@ -490,7 +486,7 @@ describe('chat v0.8 natural-week period mood report', () => {
         sourceMessageId: 'msg_1',
         content: '女儿下周生日',
         status: 'ACTIVE',
-        createdAt: new Date(mondayUtc + 3_600_000),
+        createdAt: new Date(now - 2 * day),
       },
     ])
     prismaMock.moodSnapshot.findMany.mockResolvedValue([
@@ -503,7 +499,7 @@ describe('chat v0.8 natural-week period mood report', () => {
         mood: 'POSITIVE',
         score: 1,
         keywords: '开心',
-        createdAt: new Date(mondayUtc + 3_600_000),
+        createdAt: new Date(now - 2 * day),
       },
       {
         id: 'mood_2',
@@ -514,7 +510,7 @@ describe('chat v0.8 natural-week period mood report', () => {
         mood: 'NEGATIVE',
         score: -1,
         keywords: '',
-        createdAt: new Date(mondayUtc + day + 3_600_000),
+        createdAt: new Date(now - 3_600_000),
       },
     ])
     prismaMock.moodCorrection.findMany.mockResolvedValue([
@@ -528,7 +524,7 @@ describe('chat v0.8 natural-week period mood report', () => {
         tags: '状态变化',
         reason: '当时记错了',
         clientMutationId: 'mutation-2',
-        createdAt: new Date(mondayUtc + day + 7_200_000),
+        createdAt: new Date(now - day),
       },
     ])
 
@@ -546,6 +542,7 @@ describe('chat v0.8 natural-week period mood report', () => {
         trend: 'STABLE',
       },
     })
+    vi.useRealTimers()
   })
 
   it('degrades the period report and logs loudly when persistence or aggregation fails', async () => {

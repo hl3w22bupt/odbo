@@ -21,6 +21,8 @@ export type ErrorCode =
   | 'IMPORT_VERSION_MISSING'
   | 'IMPORT_VERSION_UNSUPPORTED'
   | 'IMPORT_SCHEMA_REJECTED'
+  | 'PERIOD_COUNT_REJECTED'
+  | 'CSV_EXPORT_TOO_LARGE'
 
 export class AppError extends Error {
   readonly statusCode: number

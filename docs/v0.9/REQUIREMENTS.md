@@ -1,59 +1,48 @@
-# 心伴 v0.9 P0 · 多周期对比 + 周期 CSV 导出
+# 心伴 v0.9 P0 · 周期报告多周期对比 + CSV 导出
 
-状态：FROZEN（基线裁决触发 v0.9 还账，执行期不接受口头扩需求）。
+状态：FROZEN-SIGNED（2026-10-12 产品/架构/实现/QA 联合裁决；执行期不接受扩需求）。
 
 ## 1. 范围
 
-1. `GET /api/v1/periods/:periodId/comparison`：当前周期与上一自然周对比。
-2. `GET /api/v1/periods/:periodId/report.csv`：单周期聚合 CSV 导出。
-3. 客户端只新增纯读契约/视图状态函数与离线空态，不新增图表、不改 v0.7 轨迹渲染。
+1. 新增会话维度「最近自然周期对比」读端点。
+2. 新增同一报告的 CSV 导出端点。
+3. 仅新增测试基建点：多周期报告故障注入钩子；不新增通用测试框架。
+4. 不做客户端 UI；不做 PDF；不动轨迹增强 P1。
 
-不做：insight 三类洞察（留待 v0.10）、跨用户统计、schema/写侧/采集改动、独立外部数据库。
+## 2. 对比端点契约
 
-## 2. 契约
+- 路由：`GET /api/v1/conversations/:id/mood-period-comparison`。
+- 鉴权与归属：Bearer 鉴权；非本人/不存在沿用 404 `NOT_FOUND`；未登录 401。
+- 请求：`periods` 为正整数，缺省 `3`；允许 1、2、3；`>3` 或非法值返回 400、错误码 `PERIOD_COUNT_REJECTED`，detail 携带 `maxPeriods=3`。N=3 为上限冻结值。
+- 时间口径：对齐粒度 `NATURAL_WEEK`；周一为起点（ISO 8601）；固定 UTC+8；窗口左闭右开；周期 id 为东八区周一 `YYYY-MM-DD`。
+- 返回按周期 id 升序，包含请求的最近 N 个自然周；请求 3 而源数据只覆盖 1/2 周时，缺失周期用合法空周期补齐，不缩数组。
+- 启用维度固定 5 个且顺序冻结：`count`、`positive`、`neutral`、`negative`、`averageScore`。前三者与负/中性/正计数一致；`averageScore` 为有效 score 算术均值。周期无有效点时五个值均为 `null`。
+- 每周期披露 `empty`、`aggregateValues`、`completeness.expectedPoints/actualPoints/ratio/status`。
+- 完整度：`expectedPoints=1×5=5`；`actualPoints` 为非空维度值数；`ratio=actual/expected`；`ratio=1` 为 `COMPLETE`，`(0,1)` 为 `PARTIAL`，`0` 为 `EMPTY`。整体完整度按 `N×5` 与全部非空值数计算。
+- 趋势：相邻周期逐维度计算 `rate=(后-前)/前`；`rate>=0.05` 为 `UP`，`rate<=-0.05` 为 `DOWN`，其余为 `STABLE`。任一周期整体空、该维度空、或分母为 0 导致不可复算时，该对 `direction=null / rate=null / empty=true`，不参与整体趋势。
+- 整体趋势逐维度基于首个与最后一个可复算端点；任一端点空或不可复算则 `null`。趋势枚举仅 `UP/STABLE/DOWN/null`。
+- 失败：全部读失败/聚合失败返回 200 信封，`available=false / degraded=true / periods=[]`，并记录非静默日志；部分周期源失败返回 200，`available=true / degraded=true`，可用周期照常输出，失败周期 id 进入 `failedPeriodIds` 并补空周期。
 
-- 鉴权：Bearer；未登录 401。`periodId` 必须是真实公历日期且为东八区自然周周一（`YYYY-MM-DD`）；否则 400。
-- 数据边界：仅读取当前用户 `ACTIVE` 会话；所有 memory/correction 查询带 `userId`；零跨用户。
-- 聚合：复用 v0.8 `moodPeriodReport` 模块与 UTC+8 / ISO 周一 / 左闭右开口径；latest-wins 修正不变；缺省天不零填充。
+## 3. CSV 导出端点契约
 
-### 2.1 Comparison 成功结构
+- 路由：`GET /api/v1/conversations/:id/mood-period-comparison/export.csv`；`periods` 参数与对比端点一致。
+- 编码与类型：仅 UTF-8 CSV；成功响应 `Content-Type=text/csv; charset=utf-8`，带 BOM 便于表格识别。
+- 固定列：`period_id,date,dimension,value`；每行是一个周期的一个维度值；空值不落数据行。
+- 元信息以 HTTP 头机判：`X-Report-Row-Count` 只统计数据行、不含表头；`X-Report-Generated-At` 为 ISO-8601；`X-Report-Empty`、`X-Report-Available`、`X-Report-Degraded`、`X-Report-Partial` 均为小写布尔。
+- 空源数据：不产文件，返回 204，且 `X-Report-Empty=true / X-Report-Available=true / X-Report-Degraded=false`。
+- 全量失败：重试 1 次后仍失败不产文件，返回 200 JSON 信封；`code=OK`、`data.available=false / data.degraded=true / data.attempts=2`，并置 `X-Report-Available=false / X-Report-Degraded=true / X-Report-Partial=false`。
+- 部分失败：可用周期照常生成 CSV；`X-Report-Partial=true / X-Report-Degraded=true / X-Report-Available=true`；行数只含成功源产物。
+- 超大数据：源有效样本超 1000 返回 413、错误码 `CSV_EXPORT_TOO_LARGE`，message 明确 `limit=1000`。
+- CSV 写入必须按 RFC 4180 转义逗号、双引号、换行；导出产物必须可被标准 CSV 解析。
 
-`data` 固定包含：
+## 4. 冻结边界
 
-- `available=true`、`degraded=false`、`periodId`、`previousPeriodId`（当前 ID 减 7 天）。
-- `current` / `previous`：`periodId/from/to/sampleSize/coverageDays/totalDays/averageScore/completeness`。
-- `trend` 三值：`currentAverage`、`previousAverage`、`deltaScore`；均四舍五入 4 位。
-- `completeness`：`current`、`previous`、`overall`，枚举闭合 `FULL/PARTIAL/EMPTY`。
-  - 周期样本 0 = EMPTY；覆盖 7 天 = FULL；其余 = PARTIAL；overall 双 FULL 才 FULL，双 EMPTY 才 EMPTY。
+- 不新增/修改 Prisma schema、不改既有 API 契约、不新增写端点、不新增独立持久化。
+- 只消费成功落库的 ACTIVE 记忆与 MoodSnapshot 派生；修正沿用 latest-wins；脏点静默剔除。
+- v0.8 单周期报告路由、v0.7 周报路由和响应结构不改。
 
-空库/空周期是合法空结构：HTTP 200，样本为 0，均分为 0，不编造趋势；仍返回周期边界与 EMPTY 标记。
+## 5. 停车场
 
-### 2.2 Comparison 降级
-
-读库或聚合失败返回 HTTP 200：`available=false / degraded=true`；两期样本 0、均分 0、EMPTY，禁止脏值和 500；`logger.error` 非静默留痕。
-
-### 2.3 CSV
-
-- 200，`Content-Type: text/csv; charset=utf-8`；standalone 原样返回，不经 JSON envelope。
-- 表头列序冻结：`period_id,date,available,degraded,from,to,positive,neutral,negative,sample_size,average_score,coverage_days,total_days,completeness`。
-- 每个有数据自然日一行；空周期只有表头；不得输出 `row_count`、行数、导出时间等元信息行。
-- 读失败降级为可解析 CSV 空表 + 非静默错误日志。
-
-## 3. 兼容边界
-
-- Prisma schema 零 diff；既有路由/API/schema 零修改。
-- v0.7 轨迹渲染文件零触碰。
-- `localServer` 只 additive 支持 `rawBody`；未设置时既有 JSON 输出路径不变。
-- 客户端 `ApiClient` 新增方法为接口必要 additive；mock 返回合法空结构。
-
-## 4. DoD
-
-| # | 验收 | 机判 |
-|---|---|---|
-| T1 | 对比三值 + 完整度 | 双周期具名纯函数测试值级 `toEqual/matchObject` |
-| T2 | 空库/空周期合法 | route 空会话 + comparison all-empty 逐字段 |
-| T3 | 失败降级 | route reject + `logger.error` + 完整 degraded 结构 |
-| T4 | CSV 列序 | 表头 exact array/line；3 行；无 row_count；空周期 1 行 |
-| T5 | 授权边界 | 401、用户 ID 过滤；脏数据不进聚合 |
-| T6 | 兼容回归 | build、全量 test、v0.4–v0.9 smoke 48/48、persist 9/9 |
-| T7 | 红绿证据 | server/mobile 红日志早于绿；退出码归档 |
+- 轨迹增强 P1：驻留；闸门=交互断言基建补齐 + 不触 v0.7 冻结口径。
+- PDF 导出：驻留。
+- 捞回候选：按「闸门可机判、不触冻结口径、有独立验收路径、不阻塞本轮 P0」复核；当前均不入主线。

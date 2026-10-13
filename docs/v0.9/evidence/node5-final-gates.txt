@@ -1,0 +1,6 @@
+HEAD_BEFORE_DEPLOY_DOCS=a37dbae
+deploy_replay_exit=0
+post_deploy_smoke_exit=0
+post_deploy_persist_exit=0
+schema_diff_lines= 0
+dead_test_count= 0

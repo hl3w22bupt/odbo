@@ -1,0 +1,89 @@
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv4foce10012m9p8zj3mf3ls/apps/server
+
+stdout | src/routes/moodComparison.routes.test.ts
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+
+ ❯ src/routes/moodComparison.routes.test.ts (11 tests | 4 failed) 13ms
+     × aggregates two known cycles and recalculates adjacent trends 5ms
+     × pads only missing source cycles and keeps one requested cycle exact 1ms
+     × escapes RFC 4180 control characters in CSV cells 0ms
+     × returns a usable CSV with degraded and partial signals when one cycle source fails 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/routes/moodComparison.routes.test.ts > mood period comparison and CSV export > aggregates two known cycles and recalculates adjacent trends
+AssertionError: expected { fromPeriodId: '2026-09-28', …(7) } to match object { previousValue: -1, …(4) }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "direction": "UP",
++   "direction": "DOWN",
+    "empty": false,
+    "nextValue": 1,
+    "previousValue": -1,
+    "rate": -2,
+  }
+
+ ❯ src/routes/moodComparison.routes.test.ts:173:34
+    171|     expect(rate('count')).toMatchObject({ previousValue: 1, nextValue:…
+    172|     expect(rate('negative')).toMatchObject({ previousValue: 1, nextVal…
+    173|     expect(rate('averageScore')).toMatchObject({ previousValue: -1, ne…
+       |                                  ^
+    174|     expect(rate('positive')).toMatchObject({ previousValue: 0, nextVal…
+    175|     expect(data.overallTrends).toEqual([
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/routes/moodComparison.routes.test.ts > mood period comparison and CSV export > pads only missing source cycles and keeps one requested cycle exact
+TypeError: Cannot read properties of undefined (reading 'status')
+ ❯ src/routes/moodComparison.routes.test.ts:191:39
+    189|       expect(data.periods).toHaveLength(periods)
+    190|       expect(data.periods.every((period: any) => period.empty && perio…
+    191|       expect(data.overallCompleteness.status).toBe('EMPTY')
+       |                                       ^
+    192|     }
+    193|     const one = (await handlers.get('chat::conversation-period-compari…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/routes/moodComparison.routes.test.ts > mood period comparison and CSV export > escapes RFC 4180 control characters in CSV cells
+TypeError: encodeCsvCell is not a function
+ ❯ src/routes/moodComparison.routes.test.ts:233:12
+    231|
+    232|   it('escapes RFC 4180 control characters in CSV cells', () => {
+    233|     expect(encodeCsvCell('x,"y"\nz')).toBe('"x,""y""\nz"')
+       |            ^
+    234|   })
+    235|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/routes/moodComparison.routes.test.ts > mood period comparison and CSV export > returns a usable CSV with degraded and partial signals when one cycle source fails
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/routes/moodComparison.routes.test.ts:285:73
+    283|     const rowsParsed = csvRows(String(res.body.data))
+    284|     expect(rowsParsed).toHaveLength(6)
+    285|     expect(rowsParsed.slice(1).every((row) => row[0] === '2026-10-05')…
+       |                                                                         ^
+    286|   })
+    287|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 7 passed (11)
+   Start at  07:20:12
+   Duration  172ms (transform 50ms, setup 0ms, import 78ms, tests 13ms, environment 0ms)
+

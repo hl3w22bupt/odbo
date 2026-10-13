@@ -15,7 +15,7 @@ export interface HttpResponse {
   status_code: number
   headers: Record<string, string>
   body: ApiEnvelope<unknown>
-  /** standalone HTTP runtime专用：设置后绕过 JSON envelope 原样输出（例如 CSV）。 */
+  /** standalone runtime 直接输出；JSON envelope 仅供 iii 兼容。 */
   rawBody?: string
 }
 

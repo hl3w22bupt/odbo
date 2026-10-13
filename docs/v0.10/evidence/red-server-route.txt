@@ -1,0 +1,4 @@
+      Tests  7 failed | 7 passed (14)
+   Start at  07:44:47
+   Duration  186ms (transform 54ms, setup 0ms, import 84ms, tests 10ms, environment 0ms)
+

@@ -20,6 +20,7 @@ import { GiftSheet } from '../components/GiftSheet';
 import { MemoryPanel } from '../components/MemoryPanel';
 import { MoodCorrectionModal } from '../components/MoodCorrectionModal';
 import { MoodInsightPanel } from '../components/MoodInsightPanel';
+import { MoodPeriodInsightPanel } from '../components/MoodPeriodInsightPanel';
 import { MoodWeeklyReportPanel } from '../components/MoodWeeklyReportPanel';
 import { MoodTimelinePanel } from '../components/MoodTimelinePanel';
 import { HeartbeatBar } from '../components/HeartbeatBar';
@@ -30,8 +31,9 @@ import { useNavigation } from '../navigation/NavigationContext';
 import { useSession } from '../store/SessionContext';
 import { useToast } from '../store/ToastContext';
 import { colors, fontSizes, fontWeights, radii, spacing } from '../theme';
-import type { Affection, Character, ChatMode, CustomizationPayload, Gift, MemoryReadResult, Message, MoodInsightSummaryResult, MoodSnapshot, MoodTimelineResult, MoodWeeklyReportResult } from '../types';
+import type { Affection, Character, ChatMode, CustomizationPayload, Gift, MemoryReadResult, Message, MoodInsightSummaryResult, MoodSnapshot, MoodTimelineResult, MoodWeeklyReportResult, PeriodInsightResult } from '../types';
 import { applyMoodCorrection, correctionFallbackNotice, createCorrectionForm, type MoodCorrectionForm } from '../utils/moodCorrections';
+import { currentPeriodId } from '../utils/moodPeriodInsight';
 import { affectionLevelLabel, genId } from '../utils/format';
 
 interface ChatScreenProps {
@@ -62,6 +64,7 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
   const [moodTimeline, setMoodTimeline] = useState<MoodTimelineResult | null>(null);
   const [moodInsight, setMoodInsight] = useState<MoodInsightSummaryResult | null>(null);
   const [moodWeeklyReport, setMoodWeeklyReport] = useState<MoodWeeklyReportResult | null>(null);
+  const [moodPeriodInsight, setMoodPeriodInsight] = useState<PeriodInsightResult | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(initConvId ?? null);
   const [activeCharId, setActiveCharId] = useState<string>(initCharacters[0]?.id ?? '');
   const [affections, setAffections] = useState<Record<string, Affection>>(() =>
@@ -181,18 +184,20 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
     (async () => {
       setLoading(true);
       try {
-        const [res, memoryView, moodView, insightView, weeklyView] = await Promise.all([
+        const [res, memoryView, moodView, insightView, weeklyView, periodInsightView] = await Promise.all([
           api.listMessages(initConvId),
           api.getConversationMemory(initConvId).catch(() => null),
           api.getMoodTimeline(initConvId).catch(() => null),
           api.getMoodInsightSummary(initConvId).catch(() => null),
           api.getMoodWeeklyReport(initConvId).catch(() => null),
+          api.getPeriodInsight(currentPeriodId(new Date())).catch(() => null),
         ]);
         if (mounted) setMessages(res.items);
         if (mounted) setMemory(memoryView);
         if (mounted) setMoodTimeline(moodView);
         if (mounted) setMoodInsight(insightView);
         if (mounted) setMoodWeeklyReport(weeklyView);
+        if (mounted) setMoodPeriodInsight(periodInsightView);
         if (mounted) ensurePolling(initConvId);
         if (mounted) scheduleProactive(initConvId);
       } catch (e) {
@@ -519,6 +524,7 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
       <MoodTimelinePanel value={moodTimeline} onCorrect={openCorrection} />
       <MoodInsightPanel value={moodInsight} />
       <MoodWeeklyReportPanel value={moodWeeklyReport} />
+      <MoodPeriodInsightPanel value={moodPeriodInsight} />
 
       <ScrollView
         ref={scrollRef}

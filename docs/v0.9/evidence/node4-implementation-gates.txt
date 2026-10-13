@@ -1,0 +1,5 @@
+## implementation gates
+test_rc=0
+build_rc=0
+smoke_rc=1
+persist_rc=0

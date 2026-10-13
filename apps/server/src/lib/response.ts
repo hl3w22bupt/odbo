@@ -85,3 +85,17 @@ export function clientIp(headers: Record<string, string | string[] | undefined>)
   if (typeof cf === 'string') return cf
   return undefined
 }
+
+export function rawContent(
+  content: string,
+  contentType: string,
+  extraHeaders: Record<string, string> = {},
+  message = 'ok',
+): HttpResponse {
+  return {
+    status_code: 200,
+    headers: { 'content-type': contentType, ...extraHeaders },
+    body: { code: 'OK', message, data: { encoding: 'utf8', byteLength: Buffer.byteLength(content) } },
+    rawBody: content,
+  }
+}

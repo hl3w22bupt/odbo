@@ -1,0 +1,5 @@
+UTC: 2026-10-12T23:25:45Z
+post_deploy_smoke_rc=0
+post_deploy_persist_rc=0
+smoke_summary: [32m✅ 心伴 v0.9 冒烟通过：48 项 / 48 项[0m
+persist_summary: [32m✅ 心伴 v0.3 持久性硬门槛通过：9 项，exit=0[0m

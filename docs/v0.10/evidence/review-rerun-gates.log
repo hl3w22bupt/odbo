@@ -1,0 +1,30 @@
+# 独立验收复跑门禁证据（2026-10-13，reviewer 节点）
+# 六项门禁逐个复跑，退出码均取自重定向落盘文件。
+
+== 1. npm test ==
+ Test Files  21 passed (21)
+      Tests  112 passed (112)
+ Test Files  7 passed (7)
+      Tests  46 passed (46)
+TEST_EXIT=0
+
+== 2. npm run build ==
+BUILD_EXIT=0
+
+== 3. npm run smoke ==
+[32m✅ 心伴 v0.10 冒烟通过：51 项 / 51 项[0m
+SMOKE_EXIT=0
+
+== 4. npm run persist:check ==
+[32m✅ 心伴 v0.3 持久性硬门槛通过：9 项，exit=0[0m
+PERSIST_EXIT=0
+
+== 5. npm run deploy:v02 ==
+deploy /health: 0
+start /health: 0
+心伴 v0.2 deploy 复验：build=0 start=0 test=0
+DEPLOY_EXIT=0
+
+== 6. 发布后 npm run smoke ==
+[32m✅ 心伴 v0.10 冒烟通过：51 项 / 51 项[0m
+POST_SMOKE_EXIT=0

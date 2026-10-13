@@ -1,0 +1,9 @@
+UTC: 2026-10-12T23:22:48Z
+health_rc=0
+http_body:
+{"code":"OK","message":"ok","data":{"service":"xinban-ai","status":"up","mode":"standalone","time":"2026-10-12T23:22:48.137Z"}}server_log_tail:
+[2026-10-12T23:22:47.904Z] [INFO] [route] POST /api/v1/admin/sensitive-words -> admin::sensitive-add
+[2026-10-12T23:22:47.904Z] [INFO] [route] GET /api/v1/admin/stats -> admin::stats
+[2026-10-12T23:22:47.904Z] [INFO] [route] GET /health -> system::health
+[2026-10-12T23:22:47.908Z] [INFO] 心伴AI standalone 服务启动 {"port":13889,"database":"file:/tmp/xinban-v09-start.sLq6LO/xinban-start.db"}
+[2026-10-12T23:22:48.243Z] [INFO] 收到退出信号，正在关闭 standalone 服务…

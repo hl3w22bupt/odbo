@@ -14,3 +14,6 @@ graphify-out/cache/
 graphify-out/????-??-??/
 graphify-out/.graphify_analysis.json
 graphify-out/.graphify_labels.json.sig
+
+# 本地 vitest 缓存（非交付物；apps 内依赖为历史跟踪状态，不在本规则语义内）
+/node_modules/

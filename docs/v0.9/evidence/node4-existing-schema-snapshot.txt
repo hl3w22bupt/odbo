@@ -1,0 +1,7 @@
+# existing route/schema snapshot compatibility
+old_router_definitions=56
+new_router_definitions=58
+## removed existing (must empty)
+## additive (allowed period only)
+router.define('period::comparison', '/api/v1/periods/:periodId/comparison', 'GET', getPeriodComparison)
+router.define('period::csv', '/api/v1/periods/:periodId/report.csv', 'GET', getPeriodCsv)

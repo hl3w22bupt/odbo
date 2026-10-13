@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 心伴 v0.9 · 一条命令全链路冒烟（01-45 v0.8 基线 + 46 周期对比 CSV 产物探针）
+# 心伴 v0.10 · 一条命令全链路冒烟（01-45 兼容基线 + 46 周期对比 CSV 产物探针 + 47-49 多周期对比/CSV + 50-52 情绪洞察）
 # 用法：npm run smoke
 # 可用环境变量：XINBAN_SMOKE_PORT（默认 13888）、KEEP_SMOKE_DIR=1（保留临时目录）
 set -euo pipefail
@@ -450,4 +450,63 @@ else
   red "❌ CSV 导出探针失败（status=$csv_status rows=$csv_row_count ok=$csv_ok type=$csv_content_type generated=${csv_generated-}）"
 fi
 
-green "心伴 v0.9 冒烟通过：$PASS 项 / 46 项"
+# ---------- v0.9 增量段：多周期对比与周期 CSV ----------
+period_id="$(printf '%s' "$period_report" | jq -r '.data.period.id')"
+comparison="$(http GET "/api/v1/periods/$period_id/comparison" "$TOKEN")"
+if jq -e '.data.available == true and .data.degraded == false and .data.periodId == $pid and .data.previousPeriodId != $pid and .data.current.sampleSize == 2 and .data.current.coverageDays == 1 and .data.current.completeness == "PARTIAL" and .data.previous.sampleSize == 0 and .data.previous.coverageDays == 0 and .data.previous.completeness == "EMPTY" and ([.data.trend.currentAverage,.data.trend.previousAverage,.data.trend.deltaScore] | all(type == "number")) and .data.completeness.overall == "PARTIAL"' --arg pid "$period_id" "$BODY" >/dev/null; then
+  green '47 多周期对比输出趋势三值与完整度'
+else
+  red "❌ 多周期对比契约失败（period=$period_id body=${comparison}）"
+fi
+
+csv_file="$RUN_DIR/period.csv"
+csv_status="$(curl -sS -m 20 -o "$csv_file" -w '%{http_code}' "$BASE/api/v1/periods/$period_id/report.csv" -H "Authorization: Bearer $TOKEN")"
+csv_header='period_id,date,available,degraded,from,to,positive,neutral,negative,sample_size,average_score,coverage_days,total_days,completeness'
+csv_rows="$(tr -d '\r' < "$csv_file" | wc -l | tr -d ' ')"
+if [ "$csv_status" = 200 ]   && [ "$(head -1 "$csv_file" | tr -d '\r')" = "$csv_header" ]   && [ "$csv_rows" = 2 ]   && ! grep -qiE 'row.?_?count' "$csv_file"; then
+  green '48 周期 CSV 固定列序且不含行数元信息'
+else
+  red "❌ 周期 CSV 契约失败（status=$csv_status rows=$csv_rows header=$(head -1 "$csv_file")）"
+fi
+
+previous_id="$(printf '%s' "$comparison" | jq -r '.data.previousPeriodId')"
+empty_csv_status="$(curl -sS -m 20 -o "$csv_file" -w '%{http_code}' "$BASE/api/v1/periods/$previous_id/report.csv" -H "Authorization: Bearer $TOKEN")"
+empty_csv_rows="$(tr -d '\r' < "$csv_file" | wc -l | tr -d ' ')"
+if [ "$empty_csv_status" = 200 ]   && [ "$(head -1 "$csv_file" | tr -d '\r')" = "$csv_header" ]   && [ "$empty_csv_rows" = 1 ]   && ! grep -qiE 'row.?_?count' "$csv_file"; then
+  green '49 空周期 CSV 仅表头且无行数元信息'
+else
+  red "❌ 空周期 CSV 失败（status=$empty_csv_status rows=$empty_csv_rows）"
+fi
+
+# ---------- v0.10 增量段：单周期情绪洞察（三类封顶） ----------
+empty_insight="$(http GET "/api/v1/periods/$previous_id/insight" "$TOKEN")"
+if printf '%s' "$empty_insight" | jq -e '.data.available == true and .data.degraded == false and .data.periodId == $pid and .data.insights == []' --arg pid "$previous_id" >/dev/null; then
+  green '50 空周期洞察返回合法空结构'
+else
+  red "❌ 空周期洞察失败（period=$previous_id body=${empty_insight}）"
+fi
+
+period_insight="$(http GET "/api/v1/periods/$period_id/insight" "$TOKEN")"
+if printf '%s' "$period_insight" | jq -e '
+  .data.available == true and .data.degraded == false and .data.periodId == $pid and
+  ([.data.insights[].type] | sort) == ["ANNOTATION_CORRELATION","DOMINANT_MOOD","PERIOD_TREND"] and
+  (.data.insights[] | select(.type == "DOMINANT_MOOD") | .value == {"mood":"NEGATIVE","count":2,"share":1}) and
+  (.data.insights[] | select(.type == "DOMINANT_MOOD") | .evidence.sampleSize == 2 and .evidence.source == "moodPeriodReport.summary.counts" and (.evidence.periodId == $pid)) and
+  (.data.insights[] | select(.type == "PERIOD_TREND") | .value == {"trend":"STABLE","sampleSize":2,"averageScore":-1,"coverageDays":1}) and
+  (.data.insights[] | select(.type == "PERIOD_TREND") | .message | contains("趋势平稳")) and
+  (.data.insights[] | select(.type == "ANNOTATION_CORRELATION") | .value == {"correctedSamples":1,"sampleSize":2}) and
+  ([.data.insights[].message] | all(length > 0))
+' --arg pid "$period_id" >/dev/null; then
+  green '51 当前周期洞察输出与规则重算一致的值级结论'
+else
+  red "❌ 周期洞察契约失败（period=$period_id body=${period_insight}）"
+fi
+
+(cd "$ROOT/apps/server" && npx vitest run -t 'degrades to an empty safe structure and logs loudly on aggregation failure' src/routes/period.routes.test.ts >/dev/null)
+(cd "$ROOT/apps/server" && npx vitest run src/lib/moodPeriodInsight.test.ts >/dev/null)
+grep -q '情绪洞察暂不可用' "$ROOT/apps/mobile/src/components/MoodPeriodInsightPanel.tsx"
+grep -q '本周期还没有足够的情绪记录' "$ROOT/apps/mobile/src/components/MoodPeriodInsightPanel.tsx"
+(cd "$ROOT/apps/mobile" && npx vitest run -t '第 4 类判红' src/utils/moodPeriodInsight.test.ts >/dev/null)
+green '52 洞察降级契约与用户可见状态（第 4 类判红）'
+
+green "心伴 v0.10 冒烟通过：$PASS 项 / 52 项"

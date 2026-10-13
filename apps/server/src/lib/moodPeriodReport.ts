@@ -42,6 +42,13 @@ const CST_OFFSET_MS = 8 * 60 * 60 * 1000
 const DAY_MS = 24 * 60 * 60 * 1000
 export const PERIOD_TOTAL_DAYS = 7
 
+export type PeriodCompleteness = 'FULL' | 'PARTIAL' | 'EMPTY'
+
+export interface PeriodBounds {
+  fromMs: number
+  toMs: number
+}
+
 function isValidDate(value: string): boolean {
   return typeof value === 'string' && !Number.isNaN(Date.parse(value))
 }
@@ -49,6 +56,16 @@ function isValidDate(value: string): boolean {
 /** 东八区自然日 YYYY-MM-DD（固定 UTC+8，无夏令时） */
 function cstDate(ms: number): string {
   return new Date(ms + CST_OFFSET_MS).toISOString().slice(0, 10)
+}
+
+/** 解析东八区自然周周期 ID（周一 YYYY-MM-DD）；只接受真实存在的公历日期。 */
+export function periodBoundsFromPeriodId(periodId: string): PeriodBounds | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(periodId)) return null
+  const shiftedStart = Date.parse(`${periodId}T00:00:00.000Z`)
+  if (!Number.isFinite(shiftedStart) || new Date(shiftedStart).toISOString().slice(0, 10) !== periodId) return null
+  if (new Date(shiftedStart).getUTCDay() !== 1) return null
+  const fromMs = shiftedStart - CST_OFFSET_MS
+  return { fromMs, toMs: fromMs + PERIOD_TOTAL_DAYS * DAY_MS }
 }
 
 /** 东八区周一 00:00 对应的 UTC 瞬间（含 now 所在周的周界 [from, to)） */
@@ -85,6 +102,7 @@ export function readableMoodPeriodReport(
   memory: MemoryReadContract,
   timeline: MoodTimelineContract,
   now = new Date(),
+  periodId?: string,
 ): MoodPeriodReport {
   const nowMs = now instanceof Date ? now.getTime() : Number.NaN
   if (
@@ -97,9 +115,11 @@ export function readableMoodPeriodReport(
     return moodPeriodReportDegraded(conversationId)
   }
 
-  const { fromMs, toMs } = naturalWeekBounds(nowMs)
+  const explicitBounds = periodId ? periodBoundsFromPeriodId(periodId) : null
+  if (periodId && !explicitBounds) return moodPeriodReportDegraded(conversationId)
+  const { fromMs, toMs } = explicitBounds ?? naturalWeekBounds(nowMs)
   const period = {
-    id: cstDate(fromMs),
+    id: periodId ?? cstDate(fromMs),
     from: new Date(fromMs).toISOString(),
     to: new Date(toMs).toISOString(),
   }
@@ -198,4 +218,17 @@ export function readableMoodPeriodReport(
       headline: headlineFor(trend, validPoints.length),
     },
   }
+}
+
+/** 由既有周期聚合值重算周期平均分；空周期返回 null，绝不编造 0。 */
+export function moodPeriodAverageScore(report: MoodPeriodReport): number | null {
+  if (!report.summary || report.summary.sampleSize === 0) return null
+  const sum = report.moods.reduce((total, day) => total + day.averageScore * day.count, 0)
+  return sum / report.summary.sampleSize
+}
+
+/** 完整度只由已聚合周期推导：FULL / PARTIAL / EMPTY。 */
+export function moodPeriodCompleteness(report: MoodPeriodReport): PeriodCompleteness {
+  if (!report.summary || report.coverageDays === 0) return 'EMPTY'
+  return report.coverageDays === report.totalDays ? 'FULL' : 'PARTIAL'
 }

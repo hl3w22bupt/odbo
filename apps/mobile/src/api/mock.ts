@@ -30,6 +30,8 @@ import type {
   MoodSnapshot,
   MoodTimelineResult,
   Order,
+  PeriodComparisonResult,
+  PeriodInsightResult,
   PayResult,
   Product,
   QuotaStatus,
@@ -539,6 +541,33 @@ export const mockApi = {
       available: true,
       degraded: false,
       points: moods.get(conversationId) ?? [],
+    };
+  },
+
+  async getPeriodComparison(periodId: string): Promise<PeriodComparisonResult> {
+    const metrics = (id: string) => ({
+      periodId: id, from: '', to: '', sampleSize: 0, coverageDays: 0,
+      totalDays: 7, averageScore: 0, completeness: 'EMPTY' as const,
+    });
+    return {
+      available: true,
+      degraded: false,
+      periodId,
+      previousPeriodId: periodId,
+      current: metrics(periodId),
+      previous: metrics(periodId),
+      trend: { currentAverage: 0, previousAverage: 0, deltaScore: 0 },
+      completeness: { current: 'EMPTY', previous: 'EMPTY', overall: 'EMPTY' },
+    };
+  },
+
+  async getPeriodInsight(periodId: string): Promise<PeriodInsightResult> {
+    return {
+      conversationId: 'mock',
+      available: true,
+      degraded: false,
+      periodId,
+      insights: [],
     };
   },
 

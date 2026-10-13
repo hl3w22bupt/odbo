@@ -1,0 +1,15 @@
+# 验收复核补证（2026-10-13，独立验收节点）
+# 方法：临时移除 src/lib/moodPeriodInsight.ts 后跑 npx vitest run src/lib/moodPeriodInsight.test.ts，随后恢复（工作区零残留）。
+# 目的：red-server-lib.txt 实物仅含 RED_EXIT=0（零失败证据，与真实红形态不符），本文件补齐真实红日志。
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv5v1t68001gm9qq29ip34bm/apps/server
+
+ ❯ src/lib/moodPeriodInsight.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/moodPeriodInsight.test.ts [ src/lib/moodPeriodInsight.test.ts ]
+Error: Cannot find module './moodPeriodInsight.js' imported from /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv5v1t68001gm9qq29ip34bm/apps/server/src/lib/moodPeriodInsight.test.ts
+ ❯ src/lib/moodPeriodInsight.test.ts:4:1
+
+REAL_EXIT=1

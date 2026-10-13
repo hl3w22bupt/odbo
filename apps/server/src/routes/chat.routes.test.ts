@@ -369,6 +369,11 @@ describe('chat v0.7 weekly mood report', () => {
   it('reads persisted corrections into the weekly report', async () => {
     const now = Date.now()
     const day = 86_400_000
+    const cstOffset = 8 * 3_600_000
+    const shiftedNow = now + cstOffset
+    const dayStartShifted = Math.floor(shiftedNow / day) * day
+    const mondayShifted = dayStartShifted - ((new Date(dayStartShifted).getUTCDay() + 6) % 7) * day
+    const mondayUtc = mondayShifted - cstOffset
     prismaMock.conversationMemory.findMany.mockResolvedValue([
       {
         id: 'mem_1',
@@ -377,7 +382,7 @@ describe('chat v0.7 weekly mood report', () => {
         sourceMessageId: 'msg_1',
         content: '女儿下周生日',
         status: 'ACTIVE',
-        createdAt: new Date(now - 2 * day),
+        createdAt: new Date(mondayUtc + 3_600_000),
       },
     ])
     prismaMock.moodSnapshot.findMany.mockResolvedValue([
@@ -390,7 +395,7 @@ describe('chat v0.7 weekly mood report', () => {
         mood: 'POSITIVE',
         score: 1,
         keywords: '开心',
-        createdAt: new Date(now - 2 * day),
+        createdAt: new Date(mondayUtc + 3_600_000),
       },
       {
         id: 'mood_2',
@@ -401,7 +406,7 @@ describe('chat v0.7 weekly mood report', () => {
         mood: 'NEGATIVE',
         score: -1,
         keywords: '',
-        createdAt: new Date(now - 3_600_000),
+        createdAt: new Date(mondayUtc + day + 3_600_000),
       },
     ])
     prismaMock.moodCorrection.findMany.mockResolvedValue([
@@ -415,7 +420,7 @@ describe('chat v0.7 weekly mood report', () => {
         tags: '状态变化',
         reason: '当时记错了',
         clientMutationId: 'mutation-2',
-        createdAt: new Date(now - day),
+        createdAt: new Date(mondayUtc + day + 7_200_000),
       },
     ])
 

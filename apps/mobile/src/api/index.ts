@@ -26,6 +26,7 @@ import type {
   MoodInsightSummaryResult,
   MoodTimelineResult,
   PeriodComparisonResult,
+  PeriodInsightResult,
   MoodWeeklyReportResult,
   Message,
   Order,
@@ -65,6 +66,7 @@ export interface ApiClient {
   getMoodInsightSummary(conversationId: string): Promise<MoodInsightSummaryResult>;
   getMoodWeeklyReport(conversationId: string): Promise<MoodWeeklyReportResult>;
   getPeriodComparison(periodId: string): Promise<PeriodComparisonResult>;
+  getPeriodInsight(periodId: string): Promise<PeriodInsightResult>;
   sendMessage(params: SendMessageParams): Promise<ChatSendResult>;
   sendMultiMessage(params: SendMultiMessageParams): Promise<ChatMultiSendResult>;
   triggerProactive(characterId: string): Promise<{ triggered: boolean; messageId: string }>;
@@ -128,6 +130,9 @@ const realApi: ApiClient = {
   },
   async getPeriodComparison(periodId) {
     return request<PeriodComparisonResult>('GET', `/api/v1/periods/${encodeURIComponent(periodId)}/comparison`);
+  },
+  async getPeriodInsight(periodId) {
+    return request<PeriodInsightResult>('GET', `/api/v1/periods/${encodeURIComponent(periodId)}/insight`);
   },
   async sendMessage(params) {
     return request<ChatSendResult>('POST', '/api/v1/chat/send', params);

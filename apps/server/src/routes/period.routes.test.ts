@@ -155,3 +155,102 @@ describe('period v0.9 routes', () => {
     expect(res.rawBody).not.toContain('row_count')
   })
 })
+
+describe('period v0.10 insight routes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    prismaMock.conversation.findMany.mockResolvedValue([{ id: 'conv_1' }])
+    prismaMock.conversationMemory.findMany.mockResolvedValue([
+      row('mem_1', 'conv_1', '2026-10-05T00:00:00.000Z', { characterId: null, sourceMessageId: null, content: 'a', status: 'ACTIVE' }),
+    ])
+    prismaMock.moodSnapshot.findMany.mockResolvedValue([
+      row('mood_c1', 'conv_1', '2026-10-05T01:00:00.000Z', { characterId: null, sourceMessageId: 'msg', memoryId: 'mem_1', mood: 'POSITIVE', score: 1, keywords: '' }),
+      row('mood_c2', 'conv_1', '2026-10-06T01:00:00.000Z', { characterId: null, sourceMessageId: 'msg', memoryId: 'mem_1', mood: 'NEGATIVE', score: -1, keywords: '' }),
+    ])
+    prismaMock.moodCorrection.findMany.mockResolvedValue([])
+  })
+
+  it('registers the additive insight route in the periods family', () => {
+    const registered: Array<Record<string, string>> = []
+    registerPeriodRoutes({
+      define(name, path, method) { registered.push({ name, path, method }) },
+    } as never)
+    expect(registered).toContainEqual({
+      name: 'period::insight',
+      path: '/api/v1/periods/:periodId/insight',
+      method: 'GET',
+    })
+  })
+
+  it('requires authentication', async () => {
+    const unauthenticated = { ...context('2026-10-05') } as HttpRouteContext
+    delete (unauthenticated as Partial<HttpRouteContext>).authUser
+    await expect(handlers().get('period::insight')!(unauthenticated)).rejects.toMatchObject({
+      statusCode: 401,
+      code: 'UNAUTHORIZED',
+    })
+  })
+
+  it('rejects non-Monday period ids with 400', async () => {
+    await expect(handlers().get('period::insight')!(context('2026-10-06'))).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'BAD_REQUEST',
+    })
+  })
+
+  it('emits value-level insights equal to recomputed rule values', async () => {
+    const res = await handlers().get('period::insight')!(context())
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toMatchObject({ available: true, degraded: false, periodId: '2026-10-05' })
+    const insights = res.body.data.insights as Array<Record<string, unknown>>
+    expect(insights.map((item) => item.type)).toEqual(['DOMINANT_MOOD', 'PERIOD_TREND'])
+    // 独立重算：counts {positive:1, negative:1} 平票 → NEGATIVE；均分 (1-1)/2=0；趋势 split 后 recent<prev → WORSENING
+    expect(insights[0]?.value).toEqual({ mood: 'NEGATIVE', count: 1, share: 0.5 })
+    expect(insights[1]?.value).toEqual({ trend: 'WORSENING', sampleSize: 2, averageScore: 0, coverageDays: 2 })
+    expect(insights[0]?.evidence).toMatchObject({
+      periodId: '2026-10-05', from: '2026-10-04T16:00:00.000Z', to: '2026-10-11T16:00:00.000Z', sampleSize: 2,
+    })
+    expect(typeof insights[0]?.message).toBe('string')
+    expect((insights[0]?.message as string).length).toBeGreaterThan(0)
+  })
+
+  it('surfaces annotation correlation when corrections apply to in-period samples', async () => {
+    prismaMock.moodCorrection.findMany.mockResolvedValue([
+      {
+        id: 1, conversationId: 'conv_1', userId: 'user_1', moodSnapshotId: 'mood_c1',
+        mood: 'NEGATIVE', score: -1, tags: '', reason: '更正', clientMutationId: null,
+        createdAt: new Date('2026-10-05T02:00:00.000Z'),
+      },
+    ])
+    const res = await handlers().get('period::insight')!(context())
+    const insights = res.body.data.insights as Array<Record<string, unknown>>
+    expect(insights.map((item) => item.type)).toEqual(['DOMINANT_MOOD', 'PERIOD_TREND', 'ANNOTATION_CORRELATION'])
+    // latest-wins 修正后：mood_c1 变 NEGATIVE，counts {positive:0, negative:2} → 主导 NEGATIVE count 2
+    expect(insights[0]?.value).toEqual({ mood: 'NEGATIVE', count: 2, share: 1 })
+    expect(insights[2]?.value).toEqual({ correctedSamples: 1, sampleSize: 2 })
+  })
+
+  it('returns a legal empty structure when the user has no conversations', async () => {
+    prismaMock.conversation.findMany.mockResolvedValue([])
+    const res = await handlers().get('period::insight')!(context())
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toEqual({
+      conversationId: 'user_1', available: true, degraded: false,
+      periodId: '2026-10-05', insights: [],
+    })
+  })
+
+  it('degrades to an empty safe structure and logs loudly on aggregation failure', async () => {
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined)
+    prismaMock.conversation.findMany.mockRejectedValue(new Error('sqlite locked'))
+    const res = await handlers().get('period::insight')!(context())
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toEqual({
+      conversationId: 'user_1', available: false, degraded: true,
+      periodId: '2026-10-05', insights: [],
+    })
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    expect(String(errorSpy.mock.calls[0]?.[0])).toContain('insight degraded')
+    errorSpy.mockRestore()
+  })
+})

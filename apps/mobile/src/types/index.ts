@@ -210,6 +210,39 @@ export interface PeriodComparisonResult {
   completeness: PeriodCompletenessMark;
 }
 
+/** v0.10 情绪洞察（insight 命名空间，与 v0.9 服务端契约同构） */
+export type PeriodInsightType = 'DOMINANT_MOOD' | 'PERIOD_TREND' | 'ANNOTATION_CORRELATION';
+
+export type PeriodInsightMood = 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE';
+
+export type PeriodInsightTrend = 'IMPROVING' | 'STABLE' | 'WORSENING';
+
+export interface PeriodInsightEvidence {
+  periodId: string;
+  from: string;
+  to: string;
+  sampleSize: number;
+  source: string;
+}
+
+export interface PeriodInsightItem {
+  type: PeriodInsightType;
+  value:
+    | { mood: PeriodInsightMood; count: number; share: number }
+    | { trend: PeriodInsightTrend; sampleSize: number; averageScore: number; coverageDays: number }
+    | { correctedSamples: number; sampleSize: number };
+  evidence: PeriodInsightEvidence;
+  message: string;
+}
+
+export interface PeriodInsightResult {
+  conversationId: string;
+  available: boolean;
+  degraded: boolean;
+  periodId: string;
+  insights: PeriodInsightItem[];
+}
+
 export interface QuotaStatus {
   used: number;
   limit: number;

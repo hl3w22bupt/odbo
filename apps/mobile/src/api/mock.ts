@@ -31,6 +31,7 @@ import type {
   MoodTimelineResult,
   Order,
   PeriodComparisonResult,
+  PeriodInsightResult,
   PayResult,
   Product,
   QuotaStatus,
@@ -557,6 +558,16 @@ export const mockApi = {
       previous: metrics(periodId),
       trend: { currentAverage: 0, previousAverage: 0, deltaScore: 0 },
       completeness: { current: 'EMPTY', previous: 'EMPTY', overall: 'EMPTY' },
+    };
+  },
+
+  async getPeriodInsight(periodId: string): Promise<PeriodInsightResult> {
+    return {
+      conversationId: 'mock',
+      available: true,
+      degraded: false,
+      periodId,
+      insights: [],
     };
   },
 

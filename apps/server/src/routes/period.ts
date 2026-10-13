@@ -13,6 +13,7 @@ import {
 } from '../lib/moodPeriodReport.js'
 import { compareMoodPeriods, periodComparisonDegraded } from '../lib/periodComparison.js'
 import { moodPeriodReportCsv } from '../lib/periodCsv.js'
+import { buildMoodPeriodInsight, moodPeriodInsightDegraded } from '../lib/moodPeriodInsight.js'
 import { logger } from '../lib/logger.js'
 import { ok, rawContent } from '../lib/response.js'
 import {
@@ -121,7 +122,23 @@ async function getPeriodCsv(ctx: HttpRouteContext) {
   }
 }
 
+/** v0.10 单周期情绪洞察：输入 = 既有聚合输出，三类封顶；空态/降级均 200 合法结构。 */
+async function getPeriodInsight(ctx: HttpRouteContext) {
+  const user = await authenticate(ctx)
+  const periodId = requirePeriodId(ctx.params.periodId)
+  try {
+    const input = await scopedUserPeriodInput(user.id)
+    const report = readableScopedPeriodReport(user.id, input, periodId)
+    return ok(buildMoodPeriodInsight(report, input.timeline, input.memory, periodId))
+  } catch (err) {
+    if (err instanceof AppError) throw err
+    logger.error('[period] insight degraded', { err: String(err), periodId, userId: user.id })
+    return ok(moodPeriodInsightDegraded(user.id, periodId))
+  }
+}
+
 export function registerPeriodRoutes(router: HttpRouter): void {
   router.define('period::comparison', '/api/v1/periods/:periodId/comparison', 'GET', getPeriodComparison)
   router.define('period::csv', '/api/v1/periods/:periodId/report.csv', 'GET', getPeriodCsv)
+  router.define('period::insight', '/api/v1/periods/:periodId/insight', 'GET', getPeriodInsight)
 }

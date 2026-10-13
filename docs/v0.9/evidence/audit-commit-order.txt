@@ -1,0 +1,3 @@
+89fcf19 2026-10-12 07:15:49 +0800 chore(v0.9): confirm v0.8 baseline and freeze scope
+6386924 2026-10-12 07:17:39 +0800 test(v0.9): add red interface contract for period comparison
+7bcf1b3 2026-10-12 07:24:46 +0800 feat(v0.9): add period comparison and csv export

@@ -1,0 +1,13 @@
+
+> @xinban/server@1.0.0 test
+> vitest run chat.routes.test.ts
+
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv4foce10012m9p8zj3mf3ls/apps/server
+
+
+ Test Files  1 passed (1)
+      Tests  22 passed (22)
+   Start at  07:11:35
+   Duration  220ms (transform 81ms, setup 0ms, import 136ms, tests 8ms, environment 0ms)
+

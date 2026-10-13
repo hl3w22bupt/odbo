@@ -468,6 +468,8 @@ describe('chat v0.8 natural-week period mood report', () => {
   })
 
   it('reads persisted corrections into the period report', async () => {
+    // 路由契约使用服务端 now；固定样本测试必须同步冻结时钟，避免跨自然周后基线假失败。
+    vi.useFakeTimers({ now: new Date('2026-10-07T02:00:00.000Z') })
     const now = Date.parse('2026-10-07T02:00:00.000Z')
     const day = 86_400_000
     prismaMock.conversation.findFirst.mockResolvedValue({ id: conversationId, userId: 'user_1' })
@@ -535,6 +537,7 @@ describe('chat v0.8 natural-week period mood report', () => {
         trend: 'STABLE',
       },
     })
+    vi.useRealTimers()
   })
 
   it('degrades the period report and logs loudly when persistence or aggregation fails', async () => {

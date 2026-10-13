@@ -1,0 +1,36 @@
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv4foce10012m9p8zj3mf3ls/apps/server
+
+stdout | src/routes/moodComparison.routes.test.ts
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+
+ ❯ src/routes/moodComparison.routes.test.ts (14 tests | 1 failed) 13ms
+     × pulls one row beyond the frozen limit so the 413 guard is reachable in production 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/routes/moodComparison.routes.test.ts > mood period comparison and CSV export > pulls one row beyond the frozen limit so the 413 guard is reachable in production
+AssertionError: expected 1000 to be 1001 // Object.is equality
+
+- Expected
++ Received
+
+- 1001
++ 1000
+
+ ❯ src/routes/moodComparison.routes.test.ts:351:23
+    349|     await handlers.get('chat::conversation-period-comparison-csv')!(co…
+    350|     const call = prismaMock.moodSnapshot.findMany.mock.calls[0][0] as …
+    351|     expect(call.take).toBe(1001)
+       |                       ^
+    352|   })
+    353| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 passed (14)
+   Start at  08:06:33
+   Duration  170ms (transform 52ms, setup 0ms, import 81ms, tests 13ms, environment 0ms)
+

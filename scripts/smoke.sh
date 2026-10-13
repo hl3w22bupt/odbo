@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 心伴 v0.8 · 一条命令全链路冒烟（01-38 兼容基线 + 39-42 近7日周报 + 43-45 自然周周期报告）
+# 心伴 v0.9 · 一条命令全链路冒烟（01-45 v0.8 基线 + 46 周期对比 CSV 产物探针）
 # 用法：npm run smoke
 # 可用环境变量：XINBAN_SMOKE_PORT（默认 13888）、KEEP_SMOKE_DIR=1（保留临时目录）
 set -euo pipefail
@@ -418,4 +418,36 @@ fi
 (cd "$ROOT/apps/server" && npx vitest run -t 'degrades the period report and logs loudly when persistence or aggregation fails' src/routes/chat.routes.test.ts >/dev/null)
 green '45 周期报告纯函数口径与降级契约'
 
-green "心伴 v0.8 冒烟通过：$PASS 项 / 45 项"
+# ---------- v0.9 增量段：周期对比 CSV 导出产物探针 ----------
+CSV_BODY="${RUN_DIR}/comparison.csv"
+CSV_HEADERS="${RUN_DIR}/comparison.headers"
+csv_status="$(curl -sS -m 20 -o "$CSV_BODY" -D "$CSV_HEADERS" -w '%{http_code}' "$BASE/api/v1/conversations/$CONVERSATION_ID/mood-period-comparison/export.csv?periods=2" -H "Authorization: Bearer $TOKEN")"
+csv_row_count="$(awk 'BEGIN{IGNORECASE=1} /^x-report-row-count:/{gsub("\r",""); print $2; exit}' "$CSV_HEADERS")"
+csv_generated="$(awk 'BEGIN{IGNORECASE=1} /^x-report-generated-at:/{gsub("\r",""); print $2; exit}' "$CSV_HEADERS")"
+csv_content_type="$(sed -n 's/^[Cc]ontent-[Tt]ype:[[:space:]]*//p' "$CSV_HEADERS" | head -1 | tr -d '\r')"
+csv_ok="$(CSV_BODY="$CSV_BODY" node - <<'NODE'
+const fs = require('fs')
+const raw = fs.readFileSync(process.env.CSV_BODY, 'utf8')
+const text = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw
+const lines = text.trim().split(/\r?\n/)
+const rows = lines.slice(1).map(line => line.split(','))
+const expected = [
+  ['period_id', 'date', 'dimension', 'value'],
+  ['count', 'positive', 'neutral', 'negative', 'averageScore'],
+]
+process.stdout.write(String(
+  raw.charCodeAt(0) === 0xfeff &&
+  lines[0] === expected[0].join(',') &&
+  rows.length === 5 &&
+  rows.every(row => row.length === 4) &&
+  rows.map(row => row[2]).every((dimension, index) => dimension === expected[1][index])
+))
+NODE
+)"
+if [ "$csv_status" = 200 ] && [ "$csv_row_count" = 5 ] && [ "$csv_ok" = true ]   && printf '%s' "$csv_generated" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$'   && [ "$csv_content_type" = 'text/csv; charset=utf-8' ]; then
+  green '46 周期对比 CSV 导出产物探针'
+else
+  red "❌ CSV 导出探针失败（status=$csv_status rows=$csv_row_count ok=$csv_ok type=$csv_content_type generated=${csv_generated-}）"
+fi
+
+green "心伴 v0.9 冒烟通过：$PASS 项 / 46 项"

@@ -36,7 +36,7 @@ cp assets/cc0/particle/magic_01.png <gamePath>/assets/particles/
   asset-gate 靠它做溯源）
 - 工程资产入仓前跑 `node scripts/asset-gate.mjs --game <gamePath>`：
   CC0 库拷贝自动过；自备/生成资产必须在 `.myrd/compliance/checklist.json` 给许可证据
-- 视觉观感上限参照：`docs/eval-harness/gallery-rsi/`（参照系截图）与
+- 视觉观感上限参照：`eval-packs/perceptual-reference-rsi/gallery/`（参照系截图）与
   `docs/eval-harness/2026-10-12-rsi-reference-gap-analysis.md` 的配方清单
 
 ## 扩库（运维/agent 均可）

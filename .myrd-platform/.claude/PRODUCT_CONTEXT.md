@@ -29,38 +29,44 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 
 ## 产品关联知识
 
-## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
-
-# 失败模式：Worker SIGINT 关闭中断
-
-## 背景
-自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
-
-## 现象
-- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
-- 输出摘要为空（进程在产出任何结果前被杀）；
-- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
-
-## 根因
-- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
-- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
-- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
-
-## 排查与处置
-1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
-2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
-3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
-4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
-5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
-
-## 预防
-- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
-- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
-- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
 ## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
 negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -265,44 +271,38 @@ agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
 - fix: 修复 bug
 - docs: 文档更新
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
 修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+
+## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
+
+# 失败模式：Worker SIGINT 关闭中断
+
+## 背景
+自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
+
+## 现象
+- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
+- 输出摘要为空（进程在产出任何结果前被杀）；
+- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
+
+## 根因
+- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
+- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
+- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
+
+## 排查与处置
+1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
+2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
+3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
+4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
+5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
+
+## 预防
+- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
+- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
+- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
 ## 架构设计文档
 
@@ -1626,6 +1626,17 @@ smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的�
 
 **来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
 
+---
+
+## 五、v3 增补（2026-10-14）：v2 数值基线在 v3 中的延续与口径迁移
+
+> v3「玩法扩展与体验升级」已完成实现与门禁（分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`），**本文 §一~§四的 v2 基线全部继承、零回退**（v3 冒烟签名仍含「v2手感基线(体型1.3~1.5x·移速60~70%)」且本机对 v3 pck 复跑 PASS）。变化与迁移以 v3 结论文档为准（doc `b0a9a7ff-3339-43dc-9602-6477e562bd4f`，§一/§二），要点：
+> 1. **通关口径迁移**：`TARGET_SCORE=20` 由「件数」改为「**分数**」（normal +1 / rare 金铃铛 +3 / clock 时钟 +2 且加时 4s；Combo 加成只作用 ≥2 分高分物，普通物恒 +1——本文 §一的 50 次触碰口径在 v3 下原样成立）。
+> 2. **数值区新增 11 个声明键**（COMBO_WINDOW=2.0s、COMBO_BONUS_MAX=5、TIME_BONUS_CLOCK=4.0s、MAGNET_RADIUS=100px、MAGNET_DURATION=5s、BOOST_MULT=1.5、BOOST_DURATION=4s、WAVE_BREAK_SECONDS=1.2s、TARGET_SCORE、MAX_COLLECTIBLES=6、TIME_LIMIT 显式化），v2 的 PLAYER_SCALE/PLAYER_SPEED/SPAWN_INTERVAL_*/LIFETIME_* 默认值与钳制原样保留。
+> 3. **节奏曲线改波次状态机**：刷间隔/寿命端点（0.8→0.45s、6→3s）不变，插值改为三波锚点（WAVE_INTERVAL_FRAC=[0,0.45,0.75,1.0]），末波终点取 TARGET-1 保本文「满难度收敛到 MIN」断言同值；刷出改「同屏 ≤6 件补齐制」。
+> 4. **冒烟帧预算 240→320**（game-6 加预算先例），判定协议三条件不变；断言 13 项既有全保留 + 9 项 v3 新增（共 22 项）。
+> 5. **部署状态**：线上（version 5 @ `1089e4b`）仍是 v2——本文 §三的 pck/wasm sha256 对线上继续有效；v3 pck（sha256 `4e3c42fa…`）已就绪待上线，部署 403 卡点与一键恢复命令见 v3 结论文档 §六。
+
 
 ## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
 
@@ -2833,6 +2844,151 @@ v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 
 ## 八、衔接声明
 
 本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
+
+
+## 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+# 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+> **文档定位**：固化 game-8 v3「玩法扩展与体验升级」的机制清单（**策划案 v2 → 实现 `bfce9152` 的落账差异，实现为准**）、触屏操控实现方案、美术/音效/数值基线与门禁实测结论，并登记**唯一未闭环项——v3 部署上线卡点（403 授权）与一键恢复路径**（§六）。后续迭代与同类休闲收集小游戏直接按本文对齐，不必重新勘探。
+> **一手实测声明**：本文全部数字为一手实测（2026-10-14 取证）——`git show bfce9152` 逐文件核对、线上与本地产物 sha256 实算、`godot --headless --main-pack <pck> --quit-after 320 res://tests/smoke.tscn` 本机复跑，非转述估算。
+> **权威基准**：v3 需求（`cmv6vkith000gjotytp4v915c`，tag `goal-cmujpml1e006rm99i9hc33huu#wf-sg-v3-req-r4`）；策划案 v2 GameDesignSpec（`cmv6weob6000sjotyffuhjca6`，status=approved，create_design_spec 首次走通）；v2 参数基线（doc `843ddfec-62e1-4e02-b277-21155f7595bc`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）。
+> **实现基线（v3）**：分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`（feat 提交，远端 tip 已 `git ls-remote` 核实），数值唯一对齐点 `games/game-8/autoload/game_state.gd` 数值区（18 个 `TUNING_META` 声明键），禁止散点改代码对数值。
+> **部署现状（关键）**：线上 = HostedApp `cmujpmjsy006pm99ip9yws3wl` **version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`，仍是 v2 构建**（线上 pck sha256 实测 = v2 基线 `5f556ad9…`）；**v3 已实现、已过门禁、已推送，但部署被 403 拦下**——恢复命令见 §六。
+
+## 〇、v3 现状一图流
+
+| 环节 | 状态 | 一手证据 |
+|---|---|---|
+| v3 需求登记 | ✅ | requirement `cmv6vkith000gjotytp4v915c`（HTTP 201，戳记 `#wf-sg-v3-req-r4` 无重复） |
+| 策划案 v2 落账 | ✅ | GameDesignSpec `cmv6weob6000sjotyffuhjca6`（HTTP 201，schemaVersion v0，status approved——平台 create_design_spec 能力恢复后的首次成功） |
+| 工坊工作流 run（v3） | ❌ failed | routine 入参 `gameDecisions` 含 shell 元字符 `#` 被拒绝替换（step 命令经 `bash -c` 拼接的安全守卫），**零实现遗留** |
+| v3 实现补齐 | ✅ | 线上验收 agent 代做全链路：commit `bfce9152`（11 文件，+1348/−153），`1089e4b..bfce9152` 已推送成功 |
+| 门禁 | ✅ | preflight 13 类×40 文件 PASS；smoke @320 帧 3 连 PASS（零 SCRIPT ERROR）；input-fuzz PASS（seed=20260913，6 批次）；v3 pck 自跑冒烟 PASS（§五，本机复跑） |
+| **部署上线** | **⛔ 403** | `POST /api/v1/apphost/apps/…/deployments` 仅 app owner（`cmuimu6w…`）或系统管理员；agent 代行主体 `cmoqv70b8`（含 dryRun）均被拒（2026-10-14 复测仍 403） |
+
+## 一、v3 机制清单（实现落账口径，`game_state.gd` @ `bfce9152` 为唯一来源）
+
+### 1.1 目标物 5 类（需求「≥3 种、分值/效果互异」超额落账）
+
+| 类型 | 造型（半径≈14px 多边形） | 分值 | 效果 | 配色 RGB | 波次权重 W0/W1/W2 |
+|---|---|---|---|---|---|
+| normal 青草垛 | 菱形 | +1 | 无（**恒 +1，Combo 不加成**，保护 50 次触碰台账） | (0.55,0.8,0.3) 草绿 | 0.80 / 0.68 / 0.55 |
+| rare 金铃铛 | 十点星形 | +3 | 高分物，吃 Combo 加成 | (1.0,0.82,0.25) 亮金 | 0.10 / 0.17 / 0.25 |
+| clock 时钟 | 八边形 | +2 | 得分 +2 且**加时 +4s**（钳到 TIME_LIMIT） | (0.45,0.75,1.0) 天蓝 | 0.05 / 0.08 / 0.10 |
+| magnet 磁铁 | U 形 | 0（道具） | 生效 5s：半径 100px 内计分物以 170px/s 被拉向牛牛（`MAGNET_PULL_SPEED`） | (0.9,0.4,0.75) 品红 | 0.025 / 0.035 / 0.05 |
+| boost 加速 | 闪电形 | 0（道具） | 生效 4s：实际移速 = `PLAYER_SPEED × 1.5`（`current_speed()` 机判口径） | (0.35,0.9,0.85) 青碧 | 0.025 / 0.035 / 0.05 |
+
+- 每波权重表合计恒为 1.0；**越往后稀有物与道具占比越高**（「值得追」补偿「越来越快」），波次断言含 rare 权重单调不降。
+- 刷出改为**同屏上限补齐制**：`MAX_COLLECTIBLES=6`，低于上限由生成器补充（v1「寿命÷间隔自然收敛 ≈7±1」的推导口径被取代）。
+
+### 1.2 Combo 连击
+
+- 窗口 `COMBO_WINDOW=2.0s`：窗口内连续收集 combo +1（`_advance_combo`：窗口活着递增、断链从 1 起算），超时/暂停/重开清零；`_process` 仅 RUNNING 推进窗口倒计时。
+- 加成 `combo_bonus_for = (combo<2 ? 0 : min(combo-1, COMBO_BONUS_MAX=5))`，每级 +1。
+- **`gain_for` 关键设计**：加成只作用于分值 ≥2 的高分物（rare/clock）；普通物恒 +1 → 需求「50 次真实触碰每次恰好 +1」基线在多类型下零回退（冒烟 MASS 阶段只碰普通物，台账零重构）。
+- 档案新增 `best_combo` 持久化字段（`user://niuniu_game8_save.json`：best_score / total_collected / best_combo 三键）。
+
+### 1.3 波次状态机（替代 v1 单一线性收紧曲线）
+
+- 波次按**分数**切分：`wave_index_for` 以 `third=max(⌊T/3⌋,1)`、`two_thirds=max(⌊2T/3⌋,third+1)` 分三段（默认 T=20 → 0..6 / 7..13 / 14..19），随 TARGET_SCORE 自适应。
+- 波内插值锚点：`WAVE_INTERVAL_FRAC=[0, 0.45, 0.75, 1.0]`、`WAVE_LIFETIME_FRAC=[0, 0.55, 0.8, 1.0]`——刷新间隔 0.8s→0.45s、寿命 6s→3s 三段线性、**全局单调不增、有界**，端点与 v1/v2 断言同值。
+- **末波终点取 `TARGET_SCORE-1` 的兼容性设计**：达标分当帧即通关、曲线不再被查询，因此「满难度（score=19）收敛到 SPAWN_INTERVAL_MIN」的 v2 断言原样成立（曾实测 score=19 时插值到 0.4625≠0.45 的回归，已修）。
+- 跨波：`wave_changed` → 场景层接管**波间停顿 `WAVE_BREAK_SECONDS=1.2s`**（生成器暂停 + 横幅提示），三段副标题：「青草垛大量刷出，热身收集」→「金铃铛变多，瞄准高分」→「最后冲刺，连击冲分！」。
+
+### 1.4 单局阶段机与流程（需求 ④2）
+
+- `enum Phase { RUNNING, WON, LOST, READY, PAUSED }`——新增 READY（开始面板，确认/触摸进入）与 PAUSED（键盘 P 或触摸暂停按钮，恢复前时限冻结）。
+- `start_run()` 统一「开始/重开」入口：score 归零、时限重置、combo/run_max_combo/wave_index 复位、牛牛归位、道具清空（`clear_powerups`）、场上重铺、刷点仍避出生点 ≥96px。
+- 结算（WON/LOST 都结算）：刷新 best_score / best_combo 并 `save_progress()`——**失败也保留累计收集进度**。
+- **通关口径迁移**：`TARGET_SCORE=20` 的口径由 v1/v2 的「件数」改为「**分数**」（普通 +1 / 金铃铛 +3 / 时钟 +2，另计高分物 Combo 加成）——后续所有「集满 20」表述一律按分数理解。
+
+### 1.5 策划案 v2 → 实现落账差异（防后人拿错口径，实现为准）
+
+| 项 | 策划案 v2（设计稿） | 实现 `bfce9152`（权威） |
+|---|---|---|
+| 目标物 | 3 类：青草垛 +1 / 金铃铛 +5 / 三叶草 +1+效果，另设树桩惩罚物 | **5 类**（§1.1）：树桩取消，磁铁/加速两道具直接入权重池刷出；金铃铛 +5→**+3**；三叶草改为 **clock 时钟 +2 加时 4s** |
+| 道具参数 | 磁铁 180px·5s、蹄铁 ×1.5 速·5s | 磁铁 **100px**（拉速 170px/s）·5s；加速 ×1.5·**4s** |
+| Combo | 窗口 3s，加成 `ceil(分值×(1+0.1×等级))` | 窗口 **2s**，**每级 +1 封顶 5**，且**只作用 ≥2 分高分物** |
+| 波间停顿 | 2s | **1.2s** |
+| 通关口径 | 目标收集量 20（件数） | **20 分（分数口径）** |
+
+## 二、数值基线（18 个 TUNING_META 声明键，默认值 = 钳制区间/步长）
+
+| 键 | 默认 | min~max/step | 键 | 默认 | min~max/step |
+|---|---|---|---|---|---|
+| TARGET_SCORE | 20 | 5~60/1 | PLAYER_SCALE（v2 继承） | 1.4 | 0.5~2.0/0.05 |
+| TIME_LIMIT | 60 | 15~180/5 | PLAYER_SPEED（v2 继承） | 145 | 60~300/5 |
+| MAX_COLLECTIBLES | 6 | 1~20/1 | COMBO_WINDOW | 2.0s | 0.5~5/0.1 |
+| SPAWN_INTERVAL_START | 0.8s | 0.3~3/0.05 | COMBO_BONUS_MAX | 5 | 0~10/1 |
+| SPAWN_INTERVAL_MIN | 0.45s | 0.2~2/0.05 | TIME_BONUS_CLOCK | 4.0s | 0~10/0.5 |
+| LIFETIME_START | 6.0s | 2~15/0.5 | MAGNET_RADIUS | 100px | 60~200/5 |
+| LIFETIME_MIN | 3.0s | 1~10/0.5 | MAGNET_DURATION | 5.0s | 1~10/0.5 |
+| WAVE_BREAK_SECONDS | 1.2s | 0~3/0.1 | BOOST_MULT | 1.5 | 1.1~2.5/0.05 |
+| BOOST_DURATION | 4.0s | 1~10/0.5 | LIFETIME_WARN_SECONDS | 1.5s（const，临期闪烁阈值） | — |
+
+- 调参协议（SKILL.md §3C，v3 延续）：`apply_tuning()` 唯一应用入口——只认声明键（未声明键拒绝）、按 min/max 钳制、**保序约束**（`SPAWN_INTERVAL_MIN ≤ SPAWN_INTERVAL_START`、`LIFETIME_MIN ≤ LIFETIME_START`，防单调性被调坏）；改 TIME_LIMIT 立即重置本局剩余时间。双通道保留：游戏内调参面板 + 壳页 `?tuning=<JSON>` → `window.__GAME_TUNING__`。
+- 冒烟含调参协议断言：新增声明键可应用/钳制、未声明键必须被拒绝。
+- 判定几何（沿用 v2 实测口径）：PickupShape 本体 r=22×1.4≈30.8px + 收集物 r=14px → 触发距离 ≈44.8px；刷点安全间距 96px ≈ 2.14× 余量；刷点距场地边缘 ≥48px（`SPAWN_MARGIN`）。
+
+## 三、触屏操控实现方案（现网既有形态 + v3 延续加固）
+
+- **移动管线单一化**：左下角**虚拟摇杆**（`virtual_joystick.gd`，v2 包内既有、v3 延续）→ `InputEventAction` 注入 `move_left/right/up/down` → 与键盘共用 `_unhandled_input` 同一管线。摇杆参数：底座 `BASE_RADIUS=56px`、摇杆头 `STICK_RADIUS=26px`、死区 `DEADZONE_RATIO=0.25`。方向不反向由冒烟方向符号断言钉死（A/← 后 position.x 减小、D/→ 后增大）。
+- **按钮触达**：`touch_confirm_button.gd` 确认按钮半径 **44px**（满足「触达区 ≥44×44px」），点击注入 `confirm` 动作、与键盘同路径；局内暂停按钮仅触摸设备显示（桌面键盘环境完全不可见，`TouchUI` CanvasLayer 统一管理）。
+- **视口适配**：竖屏 **720×1280** 基线，`stretch/mode=canvas_items` + `aspect=keep` 等比缩放，`handheld/orientation=portrait`；HUD 操作提示按输入设备切换文案。
+- **壳页硬契约**（`server/src/game-page.ts`，随部署上线，实测在位）：viewport meta（user-scalable=no）、`touch-action:none`、调参桥（非法 JSON 按无调参处理绝不阻塞启动）、**音频手势解锁器**（包装 AudioContext 捕获引擎实例 + touchstart/touchend/pointerdown/keydown/click 五类事件 capture+passive 同步 resume，覆盖 suspended 与 interrupted；visibilitychange 回前台再解锁；`__audioDebug` 取证出口）、**AudioWorklet addModule 补丁**（worklet 是移动端音频单一故障点：真实资产端点优先、失败降级原路径重试一次、仍失败显式 console.error + audioLog 记 `worklet-dead`）。
+
+## 四、美术/音效基线
+
+- **分层背景**：视差远/近两层（全部代码创建，`_update_parallax` 随角色移动产生轻视差），统一牧场绿主题。
+- **目标物动效**：5 类专属多边形造型 + 专属配色（§1.1 表）；待机呼吸（缩放 1±0.08 正弦脉动，`breathing_scale()` 可观测）；临期 ≤1.5s 时 alpha 闪烁警示；收集/消失动画播放完整且节点无残留（`remove_child→queue_free` 清场纪律不回退）。
+- **反馈三件套**：收集音效 + 粒子 + 飘字同帧触发；飘字生命周期 `FLOAT_TEXT_LIFETIME=0.6s`、颜色与目标物呼应；粒子随用随建、动画完自动回收。
+- **UI 主题五色**：`THEME_PANEL_BG=(0.07,0.14,0.10,0.94)` / `BORDER=草绿(0.55,0.8,0.3,0.9)` / `TEXT=(0.96,0.97,0.92)` / `ACCENT=草绿` / `COMBO=橙(1.0,0.62,0.2)`；开始/HUD/结算/暂停面板统一主题；v3 增量 UI（背景层/连击/横幅/开始面板/暂停面板/粒子/飘字）**全部代码创建，.tscn 零新增节点**（规避场景手写风险）。
+- **字体**：Noto Sans SC（OFL，子集化）保留，`theme/custom_font` 全局生效。
+- **音效基线（「零音效」缺陷闭环）**：新增 `sfx.gd` autoload——**程序化合成、零外部资产、确定性**：7 个音色（collect=880Hz blip / rare=987.77·1174.66·1396.91Hz 琶音 / clock=660+880Hz 双音 / powerup=320→960Hz 扫频 / wave=293.66Hz / win=523.25·659.25·783.99·1046.5Hz 琶音 / lose=440→174.61Hz 下滑），22.05kHz 16-bit PCM、复音池 6（池满抢占最老播放器）、主增益 0.5、pitch 参数支持连击音高爬升；`played_count` 供冒烟机判「收集后真的播了声」。Web/iOS 出声前提 = 壳页手势解锁器（§三），引擎侧只负责「有可播的流、调用不报错」。
+
+## 五、门禁与验收（22 项断言，帧预算 240→320）
+
+### 5.1 smoke.gd 断言清单（13 项既有全保留 + 9 项 v3 新增）
+
+1. 场景实例化与接线；2. autoload 注册与约定信号；3. InputMap 键位契约 + **方向符号**（A/← 减小、D/→ 增大）；4. 信号到达订阅方；5. 收集判定触碰 +1；6. **跨 3 局 50 次真实触碰每次恰好 +1**（只碰普通物，含清场静置反例）；7. 难度梯度按**波次曲线**单调收紧有界 + 首收后 SpawnTimer 真实变快；8. 过期回收不计分；9. 通关可达（第 20 分 → WON + 结算「通关」）；10. 失败可达（时限归零 → LOST + HUD ≤10s 红色警示）；11. 一键重开全复位；12. 持久化落盘回读一致（含 best_combo）；13. **v2 手感基线**（体型 1.3~1.5×、移速 60~70% 且接线到根节点/碰撞体/PickupArea）——以上既有；v3 新增：14. 开始流程（READY→确认→RUNNING）；15. 多类型计分（rare +3、clock +2 加时 4s）；16. Combo（窗口内递增/高分物加成/UI 可见/超时清零）；17. 磁铁（85px 测试距内目标被吸至判定距离并收集）；18. 加速（实测位移 > 基线 ×1.3，BOOST_MULT=1.5 留工程余量）；19. 暂停/恢复（P 键冻结时限）；20. 波次（按分数切分、权重表逐波合计 1 且 rare 单调不降）；21. 音效（Sfx 库 ≥6 音色、收集后 played_count 真增长）；22. 调参协议（声明键可应用钳制、未声明键拒绝）。
+
+### 5.2 门禁实测（本机复跑，2026-10-14）
+
+- **v3 pck 自跑冒烟 PASS**（对 `bfce9152` 导出的 `index.pck`，2,544,432B，sha256 `4e3c42fa5dcbfa8b31d5b7c1d65df2ccd9024dcfd40f2e3edde95bce55c70aca`）：
+  `GODOT_SMOKE: PASS 场景实例化/输入映射/移动方向符号(A/←减小,D/→增大)/收集判定/50 连击一致性/波次梯度/过期回收/胜负/一键重开/持久化/v2手感基线(体型1.3~1.5x·移速60~70%)/v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环) 全部通过`（exit 0、零 SCRIPT ERROR）
+- wasm 与 v2 **逐字节一致**（`fe5cebc5…`，35,376,909B，引擎零漂移，pck 是唯一内容载体）。
+- 帧预算 **240→320**（game-6「加预算」先例路线，verify.sh 内 `GODOT_SMOKE_FRAMES:-320`）：v3 新增 6 个真实交互断言阶段约 +75 帧；判定协议（PASS 标记 + 退出码 0 + 零 SCRIPT ERROR）不变，预算只放宽兜底不改判定语义。
+- input-fuzz PASS（seed=20260913，6 批次，agent 实测）；**playtest.sh 模板资产仍缺失，D2 维持 blocked，不代写不伪造**。
+- 「新机制不破坏旧断言」四个可复用手法：①普通物恒 +1（Combo 加成只给高分物）；②末波插值终点取 TARGET-1（保 v2 收敛断言）；③断言阶段入口把分数白盒归零（防多类型/Combo 阶段误触 20 分通关线）；④持久化回读前强制 `save_progress()`（断言语义=「落盘→回读一致」而非内存值）。
+
+## 六、部署上线卡点（唯一未闭环项）与一键恢复
+
+- **现状**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`，liveUrl `https://leomac-studio.tail49399e.ts.net/apps/game-8/`）current deployment = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`（2026-10-02，v2）；线上 pck sha256 实测 = `5f556ad9…`（= v2 基线，无版本漂移），线上健康 200 `{"ok":true,...}`。
+- **卡点**：`POST /api/v1/apphost/apps/:id/deployments` 校验「仅应用所有者（`cmuimu6w…`）或系统管理员」；执行链 agent 的 token 代行主体为 `cmoqv70b8`（≠ owner），POST 与 dryRun 均 403（2026-10-13 首测、2026-10-14 复测一致）。这是平台授权缺口，不是工程问题——**不许绕过校验、不许直改平台库**。
+- **一键恢复（需 @MyRD Admin / 应用所有者或系统管理员身份执行）**：
+
+```bash
+# ① 干跑（不落部署，验证权限与构建配置；403 则需换有权限身份）
+curl -s -X POST -H "Authorization: Bearer $MYRD_TOKEN" -H "Content-Type: application/json" \
+  "$PLATFORM_API_URL/api/v1/apphost/apps/cmujpmjsy006pm99ip9yws3wl/deployments" \
+  -d '{"mode":"bundle","dryRun":true,"deployedBy":"agent","gitRef":"myrd/game-8-goal-cmujpml1e006rm99i9hc33huu","sourceId":"cmujpml1e006rm99i9hc33huu","goalId":"cmujpml1e006rm99i9hc33huu"}'
+# ② 正式部署：同体去掉 "dryRun":true；带 goalId 会把可玩产物自动回写目标卡片（= artifacts 回写）
+```
+
+- **部署 gitRef 红线**：必须是 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu`（tip=`bfce9152`，已含 v3 全部实现与导出产物），**绝不落 main**。
+- **上线核对清单（照抄即用）**：① `/apps/game-8/health` → 200 ok:true；② `GET /apps/game-8/api/public/assets/index.pck.gz.b64` → base64 解码 gunzip → sha256 应为 **`4e3c42fa…70aca`（2,544,432B）**；index.wasm.gz.b64 解码 sha256 应仍为 `fe5cebc5…`；③ 线上 pck 自跑冒烟：签名必须含「v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环)」字样；④ 移动端模拟门禁（webapp-smoke 390×844 六项：网络/console/首屏内容/触摸管线/视口等——工具链已对线上 v2 验证全绿，证据 `games/game-8/qa/mobile-live-v2/`）。
+- ⚠️ 交接文档提交 `29f982f`（v3-release-handoff.md）推送超时未上远端（`git ls-remote` tip 实测 = `bfce9152`），**恢复命令与核对口径以本文为准**。
+
+## 七、复用要点（同类小游戏照抄）
+
+1. **结构性加机制走「表 + 纯函数」**：类型表（ITEM_SCORES）/波次权重表（WAVE_WEIGHTS）/波内插值锚点（FRAC 数组）全部数据化，口径纯函数（`item_score_for/gain_for/wave_index_for/spawn_interval_now`）运行时与 smoke 共用单一事实源——断言可直接调纯函数机判。
+2. **新机制不得污染旧基线**：给旧断言留「隔离带」（普通物恒 +1、末波终点 TARGET-1、断言阶段分数白盒归零、回读前强制落盘），比放宽旧断言正确一百倍。
+3. **Godot 4.3 实测**：`const` 里写 `PackedVector2Array(...)` 构造会 Parse Error 并连锁炸掉所有引用该类型的脚本——造型表用 `static var`。
+4. **程序化音效闭环「零音效」**：合成 AudioStreamWAV（确定性、零资产、可机判 played_count）+ 壳页手势解锁器是 Web/iOS 出声的双件套，缺一即无声。
+5. **UI 增量全代码创建、.tscn 零改动**：规避场景手写风险（load_steps/ext_resource 极易错），节点随用随建、动画完自动回收。
+6. **工作流 routine 参数带 `#` 会被注入守卫拒绝**（step 命令经 bash -c 拼接）——gameDecisions 里不要带 shell 元字符，或改在 routine step 里写死。
+7. **执行链 token 与 app/goal owner 不一致时**，部署/回写会 403：按纪律停下上报、证据落盘、给出一键恢复命令（本文 §六格式），不绕权限、不伪造「已上线」。
 
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
@@ -2887,38 +3043,44 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
-
-# 失败模式：Worker SIGINT 关闭中断
-
-## 背景
-自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
-
-## 现象
-- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
-- 输出摘要为空（进程在产出任何结果前被杀）；
-- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
-
-## 根因
-- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
-- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
-- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
-
-## 排查与处置
-1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
-2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
-3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
-4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
-5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
-
-## 预防
-- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
-- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
-- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
 ## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
 negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -3123,44 +3285,38 @@ agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
 - fix: 修复 bug
 - docs: 文档更新
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
 修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+
+## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
+
+# 失败模式：Worker SIGINT 关闭中断
+
+## 背景
+自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
+
+## 现象
+- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
+- 输出摘要为空（进程在产出任何结果前被杀）；
+- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
+
+## 根因
+- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
+- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
+- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
+
+## 排查与处置
+1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
+2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
+3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
+4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
+5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
+
+## 预防
+- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
+- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
+- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
 ## 架构设计文档
 
@@ -4484,6 +4640,17 @@ smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的�
 
 **来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
 
+---
+
+## 五、v3 增补（2026-10-14）：v2 数值基线在 v3 中的延续与口径迁移
+
+> v3「玩法扩展与体验升级」已完成实现与门禁（分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`），**本文 §一~§四的 v2 基线全部继承、零回退**（v3 冒烟签名仍含「v2手感基线(体型1.3~1.5x·移速60~70%)」且本机对 v3 pck 复跑 PASS）。变化与迁移以 v3 结论文档为准（doc `b0a9a7ff-3339-43dc-9602-6477e562bd4f`，§一/§二），要点：
+> 1. **通关口径迁移**：`TARGET_SCORE=20` 由「件数」改为「**分数**」（normal +1 / rare 金铃铛 +3 / clock 时钟 +2 且加时 4s；Combo 加成只作用 ≥2 分高分物，普通物恒 +1——本文 §一的 50 次触碰口径在 v3 下原样成立）。
+> 2. **数值区新增 11 个声明键**（COMBO_WINDOW=2.0s、COMBO_BONUS_MAX=5、TIME_BONUS_CLOCK=4.0s、MAGNET_RADIUS=100px、MAGNET_DURATION=5s、BOOST_MULT=1.5、BOOST_DURATION=4s、WAVE_BREAK_SECONDS=1.2s、TARGET_SCORE、MAX_COLLECTIBLES=6、TIME_LIMIT 显式化），v2 的 PLAYER_SCALE/PLAYER_SPEED/SPAWN_INTERVAL_*/LIFETIME_* 默认值与钳制原样保留。
+> 3. **节奏曲线改波次状态机**：刷间隔/寿命端点（0.8→0.45s、6→3s）不变，插值改为三波锚点（WAVE_INTERVAL_FRAC=[0,0.45,0.75,1.0]），末波终点取 TARGET-1 保本文「满难度收敛到 MIN」断言同值；刷出改「同屏 ≤6 件补齐制」。
+> 4. **冒烟帧预算 240→320**（game-6 加预算先例），判定协议三条件不变；断言 13 项既有全保留 + 9 项 v3 新增（共 22 项）。
+> 5. **部署状态**：线上（version 5 @ `1089e4b`）仍是 v2——本文 §三的 pck/wasm sha256 对线上继续有效；v3 pck（sha256 `4e3c42fa…`）已就绪待上线，部署 403 卡点与一键恢复命令见 v3 结论文档 §六。
+
 
 ## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
 
@@ -5691,6 +5858,151 @@ v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 
 ## 八、衔接声明
 
 本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
+
+
+## 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+# 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+> **文档定位**：固化 game-8 v3「玩法扩展与体验升级」的机制清单（**策划案 v2 → 实现 `bfce9152` 的落账差异，实现为准**）、触屏操控实现方案、美术/音效/数值基线与门禁实测结论，并登记**唯一未闭环项——v3 部署上线卡点（403 授权）与一键恢复路径**（§六）。后续迭代与同类休闲收集小游戏直接按本文对齐，不必重新勘探。
+> **一手实测声明**：本文全部数字为一手实测（2026-10-14 取证）——`git show bfce9152` 逐文件核对、线上与本地产物 sha256 实算、`godot --headless --main-pack <pck> --quit-after 320 res://tests/smoke.tscn` 本机复跑，非转述估算。
+> **权威基准**：v3 需求（`cmv6vkith000gjotytp4v915c`，tag `goal-cmujpml1e006rm99i9hc33huu#wf-sg-v3-req-r4`）；策划案 v2 GameDesignSpec（`cmv6weob6000sjotyffuhjca6`，status=approved，create_design_spec 首次走通）；v2 参数基线（doc `843ddfec-62e1-4e02-b277-21155f7595bc`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）。
+> **实现基线（v3）**：分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`（feat 提交，远端 tip 已 `git ls-remote` 核实），数值唯一对齐点 `games/game-8/autoload/game_state.gd` 数值区（18 个 `TUNING_META` 声明键），禁止散点改代码对数值。
+> **部署现状（关键）**：线上 = HostedApp `cmujpmjsy006pm99ip9yws3wl` **version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`，仍是 v2 构建**（线上 pck sha256 实测 = v2 基线 `5f556ad9…`）；**v3 已实现、已过门禁、已推送，但部署被 403 拦下**——恢复命令见 §六。
+
+## 〇、v3 现状一图流
+
+| 环节 | 状态 | 一手证据 |
+|---|---|---|
+| v3 需求登记 | ✅ | requirement `cmv6vkith000gjotytp4v915c`（HTTP 201，戳记 `#wf-sg-v3-req-r4` 无重复） |
+| 策划案 v2 落账 | ✅ | GameDesignSpec `cmv6weob6000sjotyffuhjca6`（HTTP 201，schemaVersion v0，status approved——平台 create_design_spec 能力恢复后的首次成功） |
+| 工坊工作流 run（v3） | ❌ failed | routine 入参 `gameDecisions` 含 shell 元字符 `#` 被拒绝替换（step 命令经 `bash -c` 拼接的安全守卫），**零实现遗留** |
+| v3 实现补齐 | ✅ | 线上验收 agent 代做全链路：commit `bfce9152`（11 文件，+1348/−153），`1089e4b..bfce9152` 已推送成功 |
+| 门禁 | ✅ | preflight 13 类×40 文件 PASS；smoke @320 帧 3 连 PASS（零 SCRIPT ERROR）；input-fuzz PASS（seed=20260913，6 批次）；v3 pck 自跑冒烟 PASS（§五，本机复跑） |
+| **部署上线** | **⛔ 403** | `POST /api/v1/apphost/apps/…/deployments` 仅 app owner（`cmuimu6w…`）或系统管理员；agent 代行主体 `cmoqv70b8`（含 dryRun）均被拒（2026-10-14 复测仍 403） |
+
+## 一、v3 机制清单（实现落账口径，`game_state.gd` @ `bfce9152` 为唯一来源）
+
+### 1.1 目标物 5 类（需求「≥3 种、分值/效果互异」超额落账）
+
+| 类型 | 造型（半径≈14px 多边形） | 分值 | 效果 | 配色 RGB | 波次权重 W0/W1/W2 |
+|---|---|---|---|---|---|
+| normal 青草垛 | 菱形 | +1 | 无（**恒 +1，Combo 不加成**，保护 50 次触碰台账） | (0.55,0.8,0.3) 草绿 | 0.80 / 0.68 / 0.55 |
+| rare 金铃铛 | 十点星形 | +3 | 高分物，吃 Combo 加成 | (1.0,0.82,0.25) 亮金 | 0.10 / 0.17 / 0.25 |
+| clock 时钟 | 八边形 | +2 | 得分 +2 且**加时 +4s**（钳到 TIME_LIMIT） | (0.45,0.75,1.0) 天蓝 | 0.05 / 0.08 / 0.10 |
+| magnet 磁铁 | U 形 | 0（道具） | 生效 5s：半径 100px 内计分物以 170px/s 被拉向牛牛（`MAGNET_PULL_SPEED`） | (0.9,0.4,0.75) 品红 | 0.025 / 0.035 / 0.05 |
+| boost 加速 | 闪电形 | 0（道具） | 生效 4s：实际移速 = `PLAYER_SPEED × 1.5`（`current_speed()` 机判口径） | (0.35,0.9,0.85) 青碧 | 0.025 / 0.035 / 0.05 |
+
+- 每波权重表合计恒为 1.0；**越往后稀有物与道具占比越高**（「值得追」补偿「越来越快」），波次断言含 rare 权重单调不降。
+- 刷出改为**同屏上限补齐制**：`MAX_COLLECTIBLES=6`，低于上限由生成器补充（v1「寿命÷间隔自然收敛 ≈7±1」的推导口径被取代）。
+
+### 1.2 Combo 连击
+
+- 窗口 `COMBO_WINDOW=2.0s`：窗口内连续收集 combo +1（`_advance_combo`：窗口活着递增、断链从 1 起算），超时/暂停/重开清零；`_process` 仅 RUNNING 推进窗口倒计时。
+- 加成 `combo_bonus_for = (combo<2 ? 0 : min(combo-1, COMBO_BONUS_MAX=5))`，每级 +1。
+- **`gain_for` 关键设计**：加成只作用于分值 ≥2 的高分物（rare/clock）；普通物恒 +1 → 需求「50 次真实触碰每次恰好 +1」基线在多类型下零回退（冒烟 MASS 阶段只碰普通物，台账零重构）。
+- 档案新增 `best_combo` 持久化字段（`user://niuniu_game8_save.json`：best_score / total_collected / best_combo 三键）。
+
+### 1.3 波次状态机（替代 v1 单一线性收紧曲线）
+
+- 波次按**分数**切分：`wave_index_for` 以 `third=max(⌊T/3⌋,1)`、`two_thirds=max(⌊2T/3⌋,third+1)` 分三段（默认 T=20 → 0..6 / 7..13 / 14..19），随 TARGET_SCORE 自适应。
+- 波内插值锚点：`WAVE_INTERVAL_FRAC=[0, 0.45, 0.75, 1.0]`、`WAVE_LIFETIME_FRAC=[0, 0.55, 0.8, 1.0]`——刷新间隔 0.8s→0.45s、寿命 6s→3s 三段线性、**全局单调不增、有界**，端点与 v1/v2 断言同值。
+- **末波终点取 `TARGET_SCORE-1` 的兼容性设计**：达标分当帧即通关、曲线不再被查询，因此「满难度（score=19）收敛到 SPAWN_INTERVAL_MIN」的 v2 断言原样成立（曾实测 score=19 时插值到 0.4625≠0.45 的回归，已修）。
+- 跨波：`wave_changed` → 场景层接管**波间停顿 `WAVE_BREAK_SECONDS=1.2s`**（生成器暂停 + 横幅提示），三段副标题：「青草垛大量刷出，热身收集」→「金铃铛变多，瞄准高分」→「最后冲刺，连击冲分！」。
+
+### 1.4 单局阶段机与流程（需求 ④2）
+
+- `enum Phase { RUNNING, WON, LOST, READY, PAUSED }`——新增 READY（开始面板，确认/触摸进入）与 PAUSED（键盘 P 或触摸暂停按钮，恢复前时限冻结）。
+- `start_run()` 统一「开始/重开」入口：score 归零、时限重置、combo/run_max_combo/wave_index 复位、牛牛归位、道具清空（`clear_powerups`）、场上重铺、刷点仍避出生点 ≥96px。
+- 结算（WON/LOST 都结算）：刷新 best_score / best_combo 并 `save_progress()`——**失败也保留累计收集进度**。
+- **通关口径迁移**：`TARGET_SCORE=20` 的口径由 v1/v2 的「件数」改为「**分数**」（普通 +1 / 金铃铛 +3 / 时钟 +2，另计高分物 Combo 加成）——后续所有「集满 20」表述一律按分数理解。
+
+### 1.5 策划案 v2 → 实现落账差异（防后人拿错口径，实现为准）
+
+| 项 | 策划案 v2（设计稿） | 实现 `bfce9152`（权威） |
+|---|---|---|
+| 目标物 | 3 类：青草垛 +1 / 金铃铛 +5 / 三叶草 +1+效果，另设树桩惩罚物 | **5 类**（§1.1）：树桩取消，磁铁/加速两道具直接入权重池刷出；金铃铛 +5→**+3**；三叶草改为 **clock 时钟 +2 加时 4s** |
+| 道具参数 | 磁铁 180px·5s、蹄铁 ×1.5 速·5s | 磁铁 **100px**（拉速 170px/s）·5s；加速 ×1.5·**4s** |
+| Combo | 窗口 3s，加成 `ceil(分值×(1+0.1×等级))` | 窗口 **2s**，**每级 +1 封顶 5**，且**只作用 ≥2 分高分物** |
+| 波间停顿 | 2s | **1.2s** |
+| 通关口径 | 目标收集量 20（件数） | **20 分（分数口径）** |
+
+## 二、数值基线（18 个 TUNING_META 声明键，默认值 = 钳制区间/步长）
+
+| 键 | 默认 | min~max/step | 键 | 默认 | min~max/step |
+|---|---|---|---|---|---|
+| TARGET_SCORE | 20 | 5~60/1 | PLAYER_SCALE（v2 继承） | 1.4 | 0.5~2.0/0.05 |
+| TIME_LIMIT | 60 | 15~180/5 | PLAYER_SPEED（v2 继承） | 145 | 60~300/5 |
+| MAX_COLLECTIBLES | 6 | 1~20/1 | COMBO_WINDOW | 2.0s | 0.5~5/0.1 |
+| SPAWN_INTERVAL_START | 0.8s | 0.3~3/0.05 | COMBO_BONUS_MAX | 5 | 0~10/1 |
+| SPAWN_INTERVAL_MIN | 0.45s | 0.2~2/0.05 | TIME_BONUS_CLOCK | 4.0s | 0~10/0.5 |
+| LIFETIME_START | 6.0s | 2~15/0.5 | MAGNET_RADIUS | 100px | 60~200/5 |
+| LIFETIME_MIN | 3.0s | 1~10/0.5 | MAGNET_DURATION | 5.0s | 1~10/0.5 |
+| WAVE_BREAK_SECONDS | 1.2s | 0~3/0.1 | BOOST_MULT | 1.5 | 1.1~2.5/0.05 |
+| BOOST_DURATION | 4.0s | 1~10/0.5 | LIFETIME_WARN_SECONDS | 1.5s（const，临期闪烁阈值） | — |
+
+- 调参协议（SKILL.md §3C，v3 延续）：`apply_tuning()` 唯一应用入口——只认声明键（未声明键拒绝）、按 min/max 钳制、**保序约束**（`SPAWN_INTERVAL_MIN ≤ SPAWN_INTERVAL_START`、`LIFETIME_MIN ≤ LIFETIME_START`，防单调性被调坏）；改 TIME_LIMIT 立即重置本局剩余时间。双通道保留：游戏内调参面板 + 壳页 `?tuning=<JSON>` → `window.__GAME_TUNING__`。
+- 冒烟含调参协议断言：新增声明键可应用/钳制、未声明键必须被拒绝。
+- 判定几何（沿用 v2 实测口径）：PickupShape 本体 r=22×1.4≈30.8px + 收集物 r=14px → 触发距离 ≈44.8px；刷点安全间距 96px ≈ 2.14× 余量；刷点距场地边缘 ≥48px（`SPAWN_MARGIN`）。
+
+## 三、触屏操控实现方案（现网既有形态 + v3 延续加固）
+
+- **移动管线单一化**：左下角**虚拟摇杆**（`virtual_joystick.gd`，v2 包内既有、v3 延续）→ `InputEventAction` 注入 `move_left/right/up/down` → 与键盘共用 `_unhandled_input` 同一管线。摇杆参数：底座 `BASE_RADIUS=56px`、摇杆头 `STICK_RADIUS=26px`、死区 `DEADZONE_RATIO=0.25`。方向不反向由冒烟方向符号断言钉死（A/← 后 position.x 减小、D/→ 后增大）。
+- **按钮触达**：`touch_confirm_button.gd` 确认按钮半径 **44px**（满足「触达区 ≥44×44px」），点击注入 `confirm` 动作、与键盘同路径；局内暂停按钮仅触摸设备显示（桌面键盘环境完全不可见，`TouchUI` CanvasLayer 统一管理）。
+- **视口适配**：竖屏 **720×1280** 基线，`stretch/mode=canvas_items` + `aspect=keep` 等比缩放，`handheld/orientation=portrait`；HUD 操作提示按输入设备切换文案。
+- **壳页硬契约**（`server/src/game-page.ts`，随部署上线，实测在位）：viewport meta（user-scalable=no）、`touch-action:none`、调参桥（非法 JSON 按无调参处理绝不阻塞启动）、**音频手势解锁器**（包装 AudioContext 捕获引擎实例 + touchstart/touchend/pointerdown/keydown/click 五类事件 capture+passive 同步 resume，覆盖 suspended 与 interrupted；visibilitychange 回前台再解锁；`__audioDebug` 取证出口）、**AudioWorklet addModule 补丁**（worklet 是移动端音频单一故障点：真实资产端点优先、失败降级原路径重试一次、仍失败显式 console.error + audioLog 记 `worklet-dead`）。
+
+## 四、美术/音效基线
+
+- **分层背景**：视差远/近两层（全部代码创建，`_update_parallax` 随角色移动产生轻视差），统一牧场绿主题。
+- **目标物动效**：5 类专属多边形造型 + 专属配色（§1.1 表）；待机呼吸（缩放 1±0.08 正弦脉动，`breathing_scale()` 可观测）；临期 ≤1.5s 时 alpha 闪烁警示；收集/消失动画播放完整且节点无残留（`remove_child→queue_free` 清场纪律不回退）。
+- **反馈三件套**：收集音效 + 粒子 + 飘字同帧触发；飘字生命周期 `FLOAT_TEXT_LIFETIME=0.6s`、颜色与目标物呼应；粒子随用随建、动画完自动回收。
+- **UI 主题五色**：`THEME_PANEL_BG=(0.07,0.14,0.10,0.94)` / `BORDER=草绿(0.55,0.8,0.3,0.9)` / `TEXT=(0.96,0.97,0.92)` / `ACCENT=草绿` / `COMBO=橙(1.0,0.62,0.2)`；开始/HUD/结算/暂停面板统一主题；v3 增量 UI（背景层/连击/横幅/开始面板/暂停面板/粒子/飘字）**全部代码创建，.tscn 零新增节点**（规避场景手写风险）。
+- **字体**：Noto Sans SC（OFL，子集化）保留，`theme/custom_font` 全局生效。
+- **音效基线（「零音效」缺陷闭环）**：新增 `sfx.gd` autoload——**程序化合成、零外部资产、确定性**：7 个音色（collect=880Hz blip / rare=987.77·1174.66·1396.91Hz 琶音 / clock=660+880Hz 双音 / powerup=320→960Hz 扫频 / wave=293.66Hz / win=523.25·659.25·783.99·1046.5Hz 琶音 / lose=440→174.61Hz 下滑），22.05kHz 16-bit PCM、复音池 6（池满抢占最老播放器）、主增益 0.5、pitch 参数支持连击音高爬升；`played_count` 供冒烟机判「收集后真的播了声」。Web/iOS 出声前提 = 壳页手势解锁器（§三），引擎侧只负责「有可播的流、调用不报错」。
+
+## 五、门禁与验收（22 项断言，帧预算 240→320）
+
+### 5.1 smoke.gd 断言清单（13 项既有全保留 + 9 项 v3 新增）
+
+1. 场景实例化与接线；2. autoload 注册与约定信号；3. InputMap 键位契约 + **方向符号**（A/← 减小、D/→ 增大）；4. 信号到达订阅方；5. 收集判定触碰 +1；6. **跨 3 局 50 次真实触碰每次恰好 +1**（只碰普通物，含清场静置反例）；7. 难度梯度按**波次曲线**单调收紧有界 + 首收后 SpawnTimer 真实变快；8. 过期回收不计分；9. 通关可达（第 20 分 → WON + 结算「通关」）；10. 失败可达（时限归零 → LOST + HUD ≤10s 红色警示）；11. 一键重开全复位；12. 持久化落盘回读一致（含 best_combo）；13. **v2 手感基线**（体型 1.3~1.5×、移速 60~70% 且接线到根节点/碰撞体/PickupArea）——以上既有；v3 新增：14. 开始流程（READY→确认→RUNNING）；15. 多类型计分（rare +3、clock +2 加时 4s）；16. Combo（窗口内递增/高分物加成/UI 可见/超时清零）；17. 磁铁（85px 测试距内目标被吸至判定距离并收集）；18. 加速（实测位移 > 基线 ×1.3，BOOST_MULT=1.5 留工程余量）；19. 暂停/恢复（P 键冻结时限）；20. 波次（按分数切分、权重表逐波合计 1 且 rare 单调不降）；21. 音效（Sfx 库 ≥6 音色、收集后 played_count 真增长）；22. 调参协议（声明键可应用钳制、未声明键拒绝）。
+
+### 5.2 门禁实测（本机复跑，2026-10-14）
+
+- **v3 pck 自跑冒烟 PASS**（对 `bfce9152` 导出的 `index.pck`，2,544,432B，sha256 `4e3c42fa5dcbfa8b31d5b7c1d65df2ccd9024dcfd40f2e3edde95bce55c70aca`）：
+  `GODOT_SMOKE: PASS 场景实例化/输入映射/移动方向符号(A/←减小,D/→增大)/收集判定/50 连击一致性/波次梯度/过期回收/胜负/一键重开/持久化/v2手感基线(体型1.3~1.5x·移速60~70%)/v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环) 全部通过`（exit 0、零 SCRIPT ERROR）
+- wasm 与 v2 **逐字节一致**（`fe5cebc5…`，35,376,909B，引擎零漂移，pck 是唯一内容载体）。
+- 帧预算 **240→320**（game-6「加预算」先例路线，verify.sh 内 `GODOT_SMOKE_FRAMES:-320`）：v3 新增 6 个真实交互断言阶段约 +75 帧；判定协议（PASS 标记 + 退出码 0 + 零 SCRIPT ERROR）不变，预算只放宽兜底不改判定语义。
+- input-fuzz PASS（seed=20260913，6 批次，agent 实测）；**playtest.sh 模板资产仍缺失，D2 维持 blocked，不代写不伪造**。
+- 「新机制不破坏旧断言」四个可复用手法：①普通物恒 +1（Combo 加成只给高分物）；②末波插值终点取 TARGET-1（保 v2 收敛断言）；③断言阶段入口把分数白盒归零（防多类型/Combo 阶段误触 20 分通关线）；④持久化回读前强制 `save_progress()`（断言语义=「落盘→回读一致」而非内存值）。
+
+## 六、部署上线卡点（唯一未闭环项）与一键恢复
+
+- **现状**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`，liveUrl `https://leomac-studio.tail49399e.ts.net/apps/game-8/`）current deployment = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`（2026-10-02，v2）；线上 pck sha256 实测 = `5f556ad9…`（= v2 基线，无版本漂移），线上健康 200 `{"ok":true,...}`。
+- **卡点**：`POST /api/v1/apphost/apps/:id/deployments` 校验「仅应用所有者（`cmuimu6w…`）或系统管理员」；执行链 agent 的 token 代行主体为 `cmoqv70b8`（≠ owner），POST 与 dryRun 均 403（2026-10-13 首测、2026-10-14 复测一致）。这是平台授权缺口，不是工程问题——**不许绕过校验、不许直改平台库**。
+- **一键恢复（需 @MyRD Admin / 应用所有者或系统管理员身份执行）**：
+
+```bash
+# ① 干跑（不落部署，验证权限与构建配置；403 则需换有权限身份）
+curl -s -X POST -H "Authorization: Bearer $MYRD_TOKEN" -H "Content-Type: application/json" \
+  "$PLATFORM_API_URL/api/v1/apphost/apps/cmujpmjsy006pm99ip9yws3wl/deployments" \
+  -d '{"mode":"bundle","dryRun":true,"deployedBy":"agent","gitRef":"myrd/game-8-goal-cmujpml1e006rm99i9hc33huu","sourceId":"cmujpml1e006rm99i9hc33huu","goalId":"cmujpml1e006rm99i9hc33huu"}'
+# ② 正式部署：同体去掉 "dryRun":true；带 goalId 会把可玩产物自动回写目标卡片（= artifacts 回写）
+```
+
+- **部署 gitRef 红线**：必须是 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu`（tip=`bfce9152`，已含 v3 全部实现与导出产物），**绝不落 main**。
+- **上线核对清单（照抄即用）**：① `/apps/game-8/health` → 200 ok:true；② `GET /apps/game-8/api/public/assets/index.pck.gz.b64` → base64 解码 gunzip → sha256 应为 **`4e3c42fa…70aca`（2,544,432B）**；index.wasm.gz.b64 解码 sha256 应仍为 `fe5cebc5…`；③ 线上 pck 自跑冒烟：签名必须含「v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环)」字样；④ 移动端模拟门禁（webapp-smoke 390×844 六项：网络/console/首屏内容/触摸管线/视口等——工具链已对线上 v2 验证全绿，证据 `games/game-8/qa/mobile-live-v2/`）。
+- ⚠️ 交接文档提交 `29f982f`（v3-release-handoff.md）推送超时未上远端（`git ls-remote` tip 实测 = `bfce9152`），**恢复命令与核对口径以本文为准**。
+
+## 七、复用要点（同类小游戏照抄）
+
+1. **结构性加机制走「表 + 纯函数」**：类型表（ITEM_SCORES）/波次权重表（WAVE_WEIGHTS）/波内插值锚点（FRAC 数组）全部数据化，口径纯函数（`item_score_for/gain_for/wave_index_for/spawn_interval_now`）运行时与 smoke 共用单一事实源——断言可直接调纯函数机判。
+2. **新机制不得污染旧基线**：给旧断言留「隔离带」（普通物恒 +1、末波终点 TARGET-1、断言阶段分数白盒归零、回读前强制落盘），比放宽旧断言正确一百倍。
+3. **Godot 4.3 实测**：`const` 里写 `PackedVector2Array(...)` 构造会 Parse Error 并连锁炸掉所有引用该类型的脚本——造型表用 `static var`。
+4. **程序化音效闭环「零音效」**：合成 AudioStreamWAV（确定性、零资产、可机判 played_count）+ 壳页手势解锁器是 Web/iOS 出声的双件套，缺一即无声。
+5. **UI 增量全代码创建、.tscn 零改动**：规避场景手写风险（load_steps/ext_resource 极易错），节点随用随建、动画完自动回收。
+6. **工作流 routine 参数带 `#` 会被注入守卫拒绝**（step 命令经 bash -c 拼接）——gameDecisions 里不要带 shell 元字符，或改在 routine step 里写死。
+7. **执行链 token 与 app/goal owner 不一致时**，部署/回写会 403：按纪律停下上报、证据落盘、给出一键恢复命令（本文 §六格式），不绕权限、不伪造「已上线」。
 
 
 ---
@@ -5714,38 +6026,44 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
-
-# 失败模式：Worker SIGINT 关闭中断
-
-## 背景
-自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
-
-## 现象
-- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
-- 输出摘要为空（进程在产出任何结果前被杀）；
-- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
-
-## 根因
-- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
-- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
-- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
-
-## 排查与处置
-1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
-2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
-3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
-4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
-5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
-
-## 预防
-- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
-- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
-- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
 ## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
 negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -5950,44 +6268,38 @@ agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
 - fix: 修复 bug
 - docs: 文档更新
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
 修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+
+## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
+
+# 失败模式：Worker SIGINT 关闭中断
+
+## 背景
+自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
+
+## 现象
+- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
+- 输出摘要为空（进程在产出任何结果前被杀）；
+- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
+
+## 根因
+- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
+- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
+- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
+
+## 排查与处置
+1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
+2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
+3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
+4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
+5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
+
+## 预防
+- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
+- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
+- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
 ## 架构设计文档
 
@@ -7311,6 +7623,17 @@ smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的�
 
 **来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
 
+---
+
+## 五、v3 增补（2026-10-14）：v2 数值基线在 v3 中的延续与口径迁移
+
+> v3「玩法扩展与体验升级」已完成实现与门禁（分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`），**本文 §一~§四的 v2 基线全部继承、零回退**（v3 冒烟签名仍含「v2手感基线(体型1.3~1.5x·移速60~70%)」且本机对 v3 pck 复跑 PASS）。变化与迁移以 v3 结论文档为准（doc `b0a9a7ff-3339-43dc-9602-6477e562bd4f`，§一/§二），要点：
+> 1. **通关口径迁移**：`TARGET_SCORE=20` 由「件数」改为「**分数**」（normal +1 / rare 金铃铛 +3 / clock 时钟 +2 且加时 4s；Combo 加成只作用 ≥2 分高分物，普通物恒 +1——本文 §一的 50 次触碰口径在 v3 下原样成立）。
+> 2. **数值区新增 11 个声明键**（COMBO_WINDOW=2.0s、COMBO_BONUS_MAX=5、TIME_BONUS_CLOCK=4.0s、MAGNET_RADIUS=100px、MAGNET_DURATION=5s、BOOST_MULT=1.5、BOOST_DURATION=4s、WAVE_BREAK_SECONDS=1.2s、TARGET_SCORE、MAX_COLLECTIBLES=6、TIME_LIMIT 显式化），v2 的 PLAYER_SCALE/PLAYER_SPEED/SPAWN_INTERVAL_*/LIFETIME_* 默认值与钳制原样保留。
+> 3. **节奏曲线改波次状态机**：刷间隔/寿命端点（0.8→0.45s、6→3s）不变，插值改为三波锚点（WAVE_INTERVAL_FRAC=[0,0.45,0.75,1.0]），末波终点取 TARGET-1 保本文「满难度收敛到 MIN」断言同值；刷出改「同屏 ≤6 件补齐制」。
+> 4. **冒烟帧预算 240→320**（game-6 加预算先例），判定协议三条件不变；断言 13 项既有全保留 + 9 项 v3 新增（共 22 项）。
+> 5. **部署状态**：线上（version 5 @ `1089e4b`）仍是 v2——本文 §三的 pck/wasm sha256 对线上继续有效；v3 pck（sha256 `4e3c42fa…`）已就绪待上线，部署 403 卡点与一键恢复命令见 v3 结论文档 §六。
+
 
 ## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
 
@@ -8518,6 +8841,151 @@ v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 
 ## 八、衔接声明
 
 本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
+
+
+## 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+# 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+> **文档定位**：固化 game-8 v3「玩法扩展与体验升级」的机制清单（**策划案 v2 → 实现 `bfce9152` 的落账差异，实现为准**）、触屏操控实现方案、美术/音效/数值基线与门禁实测结论，并登记**唯一未闭环项——v3 部署上线卡点（403 授权）与一键恢复路径**（§六）。后续迭代与同类休闲收集小游戏直接按本文对齐，不必重新勘探。
+> **一手实测声明**：本文全部数字为一手实测（2026-10-14 取证）——`git show bfce9152` 逐文件核对、线上与本地产物 sha256 实算、`godot --headless --main-pack <pck> --quit-after 320 res://tests/smoke.tscn` 本机复跑，非转述估算。
+> **权威基准**：v3 需求（`cmv6vkith000gjotytp4v915c`，tag `goal-cmujpml1e006rm99i9hc33huu#wf-sg-v3-req-r4`）；策划案 v2 GameDesignSpec（`cmv6weob6000sjotyffuhjca6`，status=approved，create_design_spec 首次走通）；v2 参数基线（doc `843ddfec-62e1-4e02-b277-21155f7595bc`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）。
+> **实现基线（v3）**：分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`（feat 提交，远端 tip 已 `git ls-remote` 核实），数值唯一对齐点 `games/game-8/autoload/game_state.gd` 数值区（18 个 `TUNING_META` 声明键），禁止散点改代码对数值。
+> **部署现状（关键）**：线上 = HostedApp `cmujpmjsy006pm99ip9yws3wl` **version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`，仍是 v2 构建**（线上 pck sha256 实测 = v2 基线 `5f556ad9…`）；**v3 已实现、已过门禁、已推送，但部署被 403 拦下**——恢复命令见 §六。
+
+## 〇、v3 现状一图流
+
+| 环节 | 状态 | 一手证据 |
+|---|---|---|
+| v3 需求登记 | ✅ | requirement `cmv6vkith000gjotytp4v915c`（HTTP 201，戳记 `#wf-sg-v3-req-r4` 无重复） |
+| 策划案 v2 落账 | ✅ | GameDesignSpec `cmv6weob6000sjotyffuhjca6`（HTTP 201，schemaVersion v0，status approved——平台 create_design_spec 能力恢复后的首次成功） |
+| 工坊工作流 run（v3） | ❌ failed | routine 入参 `gameDecisions` 含 shell 元字符 `#` 被拒绝替换（step 命令经 `bash -c` 拼接的安全守卫），**零实现遗留** |
+| v3 实现补齐 | ✅ | 线上验收 agent 代做全链路：commit `bfce9152`（11 文件，+1348/−153），`1089e4b..bfce9152` 已推送成功 |
+| 门禁 | ✅ | preflight 13 类×40 文件 PASS；smoke @320 帧 3 连 PASS（零 SCRIPT ERROR）；input-fuzz PASS（seed=20260913，6 批次）；v3 pck 自跑冒烟 PASS（§五，本机复跑） |
+| **部署上线** | **⛔ 403** | `POST /api/v1/apphost/apps/…/deployments` 仅 app owner（`cmuimu6w…`）或系统管理员；agent 代行主体 `cmoqv70b8`（含 dryRun）均被拒（2026-10-14 复测仍 403） |
+
+## 一、v3 机制清单（实现落账口径，`game_state.gd` @ `bfce9152` 为唯一来源）
+
+### 1.1 目标物 5 类（需求「≥3 种、分值/效果互异」超额落账）
+
+| 类型 | 造型（半径≈14px 多边形） | 分值 | 效果 | 配色 RGB | 波次权重 W0/W1/W2 |
+|---|---|---|---|---|---|
+| normal 青草垛 | 菱形 | +1 | 无（**恒 +1，Combo 不加成**，保护 50 次触碰台账） | (0.55,0.8,0.3) 草绿 | 0.80 / 0.68 / 0.55 |
+| rare 金铃铛 | 十点星形 | +3 | 高分物，吃 Combo 加成 | (1.0,0.82,0.25) 亮金 | 0.10 / 0.17 / 0.25 |
+| clock 时钟 | 八边形 | +2 | 得分 +2 且**加时 +4s**（钳到 TIME_LIMIT） | (0.45,0.75,1.0) 天蓝 | 0.05 / 0.08 / 0.10 |
+| magnet 磁铁 | U 形 | 0（道具） | 生效 5s：半径 100px 内计分物以 170px/s 被拉向牛牛（`MAGNET_PULL_SPEED`） | (0.9,0.4,0.75) 品红 | 0.025 / 0.035 / 0.05 |
+| boost 加速 | 闪电形 | 0（道具） | 生效 4s：实际移速 = `PLAYER_SPEED × 1.5`（`current_speed()` 机判口径） | (0.35,0.9,0.85) 青碧 | 0.025 / 0.035 / 0.05 |
+
+- 每波权重表合计恒为 1.0；**越往后稀有物与道具占比越高**（「值得追」补偿「越来越快」），波次断言含 rare 权重单调不降。
+- 刷出改为**同屏上限补齐制**：`MAX_COLLECTIBLES=6`，低于上限由生成器补充（v1「寿命÷间隔自然收敛 ≈7±1」的推导口径被取代）。
+
+### 1.2 Combo 连击
+
+- 窗口 `COMBO_WINDOW=2.0s`：窗口内连续收集 combo +1（`_advance_combo`：窗口活着递增、断链从 1 起算），超时/暂停/重开清零；`_process` 仅 RUNNING 推进窗口倒计时。
+- 加成 `combo_bonus_for = (combo<2 ? 0 : min(combo-1, COMBO_BONUS_MAX=5))`，每级 +1。
+- **`gain_for` 关键设计**：加成只作用于分值 ≥2 的高分物（rare/clock）；普通物恒 +1 → 需求「50 次真实触碰每次恰好 +1」基线在多类型下零回退（冒烟 MASS 阶段只碰普通物，台账零重构）。
+- 档案新增 `best_combo` 持久化字段（`user://niuniu_game8_save.json`：best_score / total_collected / best_combo 三键）。
+
+### 1.3 波次状态机（替代 v1 单一线性收紧曲线）
+
+- 波次按**分数**切分：`wave_index_for` 以 `third=max(⌊T/3⌋,1)`、`two_thirds=max(⌊2T/3⌋,third+1)` 分三段（默认 T=20 → 0..6 / 7..13 / 14..19），随 TARGET_SCORE 自适应。
+- 波内插值锚点：`WAVE_INTERVAL_FRAC=[0, 0.45, 0.75, 1.0]`、`WAVE_LIFETIME_FRAC=[0, 0.55, 0.8, 1.0]`——刷新间隔 0.8s→0.45s、寿命 6s→3s 三段线性、**全局单调不增、有界**，端点与 v1/v2 断言同值。
+- **末波终点取 `TARGET_SCORE-1` 的兼容性设计**：达标分当帧即通关、曲线不再被查询，因此「满难度（score=19）收敛到 SPAWN_INTERVAL_MIN」的 v2 断言原样成立（曾实测 score=19 时插值到 0.4625≠0.45 的回归，已修）。
+- 跨波：`wave_changed` → 场景层接管**波间停顿 `WAVE_BREAK_SECONDS=1.2s`**（生成器暂停 + 横幅提示），三段副标题：「青草垛大量刷出，热身收集」→「金铃铛变多，瞄准高分」→「最后冲刺，连击冲分！」。
+
+### 1.4 单局阶段机与流程（需求 ④2）
+
+- `enum Phase { RUNNING, WON, LOST, READY, PAUSED }`——新增 READY（开始面板，确认/触摸进入）与 PAUSED（键盘 P 或触摸暂停按钮，恢复前时限冻结）。
+- `start_run()` 统一「开始/重开」入口：score 归零、时限重置、combo/run_max_combo/wave_index 复位、牛牛归位、道具清空（`clear_powerups`）、场上重铺、刷点仍避出生点 ≥96px。
+- 结算（WON/LOST 都结算）：刷新 best_score / best_combo 并 `save_progress()`——**失败也保留累计收集进度**。
+- **通关口径迁移**：`TARGET_SCORE=20` 的口径由 v1/v2 的「件数」改为「**分数**」（普通 +1 / 金铃铛 +3 / 时钟 +2，另计高分物 Combo 加成）——后续所有「集满 20」表述一律按分数理解。
+
+### 1.5 策划案 v2 → 实现落账差异（防后人拿错口径，实现为准）
+
+| 项 | 策划案 v2（设计稿） | 实现 `bfce9152`（权威） |
+|---|---|---|
+| 目标物 | 3 类：青草垛 +1 / 金铃铛 +5 / 三叶草 +1+效果，另设树桩惩罚物 | **5 类**（§1.1）：树桩取消，磁铁/加速两道具直接入权重池刷出；金铃铛 +5→**+3**；三叶草改为 **clock 时钟 +2 加时 4s** |
+| 道具参数 | 磁铁 180px·5s、蹄铁 ×1.5 速·5s | 磁铁 **100px**（拉速 170px/s）·5s；加速 ×1.5·**4s** |
+| Combo | 窗口 3s，加成 `ceil(分值×(1+0.1×等级))` | 窗口 **2s**，**每级 +1 封顶 5**，且**只作用 ≥2 分高分物** |
+| 波间停顿 | 2s | **1.2s** |
+| 通关口径 | 目标收集量 20（件数） | **20 分（分数口径）** |
+
+## 二、数值基线（18 个 TUNING_META 声明键，默认值 = 钳制区间/步长）
+
+| 键 | 默认 | min~max/step | 键 | 默认 | min~max/step |
+|---|---|---|---|---|---|
+| TARGET_SCORE | 20 | 5~60/1 | PLAYER_SCALE（v2 继承） | 1.4 | 0.5~2.0/0.05 |
+| TIME_LIMIT | 60 | 15~180/5 | PLAYER_SPEED（v2 继承） | 145 | 60~300/5 |
+| MAX_COLLECTIBLES | 6 | 1~20/1 | COMBO_WINDOW | 2.0s | 0.5~5/0.1 |
+| SPAWN_INTERVAL_START | 0.8s | 0.3~3/0.05 | COMBO_BONUS_MAX | 5 | 0~10/1 |
+| SPAWN_INTERVAL_MIN | 0.45s | 0.2~2/0.05 | TIME_BONUS_CLOCK | 4.0s | 0~10/0.5 |
+| LIFETIME_START | 6.0s | 2~15/0.5 | MAGNET_RADIUS | 100px | 60~200/5 |
+| LIFETIME_MIN | 3.0s | 1~10/0.5 | MAGNET_DURATION | 5.0s | 1~10/0.5 |
+| WAVE_BREAK_SECONDS | 1.2s | 0~3/0.1 | BOOST_MULT | 1.5 | 1.1~2.5/0.05 |
+| BOOST_DURATION | 4.0s | 1~10/0.5 | LIFETIME_WARN_SECONDS | 1.5s（const，临期闪烁阈值） | — |
+
+- 调参协议（SKILL.md §3C，v3 延续）：`apply_tuning()` 唯一应用入口——只认声明键（未声明键拒绝）、按 min/max 钳制、**保序约束**（`SPAWN_INTERVAL_MIN ≤ SPAWN_INTERVAL_START`、`LIFETIME_MIN ≤ LIFETIME_START`，防单调性被调坏）；改 TIME_LIMIT 立即重置本局剩余时间。双通道保留：游戏内调参面板 + 壳页 `?tuning=<JSON>` → `window.__GAME_TUNING__`。
+- 冒烟含调参协议断言：新增声明键可应用/钳制、未声明键必须被拒绝。
+- 判定几何（沿用 v2 实测口径）：PickupShape 本体 r=22×1.4≈30.8px + 收集物 r=14px → 触发距离 ≈44.8px；刷点安全间距 96px ≈ 2.14× 余量；刷点距场地边缘 ≥48px（`SPAWN_MARGIN`）。
+
+## 三、触屏操控实现方案（现网既有形态 + v3 延续加固）
+
+- **移动管线单一化**：左下角**虚拟摇杆**（`virtual_joystick.gd`，v2 包内既有、v3 延续）→ `InputEventAction` 注入 `move_left/right/up/down` → 与键盘共用 `_unhandled_input` 同一管线。摇杆参数：底座 `BASE_RADIUS=56px`、摇杆头 `STICK_RADIUS=26px`、死区 `DEADZONE_RATIO=0.25`。方向不反向由冒烟方向符号断言钉死（A/← 后 position.x 减小、D/→ 后增大）。
+- **按钮触达**：`touch_confirm_button.gd` 确认按钮半径 **44px**（满足「触达区 ≥44×44px」），点击注入 `confirm` 动作、与键盘同路径；局内暂停按钮仅触摸设备显示（桌面键盘环境完全不可见，`TouchUI` CanvasLayer 统一管理）。
+- **视口适配**：竖屏 **720×1280** 基线，`stretch/mode=canvas_items` + `aspect=keep` 等比缩放，`handheld/orientation=portrait`；HUD 操作提示按输入设备切换文案。
+- **壳页硬契约**（`server/src/game-page.ts`，随部署上线，实测在位）：viewport meta（user-scalable=no）、`touch-action:none`、调参桥（非法 JSON 按无调参处理绝不阻塞启动）、**音频手势解锁器**（包装 AudioContext 捕获引擎实例 + touchstart/touchend/pointerdown/keydown/click 五类事件 capture+passive 同步 resume，覆盖 suspended 与 interrupted；visibilitychange 回前台再解锁；`__audioDebug` 取证出口）、**AudioWorklet addModule 补丁**（worklet 是移动端音频单一故障点：真实资产端点优先、失败降级原路径重试一次、仍失败显式 console.error + audioLog 记 `worklet-dead`）。
+
+## 四、美术/音效基线
+
+- **分层背景**：视差远/近两层（全部代码创建，`_update_parallax` 随角色移动产生轻视差），统一牧场绿主题。
+- **目标物动效**：5 类专属多边形造型 + 专属配色（§1.1 表）；待机呼吸（缩放 1±0.08 正弦脉动，`breathing_scale()` 可观测）；临期 ≤1.5s 时 alpha 闪烁警示；收集/消失动画播放完整且节点无残留（`remove_child→queue_free` 清场纪律不回退）。
+- **反馈三件套**：收集音效 + 粒子 + 飘字同帧触发；飘字生命周期 `FLOAT_TEXT_LIFETIME=0.6s`、颜色与目标物呼应；粒子随用随建、动画完自动回收。
+- **UI 主题五色**：`THEME_PANEL_BG=(0.07,0.14,0.10,0.94)` / `BORDER=草绿(0.55,0.8,0.3,0.9)` / `TEXT=(0.96,0.97,0.92)` / `ACCENT=草绿` / `COMBO=橙(1.0,0.62,0.2)`；开始/HUD/结算/暂停面板统一主题；v3 增量 UI（背景层/连击/横幅/开始面板/暂停面板/粒子/飘字）**全部代码创建，.tscn 零新增节点**（规避场景手写风险）。
+- **字体**：Noto Sans SC（OFL，子集化）保留，`theme/custom_font` 全局生效。
+- **音效基线（「零音效」缺陷闭环）**：新增 `sfx.gd` autoload——**程序化合成、零外部资产、确定性**：7 个音色（collect=880Hz blip / rare=987.77·1174.66·1396.91Hz 琶音 / clock=660+880Hz 双音 / powerup=320→960Hz 扫频 / wave=293.66Hz / win=523.25·659.25·783.99·1046.5Hz 琶音 / lose=440→174.61Hz 下滑），22.05kHz 16-bit PCM、复音池 6（池满抢占最老播放器）、主增益 0.5、pitch 参数支持连击音高爬升；`played_count` 供冒烟机判「收集后真的播了声」。Web/iOS 出声前提 = 壳页手势解锁器（§三），引擎侧只负责「有可播的流、调用不报错」。
+
+## 五、门禁与验收（22 项断言，帧预算 240→320）
+
+### 5.1 smoke.gd 断言清单（13 项既有全保留 + 9 项 v3 新增）
+
+1. 场景实例化与接线；2. autoload 注册与约定信号；3. InputMap 键位契约 + **方向符号**（A/← 减小、D/→ 增大）；4. 信号到达订阅方；5. 收集判定触碰 +1；6. **跨 3 局 50 次真实触碰每次恰好 +1**（只碰普通物，含清场静置反例）；7. 难度梯度按**波次曲线**单调收紧有界 + 首收后 SpawnTimer 真实变快；8. 过期回收不计分；9. 通关可达（第 20 分 → WON + 结算「通关」）；10. 失败可达（时限归零 → LOST + HUD ≤10s 红色警示）；11. 一键重开全复位；12. 持久化落盘回读一致（含 best_combo）；13. **v2 手感基线**（体型 1.3~1.5×、移速 60~70% 且接线到根节点/碰撞体/PickupArea）——以上既有；v3 新增：14. 开始流程（READY→确认→RUNNING）；15. 多类型计分（rare +3、clock +2 加时 4s）；16. Combo（窗口内递增/高分物加成/UI 可见/超时清零）；17. 磁铁（85px 测试距内目标被吸至判定距离并收集）；18. 加速（实测位移 > 基线 ×1.3，BOOST_MULT=1.5 留工程余量）；19. 暂停/恢复（P 键冻结时限）；20. 波次（按分数切分、权重表逐波合计 1 且 rare 单调不降）；21. 音效（Sfx 库 ≥6 音色、收集后 played_count 真增长）；22. 调参协议（声明键可应用钳制、未声明键拒绝）。
+
+### 5.2 门禁实测（本机复跑，2026-10-14）
+
+- **v3 pck 自跑冒烟 PASS**（对 `bfce9152` 导出的 `index.pck`，2,544,432B，sha256 `4e3c42fa5dcbfa8b31d5b7c1d65df2ccd9024dcfd40f2e3edde95bce55c70aca`）：
+  `GODOT_SMOKE: PASS 场景实例化/输入映射/移动方向符号(A/←减小,D/→增大)/收集判定/50 连击一致性/波次梯度/过期回收/胜负/一键重开/持久化/v2手感基线(体型1.3~1.5x·移速60~70%)/v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环) 全部通过`（exit 0、零 SCRIPT ERROR）
+- wasm 与 v2 **逐字节一致**（`fe5cebc5…`，35,376,909B，引擎零漂移，pck 是唯一内容载体）。
+- 帧预算 **240→320**（game-6「加预算」先例路线，verify.sh 内 `GODOT_SMOKE_FRAMES:-320`）：v3 新增 6 个真实交互断言阶段约 +75 帧；判定协议（PASS 标记 + 退出码 0 + 零 SCRIPT ERROR）不变，预算只放宽兜底不改判定语义。
+- input-fuzz PASS（seed=20260913，6 批次，agent 实测）；**playtest.sh 模板资产仍缺失，D2 维持 blocked，不代写不伪造**。
+- 「新机制不破坏旧断言」四个可复用手法：①普通物恒 +1（Combo 加成只给高分物）；②末波插值终点取 TARGET-1（保 v2 收敛断言）；③断言阶段入口把分数白盒归零（防多类型/Combo 阶段误触 20 分通关线）；④持久化回读前强制 `save_progress()`（断言语义=「落盘→回读一致」而非内存值）。
+
+## 六、部署上线卡点（唯一未闭环项）与一键恢复
+
+- **现状**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`，liveUrl `https://leomac-studio.tail49399e.ts.net/apps/game-8/`）current deployment = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`（2026-10-02，v2）；线上 pck sha256 实测 = `5f556ad9…`（= v2 基线，无版本漂移），线上健康 200 `{"ok":true,...}`。
+- **卡点**：`POST /api/v1/apphost/apps/:id/deployments` 校验「仅应用所有者（`cmuimu6w…`）或系统管理员」；执行链 agent 的 token 代行主体为 `cmoqv70b8`（≠ owner），POST 与 dryRun 均 403（2026-10-13 首测、2026-10-14 复测一致）。这是平台授权缺口，不是工程问题——**不许绕过校验、不许直改平台库**。
+- **一键恢复（需 @MyRD Admin / 应用所有者或系统管理员身份执行）**：
+
+```bash
+# ① 干跑（不落部署，验证权限与构建配置；403 则需换有权限身份）
+curl -s -X POST -H "Authorization: Bearer $MYRD_TOKEN" -H "Content-Type: application/json" \
+  "$PLATFORM_API_URL/api/v1/apphost/apps/cmujpmjsy006pm99ip9yws3wl/deployments" \
+  -d '{"mode":"bundle","dryRun":true,"deployedBy":"agent","gitRef":"myrd/game-8-goal-cmujpml1e006rm99i9hc33huu","sourceId":"cmujpml1e006rm99i9hc33huu","goalId":"cmujpml1e006rm99i9hc33huu"}'
+# ② 正式部署：同体去掉 "dryRun":true；带 goalId 会把可玩产物自动回写目标卡片（= artifacts 回写）
+```
+
+- **部署 gitRef 红线**：必须是 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu`（tip=`bfce9152`，已含 v3 全部实现与导出产物），**绝不落 main**。
+- **上线核对清单（照抄即用）**：① `/apps/game-8/health` → 200 ok:true；② `GET /apps/game-8/api/public/assets/index.pck.gz.b64` → base64 解码 gunzip → sha256 应为 **`4e3c42fa…70aca`（2,544,432B）**；index.wasm.gz.b64 解码 sha256 应仍为 `fe5cebc5…`；③ 线上 pck 自跑冒烟：签名必须含「v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环)」字样；④ 移动端模拟门禁（webapp-smoke 390×844 六项：网络/console/首屏内容/触摸管线/视口等——工具链已对线上 v2 验证全绿，证据 `games/game-8/qa/mobile-live-v2/`）。
+- ⚠️ 交接文档提交 `29f982f`（v3-release-handoff.md）推送超时未上远端（`git ls-remote` tip 实测 = `bfce9152`），**恢复命令与核对口径以本文为准**。
+
+## 七、复用要点（同类小游戏照抄）
+
+1. **结构性加机制走「表 + 纯函数」**：类型表（ITEM_SCORES）/波次权重表（WAVE_WEIGHTS）/波内插值锚点（FRAC 数组）全部数据化，口径纯函数（`item_score_for/gain_for/wave_index_for/spawn_interval_now`）运行时与 smoke 共用单一事实源——断言可直接调纯函数机判。
+2. **新机制不得污染旧基线**：给旧断言留「隔离带」（普通物恒 +1、末波终点 TARGET-1、断言阶段分数白盒归零、回读前强制落盘），比放宽旧断言正确一百倍。
+3. **Godot 4.3 实测**：`const` 里写 `PackedVector2Array(...)` 构造会 Parse Error 并连锁炸掉所有引用该类型的脚本——造型表用 `static var`。
+4. **程序化音效闭环「零音效」**：合成 AudioStreamWAV（确定性、零资产、可机判 played_count）+ 壳页手势解锁器是 Web/iOS 出声的双件套，缺一即无声。
+5. **UI 增量全代码创建、.tscn 零改动**：规避场景手写风险（load_steps/ext_resource 极易错），节点随用随建、动画完自动回收。
+6. **工作流 routine 参数带 `#` 会被注入守卫拒绝**（step 命令经 bash -c 拼接）——gameDecisions 里不要带 shell 元字符，或改在 routine step 里写死。
+7. **执行链 token 与 app/goal owner 不一致时**，部署/回写会 403：按纪律停下上报、证据落盘、给出一键恢复命令（本文 §六格式），不绕权限、不伪造「已上线」。
 
 
 ---
@@ -8551,38 +9019,44 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 
 ## 产品关联知识
 
-## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
-
-# 失败模式：Worker SIGINT 关闭中断
-
-## 背景
-自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
-
-## 现象
-- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
-- 输出摘要为空（进程在产出任何结果前被杀）；
-- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
-
-## 根因
-- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
-- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
-- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
-
-## 排查与处置
-1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
-2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
-3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
-4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
-5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
-
-## 预防
-- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
-- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
-- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
 ## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
 negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -8787,44 +9261,38 @@ agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
 - fix: 修复 bug
 - docs: 文档更新
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
 修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+
+## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
+
+# 失败模式：Worker SIGINT 关闭中断
+
+## 背景
+自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
+
+## 现象
+- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
+- 输出摘要为空（进程在产出任何结果前被杀）；
+- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
+
+## 根因
+- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
+- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
+- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
+
+## 排查与处置
+1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
+2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
+3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
+4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
+5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
+
+## 预防
+- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
+- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
+- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
 ## 架构设计文档
 
@@ -10148,6 +10616,17 @@ smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的�
 
 **来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
 
+---
+
+## 五、v3 增补（2026-10-14）：v2 数值基线在 v3 中的延续与口径迁移
+
+> v3「玩法扩展与体验升级」已完成实现与门禁（分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`），**本文 §一~§四的 v2 基线全部继承、零回退**（v3 冒烟签名仍含「v2手感基线(体型1.3~1.5x·移速60~70%)」且本机对 v3 pck 复跑 PASS）。变化与迁移以 v3 结论文档为准（doc `b0a9a7ff-3339-43dc-9602-6477e562bd4f`，§一/§二），要点：
+> 1. **通关口径迁移**：`TARGET_SCORE=20` 由「件数」改为「**分数**」（normal +1 / rare 金铃铛 +3 / clock 时钟 +2 且加时 4s；Combo 加成只作用 ≥2 分高分物，普通物恒 +1——本文 §一的 50 次触碰口径在 v3 下原样成立）。
+> 2. **数值区新增 11 个声明键**（COMBO_WINDOW=2.0s、COMBO_BONUS_MAX=5、TIME_BONUS_CLOCK=4.0s、MAGNET_RADIUS=100px、MAGNET_DURATION=5s、BOOST_MULT=1.5、BOOST_DURATION=4s、WAVE_BREAK_SECONDS=1.2s、TARGET_SCORE、MAX_COLLECTIBLES=6、TIME_LIMIT 显式化），v2 的 PLAYER_SCALE/PLAYER_SPEED/SPAWN_INTERVAL_*/LIFETIME_* 默认值与钳制原样保留。
+> 3. **节奏曲线改波次状态机**：刷间隔/寿命端点（0.8→0.45s、6→3s）不变，插值改为三波锚点（WAVE_INTERVAL_FRAC=[0,0.45,0.75,1.0]），末波终点取 TARGET-1 保本文「满难度收敛到 MIN」断言同值；刷出改「同屏 ≤6 件补齐制」。
+> 4. **冒烟帧预算 240→320**（game-6 加预算先例），判定协议三条件不变；断言 13 项既有全保留 + 9 项 v3 新增（共 22 项）。
+> 5. **部署状态**：线上（version 5 @ `1089e4b`）仍是 v2——本文 §三的 pck/wasm sha256 对线上继续有效；v3 pck（sha256 `4e3c42fa…`）已就绪待上线，部署 403 卡点与一键恢复命令见 v3 结论文档 §六。
+
 
 ## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
 
@@ -11355,6 +11834,151 @@ v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 
 ## 八、衔接声明
 
 本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
+
+
+## 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+# 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+> **文档定位**：固化 game-8 v3「玩法扩展与体验升级」的机制清单（**策划案 v2 → 实现 `bfce9152` 的落账差异，实现为准**）、触屏操控实现方案、美术/音效/数值基线与门禁实测结论，并登记**唯一未闭环项——v3 部署上线卡点（403 授权）与一键恢复路径**（§六）。后续迭代与同类休闲收集小游戏直接按本文对齐，不必重新勘探。
+> **一手实测声明**：本文全部数字为一手实测（2026-10-14 取证）——`git show bfce9152` 逐文件核对、线上与本地产物 sha256 实算、`godot --headless --main-pack <pck> --quit-after 320 res://tests/smoke.tscn` 本机复跑，非转述估算。
+> **权威基准**：v3 需求（`cmv6vkith000gjotytp4v915c`，tag `goal-cmujpml1e006rm99i9hc33huu#wf-sg-v3-req-r4`）；策划案 v2 GameDesignSpec（`cmv6weob6000sjotyffuhjca6`，status=approved，create_design_spec 首次走通）；v2 参数基线（doc `843ddfec-62e1-4e02-b277-21155f7595bc`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）。
+> **实现基线（v3）**：分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`（feat 提交，远端 tip 已 `git ls-remote` 核实），数值唯一对齐点 `games/game-8/autoload/game_state.gd` 数值区（18 个 `TUNING_META` 声明键），禁止散点改代码对数值。
+> **部署现状（关键）**：线上 = HostedApp `cmujpmjsy006pm99ip9yws3wl` **version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`，仍是 v2 构建**（线上 pck sha256 实测 = v2 基线 `5f556ad9…`）；**v3 已实现、已过门禁、已推送，但部署被 403 拦下**——恢复命令见 §六。
+
+## 〇、v3 现状一图流
+
+| 环节 | 状态 | 一手证据 |
+|---|---|---|
+| v3 需求登记 | ✅ | requirement `cmv6vkith000gjotytp4v915c`（HTTP 201，戳记 `#wf-sg-v3-req-r4` 无重复） |
+| 策划案 v2 落账 | ✅ | GameDesignSpec `cmv6weob6000sjotyffuhjca6`（HTTP 201，schemaVersion v0，status approved——平台 create_design_spec 能力恢复后的首次成功） |
+| 工坊工作流 run（v3） | ❌ failed | routine 入参 `gameDecisions` 含 shell 元字符 `#` 被拒绝替换（step 命令经 `bash -c` 拼接的安全守卫），**零实现遗留** |
+| v3 实现补齐 | ✅ | 线上验收 agent 代做全链路：commit `bfce9152`（11 文件，+1348/−153），`1089e4b..bfce9152` 已推送成功 |
+| 门禁 | ✅ | preflight 13 类×40 文件 PASS；smoke @320 帧 3 连 PASS（零 SCRIPT ERROR）；input-fuzz PASS（seed=20260913，6 批次）；v3 pck 自跑冒烟 PASS（§五，本机复跑） |
+| **部署上线** | **⛔ 403** | `POST /api/v1/apphost/apps/…/deployments` 仅 app owner（`cmuimu6w…`）或系统管理员；agent 代行主体 `cmoqv70b8`（含 dryRun）均被拒（2026-10-14 复测仍 403） |
+
+## 一、v3 机制清单（实现落账口径，`game_state.gd` @ `bfce9152` 为唯一来源）
+
+### 1.1 目标物 5 类（需求「≥3 种、分值/效果互异」超额落账）
+
+| 类型 | 造型（半径≈14px 多边形） | 分值 | 效果 | 配色 RGB | 波次权重 W0/W1/W2 |
+|---|---|---|---|---|---|
+| normal 青草垛 | 菱形 | +1 | 无（**恒 +1，Combo 不加成**，保护 50 次触碰台账） | (0.55,0.8,0.3) 草绿 | 0.80 / 0.68 / 0.55 |
+| rare 金铃铛 | 十点星形 | +3 | 高分物，吃 Combo 加成 | (1.0,0.82,0.25) 亮金 | 0.10 / 0.17 / 0.25 |
+| clock 时钟 | 八边形 | +2 | 得分 +2 且**加时 +4s**（钳到 TIME_LIMIT） | (0.45,0.75,1.0) 天蓝 | 0.05 / 0.08 / 0.10 |
+| magnet 磁铁 | U 形 | 0（道具） | 生效 5s：半径 100px 内计分物以 170px/s 被拉向牛牛（`MAGNET_PULL_SPEED`） | (0.9,0.4,0.75) 品红 | 0.025 / 0.035 / 0.05 |
+| boost 加速 | 闪电形 | 0（道具） | 生效 4s：实际移速 = `PLAYER_SPEED × 1.5`（`current_speed()` 机判口径） | (0.35,0.9,0.85) 青碧 | 0.025 / 0.035 / 0.05 |
+
+- 每波权重表合计恒为 1.0；**越往后稀有物与道具占比越高**（「值得追」补偿「越来越快」），波次断言含 rare 权重单调不降。
+- 刷出改为**同屏上限补齐制**：`MAX_COLLECTIBLES=6`，低于上限由生成器补充（v1「寿命÷间隔自然收敛 ≈7±1」的推导口径被取代）。
+
+### 1.2 Combo 连击
+
+- 窗口 `COMBO_WINDOW=2.0s`：窗口内连续收集 combo +1（`_advance_combo`：窗口活着递增、断链从 1 起算），超时/暂停/重开清零；`_process` 仅 RUNNING 推进窗口倒计时。
+- 加成 `combo_bonus_for = (combo<2 ? 0 : min(combo-1, COMBO_BONUS_MAX=5))`，每级 +1。
+- **`gain_for` 关键设计**：加成只作用于分值 ≥2 的高分物（rare/clock）；普通物恒 +1 → 需求「50 次真实触碰每次恰好 +1」基线在多类型下零回退（冒烟 MASS 阶段只碰普通物，台账零重构）。
+- 档案新增 `best_combo` 持久化字段（`user://niuniu_game8_save.json`：best_score / total_collected / best_combo 三键）。
+
+### 1.3 波次状态机（替代 v1 单一线性收紧曲线）
+
+- 波次按**分数**切分：`wave_index_for` 以 `third=max(⌊T/3⌋,1)`、`two_thirds=max(⌊2T/3⌋,third+1)` 分三段（默认 T=20 → 0..6 / 7..13 / 14..19），随 TARGET_SCORE 自适应。
+- 波内插值锚点：`WAVE_INTERVAL_FRAC=[0, 0.45, 0.75, 1.0]`、`WAVE_LIFETIME_FRAC=[0, 0.55, 0.8, 1.0]`——刷新间隔 0.8s→0.45s、寿命 6s→3s 三段线性、**全局单调不增、有界**，端点与 v1/v2 断言同值。
+- **末波终点取 `TARGET_SCORE-1` 的兼容性设计**：达标分当帧即通关、曲线不再被查询，因此「满难度（score=19）收敛到 SPAWN_INTERVAL_MIN」的 v2 断言原样成立（曾实测 score=19 时插值到 0.4625≠0.45 的回归，已修）。
+- 跨波：`wave_changed` → 场景层接管**波间停顿 `WAVE_BREAK_SECONDS=1.2s`**（生成器暂停 + 横幅提示），三段副标题：「青草垛大量刷出，热身收集」→「金铃铛变多，瞄准高分」→「最后冲刺，连击冲分！」。
+
+### 1.4 单局阶段机与流程（需求 ④2）
+
+- `enum Phase { RUNNING, WON, LOST, READY, PAUSED }`——新增 READY（开始面板，确认/触摸进入）与 PAUSED（键盘 P 或触摸暂停按钮，恢复前时限冻结）。
+- `start_run()` 统一「开始/重开」入口：score 归零、时限重置、combo/run_max_combo/wave_index 复位、牛牛归位、道具清空（`clear_powerups`）、场上重铺、刷点仍避出生点 ≥96px。
+- 结算（WON/LOST 都结算）：刷新 best_score / best_combo 并 `save_progress()`——**失败也保留累计收集进度**。
+- **通关口径迁移**：`TARGET_SCORE=20` 的口径由 v1/v2 的「件数」改为「**分数**」（普通 +1 / 金铃铛 +3 / 时钟 +2，另计高分物 Combo 加成）——后续所有「集满 20」表述一律按分数理解。
+
+### 1.5 策划案 v2 → 实现落账差异（防后人拿错口径，实现为准）
+
+| 项 | 策划案 v2（设计稿） | 实现 `bfce9152`（权威） |
+|---|---|---|
+| 目标物 | 3 类：青草垛 +1 / 金铃铛 +5 / 三叶草 +1+效果，另设树桩惩罚物 | **5 类**（§1.1）：树桩取消，磁铁/加速两道具直接入权重池刷出；金铃铛 +5→**+3**；三叶草改为 **clock 时钟 +2 加时 4s** |
+| 道具参数 | 磁铁 180px·5s、蹄铁 ×1.5 速·5s | 磁铁 **100px**（拉速 170px/s）·5s；加速 ×1.5·**4s** |
+| Combo | 窗口 3s，加成 `ceil(分值×(1+0.1×等级))` | 窗口 **2s**，**每级 +1 封顶 5**，且**只作用 ≥2 分高分物** |
+| 波间停顿 | 2s | **1.2s** |
+| 通关口径 | 目标收集量 20（件数） | **20 分（分数口径）** |
+
+## 二、数值基线（18 个 TUNING_META 声明键，默认值 = 钳制区间/步长）
+
+| 键 | 默认 | min~max/step | 键 | 默认 | min~max/step |
+|---|---|---|---|---|---|
+| TARGET_SCORE | 20 | 5~60/1 | PLAYER_SCALE（v2 继承） | 1.4 | 0.5~2.0/0.05 |
+| TIME_LIMIT | 60 | 15~180/5 | PLAYER_SPEED（v2 继承） | 145 | 60~300/5 |
+| MAX_COLLECTIBLES | 6 | 1~20/1 | COMBO_WINDOW | 2.0s | 0.5~5/0.1 |
+| SPAWN_INTERVAL_START | 0.8s | 0.3~3/0.05 | COMBO_BONUS_MAX | 5 | 0~10/1 |
+| SPAWN_INTERVAL_MIN | 0.45s | 0.2~2/0.05 | TIME_BONUS_CLOCK | 4.0s | 0~10/0.5 |
+| LIFETIME_START | 6.0s | 2~15/0.5 | MAGNET_RADIUS | 100px | 60~200/5 |
+| LIFETIME_MIN | 3.0s | 1~10/0.5 | MAGNET_DURATION | 5.0s | 1~10/0.5 |
+| WAVE_BREAK_SECONDS | 1.2s | 0~3/0.1 | BOOST_MULT | 1.5 | 1.1~2.5/0.05 |
+| BOOST_DURATION | 4.0s | 1~10/0.5 | LIFETIME_WARN_SECONDS | 1.5s（const，临期闪烁阈值） | — |
+
+- 调参协议（SKILL.md §3C，v3 延续）：`apply_tuning()` 唯一应用入口——只认声明键（未声明键拒绝）、按 min/max 钳制、**保序约束**（`SPAWN_INTERVAL_MIN ≤ SPAWN_INTERVAL_START`、`LIFETIME_MIN ≤ LIFETIME_START`，防单调性被调坏）；改 TIME_LIMIT 立即重置本局剩余时间。双通道保留：游戏内调参面板 + 壳页 `?tuning=<JSON>` → `window.__GAME_TUNING__`。
+- 冒烟含调参协议断言：新增声明键可应用/钳制、未声明键必须被拒绝。
+- 判定几何（沿用 v2 实测口径）：PickupShape 本体 r=22×1.4≈30.8px + 收集物 r=14px → 触发距离 ≈44.8px；刷点安全间距 96px ≈ 2.14× 余量；刷点距场地边缘 ≥48px（`SPAWN_MARGIN`）。
+
+## 三、触屏操控实现方案（现网既有形态 + v3 延续加固）
+
+- **移动管线单一化**：左下角**虚拟摇杆**（`virtual_joystick.gd`，v2 包内既有、v3 延续）→ `InputEventAction` 注入 `move_left/right/up/down` → 与键盘共用 `_unhandled_input` 同一管线。摇杆参数：底座 `BASE_RADIUS=56px`、摇杆头 `STICK_RADIUS=26px`、死区 `DEADZONE_RATIO=0.25`。方向不反向由冒烟方向符号断言钉死（A/← 后 position.x 减小、D/→ 后增大）。
+- **按钮触达**：`touch_confirm_button.gd` 确认按钮半径 **44px**（满足「触达区 ≥44×44px」），点击注入 `confirm` 动作、与键盘同路径；局内暂停按钮仅触摸设备显示（桌面键盘环境完全不可见，`TouchUI` CanvasLayer 统一管理）。
+- **视口适配**：竖屏 **720×1280** 基线，`stretch/mode=canvas_items` + `aspect=keep` 等比缩放，`handheld/orientation=portrait`；HUD 操作提示按输入设备切换文案。
+- **壳页硬契约**（`server/src/game-page.ts`，随部署上线，实测在位）：viewport meta（user-scalable=no）、`touch-action:none`、调参桥（非法 JSON 按无调参处理绝不阻塞启动）、**音频手势解锁器**（包装 AudioContext 捕获引擎实例 + touchstart/touchend/pointerdown/keydown/click 五类事件 capture+passive 同步 resume，覆盖 suspended 与 interrupted；visibilitychange 回前台再解锁；`__audioDebug` 取证出口）、**AudioWorklet addModule 补丁**（worklet 是移动端音频单一故障点：真实资产端点优先、失败降级原路径重试一次、仍失败显式 console.error + audioLog 记 `worklet-dead`）。
+
+## 四、美术/音效基线
+
+- **分层背景**：视差远/近两层（全部代码创建，`_update_parallax` 随角色移动产生轻视差），统一牧场绿主题。
+- **目标物动效**：5 类专属多边形造型 + 专属配色（§1.1 表）；待机呼吸（缩放 1±0.08 正弦脉动，`breathing_scale()` 可观测）；临期 ≤1.5s 时 alpha 闪烁警示；收集/消失动画播放完整且节点无残留（`remove_child→queue_free` 清场纪律不回退）。
+- **反馈三件套**：收集音效 + 粒子 + 飘字同帧触发；飘字生命周期 `FLOAT_TEXT_LIFETIME=0.6s`、颜色与目标物呼应；粒子随用随建、动画完自动回收。
+- **UI 主题五色**：`THEME_PANEL_BG=(0.07,0.14,0.10,0.94)` / `BORDER=草绿(0.55,0.8,0.3,0.9)` / `TEXT=(0.96,0.97,0.92)` / `ACCENT=草绿` / `COMBO=橙(1.0,0.62,0.2)`；开始/HUD/结算/暂停面板统一主题；v3 增量 UI（背景层/连击/横幅/开始面板/暂停面板/粒子/飘字）**全部代码创建，.tscn 零新增节点**（规避场景手写风险）。
+- **字体**：Noto Sans SC（OFL，子集化）保留，`theme/custom_font` 全局生效。
+- **音效基线（「零音效」缺陷闭环）**：新增 `sfx.gd` autoload——**程序化合成、零外部资产、确定性**：7 个音色（collect=880Hz blip / rare=987.77·1174.66·1396.91Hz 琶音 / clock=660+880Hz 双音 / powerup=320→960Hz 扫频 / wave=293.66Hz / win=523.25·659.25·783.99·1046.5Hz 琶音 / lose=440→174.61Hz 下滑），22.05kHz 16-bit PCM、复音池 6（池满抢占最老播放器）、主增益 0.5、pitch 参数支持连击音高爬升；`played_count` 供冒烟机判「收集后真的播了声」。Web/iOS 出声前提 = 壳页手势解锁器（§三），引擎侧只负责「有可播的流、调用不报错」。
+
+## 五、门禁与验收（22 项断言，帧预算 240→320）
+
+### 5.1 smoke.gd 断言清单（13 项既有全保留 + 9 项 v3 新增）
+
+1. 场景实例化与接线；2. autoload 注册与约定信号；3. InputMap 键位契约 + **方向符号**（A/← 减小、D/→ 增大）；4. 信号到达订阅方；5. 收集判定触碰 +1；6. **跨 3 局 50 次真实触碰每次恰好 +1**（只碰普通物，含清场静置反例）；7. 难度梯度按**波次曲线**单调收紧有界 + 首收后 SpawnTimer 真实变快；8. 过期回收不计分；9. 通关可达（第 20 分 → WON + 结算「通关」）；10. 失败可达（时限归零 → LOST + HUD ≤10s 红色警示）；11. 一键重开全复位；12. 持久化落盘回读一致（含 best_combo）；13. **v2 手感基线**（体型 1.3~1.5×、移速 60~70% 且接线到根节点/碰撞体/PickupArea）——以上既有；v3 新增：14. 开始流程（READY→确认→RUNNING）；15. 多类型计分（rare +3、clock +2 加时 4s）；16. Combo（窗口内递增/高分物加成/UI 可见/超时清零）；17. 磁铁（85px 测试距内目标被吸至判定距离并收集）；18. 加速（实测位移 > 基线 ×1.3，BOOST_MULT=1.5 留工程余量）；19. 暂停/恢复（P 键冻结时限）；20. 波次（按分数切分、权重表逐波合计 1 且 rare 单调不降）；21. 音效（Sfx 库 ≥6 音色、收集后 played_count 真增长）；22. 调参协议（声明键可应用钳制、未声明键拒绝）。
+
+### 5.2 门禁实测（本机复跑，2026-10-14）
+
+- **v3 pck 自跑冒烟 PASS**（对 `bfce9152` 导出的 `index.pck`，2,544,432B，sha256 `4e3c42fa5dcbfa8b31d5b7c1d65df2ccd9024dcfd40f2e3edde95bce55c70aca`）：
+  `GODOT_SMOKE: PASS 场景实例化/输入映射/移动方向符号(A/←减小,D/→增大)/收集判定/50 连击一致性/波次梯度/过期回收/胜负/一键重开/持久化/v2手感基线(体型1.3~1.5x·移速60~70%)/v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环) 全部通过`（exit 0、零 SCRIPT ERROR）
+- wasm 与 v2 **逐字节一致**（`fe5cebc5…`，35,376,909B，引擎零漂移，pck 是唯一内容载体）。
+- 帧预算 **240→320**（game-6「加预算」先例路线，verify.sh 内 `GODOT_SMOKE_FRAMES:-320`）：v3 新增 6 个真实交互断言阶段约 +75 帧；判定协议（PASS 标记 + 退出码 0 + 零 SCRIPT ERROR）不变，预算只放宽兜底不改判定语义。
+- input-fuzz PASS（seed=20260913，6 批次，agent 实测）；**playtest.sh 模板资产仍缺失，D2 维持 blocked，不代写不伪造**。
+- 「新机制不破坏旧断言」四个可复用手法：①普通物恒 +1（Combo 加成只给高分物）；②末波插值终点取 TARGET-1（保 v2 收敛断言）；③断言阶段入口把分数白盒归零（防多类型/Combo 阶段误触 20 分通关线）；④持久化回读前强制 `save_progress()`（断言语义=「落盘→回读一致」而非内存值）。
+
+## 六、部署上线卡点（唯一未闭环项）与一键恢复
+
+- **现状**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`，liveUrl `https://leomac-studio.tail49399e.ts.net/apps/game-8/`）current deployment = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`（2026-10-02，v2）；线上 pck sha256 实测 = `5f556ad9…`（= v2 基线，无版本漂移），线上健康 200 `{"ok":true,...}`。
+- **卡点**：`POST /api/v1/apphost/apps/:id/deployments` 校验「仅应用所有者（`cmuimu6w…`）或系统管理员」；执行链 agent 的 token 代行主体为 `cmoqv70b8`（≠ owner），POST 与 dryRun 均 403（2026-10-13 首测、2026-10-14 复测一致）。这是平台授权缺口，不是工程问题——**不许绕过校验、不许直改平台库**。
+- **一键恢复（需 @MyRD Admin / 应用所有者或系统管理员身份执行）**：
+
+```bash
+# ① 干跑（不落部署，验证权限与构建配置；403 则需换有权限身份）
+curl -s -X POST -H "Authorization: Bearer $MYRD_TOKEN" -H "Content-Type: application/json" \
+  "$PLATFORM_API_URL/api/v1/apphost/apps/cmujpmjsy006pm99ip9yws3wl/deployments" \
+  -d '{"mode":"bundle","dryRun":true,"deployedBy":"agent","gitRef":"myrd/game-8-goal-cmujpml1e006rm99i9hc33huu","sourceId":"cmujpml1e006rm99i9hc33huu","goalId":"cmujpml1e006rm99i9hc33huu"}'
+# ② 正式部署：同体去掉 "dryRun":true；带 goalId 会把可玩产物自动回写目标卡片（= artifacts 回写）
+```
+
+- **部署 gitRef 红线**：必须是 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu`（tip=`bfce9152`，已含 v3 全部实现与导出产物），**绝不落 main**。
+- **上线核对清单（照抄即用）**：① `/apps/game-8/health` → 200 ok:true；② `GET /apps/game-8/api/public/assets/index.pck.gz.b64` → base64 解码 gunzip → sha256 应为 **`4e3c42fa…70aca`（2,544,432B）**；index.wasm.gz.b64 解码 sha256 应仍为 `fe5cebc5…`；③ 线上 pck 自跑冒烟：签名必须含「v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环)」字样；④ 移动端模拟门禁（webapp-smoke 390×844 六项：网络/console/首屏内容/触摸管线/视口等——工具链已对线上 v2 验证全绿，证据 `games/game-8/qa/mobile-live-v2/`）。
+- ⚠️ 交接文档提交 `29f982f`（v3-release-handoff.md）推送超时未上远端（`git ls-remote` tip 实测 = `bfce9152`），**恢复命令与核对口径以本文为准**。
+
+## 七、复用要点（同类小游戏照抄）
+
+1. **结构性加机制走「表 + 纯函数」**：类型表（ITEM_SCORES）/波次权重表（WAVE_WEIGHTS）/波内插值锚点（FRAC 数组）全部数据化，口径纯函数（`item_score_for/gain_for/wave_index_for/spawn_interval_now`）运行时与 smoke 共用单一事实源——断言可直接调纯函数机判。
+2. **新机制不得污染旧基线**：给旧断言留「隔离带」（普通物恒 +1、末波终点 TARGET-1、断言阶段分数白盒归零、回读前强制落盘），比放宽旧断言正确一百倍。
+3. **Godot 4.3 实测**：`const` 里写 `PackedVector2Array(...)` 构造会 Parse Error 并连锁炸掉所有引用该类型的脚本——造型表用 `static var`。
+4. **程序化音效闭环「零音效」**：合成 AudioStreamWAV（确定性、零资产、可机判 played_count）+ 壳页手势解锁器是 Web/iOS 出声的双件套，缺一即无声。
+5. **UI 增量全代码创建、.tscn 零改动**：规避场景手写风险（load_steps/ext_resource 极易错），节点随用随建、动画完自动回收。
+6. **工作流 routine 参数带 `#` 会被注入守卫拒绝**（step 命令经 bash -c 拼接）——gameDecisions 里不要带 shell 元字符，或改在 routine step 里写死。
+7. **执行链 token 与 app/goal owner 不一致时**，部署/回写会 403：按纪律停下上报、证据落盘、给出一键恢复命令（本文 §六格式），不绕权限、不伪造「已上线」。
 
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
@@ -11416,38 +12040,44 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 
 ## 产品关联知识
 
-## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
-
-# 失败模式：Worker SIGINT 关闭中断
-
-## 背景
-自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
-
-## 现象
-- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
-- 输出摘要为空（进程在产出任何结果前被杀）；
-- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
-
-## 根因
-- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
-- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
-- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
-
-## 排查与处置
-1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
-2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
-3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
-4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
-5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
-
-## 预防
-- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
-- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
-- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
 ## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
 negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -11652,44 +12282,38 @@ agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
 - fix: 修复 bug
 - docs: 文档更新
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
 修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+
+## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
+
+# 失败模式：Worker SIGINT 关闭中断
+
+## 背景
+自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
+
+## 现象
+- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
+- 输出摘要为空（进程在产出任何结果前被杀）；
+- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
+
+## 根因
+- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
+- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
+- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
+
+## 排查与处置
+1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
+2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
+3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
+4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
+5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
+
+## 预防
+- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
+- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
+- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
 ## 架构设计文档
 
@@ -13013,6 +13637,17 @@ smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的�
 
 **来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
 
+---
+
+## 五、v3 增补（2026-10-14）：v2 数值基线在 v3 中的延续与口径迁移
+
+> v3「玩法扩展与体验升级」已完成实现与门禁（分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`），**本文 §一~§四的 v2 基线全部继承、零回退**（v3 冒烟签名仍含「v2手感基线(体型1.3~1.5x·移速60~70%)」且本机对 v3 pck 复跑 PASS）。变化与迁移以 v3 结论文档为准（doc `b0a9a7ff-3339-43dc-9602-6477e562bd4f`，§一/§二），要点：
+> 1. **通关口径迁移**：`TARGET_SCORE=20` 由「件数」改为「**分数**」（normal +1 / rare 金铃铛 +3 / clock 时钟 +2 且加时 4s；Combo 加成只作用 ≥2 分高分物，普通物恒 +1——本文 §一的 50 次触碰口径在 v3 下原样成立）。
+> 2. **数值区新增 11 个声明键**（COMBO_WINDOW=2.0s、COMBO_BONUS_MAX=5、TIME_BONUS_CLOCK=4.0s、MAGNET_RADIUS=100px、MAGNET_DURATION=5s、BOOST_MULT=1.5、BOOST_DURATION=4s、WAVE_BREAK_SECONDS=1.2s、TARGET_SCORE、MAX_COLLECTIBLES=6、TIME_LIMIT 显式化），v2 的 PLAYER_SCALE/PLAYER_SPEED/SPAWN_INTERVAL_*/LIFETIME_* 默认值与钳制原样保留。
+> 3. **节奏曲线改波次状态机**：刷间隔/寿命端点（0.8→0.45s、6→3s）不变，插值改为三波锚点（WAVE_INTERVAL_FRAC=[0,0.45,0.75,1.0]），末波终点取 TARGET-1 保本文「满难度收敛到 MIN」断言同值；刷出改「同屏 ≤6 件补齐制」。
+> 4. **冒烟帧预算 240→320**（game-6 加预算先例），判定协议三条件不变；断言 13 项既有全保留 + 9 项 v3 新增（共 22 项）。
+> 5. **部署状态**：线上（version 5 @ `1089e4b`）仍是 v2——本文 §三的 pck/wasm sha256 对线上继续有效；v3 pck（sha256 `4e3c42fa…`）已就绪待上线，部署 403 卡点与一键恢复命令见 v3 结论文档 §六。
+
 
 ## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
 
@@ -14220,6 +14855,151 @@ v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 
 ## 八、衔接声明
 
 本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
+
+
+## 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+# 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+> **文档定位**：固化 game-8 v3「玩法扩展与体验升级」的机制清单（**策划案 v2 → 实现 `bfce9152` 的落账差异，实现为准**）、触屏操控实现方案、美术/音效/数值基线与门禁实测结论，并登记**唯一未闭环项——v3 部署上线卡点（403 授权）与一键恢复路径**（§六）。后续迭代与同类休闲收集小游戏直接按本文对齐，不必重新勘探。
+> **一手实测声明**：本文全部数字为一手实测（2026-10-14 取证）——`git show bfce9152` 逐文件核对、线上与本地产物 sha256 实算、`godot --headless --main-pack <pck> --quit-after 320 res://tests/smoke.tscn` 本机复跑，非转述估算。
+> **权威基准**：v3 需求（`cmv6vkith000gjotytp4v915c`，tag `goal-cmujpml1e006rm99i9hc33huu#wf-sg-v3-req-r4`）；策划案 v2 GameDesignSpec（`cmv6weob6000sjotyffuhjca6`，status=approved，create_design_spec 首次走通）；v2 参数基线（doc `843ddfec-62e1-4e02-b277-21155f7595bc`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）。
+> **实现基线（v3）**：分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`（feat 提交，远端 tip 已 `git ls-remote` 核实），数值唯一对齐点 `games/game-8/autoload/game_state.gd` 数值区（18 个 `TUNING_META` 声明键），禁止散点改代码对数值。
+> **部署现状（关键）**：线上 = HostedApp `cmujpmjsy006pm99ip9yws3wl` **version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`，仍是 v2 构建**（线上 pck sha256 实测 = v2 基线 `5f556ad9…`）；**v3 已实现、已过门禁、已推送，但部署被 403 拦下**——恢复命令见 §六。
+
+## 〇、v3 现状一图流
+
+| 环节 | 状态 | 一手证据 |
+|---|---|---|
+| v3 需求登记 | ✅ | requirement `cmv6vkith000gjotytp4v915c`（HTTP 201，戳记 `#wf-sg-v3-req-r4` 无重复） |
+| 策划案 v2 落账 | ✅ | GameDesignSpec `cmv6weob6000sjotyffuhjca6`（HTTP 201，schemaVersion v0，status approved——平台 create_design_spec 能力恢复后的首次成功） |
+| 工坊工作流 run（v3） | ❌ failed | routine 入参 `gameDecisions` 含 shell 元字符 `#` 被拒绝替换（step 命令经 `bash -c` 拼接的安全守卫），**零实现遗留** |
+| v3 实现补齐 | ✅ | 线上验收 agent 代做全链路：commit `bfce9152`（11 文件，+1348/−153），`1089e4b..bfce9152` 已推送成功 |
+| 门禁 | ✅ | preflight 13 类×40 文件 PASS；smoke @320 帧 3 连 PASS（零 SCRIPT ERROR）；input-fuzz PASS（seed=20260913，6 批次）；v3 pck 自跑冒烟 PASS（§五，本机复跑） |
+| **部署上线** | **⛔ 403** | `POST /api/v1/apphost/apps/…/deployments` 仅 app owner（`cmuimu6w…`）或系统管理员；agent 代行主体 `cmoqv70b8`（含 dryRun）均被拒（2026-10-14 复测仍 403） |
+
+## 一、v3 机制清单（实现落账口径，`game_state.gd` @ `bfce9152` 为唯一来源）
+
+### 1.1 目标物 5 类（需求「≥3 种、分值/效果互异」超额落账）
+
+| 类型 | 造型（半径≈14px 多边形） | 分值 | 效果 | 配色 RGB | 波次权重 W0/W1/W2 |
+|---|---|---|---|---|---|
+| normal 青草垛 | 菱形 | +1 | 无（**恒 +1，Combo 不加成**，保护 50 次触碰台账） | (0.55,0.8,0.3) 草绿 | 0.80 / 0.68 / 0.55 |
+| rare 金铃铛 | 十点星形 | +3 | 高分物，吃 Combo 加成 | (1.0,0.82,0.25) 亮金 | 0.10 / 0.17 / 0.25 |
+| clock 时钟 | 八边形 | +2 | 得分 +2 且**加时 +4s**（钳到 TIME_LIMIT） | (0.45,0.75,1.0) 天蓝 | 0.05 / 0.08 / 0.10 |
+| magnet 磁铁 | U 形 | 0（道具） | 生效 5s：半径 100px 内计分物以 170px/s 被拉向牛牛（`MAGNET_PULL_SPEED`） | (0.9,0.4,0.75) 品红 | 0.025 / 0.035 / 0.05 |
+| boost 加速 | 闪电形 | 0（道具） | 生效 4s：实际移速 = `PLAYER_SPEED × 1.5`（`current_speed()` 机判口径） | (0.35,0.9,0.85) 青碧 | 0.025 / 0.035 / 0.05 |
+
+- 每波权重表合计恒为 1.0；**越往后稀有物与道具占比越高**（「值得追」补偿「越来越快」），波次断言含 rare 权重单调不降。
+- 刷出改为**同屏上限补齐制**：`MAX_COLLECTIBLES=6`，低于上限由生成器补充（v1「寿命÷间隔自然收敛 ≈7±1」的推导口径被取代）。
+
+### 1.2 Combo 连击
+
+- 窗口 `COMBO_WINDOW=2.0s`：窗口内连续收集 combo +1（`_advance_combo`：窗口活着递增、断链从 1 起算），超时/暂停/重开清零；`_process` 仅 RUNNING 推进窗口倒计时。
+- 加成 `combo_bonus_for = (combo<2 ? 0 : min(combo-1, COMBO_BONUS_MAX=5))`，每级 +1。
+- **`gain_for` 关键设计**：加成只作用于分值 ≥2 的高分物（rare/clock）；普通物恒 +1 → 需求「50 次真实触碰每次恰好 +1」基线在多类型下零回退（冒烟 MASS 阶段只碰普通物，台账零重构）。
+- 档案新增 `best_combo` 持久化字段（`user://niuniu_game8_save.json`：best_score / total_collected / best_combo 三键）。
+
+### 1.3 波次状态机（替代 v1 单一线性收紧曲线）
+
+- 波次按**分数**切分：`wave_index_for` 以 `third=max(⌊T/3⌋,1)`、`two_thirds=max(⌊2T/3⌋,third+1)` 分三段（默认 T=20 → 0..6 / 7..13 / 14..19），随 TARGET_SCORE 自适应。
+- 波内插值锚点：`WAVE_INTERVAL_FRAC=[0, 0.45, 0.75, 1.0]`、`WAVE_LIFETIME_FRAC=[0, 0.55, 0.8, 1.0]`——刷新间隔 0.8s→0.45s、寿命 6s→3s 三段线性、**全局单调不增、有界**，端点与 v1/v2 断言同值。
+- **末波终点取 `TARGET_SCORE-1` 的兼容性设计**：达标分当帧即通关、曲线不再被查询，因此「满难度（score=19）收敛到 SPAWN_INTERVAL_MIN」的 v2 断言原样成立（曾实测 score=19 时插值到 0.4625≠0.45 的回归，已修）。
+- 跨波：`wave_changed` → 场景层接管**波间停顿 `WAVE_BREAK_SECONDS=1.2s`**（生成器暂停 + 横幅提示），三段副标题：「青草垛大量刷出，热身收集」→「金铃铛变多，瞄准高分」→「最后冲刺，连击冲分！」。
+
+### 1.4 单局阶段机与流程（需求 ④2）
+
+- `enum Phase { RUNNING, WON, LOST, READY, PAUSED }`——新增 READY（开始面板，确认/触摸进入）与 PAUSED（键盘 P 或触摸暂停按钮，恢复前时限冻结）。
+- `start_run()` 统一「开始/重开」入口：score 归零、时限重置、combo/run_max_combo/wave_index 复位、牛牛归位、道具清空（`clear_powerups`）、场上重铺、刷点仍避出生点 ≥96px。
+- 结算（WON/LOST 都结算）：刷新 best_score / best_combo 并 `save_progress()`——**失败也保留累计收集进度**。
+- **通关口径迁移**：`TARGET_SCORE=20` 的口径由 v1/v2 的「件数」改为「**分数**」（普通 +1 / 金铃铛 +3 / 时钟 +2，另计高分物 Combo 加成）——后续所有「集满 20」表述一律按分数理解。
+
+### 1.5 策划案 v2 → 实现落账差异（防后人拿错口径，实现为准）
+
+| 项 | 策划案 v2（设计稿） | 实现 `bfce9152`（权威） |
+|---|---|---|
+| 目标物 | 3 类：青草垛 +1 / 金铃铛 +5 / 三叶草 +1+效果，另设树桩惩罚物 | **5 类**（§1.1）：树桩取消，磁铁/加速两道具直接入权重池刷出；金铃铛 +5→**+3**；三叶草改为 **clock 时钟 +2 加时 4s** |
+| 道具参数 | 磁铁 180px·5s、蹄铁 ×1.5 速·5s | 磁铁 **100px**（拉速 170px/s）·5s；加速 ×1.5·**4s** |
+| Combo | 窗口 3s，加成 `ceil(分值×(1+0.1×等级))` | 窗口 **2s**，**每级 +1 封顶 5**，且**只作用 ≥2 分高分物** |
+| 波间停顿 | 2s | **1.2s** |
+| 通关口径 | 目标收集量 20（件数） | **20 分（分数口径）** |
+
+## 二、数值基线（18 个 TUNING_META 声明键，默认值 = 钳制区间/步长）
+
+| 键 | 默认 | min~max/step | 键 | 默认 | min~max/step |
+|---|---|---|---|---|---|
+| TARGET_SCORE | 20 | 5~60/1 | PLAYER_SCALE（v2 继承） | 1.4 | 0.5~2.0/0.05 |
+| TIME_LIMIT | 60 | 15~180/5 | PLAYER_SPEED（v2 继承） | 145 | 60~300/5 |
+| MAX_COLLECTIBLES | 6 | 1~20/1 | COMBO_WINDOW | 2.0s | 0.5~5/0.1 |
+| SPAWN_INTERVAL_START | 0.8s | 0.3~3/0.05 | COMBO_BONUS_MAX | 5 | 0~10/1 |
+| SPAWN_INTERVAL_MIN | 0.45s | 0.2~2/0.05 | TIME_BONUS_CLOCK | 4.0s | 0~10/0.5 |
+| LIFETIME_START | 6.0s | 2~15/0.5 | MAGNET_RADIUS | 100px | 60~200/5 |
+| LIFETIME_MIN | 3.0s | 1~10/0.5 | MAGNET_DURATION | 5.0s | 1~10/0.5 |
+| WAVE_BREAK_SECONDS | 1.2s | 0~3/0.1 | BOOST_MULT | 1.5 | 1.1~2.5/0.05 |
+| BOOST_DURATION | 4.0s | 1~10/0.5 | LIFETIME_WARN_SECONDS | 1.5s（const，临期闪烁阈值） | — |
+
+- 调参协议（SKILL.md §3C，v3 延续）：`apply_tuning()` 唯一应用入口——只认声明键（未声明键拒绝）、按 min/max 钳制、**保序约束**（`SPAWN_INTERVAL_MIN ≤ SPAWN_INTERVAL_START`、`LIFETIME_MIN ≤ LIFETIME_START`，防单调性被调坏）；改 TIME_LIMIT 立即重置本局剩余时间。双通道保留：游戏内调参面板 + 壳页 `?tuning=<JSON>` → `window.__GAME_TUNING__`。
+- 冒烟含调参协议断言：新增声明键可应用/钳制、未声明键必须被拒绝。
+- 判定几何（沿用 v2 实测口径）：PickupShape 本体 r=22×1.4≈30.8px + 收集物 r=14px → 触发距离 ≈44.8px；刷点安全间距 96px ≈ 2.14× 余量；刷点距场地边缘 ≥48px（`SPAWN_MARGIN`）。
+
+## 三、触屏操控实现方案（现网既有形态 + v3 延续加固）
+
+- **移动管线单一化**：左下角**虚拟摇杆**（`virtual_joystick.gd`，v2 包内既有、v3 延续）→ `InputEventAction` 注入 `move_left/right/up/down` → 与键盘共用 `_unhandled_input` 同一管线。摇杆参数：底座 `BASE_RADIUS=56px`、摇杆头 `STICK_RADIUS=26px`、死区 `DEADZONE_RATIO=0.25`。方向不反向由冒烟方向符号断言钉死（A/← 后 position.x 减小、D/→ 后增大）。
+- **按钮触达**：`touch_confirm_button.gd` 确认按钮半径 **44px**（满足「触达区 ≥44×44px」），点击注入 `confirm` 动作、与键盘同路径；局内暂停按钮仅触摸设备显示（桌面键盘环境完全不可见，`TouchUI` CanvasLayer 统一管理）。
+- **视口适配**：竖屏 **720×1280** 基线，`stretch/mode=canvas_items` + `aspect=keep` 等比缩放，`handheld/orientation=portrait`；HUD 操作提示按输入设备切换文案。
+- **壳页硬契约**（`server/src/game-page.ts`，随部署上线，实测在位）：viewport meta（user-scalable=no）、`touch-action:none`、调参桥（非法 JSON 按无调参处理绝不阻塞启动）、**音频手势解锁器**（包装 AudioContext 捕获引擎实例 + touchstart/touchend/pointerdown/keydown/click 五类事件 capture+passive 同步 resume，覆盖 suspended 与 interrupted；visibilitychange 回前台再解锁；`__audioDebug` 取证出口）、**AudioWorklet addModule 补丁**（worklet 是移动端音频单一故障点：真实资产端点优先、失败降级原路径重试一次、仍失败显式 console.error + audioLog 记 `worklet-dead`）。
+
+## 四、美术/音效基线
+
+- **分层背景**：视差远/近两层（全部代码创建，`_update_parallax` 随角色移动产生轻视差），统一牧场绿主题。
+- **目标物动效**：5 类专属多边形造型 + 专属配色（§1.1 表）；待机呼吸（缩放 1±0.08 正弦脉动，`breathing_scale()` 可观测）；临期 ≤1.5s 时 alpha 闪烁警示；收集/消失动画播放完整且节点无残留（`remove_child→queue_free` 清场纪律不回退）。
+- **反馈三件套**：收集音效 + 粒子 + 飘字同帧触发；飘字生命周期 `FLOAT_TEXT_LIFETIME=0.6s`、颜色与目标物呼应；粒子随用随建、动画完自动回收。
+- **UI 主题五色**：`THEME_PANEL_BG=(0.07,0.14,0.10,0.94)` / `BORDER=草绿(0.55,0.8,0.3,0.9)` / `TEXT=(0.96,0.97,0.92)` / `ACCENT=草绿` / `COMBO=橙(1.0,0.62,0.2)`；开始/HUD/结算/暂停面板统一主题；v3 增量 UI（背景层/连击/横幅/开始面板/暂停面板/粒子/飘字）**全部代码创建，.tscn 零新增节点**（规避场景手写风险）。
+- **字体**：Noto Sans SC（OFL，子集化）保留，`theme/custom_font` 全局生效。
+- **音效基线（「零音效」缺陷闭环）**：新增 `sfx.gd` autoload——**程序化合成、零外部资产、确定性**：7 个音色（collect=880Hz blip / rare=987.77·1174.66·1396.91Hz 琶音 / clock=660+880Hz 双音 / powerup=320→960Hz 扫频 / wave=293.66Hz / win=523.25·659.25·783.99·1046.5Hz 琶音 / lose=440→174.61Hz 下滑），22.05kHz 16-bit PCM、复音池 6（池满抢占最老播放器）、主增益 0.5、pitch 参数支持连击音高爬升；`played_count` 供冒烟机判「收集后真的播了声」。Web/iOS 出声前提 = 壳页手势解锁器（§三），引擎侧只负责「有可播的流、调用不报错」。
+
+## 五、门禁与验收（22 项断言，帧预算 240→320）
+
+### 5.1 smoke.gd 断言清单（13 项既有全保留 + 9 项 v3 新增）
+
+1. 场景实例化与接线；2. autoload 注册与约定信号；3. InputMap 键位契约 + **方向符号**（A/← 减小、D/→ 增大）；4. 信号到达订阅方；5. 收集判定触碰 +1；6. **跨 3 局 50 次真实触碰每次恰好 +1**（只碰普通物，含清场静置反例）；7. 难度梯度按**波次曲线**单调收紧有界 + 首收后 SpawnTimer 真实变快；8. 过期回收不计分；9. 通关可达（第 20 分 → WON + 结算「通关」）；10. 失败可达（时限归零 → LOST + HUD ≤10s 红色警示）；11. 一键重开全复位；12. 持久化落盘回读一致（含 best_combo）；13. **v2 手感基线**（体型 1.3~1.5×、移速 60~70% 且接线到根节点/碰撞体/PickupArea）——以上既有；v3 新增：14. 开始流程（READY→确认→RUNNING）；15. 多类型计分（rare +3、clock +2 加时 4s）；16. Combo（窗口内递增/高分物加成/UI 可见/超时清零）；17. 磁铁（85px 测试距内目标被吸至判定距离并收集）；18. 加速（实测位移 > 基线 ×1.3，BOOST_MULT=1.5 留工程余量）；19. 暂停/恢复（P 键冻结时限）；20. 波次（按分数切分、权重表逐波合计 1 且 rare 单调不降）；21. 音效（Sfx 库 ≥6 音色、收集后 played_count 真增长）；22. 调参协议（声明键可应用钳制、未声明键拒绝）。
+
+### 5.2 门禁实测（本机复跑，2026-10-14）
+
+- **v3 pck 自跑冒烟 PASS**（对 `bfce9152` 导出的 `index.pck`，2,544,432B，sha256 `4e3c42fa5dcbfa8b31d5b7c1d65df2ccd9024dcfd40f2e3edde95bce55c70aca`）：
+  `GODOT_SMOKE: PASS 场景实例化/输入映射/移动方向符号(A/←减小,D/→增大)/收集判定/50 连击一致性/波次梯度/过期回收/胜负/一键重开/持久化/v2手感基线(体型1.3~1.5x·移速60~70%)/v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环) 全部通过`（exit 0、零 SCRIPT ERROR）
+- wasm 与 v2 **逐字节一致**（`fe5cebc5…`，35,376,909B，引擎零漂移，pck 是唯一内容载体）。
+- 帧预算 **240→320**（game-6「加预算」先例路线，verify.sh 内 `GODOT_SMOKE_FRAMES:-320`）：v3 新增 6 个真实交互断言阶段约 +75 帧；判定协议（PASS 标记 + 退出码 0 + 零 SCRIPT ERROR）不变，预算只放宽兜底不改判定语义。
+- input-fuzz PASS（seed=20260913，6 批次，agent 实测）；**playtest.sh 模板资产仍缺失，D2 维持 blocked，不代写不伪造**。
+- 「新机制不破坏旧断言」四个可复用手法：①普通物恒 +1（Combo 加成只给高分物）；②末波插值终点取 TARGET-1（保 v2 收敛断言）；③断言阶段入口把分数白盒归零（防多类型/Combo 阶段误触 20 分通关线）；④持久化回读前强制 `save_progress()`（断言语义=「落盘→回读一致」而非内存值）。
+
+## 六、部署上线卡点（唯一未闭环项）与一键恢复
+
+- **现状**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`，liveUrl `https://leomac-studio.tail49399e.ts.net/apps/game-8/`）current deployment = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`（2026-10-02，v2）；线上 pck sha256 实测 = `5f556ad9…`（= v2 基线，无版本漂移），线上健康 200 `{"ok":true,...}`。
+- **卡点**：`POST /api/v1/apphost/apps/:id/deployments` 校验「仅应用所有者（`cmuimu6w…`）或系统管理员」；执行链 agent 的 token 代行主体为 `cmoqv70b8`（≠ owner），POST 与 dryRun 均 403（2026-10-13 首测、2026-10-14 复测一致）。这是平台授权缺口，不是工程问题——**不许绕过校验、不许直改平台库**。
+- **一键恢复（需 @MyRD Admin / 应用所有者或系统管理员身份执行）**：
+
+```bash
+# ① 干跑（不落部署，验证权限与构建配置；403 则需换有权限身份）
+curl -s -X POST -H "Authorization: Bearer $MYRD_TOKEN" -H "Content-Type: application/json" \
+  "$PLATFORM_API_URL/api/v1/apphost/apps/cmujpmjsy006pm99ip9yws3wl/deployments" \
+  -d '{"mode":"bundle","dryRun":true,"deployedBy":"agent","gitRef":"myrd/game-8-goal-cmujpml1e006rm99i9hc33huu","sourceId":"cmujpml1e006rm99i9hc33huu","goalId":"cmujpml1e006rm99i9hc33huu"}'
+# ② 正式部署：同体去掉 "dryRun":true；带 goalId 会把可玩产物自动回写目标卡片（= artifacts 回写）
+```
+
+- **部署 gitRef 红线**：必须是 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu`（tip=`bfce9152`，已含 v3 全部实现与导出产物），**绝不落 main**。
+- **上线核对清单（照抄即用）**：① `/apps/game-8/health` → 200 ok:true；② `GET /apps/game-8/api/public/assets/index.pck.gz.b64` → base64 解码 gunzip → sha256 应为 **`4e3c42fa…70aca`（2,544,432B）**；index.wasm.gz.b64 解码 sha256 应仍为 `fe5cebc5…`；③ 线上 pck 自跑冒烟：签名必须含「v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环)」字样；④ 移动端模拟门禁（webapp-smoke 390×844 六项：网络/console/首屏内容/触摸管线/视口等——工具链已对线上 v2 验证全绿，证据 `games/game-8/qa/mobile-live-v2/`）。
+- ⚠️ 交接文档提交 `29f982f`（v3-release-handoff.md）推送超时未上远端（`git ls-remote` tip 实测 = `bfce9152`），**恢复命令与核对口径以本文为准**。
+
+## 七、复用要点（同类小游戏照抄）
+
+1. **结构性加机制走「表 + 纯函数」**：类型表（ITEM_SCORES）/波次权重表（WAVE_WEIGHTS）/波内插值锚点（FRAC 数组）全部数据化，口径纯函数（`item_score_for/gain_for/wave_index_for/spawn_interval_now`）运行时与 smoke 共用单一事实源——断言可直接调纯函数机判。
+2. **新机制不得污染旧基线**：给旧断言留「隔离带」（普通物恒 +1、末波终点 TARGET-1、断言阶段分数白盒归零、回读前强制落盘），比放宽旧断言正确一百倍。
+3. **Godot 4.3 实测**：`const` 里写 `PackedVector2Array(...)` 构造会 Parse Error 并连锁炸掉所有引用该类型的脚本——造型表用 `static var`。
+4. **程序化音效闭环「零音效」**：合成 AudioStreamWAV（确定性、零资产、可机判 played_count）+ 壳页手势解锁器是 Web/iOS 出声的双件套，缺一即无声。
+5. **UI 增量全代码创建、.tscn 零改动**：规避场景手写风险（load_steps/ext_resource 极易错），节点随用随建、动画完自动回收。
+6. **工作流 routine 参数带 `#` 会被注入守卫拒绝**（step 命令经 bash -c 拼接）——gameDecisions 里不要带 shell 元字符，或改在 routine step 里写死。
+7. **执行链 token 与 app/goal owner 不一致时**，部署/回写会 403：按纪律停下上报、证据落盘、给出一键恢复命令（本文 §六格式），不绕权限、不伪造「已上线」。
 
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
@@ -14271,38 +15051,44 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
-
-# 失败模式：Worker SIGINT 关闭中断
-
-## 背景
-自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
-
-## 现象
-- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
-- 输出摘要为空（进程在产出任何结果前被杀）；
-- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
-
-## 根因
-- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
-- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
-- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
-
-## 排查与处置
-1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
-2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
-3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
-4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
-5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
-
-## 预防
-- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
-- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
-- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
 ## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
 negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -14507,44 +15293,38 @@ agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
 - fix: 修复 bug
 - docs: 文档更新
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
 修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+
+## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
+
+# 失败模式：Worker SIGINT 关闭中断
+
+## 背景
+自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
+
+## 现象
+- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
+- 输出摘要为空（进程在产出任何结果前被杀）；
+- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
+
+## 根因
+- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
+- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
+- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
+
+## 排查与处置
+1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
+2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
+3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
+4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
+5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
+
+## 预防
+- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
+- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
+- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
 ## 架构设计文档
 
@@ -15868,6 +16648,17 @@ smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的�
 
 **来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
 
+---
+
+## 五、v3 增补（2026-10-14）：v2 数值基线在 v3 中的延续与口径迁移
+
+> v3「玩法扩展与体验升级」已完成实现与门禁（分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`），**本文 §一~§四的 v2 基线全部继承、零回退**（v3 冒烟签名仍含「v2手感基线(体型1.3~1.5x·移速60~70%)」且本机对 v3 pck 复跑 PASS）。变化与迁移以 v3 结论文档为准（doc `b0a9a7ff-3339-43dc-9602-6477e562bd4f`，§一/§二），要点：
+> 1. **通关口径迁移**：`TARGET_SCORE=20` 由「件数」改为「**分数**」（normal +1 / rare 金铃铛 +3 / clock 时钟 +2 且加时 4s；Combo 加成只作用 ≥2 分高分物，普通物恒 +1——本文 §一的 50 次触碰口径在 v3 下原样成立）。
+> 2. **数值区新增 11 个声明键**（COMBO_WINDOW=2.0s、COMBO_BONUS_MAX=5、TIME_BONUS_CLOCK=4.0s、MAGNET_RADIUS=100px、MAGNET_DURATION=5s、BOOST_MULT=1.5、BOOST_DURATION=4s、WAVE_BREAK_SECONDS=1.2s、TARGET_SCORE、MAX_COLLECTIBLES=6、TIME_LIMIT 显式化），v2 的 PLAYER_SCALE/PLAYER_SPEED/SPAWN_INTERVAL_*/LIFETIME_* 默认值与钳制原样保留。
+> 3. **节奏曲线改波次状态机**：刷间隔/寿命端点（0.8→0.45s、6→3s）不变，插值改为三波锚点（WAVE_INTERVAL_FRAC=[0,0.45,0.75,1.0]），末波终点取 TARGET-1 保本文「满难度收敛到 MIN」断言同值；刷出改「同屏 ≤6 件补齐制」。
+> 4. **冒烟帧预算 240→320**（game-6 加预算先例），判定协议三条件不变；断言 13 项既有全保留 + 9 项 v3 新增（共 22 项）。
+> 5. **部署状态**：线上（version 5 @ `1089e4b`）仍是 v2——本文 §三的 pck/wasm sha256 对线上继续有效；v3 pck（sha256 `4e3c42fa…`）已就绪待上线，部署 403 卡点与一键恢复命令见 v3 结论文档 §六。
+
 
 ## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
 
@@ -17075,6 +17866,151 @@ v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 
 ## 八、衔接声明
 
 本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
+
+
+## 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+# 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+> **文档定位**：固化 game-8 v3「玩法扩展与体验升级」的机制清单（**策划案 v2 → 实现 `bfce9152` 的落账差异，实现为准**）、触屏操控实现方案、美术/音效/数值基线与门禁实测结论，并登记**唯一未闭环项——v3 部署上线卡点（403 授权）与一键恢复路径**（§六）。后续迭代与同类休闲收集小游戏直接按本文对齐，不必重新勘探。
+> **一手实测声明**：本文全部数字为一手实测（2026-10-14 取证）——`git show bfce9152` 逐文件核对、线上与本地产物 sha256 实算、`godot --headless --main-pack <pck> --quit-after 320 res://tests/smoke.tscn` 本机复跑，非转述估算。
+> **权威基准**：v3 需求（`cmv6vkith000gjotytp4v915c`，tag `goal-cmujpml1e006rm99i9hc33huu#wf-sg-v3-req-r4`）；策划案 v2 GameDesignSpec（`cmv6weob6000sjotyffuhjca6`，status=approved，create_design_spec 首次走通）；v2 参数基线（doc `843ddfec-62e1-4e02-b277-21155f7595bc`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）。
+> **实现基线（v3）**：分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`（feat 提交，远端 tip 已 `git ls-remote` 核实），数值唯一对齐点 `games/game-8/autoload/game_state.gd` 数值区（18 个 `TUNING_META` 声明键），禁止散点改代码对数值。
+> **部署现状（关键）**：线上 = HostedApp `cmujpmjsy006pm99ip9yws3wl` **version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`，仍是 v2 构建**（线上 pck sha256 实测 = v2 基线 `5f556ad9…`）；**v3 已实现、已过门禁、已推送，但部署被 403 拦下**——恢复命令见 §六。
+
+## 〇、v3 现状一图流
+
+| 环节 | 状态 | 一手证据 |
+|---|---|---|
+| v3 需求登记 | ✅ | requirement `cmv6vkith000gjotytp4v915c`（HTTP 201，戳记 `#wf-sg-v3-req-r4` 无重复） |
+| 策划案 v2 落账 | ✅ | GameDesignSpec `cmv6weob6000sjotyffuhjca6`（HTTP 201，schemaVersion v0，status approved——平台 create_design_spec 能力恢复后的首次成功） |
+| 工坊工作流 run（v3） | ❌ failed | routine 入参 `gameDecisions` 含 shell 元字符 `#` 被拒绝替换（step 命令经 `bash -c` 拼接的安全守卫），**零实现遗留** |
+| v3 实现补齐 | ✅ | 线上验收 agent 代做全链路：commit `bfce9152`（11 文件，+1348/−153），`1089e4b..bfce9152` 已推送成功 |
+| 门禁 | ✅ | preflight 13 类×40 文件 PASS；smoke @320 帧 3 连 PASS（零 SCRIPT ERROR）；input-fuzz PASS（seed=20260913，6 批次）；v3 pck 自跑冒烟 PASS（§五，本机复跑） |
+| **部署上线** | **⛔ 403** | `POST /api/v1/apphost/apps/…/deployments` 仅 app owner（`cmuimu6w…`）或系统管理员；agent 代行主体 `cmoqv70b8`（含 dryRun）均被拒（2026-10-14 复测仍 403） |
+
+## 一、v3 机制清单（实现落账口径，`game_state.gd` @ `bfce9152` 为唯一来源）
+
+### 1.1 目标物 5 类（需求「≥3 种、分值/效果互异」超额落账）
+
+| 类型 | 造型（半径≈14px 多边形） | 分值 | 效果 | 配色 RGB | 波次权重 W0/W1/W2 |
+|---|---|---|---|---|---|
+| normal 青草垛 | 菱形 | +1 | 无（**恒 +1，Combo 不加成**，保护 50 次触碰台账） | (0.55,0.8,0.3) 草绿 | 0.80 / 0.68 / 0.55 |
+| rare 金铃铛 | 十点星形 | +3 | 高分物，吃 Combo 加成 | (1.0,0.82,0.25) 亮金 | 0.10 / 0.17 / 0.25 |
+| clock 时钟 | 八边形 | +2 | 得分 +2 且**加时 +4s**（钳到 TIME_LIMIT） | (0.45,0.75,1.0) 天蓝 | 0.05 / 0.08 / 0.10 |
+| magnet 磁铁 | U 形 | 0（道具） | 生效 5s：半径 100px 内计分物以 170px/s 被拉向牛牛（`MAGNET_PULL_SPEED`） | (0.9,0.4,0.75) 品红 | 0.025 / 0.035 / 0.05 |
+| boost 加速 | 闪电形 | 0（道具） | 生效 4s：实际移速 = `PLAYER_SPEED × 1.5`（`current_speed()` 机判口径） | (0.35,0.9,0.85) 青碧 | 0.025 / 0.035 / 0.05 |
+
+- 每波权重表合计恒为 1.0；**越往后稀有物与道具占比越高**（「值得追」补偿「越来越快」），波次断言含 rare 权重单调不降。
+- 刷出改为**同屏上限补齐制**：`MAX_COLLECTIBLES=6`，低于上限由生成器补充（v1「寿命÷间隔自然收敛 ≈7±1」的推导口径被取代）。
+
+### 1.2 Combo 连击
+
+- 窗口 `COMBO_WINDOW=2.0s`：窗口内连续收集 combo +1（`_advance_combo`：窗口活着递增、断链从 1 起算），超时/暂停/重开清零；`_process` 仅 RUNNING 推进窗口倒计时。
+- 加成 `combo_bonus_for = (combo<2 ? 0 : min(combo-1, COMBO_BONUS_MAX=5))`，每级 +1。
+- **`gain_for` 关键设计**：加成只作用于分值 ≥2 的高分物（rare/clock）；普通物恒 +1 → 需求「50 次真实触碰每次恰好 +1」基线在多类型下零回退（冒烟 MASS 阶段只碰普通物，台账零重构）。
+- 档案新增 `best_combo` 持久化字段（`user://niuniu_game8_save.json`：best_score / total_collected / best_combo 三键）。
+
+### 1.3 波次状态机（替代 v1 单一线性收紧曲线）
+
+- 波次按**分数**切分：`wave_index_for` 以 `third=max(⌊T/3⌋,1)`、`two_thirds=max(⌊2T/3⌋,third+1)` 分三段（默认 T=20 → 0..6 / 7..13 / 14..19），随 TARGET_SCORE 自适应。
+- 波内插值锚点：`WAVE_INTERVAL_FRAC=[0, 0.45, 0.75, 1.0]`、`WAVE_LIFETIME_FRAC=[0, 0.55, 0.8, 1.0]`——刷新间隔 0.8s→0.45s、寿命 6s→3s 三段线性、**全局单调不增、有界**，端点与 v1/v2 断言同值。
+- **末波终点取 `TARGET_SCORE-1` 的兼容性设计**：达标分当帧即通关、曲线不再被查询，因此「满难度（score=19）收敛到 SPAWN_INTERVAL_MIN」的 v2 断言原样成立（曾实测 score=19 时插值到 0.4625≠0.45 的回归，已修）。
+- 跨波：`wave_changed` → 场景层接管**波间停顿 `WAVE_BREAK_SECONDS=1.2s`**（生成器暂停 + 横幅提示），三段副标题：「青草垛大量刷出，热身收集」→「金铃铛变多，瞄准高分」→「最后冲刺，连击冲分！」。
+
+### 1.4 单局阶段机与流程（需求 ④2）
+
+- `enum Phase { RUNNING, WON, LOST, READY, PAUSED }`——新增 READY（开始面板，确认/触摸进入）与 PAUSED（键盘 P 或触摸暂停按钮，恢复前时限冻结）。
+- `start_run()` 统一「开始/重开」入口：score 归零、时限重置、combo/run_max_combo/wave_index 复位、牛牛归位、道具清空（`clear_powerups`）、场上重铺、刷点仍避出生点 ≥96px。
+- 结算（WON/LOST 都结算）：刷新 best_score / best_combo 并 `save_progress()`——**失败也保留累计收集进度**。
+- **通关口径迁移**：`TARGET_SCORE=20` 的口径由 v1/v2 的「件数」改为「**分数**」（普通 +1 / 金铃铛 +3 / 时钟 +2，另计高分物 Combo 加成）——后续所有「集满 20」表述一律按分数理解。
+
+### 1.5 策划案 v2 → 实现落账差异（防后人拿错口径，实现为准）
+
+| 项 | 策划案 v2（设计稿） | 实现 `bfce9152`（权威） |
+|---|---|---|
+| 目标物 | 3 类：青草垛 +1 / 金铃铛 +5 / 三叶草 +1+效果，另设树桩惩罚物 | **5 类**（§1.1）：树桩取消，磁铁/加速两道具直接入权重池刷出；金铃铛 +5→**+3**；三叶草改为 **clock 时钟 +2 加时 4s** |
+| 道具参数 | 磁铁 180px·5s、蹄铁 ×1.5 速·5s | 磁铁 **100px**（拉速 170px/s）·5s；加速 ×1.5·**4s** |
+| Combo | 窗口 3s，加成 `ceil(分值×(1+0.1×等级))` | 窗口 **2s**，**每级 +1 封顶 5**，且**只作用 ≥2 分高分物** |
+| 波间停顿 | 2s | **1.2s** |
+| 通关口径 | 目标收集量 20（件数） | **20 分（分数口径）** |
+
+## 二、数值基线（18 个 TUNING_META 声明键，默认值 = 钳制区间/步长）
+
+| 键 | 默认 | min~max/step | 键 | 默认 | min~max/step |
+|---|---|---|---|---|---|
+| TARGET_SCORE | 20 | 5~60/1 | PLAYER_SCALE（v2 继承） | 1.4 | 0.5~2.0/0.05 |
+| TIME_LIMIT | 60 | 15~180/5 | PLAYER_SPEED（v2 继承） | 145 | 60~300/5 |
+| MAX_COLLECTIBLES | 6 | 1~20/1 | COMBO_WINDOW | 2.0s | 0.5~5/0.1 |
+| SPAWN_INTERVAL_START | 0.8s | 0.3~3/0.05 | COMBO_BONUS_MAX | 5 | 0~10/1 |
+| SPAWN_INTERVAL_MIN | 0.45s | 0.2~2/0.05 | TIME_BONUS_CLOCK | 4.0s | 0~10/0.5 |
+| LIFETIME_START | 6.0s | 2~15/0.5 | MAGNET_RADIUS | 100px | 60~200/5 |
+| LIFETIME_MIN | 3.0s | 1~10/0.5 | MAGNET_DURATION | 5.0s | 1~10/0.5 |
+| WAVE_BREAK_SECONDS | 1.2s | 0~3/0.1 | BOOST_MULT | 1.5 | 1.1~2.5/0.05 |
+| BOOST_DURATION | 4.0s | 1~10/0.5 | LIFETIME_WARN_SECONDS | 1.5s（const，临期闪烁阈值） | — |
+
+- 调参协议（SKILL.md §3C，v3 延续）：`apply_tuning()` 唯一应用入口——只认声明键（未声明键拒绝）、按 min/max 钳制、**保序约束**（`SPAWN_INTERVAL_MIN ≤ SPAWN_INTERVAL_START`、`LIFETIME_MIN ≤ LIFETIME_START`，防单调性被调坏）；改 TIME_LIMIT 立即重置本局剩余时间。双通道保留：游戏内调参面板 + 壳页 `?tuning=<JSON>` → `window.__GAME_TUNING__`。
+- 冒烟含调参协议断言：新增声明键可应用/钳制、未声明键必须被拒绝。
+- 判定几何（沿用 v2 实测口径）：PickupShape 本体 r=22×1.4≈30.8px + 收集物 r=14px → 触发距离 ≈44.8px；刷点安全间距 96px ≈ 2.14× 余量；刷点距场地边缘 ≥48px（`SPAWN_MARGIN`）。
+
+## 三、触屏操控实现方案（现网既有形态 + v3 延续加固）
+
+- **移动管线单一化**：左下角**虚拟摇杆**（`virtual_joystick.gd`，v2 包内既有、v3 延续）→ `InputEventAction` 注入 `move_left/right/up/down` → 与键盘共用 `_unhandled_input` 同一管线。摇杆参数：底座 `BASE_RADIUS=56px`、摇杆头 `STICK_RADIUS=26px`、死区 `DEADZONE_RATIO=0.25`。方向不反向由冒烟方向符号断言钉死（A/← 后 position.x 减小、D/→ 后增大）。
+- **按钮触达**：`touch_confirm_button.gd` 确认按钮半径 **44px**（满足「触达区 ≥44×44px」），点击注入 `confirm` 动作、与键盘同路径；局内暂停按钮仅触摸设备显示（桌面键盘环境完全不可见，`TouchUI` CanvasLayer 统一管理）。
+- **视口适配**：竖屏 **720×1280** 基线，`stretch/mode=canvas_items` + `aspect=keep` 等比缩放，`handheld/orientation=portrait`；HUD 操作提示按输入设备切换文案。
+- **壳页硬契约**（`server/src/game-page.ts`，随部署上线，实测在位）：viewport meta（user-scalable=no）、`touch-action:none`、调参桥（非法 JSON 按无调参处理绝不阻塞启动）、**音频手势解锁器**（包装 AudioContext 捕获引擎实例 + touchstart/touchend/pointerdown/keydown/click 五类事件 capture+passive 同步 resume，覆盖 suspended 与 interrupted；visibilitychange 回前台再解锁；`__audioDebug` 取证出口）、**AudioWorklet addModule 补丁**（worklet 是移动端音频单一故障点：真实资产端点优先、失败降级原路径重试一次、仍失败显式 console.error + audioLog 记 `worklet-dead`）。
+
+## 四、美术/音效基线
+
+- **分层背景**：视差远/近两层（全部代码创建，`_update_parallax` 随角色移动产生轻视差），统一牧场绿主题。
+- **目标物动效**：5 类专属多边形造型 + 专属配色（§1.1 表）；待机呼吸（缩放 1±0.08 正弦脉动，`breathing_scale()` 可观测）；临期 ≤1.5s 时 alpha 闪烁警示；收集/消失动画播放完整且节点无残留（`remove_child→queue_free` 清场纪律不回退）。
+- **反馈三件套**：收集音效 + 粒子 + 飘字同帧触发；飘字生命周期 `FLOAT_TEXT_LIFETIME=0.6s`、颜色与目标物呼应；粒子随用随建、动画完自动回收。
+- **UI 主题五色**：`THEME_PANEL_BG=(0.07,0.14,0.10,0.94)` / `BORDER=草绿(0.55,0.8,0.3,0.9)` / `TEXT=(0.96,0.97,0.92)` / `ACCENT=草绿` / `COMBO=橙(1.0,0.62,0.2)`；开始/HUD/结算/暂停面板统一主题；v3 增量 UI（背景层/连击/横幅/开始面板/暂停面板/粒子/飘字）**全部代码创建，.tscn 零新增节点**（规避场景手写风险）。
+- **字体**：Noto Sans SC（OFL，子集化）保留，`theme/custom_font` 全局生效。
+- **音效基线（「零音效」缺陷闭环）**：新增 `sfx.gd` autoload——**程序化合成、零外部资产、确定性**：7 个音色（collect=880Hz blip / rare=987.77·1174.66·1396.91Hz 琶音 / clock=660+880Hz 双音 / powerup=320→960Hz 扫频 / wave=293.66Hz / win=523.25·659.25·783.99·1046.5Hz 琶音 / lose=440→174.61Hz 下滑），22.05kHz 16-bit PCM、复音池 6（池满抢占最老播放器）、主增益 0.5、pitch 参数支持连击音高爬升；`played_count` 供冒烟机判「收集后真的播了声」。Web/iOS 出声前提 = 壳页手势解锁器（§三），引擎侧只负责「有可播的流、调用不报错」。
+
+## 五、门禁与验收（22 项断言，帧预算 240→320）
+
+### 5.1 smoke.gd 断言清单（13 项既有全保留 + 9 项 v3 新增）
+
+1. 场景实例化与接线；2. autoload 注册与约定信号；3. InputMap 键位契约 + **方向符号**（A/← 减小、D/→ 增大）；4. 信号到达订阅方；5. 收集判定触碰 +1；6. **跨 3 局 50 次真实触碰每次恰好 +1**（只碰普通物，含清场静置反例）；7. 难度梯度按**波次曲线**单调收紧有界 + 首收后 SpawnTimer 真实变快；8. 过期回收不计分；9. 通关可达（第 20 分 → WON + 结算「通关」）；10. 失败可达（时限归零 → LOST + HUD ≤10s 红色警示）；11. 一键重开全复位；12. 持久化落盘回读一致（含 best_combo）；13. **v2 手感基线**（体型 1.3~1.5×、移速 60~70% 且接线到根节点/碰撞体/PickupArea）——以上既有；v3 新增：14. 开始流程（READY→确认→RUNNING）；15. 多类型计分（rare +3、clock +2 加时 4s）；16. Combo（窗口内递增/高分物加成/UI 可见/超时清零）；17. 磁铁（85px 测试距内目标被吸至判定距离并收集）；18. 加速（实测位移 > 基线 ×1.3，BOOST_MULT=1.5 留工程余量）；19. 暂停/恢复（P 键冻结时限）；20. 波次（按分数切分、权重表逐波合计 1 且 rare 单调不降）；21. 音效（Sfx 库 ≥6 音色、收集后 played_count 真增长）；22. 调参协议（声明键可应用钳制、未声明键拒绝）。
+
+### 5.2 门禁实测（本机复跑，2026-10-14）
+
+- **v3 pck 自跑冒烟 PASS**（对 `bfce9152` 导出的 `index.pck`，2,544,432B，sha256 `4e3c42fa5dcbfa8b31d5b7c1d65df2ccd9024dcfd40f2e3edde95bce55c70aca`）：
+  `GODOT_SMOKE: PASS 场景实例化/输入映射/移动方向符号(A/←减小,D/→增大)/收集判定/50 连击一致性/波次梯度/过期回收/胜负/一键重开/持久化/v2手感基线(体型1.3~1.5x·移速60~70%)/v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环) 全部通过`（exit 0、零 SCRIPT ERROR）
+- wasm 与 v2 **逐字节一致**（`fe5cebc5…`，35,376,909B，引擎零漂移，pck 是唯一内容载体）。
+- 帧预算 **240→320**（game-6「加预算」先例路线，verify.sh 内 `GODOT_SMOKE_FRAMES:-320`）：v3 新增 6 个真实交互断言阶段约 +75 帧；判定协议（PASS 标记 + 退出码 0 + 零 SCRIPT ERROR）不变，预算只放宽兜底不改判定语义。
+- input-fuzz PASS（seed=20260913，6 批次，agent 实测）；**playtest.sh 模板资产仍缺失，D2 维持 blocked，不代写不伪造**。
+- 「新机制不破坏旧断言」四个可复用手法：①普通物恒 +1（Combo 加成只给高分物）；②末波插值终点取 TARGET-1（保 v2 收敛断言）；③断言阶段入口把分数白盒归零（防多类型/Combo 阶段误触 20 分通关线）；④持久化回读前强制 `save_progress()`（断言语义=「落盘→回读一致」而非内存值）。
+
+## 六、部署上线卡点（唯一未闭环项）与一键恢复
+
+- **现状**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`，liveUrl `https://leomac-studio.tail49399e.ts.net/apps/game-8/`）current deployment = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`（2026-10-02，v2）；线上 pck sha256 实测 = `5f556ad9…`（= v2 基线，无版本漂移），线上健康 200 `{"ok":true,...}`。
+- **卡点**：`POST /api/v1/apphost/apps/:id/deployments` 校验「仅应用所有者（`cmuimu6w…`）或系统管理员」；执行链 agent 的 token 代行主体为 `cmoqv70b8`（≠ owner），POST 与 dryRun 均 403（2026-10-13 首测、2026-10-14 复测一致）。这是平台授权缺口，不是工程问题——**不许绕过校验、不许直改平台库**。
+- **一键恢复（需 @MyRD Admin / 应用所有者或系统管理员身份执行）**：
+
+```bash
+# ① 干跑（不落部署，验证权限与构建配置；403 则需换有权限身份）
+curl -s -X POST -H "Authorization: Bearer $MYRD_TOKEN" -H "Content-Type: application/json" \
+  "$PLATFORM_API_URL/api/v1/apphost/apps/cmujpmjsy006pm99ip9yws3wl/deployments" \
+  -d '{"mode":"bundle","dryRun":true,"deployedBy":"agent","gitRef":"myrd/game-8-goal-cmujpml1e006rm99i9hc33huu","sourceId":"cmujpml1e006rm99i9hc33huu","goalId":"cmujpml1e006rm99i9hc33huu"}'
+# ② 正式部署：同体去掉 "dryRun":true；带 goalId 会把可玩产物自动回写目标卡片（= artifacts 回写）
+```
+
+- **部署 gitRef 红线**：必须是 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu`（tip=`bfce9152`，已含 v3 全部实现与导出产物），**绝不落 main**。
+- **上线核对清单（照抄即用）**：① `/apps/game-8/health` → 200 ok:true；② `GET /apps/game-8/api/public/assets/index.pck.gz.b64` → base64 解码 gunzip → sha256 应为 **`4e3c42fa…70aca`（2,544,432B）**；index.wasm.gz.b64 解码 sha256 应仍为 `fe5cebc5…`；③ 线上 pck 自跑冒烟：签名必须含「v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环)」字样；④ 移动端模拟门禁（webapp-smoke 390×844 六项：网络/console/首屏内容/触摸管线/视口等——工具链已对线上 v2 验证全绿，证据 `games/game-8/qa/mobile-live-v2/`）。
+- ⚠️ 交接文档提交 `29f982f`（v3-release-handoff.md）推送超时未上远端（`git ls-remote` tip 实测 = `bfce9152`），**恢复命令与核对口径以本文为准**。
+
+## 七、复用要点（同类小游戏照抄）
+
+1. **结构性加机制走「表 + 纯函数」**：类型表（ITEM_SCORES）/波次权重表（WAVE_WEIGHTS）/波内插值锚点（FRAC 数组）全部数据化，口径纯函数（`item_score_for/gain_for/wave_index_for/spawn_interval_now`）运行时与 smoke 共用单一事实源——断言可直接调纯函数机判。
+2. **新机制不得污染旧基线**：给旧断言留「隔离带」（普通物恒 +1、末波终点 TARGET-1、断言阶段分数白盒归零、回读前强制落盘），比放宽旧断言正确一百倍。
+3. **Godot 4.3 实测**：`const` 里写 `PackedVector2Array(...)` 构造会 Parse Error 并连锁炸掉所有引用该类型的脚本——造型表用 `static var`。
+4. **程序化音效闭环「零音效」**：合成 AudioStreamWAV（确定性、零资产、可机判 played_count）+ 壳页手势解锁器是 Web/iOS 出声的双件套，缺一即无声。
+5. **UI 增量全代码创建、.tscn 零改动**：规避场景手写风险（load_steps/ext_resource 极易错），节点随用随建、动画完自动回收。
+6. **工作流 routine 参数带 `#` 会被注入守卫拒绝**（step 命令经 bash -c 拼接）——gameDecisions 里不要带 shell 元字符，或改在 routine step 里写死。
+7. **执行链 token 与 app/goal owner 不一致时**，部署/回写会 403：按纪律停下上报、证据落盘、给出一键恢复命令（本文 §六格式），不绕权限、不伪造「已上线」。
 
 
 ---
@@ -17098,38 +18034,44 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
-
-# 失败模式：Worker SIGINT 关闭中断
-
-## 背景
-自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
-
-## 现象
-- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
-- 输出摘要为空（进程在产出任何结果前被杀）；
-- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
-
-## 根因
-- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
-- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
-- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
-
-## 排查与处置
-1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
-2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
-3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
-4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
-5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
-
-## 预防
-- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
-- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
-- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
 ## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
 negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -17334,44 +18276,38 @@ agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
 - fix: 修复 bug
 - docs: 文档更新
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
 修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+
+## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
+
+# 失败模式：Worker SIGINT 关闭中断
+
+## 背景
+自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
+
+## 现象
+- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
+- 输出摘要为空（进程在产出任何结果前被杀）；
+- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
+
+## 根因
+- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
+- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
+- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
+
+## 排查与处置
+1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
+2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
+3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
+4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
+5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
+
+## 预防
+- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
+- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
+- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
 ## 架构设计文档
 
@@ -18695,6 +19631,17 @@ smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的�
 
 **来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
 
+---
+
+## 五、v3 增补（2026-10-14）：v2 数值基线在 v3 中的延续与口径迁移
+
+> v3「玩法扩展与体验升级」已完成实现与门禁（分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`），**本文 §一~§四的 v2 基线全部继承、零回退**（v3 冒烟签名仍含「v2手感基线(体型1.3~1.5x·移速60~70%)」且本机对 v3 pck 复跑 PASS）。变化与迁移以 v3 结论文档为准（doc `b0a9a7ff-3339-43dc-9602-6477e562bd4f`，§一/§二），要点：
+> 1. **通关口径迁移**：`TARGET_SCORE=20` 由「件数」改为「**分数**」（normal +1 / rare 金铃铛 +3 / clock 时钟 +2 且加时 4s；Combo 加成只作用 ≥2 分高分物，普通物恒 +1——本文 §一的 50 次触碰口径在 v3 下原样成立）。
+> 2. **数值区新增 11 个声明键**（COMBO_WINDOW=2.0s、COMBO_BONUS_MAX=5、TIME_BONUS_CLOCK=4.0s、MAGNET_RADIUS=100px、MAGNET_DURATION=5s、BOOST_MULT=1.5、BOOST_DURATION=4s、WAVE_BREAK_SECONDS=1.2s、TARGET_SCORE、MAX_COLLECTIBLES=6、TIME_LIMIT 显式化），v2 的 PLAYER_SCALE/PLAYER_SPEED/SPAWN_INTERVAL_*/LIFETIME_* 默认值与钳制原样保留。
+> 3. **节奏曲线改波次状态机**：刷间隔/寿命端点（0.8→0.45s、6→3s）不变，插值改为三波锚点（WAVE_INTERVAL_FRAC=[0,0.45,0.75,1.0]），末波终点取 TARGET-1 保本文「满难度收敛到 MIN」断言同值；刷出改「同屏 ≤6 件补齐制」。
+> 4. **冒烟帧预算 240→320**（game-6 加预算先例），判定协议三条件不变；断言 13 项既有全保留 + 9 项 v3 新增（共 22 项）。
+> 5. **部署状态**：线上（version 5 @ `1089e4b`）仍是 v2——本文 §三的 pck/wasm sha256 对线上继续有效；v3 pck（sha256 `4e3c42fa…`）已就绪待上线，部署 403 卡点与一键恢复命令见 v3 结论文档 §六。
+
 
 ## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
 
@@ -19902,6 +20849,151 @@ v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 
 ## 八、衔接声明
 
 本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
+
+
+## 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+# 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+> **文档定位**：固化 game-8 v3「玩法扩展与体验升级」的机制清单（**策划案 v2 → 实现 `bfce9152` 的落账差异，实现为准**）、触屏操控实现方案、美术/音效/数值基线与门禁实测结论，并登记**唯一未闭环项——v3 部署上线卡点（403 授权）与一键恢复路径**（§六）。后续迭代与同类休闲收集小游戏直接按本文对齐，不必重新勘探。
+> **一手实测声明**：本文全部数字为一手实测（2026-10-14 取证）——`git show bfce9152` 逐文件核对、线上与本地产物 sha256 实算、`godot --headless --main-pack <pck> --quit-after 320 res://tests/smoke.tscn` 本机复跑，非转述估算。
+> **权威基准**：v3 需求（`cmv6vkith000gjotytp4v915c`，tag `goal-cmujpml1e006rm99i9hc33huu#wf-sg-v3-req-r4`）；策划案 v2 GameDesignSpec（`cmv6weob6000sjotyffuhjca6`，status=approved，create_design_spec 首次走通）；v2 参数基线（doc `843ddfec-62e1-4e02-b277-21155f7595bc`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）。
+> **实现基线（v3）**：分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`（feat 提交，远端 tip 已 `git ls-remote` 核实），数值唯一对齐点 `games/game-8/autoload/game_state.gd` 数值区（18 个 `TUNING_META` 声明键），禁止散点改代码对数值。
+> **部署现状（关键）**：线上 = HostedApp `cmujpmjsy006pm99ip9yws3wl` **version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`，仍是 v2 构建**（线上 pck sha256 实测 = v2 基线 `5f556ad9…`）；**v3 已实现、已过门禁、已推送，但部署被 403 拦下**——恢复命令见 §六。
+
+## 〇、v3 现状一图流
+
+| 环节 | 状态 | 一手证据 |
+|---|---|---|
+| v3 需求登记 | ✅ | requirement `cmv6vkith000gjotytp4v915c`（HTTP 201，戳记 `#wf-sg-v3-req-r4` 无重复） |
+| 策划案 v2 落账 | ✅ | GameDesignSpec `cmv6weob6000sjotyffuhjca6`（HTTP 201，schemaVersion v0，status approved——平台 create_design_spec 能力恢复后的首次成功） |
+| 工坊工作流 run（v3） | ❌ failed | routine 入参 `gameDecisions` 含 shell 元字符 `#` 被拒绝替换（step 命令经 `bash -c` 拼接的安全守卫），**零实现遗留** |
+| v3 实现补齐 | ✅ | 线上验收 agent 代做全链路：commit `bfce9152`（11 文件，+1348/−153），`1089e4b..bfce9152` 已推送成功 |
+| 门禁 | ✅ | preflight 13 类×40 文件 PASS；smoke @320 帧 3 连 PASS（零 SCRIPT ERROR）；input-fuzz PASS（seed=20260913，6 批次）；v3 pck 自跑冒烟 PASS（§五，本机复跑） |
+| **部署上线** | **⛔ 403** | `POST /api/v1/apphost/apps/…/deployments` 仅 app owner（`cmuimu6w…`）或系统管理员；agent 代行主体 `cmoqv70b8`（含 dryRun）均被拒（2026-10-14 复测仍 403） |
+
+## 一、v3 机制清单（实现落账口径，`game_state.gd` @ `bfce9152` 为唯一来源）
+
+### 1.1 目标物 5 类（需求「≥3 种、分值/效果互异」超额落账）
+
+| 类型 | 造型（半径≈14px 多边形） | 分值 | 效果 | 配色 RGB | 波次权重 W0/W1/W2 |
+|---|---|---|---|---|---|
+| normal 青草垛 | 菱形 | +1 | 无（**恒 +1，Combo 不加成**，保护 50 次触碰台账） | (0.55,0.8,0.3) 草绿 | 0.80 / 0.68 / 0.55 |
+| rare 金铃铛 | 十点星形 | +3 | 高分物，吃 Combo 加成 | (1.0,0.82,0.25) 亮金 | 0.10 / 0.17 / 0.25 |
+| clock 时钟 | 八边形 | +2 | 得分 +2 且**加时 +4s**（钳到 TIME_LIMIT） | (0.45,0.75,1.0) 天蓝 | 0.05 / 0.08 / 0.10 |
+| magnet 磁铁 | U 形 | 0（道具） | 生效 5s：半径 100px 内计分物以 170px/s 被拉向牛牛（`MAGNET_PULL_SPEED`） | (0.9,0.4,0.75) 品红 | 0.025 / 0.035 / 0.05 |
+| boost 加速 | 闪电形 | 0（道具） | 生效 4s：实际移速 = `PLAYER_SPEED × 1.5`（`current_speed()` 机判口径） | (0.35,0.9,0.85) 青碧 | 0.025 / 0.035 / 0.05 |
+
+- 每波权重表合计恒为 1.0；**越往后稀有物与道具占比越高**（「值得追」补偿「越来越快」），波次断言含 rare 权重单调不降。
+- 刷出改为**同屏上限补齐制**：`MAX_COLLECTIBLES=6`，低于上限由生成器补充（v1「寿命÷间隔自然收敛 ≈7±1」的推导口径被取代）。
+
+### 1.2 Combo 连击
+
+- 窗口 `COMBO_WINDOW=2.0s`：窗口内连续收集 combo +1（`_advance_combo`：窗口活着递增、断链从 1 起算），超时/暂停/重开清零；`_process` 仅 RUNNING 推进窗口倒计时。
+- 加成 `combo_bonus_for = (combo<2 ? 0 : min(combo-1, COMBO_BONUS_MAX=5))`，每级 +1。
+- **`gain_for` 关键设计**：加成只作用于分值 ≥2 的高分物（rare/clock）；普通物恒 +1 → 需求「50 次真实触碰每次恰好 +1」基线在多类型下零回退（冒烟 MASS 阶段只碰普通物，台账零重构）。
+- 档案新增 `best_combo` 持久化字段（`user://niuniu_game8_save.json`：best_score / total_collected / best_combo 三键）。
+
+### 1.3 波次状态机（替代 v1 单一线性收紧曲线）
+
+- 波次按**分数**切分：`wave_index_for` 以 `third=max(⌊T/3⌋,1)`、`two_thirds=max(⌊2T/3⌋,third+1)` 分三段（默认 T=20 → 0..6 / 7..13 / 14..19），随 TARGET_SCORE 自适应。
+- 波内插值锚点：`WAVE_INTERVAL_FRAC=[0, 0.45, 0.75, 1.0]`、`WAVE_LIFETIME_FRAC=[0, 0.55, 0.8, 1.0]`——刷新间隔 0.8s→0.45s、寿命 6s→3s 三段线性、**全局单调不增、有界**，端点与 v1/v2 断言同值。
+- **末波终点取 `TARGET_SCORE-1` 的兼容性设计**：达标分当帧即通关、曲线不再被查询，因此「满难度（score=19）收敛到 SPAWN_INTERVAL_MIN」的 v2 断言原样成立（曾实测 score=19 时插值到 0.4625≠0.45 的回归，已修）。
+- 跨波：`wave_changed` → 场景层接管**波间停顿 `WAVE_BREAK_SECONDS=1.2s`**（生成器暂停 + 横幅提示），三段副标题：「青草垛大量刷出，热身收集」→「金铃铛变多，瞄准高分」→「最后冲刺，连击冲分！」。
+
+### 1.4 单局阶段机与流程（需求 ④2）
+
+- `enum Phase { RUNNING, WON, LOST, READY, PAUSED }`——新增 READY（开始面板，确认/触摸进入）与 PAUSED（键盘 P 或触摸暂停按钮，恢复前时限冻结）。
+- `start_run()` 统一「开始/重开」入口：score 归零、时限重置、combo/run_max_combo/wave_index 复位、牛牛归位、道具清空（`clear_powerups`）、场上重铺、刷点仍避出生点 ≥96px。
+- 结算（WON/LOST 都结算）：刷新 best_score / best_combo 并 `save_progress()`——**失败也保留累计收集进度**。
+- **通关口径迁移**：`TARGET_SCORE=20` 的口径由 v1/v2 的「件数」改为「**分数**」（普通 +1 / 金铃铛 +3 / 时钟 +2，另计高分物 Combo 加成）——后续所有「集满 20」表述一律按分数理解。
+
+### 1.5 策划案 v2 → 实现落账差异（防后人拿错口径，实现为准）
+
+| 项 | 策划案 v2（设计稿） | 实现 `bfce9152`（权威） |
+|---|---|---|
+| 目标物 | 3 类：青草垛 +1 / 金铃铛 +5 / 三叶草 +1+效果，另设树桩惩罚物 | **5 类**（§1.1）：树桩取消，磁铁/加速两道具直接入权重池刷出；金铃铛 +5→**+3**；三叶草改为 **clock 时钟 +2 加时 4s** |
+| 道具参数 | 磁铁 180px·5s、蹄铁 ×1.5 速·5s | 磁铁 **100px**（拉速 170px/s）·5s；加速 ×1.5·**4s** |
+| Combo | 窗口 3s，加成 `ceil(分值×(1+0.1×等级))` | 窗口 **2s**，**每级 +1 封顶 5**，且**只作用 ≥2 分高分物** |
+| 波间停顿 | 2s | **1.2s** |
+| 通关口径 | 目标收集量 20（件数） | **20 分（分数口径）** |
+
+## 二、数值基线（18 个 TUNING_META 声明键，默认值 = 钳制区间/步长）
+
+| 键 | 默认 | min~max/step | 键 | 默认 | min~max/step |
+|---|---|---|---|---|---|
+| TARGET_SCORE | 20 | 5~60/1 | PLAYER_SCALE（v2 继承） | 1.4 | 0.5~2.0/0.05 |
+| TIME_LIMIT | 60 | 15~180/5 | PLAYER_SPEED（v2 继承） | 145 | 60~300/5 |
+| MAX_COLLECTIBLES | 6 | 1~20/1 | COMBO_WINDOW | 2.0s | 0.5~5/0.1 |
+| SPAWN_INTERVAL_START | 0.8s | 0.3~3/0.05 | COMBO_BONUS_MAX | 5 | 0~10/1 |
+| SPAWN_INTERVAL_MIN | 0.45s | 0.2~2/0.05 | TIME_BONUS_CLOCK | 4.0s | 0~10/0.5 |
+| LIFETIME_START | 6.0s | 2~15/0.5 | MAGNET_RADIUS | 100px | 60~200/5 |
+| LIFETIME_MIN | 3.0s | 1~10/0.5 | MAGNET_DURATION | 5.0s | 1~10/0.5 |
+| WAVE_BREAK_SECONDS | 1.2s | 0~3/0.1 | BOOST_MULT | 1.5 | 1.1~2.5/0.05 |
+| BOOST_DURATION | 4.0s | 1~10/0.5 | LIFETIME_WARN_SECONDS | 1.5s（const，临期闪烁阈值） | — |
+
+- 调参协议（SKILL.md §3C，v3 延续）：`apply_tuning()` 唯一应用入口——只认声明键（未声明键拒绝）、按 min/max 钳制、**保序约束**（`SPAWN_INTERVAL_MIN ≤ SPAWN_INTERVAL_START`、`LIFETIME_MIN ≤ LIFETIME_START`，防单调性被调坏）；改 TIME_LIMIT 立即重置本局剩余时间。双通道保留：游戏内调参面板 + 壳页 `?tuning=<JSON>` → `window.__GAME_TUNING__`。
+- 冒烟含调参协议断言：新增声明键可应用/钳制、未声明键必须被拒绝。
+- 判定几何（沿用 v2 实测口径）：PickupShape 本体 r=22×1.4≈30.8px + 收集物 r=14px → 触发距离 ≈44.8px；刷点安全间距 96px ≈ 2.14× 余量；刷点距场地边缘 ≥48px（`SPAWN_MARGIN`）。
+
+## 三、触屏操控实现方案（现网既有形态 + v3 延续加固）
+
+- **移动管线单一化**：左下角**虚拟摇杆**（`virtual_joystick.gd`，v2 包内既有、v3 延续）→ `InputEventAction` 注入 `move_left/right/up/down` → 与键盘共用 `_unhandled_input` 同一管线。摇杆参数：底座 `BASE_RADIUS=56px`、摇杆头 `STICK_RADIUS=26px`、死区 `DEADZONE_RATIO=0.25`。方向不反向由冒烟方向符号断言钉死（A/← 后 position.x 减小、D/→ 后增大）。
+- **按钮触达**：`touch_confirm_button.gd` 确认按钮半径 **44px**（满足「触达区 ≥44×44px」），点击注入 `confirm` 动作、与键盘同路径；局内暂停按钮仅触摸设备显示（桌面键盘环境完全不可见，`TouchUI` CanvasLayer 统一管理）。
+- **视口适配**：竖屏 **720×1280** 基线，`stretch/mode=canvas_items` + `aspect=keep` 等比缩放，`handheld/orientation=portrait`；HUD 操作提示按输入设备切换文案。
+- **壳页硬契约**（`server/src/game-page.ts`，随部署上线，实测在位）：viewport meta（user-scalable=no）、`touch-action:none`、调参桥（非法 JSON 按无调参处理绝不阻塞启动）、**音频手势解锁器**（包装 AudioContext 捕获引擎实例 + touchstart/touchend/pointerdown/keydown/click 五类事件 capture+passive 同步 resume，覆盖 suspended 与 interrupted；visibilitychange 回前台再解锁；`__audioDebug` 取证出口）、**AudioWorklet addModule 补丁**（worklet 是移动端音频单一故障点：真实资产端点优先、失败降级原路径重试一次、仍失败显式 console.error + audioLog 记 `worklet-dead`）。
+
+## 四、美术/音效基线
+
+- **分层背景**：视差远/近两层（全部代码创建，`_update_parallax` 随角色移动产生轻视差），统一牧场绿主题。
+- **目标物动效**：5 类专属多边形造型 + 专属配色（§1.1 表）；待机呼吸（缩放 1±0.08 正弦脉动，`breathing_scale()` 可观测）；临期 ≤1.5s 时 alpha 闪烁警示；收集/消失动画播放完整且节点无残留（`remove_child→queue_free` 清场纪律不回退）。
+- **反馈三件套**：收集音效 + 粒子 + 飘字同帧触发；飘字生命周期 `FLOAT_TEXT_LIFETIME=0.6s`、颜色与目标物呼应；粒子随用随建、动画完自动回收。
+- **UI 主题五色**：`THEME_PANEL_BG=(0.07,0.14,0.10,0.94)` / `BORDER=草绿(0.55,0.8,0.3,0.9)` / `TEXT=(0.96,0.97,0.92)` / `ACCENT=草绿` / `COMBO=橙(1.0,0.62,0.2)`；开始/HUD/结算/暂停面板统一主题；v3 增量 UI（背景层/连击/横幅/开始面板/暂停面板/粒子/飘字）**全部代码创建，.tscn 零新增节点**（规避场景手写风险）。
+- **字体**：Noto Sans SC（OFL，子集化）保留，`theme/custom_font` 全局生效。
+- **音效基线（「零音效」缺陷闭环）**：新增 `sfx.gd` autoload——**程序化合成、零外部资产、确定性**：7 个音色（collect=880Hz blip / rare=987.77·1174.66·1396.91Hz 琶音 / clock=660+880Hz 双音 / powerup=320→960Hz 扫频 / wave=293.66Hz / win=523.25·659.25·783.99·1046.5Hz 琶音 / lose=440→174.61Hz 下滑），22.05kHz 16-bit PCM、复音池 6（池满抢占最老播放器）、主增益 0.5、pitch 参数支持连击音高爬升；`played_count` 供冒烟机判「收集后真的播了声」。Web/iOS 出声前提 = 壳页手势解锁器（§三），引擎侧只负责「有可播的流、调用不报错」。
+
+## 五、门禁与验收（22 项断言，帧预算 240→320）
+
+### 5.1 smoke.gd 断言清单（13 项既有全保留 + 9 项 v3 新增）
+
+1. 场景实例化与接线；2. autoload 注册与约定信号；3. InputMap 键位契约 + **方向符号**（A/← 减小、D/→ 增大）；4. 信号到达订阅方；5. 收集判定触碰 +1；6. **跨 3 局 50 次真实触碰每次恰好 +1**（只碰普通物，含清场静置反例）；7. 难度梯度按**波次曲线**单调收紧有界 + 首收后 SpawnTimer 真实变快；8. 过期回收不计分；9. 通关可达（第 20 分 → WON + 结算「通关」）；10. 失败可达（时限归零 → LOST + HUD ≤10s 红色警示）；11. 一键重开全复位；12. 持久化落盘回读一致（含 best_combo）；13. **v2 手感基线**（体型 1.3~1.5×、移速 60~70% 且接线到根节点/碰撞体/PickupArea）——以上既有；v3 新增：14. 开始流程（READY→确认→RUNNING）；15. 多类型计分（rare +3、clock +2 加时 4s）；16. Combo（窗口内递增/高分物加成/UI 可见/超时清零）；17. 磁铁（85px 测试距内目标被吸至判定距离并收集）；18. 加速（实测位移 > 基线 ×1.3，BOOST_MULT=1.5 留工程余量）；19. 暂停/恢复（P 键冻结时限）；20. 波次（按分数切分、权重表逐波合计 1 且 rare 单调不降）；21. 音效（Sfx 库 ≥6 音色、收集后 played_count 真增长）；22. 调参协议（声明键可应用钳制、未声明键拒绝）。
+
+### 5.2 门禁实测（本机复跑，2026-10-14）
+
+- **v3 pck 自跑冒烟 PASS**（对 `bfce9152` 导出的 `index.pck`，2,544,432B，sha256 `4e3c42fa5dcbfa8b31d5b7c1d65df2ccd9024dcfd40f2e3edde95bce55c70aca`）：
+  `GODOT_SMOKE: PASS 场景实例化/输入映射/移动方向符号(A/←减小,D/→增大)/收集判定/50 连击一致性/波次梯度/过期回收/胜负/一键重开/持久化/v2手感基线(体型1.3~1.5x·移速60~70%)/v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环) 全部通过`（exit 0、零 SCRIPT ERROR）
+- wasm 与 v2 **逐字节一致**（`fe5cebc5…`，35,376,909B，引擎零漂移，pck 是唯一内容载体）。
+- 帧预算 **240→320**（game-6「加预算」先例路线，verify.sh 内 `GODOT_SMOKE_FRAMES:-320`）：v3 新增 6 个真实交互断言阶段约 +75 帧；判定协议（PASS 标记 + 退出码 0 + 零 SCRIPT ERROR）不变，预算只放宽兜底不改判定语义。
+- input-fuzz PASS（seed=20260913，6 批次，agent 实测）；**playtest.sh 模板资产仍缺失，D2 维持 blocked，不代写不伪造**。
+- 「新机制不破坏旧断言」四个可复用手法：①普通物恒 +1（Combo 加成只给高分物）；②末波插值终点取 TARGET-1（保 v2 收敛断言）；③断言阶段入口把分数白盒归零（防多类型/Combo 阶段误触 20 分通关线）；④持久化回读前强制 `save_progress()`（断言语义=「落盘→回读一致」而非内存值）。
+
+## 六、部署上线卡点（唯一未闭环项）与一键恢复
+
+- **现状**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`，liveUrl `https://leomac-studio.tail49399e.ts.net/apps/game-8/`）current deployment = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`（2026-10-02，v2）；线上 pck sha256 实测 = `5f556ad9…`（= v2 基线，无版本漂移），线上健康 200 `{"ok":true,...}`。
+- **卡点**：`POST /api/v1/apphost/apps/:id/deployments` 校验「仅应用所有者（`cmuimu6w…`）或系统管理员」；执行链 agent 的 token 代行主体为 `cmoqv70b8`（≠ owner），POST 与 dryRun 均 403（2026-10-13 首测、2026-10-14 复测一致）。这是平台授权缺口，不是工程问题——**不许绕过校验、不许直改平台库**。
+- **一键恢复（需 @MyRD Admin / 应用所有者或系统管理员身份执行）**：
+
+```bash
+# ① 干跑（不落部署，验证权限与构建配置；403 则需换有权限身份）
+curl -s -X POST -H "Authorization: Bearer $MYRD_TOKEN" -H "Content-Type: application/json" \
+  "$PLATFORM_API_URL/api/v1/apphost/apps/cmujpmjsy006pm99ip9yws3wl/deployments" \
+  -d '{"mode":"bundle","dryRun":true,"deployedBy":"agent","gitRef":"myrd/game-8-goal-cmujpml1e006rm99i9hc33huu","sourceId":"cmujpml1e006rm99i9hc33huu","goalId":"cmujpml1e006rm99i9hc33huu"}'
+# ② 正式部署：同体去掉 "dryRun":true；带 goalId 会把可玩产物自动回写目标卡片（= artifacts 回写）
+```
+
+- **部署 gitRef 红线**：必须是 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu`（tip=`bfce9152`，已含 v3 全部实现与导出产物），**绝不落 main**。
+- **上线核对清单（照抄即用）**：① `/apps/game-8/health` → 200 ok:true；② `GET /apps/game-8/api/public/assets/index.pck.gz.b64` → base64 解码 gunzip → sha256 应为 **`4e3c42fa…70aca`（2,544,432B）**；index.wasm.gz.b64 解码 sha256 应仍为 `fe5cebc5…`；③ 线上 pck 自跑冒烟：签名必须含「v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环)」字样；④ 移动端模拟门禁（webapp-smoke 390×844 六项：网络/console/首屏内容/触摸管线/视口等——工具链已对线上 v2 验证全绿，证据 `games/game-8/qa/mobile-live-v2/`）。
+- ⚠️ 交接文档提交 `29f982f`（v3-release-handoff.md）推送超时未上远端（`git ls-remote` tip 实测 = `bfce9152`），**恢复命令与核对口径以本文为准**。
+
+## 七、复用要点（同类小游戏照抄）
+
+1. **结构性加机制走「表 + 纯函数」**：类型表（ITEM_SCORES）/波次权重表（WAVE_WEIGHTS）/波内插值锚点（FRAC 数组）全部数据化，口径纯函数（`item_score_for/gain_for/wave_index_for/spawn_interval_now`）运行时与 smoke 共用单一事实源——断言可直接调纯函数机判。
+2. **新机制不得污染旧基线**：给旧断言留「隔离带」（普通物恒 +1、末波终点 TARGET-1、断言阶段分数白盒归零、回读前强制落盘），比放宽旧断言正确一百倍。
+3. **Godot 4.3 实测**：`const` 里写 `PackedVector2Array(...)` 构造会 Parse Error 并连锁炸掉所有引用该类型的脚本——造型表用 `static var`。
+4. **程序化音效闭环「零音效」**：合成 AudioStreamWAV（确定性、零资产、可机判 played_count）+ 壳页手势解锁器是 Web/iOS 出声的双件套，缺一即无声。
+5. **UI 增量全代码创建、.tscn 零改动**：规避场景手写风险（load_steps/ext_resource 极易错），节点随用随建、动画完自动回收。
+6. **工作流 routine 参数带 `#` 会被注入守卫拒绝**（step 命令经 bash -c 拼接）——gameDecisions 里不要带 shell 元字符，或改在 routine step 里写死。
+7. **执行链 token 与 app/goal owner 不一致时**，部署/回写会 403：按纪律停下上报、证据落盘、给出一键恢复命令（本文 §六格式），不绕权限、不伪造「已上线」。
 
 
 ---
@@ -19925,38 +21017,44 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
-
-# 失败模式：Worker SIGINT 关闭中断
-
-## 背景
-自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
-
-## 现象
-- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
-- 输出摘要为空（进程在产出任何结果前被杀）；
-- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
-
-## 根因
-- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
-- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
-- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
-
-## 排查与处置
-1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
-2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
-3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
-4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
-5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
-
-## 预防
-- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
-- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
-- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
 ## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
 negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -20161,44 +21259,38 @@ agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
 - fix: 修复 bug
 - docs: 文档更新
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
 修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+
+## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
+
+# 失败模式：Worker SIGINT 关闭中断
+
+## 背景
+自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
+
+## 现象
+- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
+- 输出摘要为空（进程在产出任何结果前被杀）；
+- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
+
+## 根因
+- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
+- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
+- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
+
+## 排查与处置
+1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
+2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
+3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
+4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
+5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
+
+## 预防
+- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
+- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
+- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
 ## 架构设计文档
 
@@ -21522,6 +22614,17 @@ smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的�
 
 **来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
 
+---
+
+## 五、v3 增补（2026-10-14）：v2 数值基线在 v3 中的延续与口径迁移
+
+> v3「玩法扩展与体验升级」已完成实现与门禁（分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`），**本文 §一~§四的 v2 基线全部继承、零回退**（v3 冒烟签名仍含「v2手感基线(体型1.3~1.5x·移速60~70%)」且本机对 v3 pck 复跑 PASS）。变化与迁移以 v3 结论文档为准（doc `b0a9a7ff-3339-43dc-9602-6477e562bd4f`，§一/§二），要点：
+> 1. **通关口径迁移**：`TARGET_SCORE=20` 由「件数」改为「**分数**」（normal +1 / rare 金铃铛 +3 / clock 时钟 +2 且加时 4s；Combo 加成只作用 ≥2 分高分物，普通物恒 +1——本文 §一的 50 次触碰口径在 v3 下原样成立）。
+> 2. **数值区新增 11 个声明键**（COMBO_WINDOW=2.0s、COMBO_BONUS_MAX=5、TIME_BONUS_CLOCK=4.0s、MAGNET_RADIUS=100px、MAGNET_DURATION=5s、BOOST_MULT=1.5、BOOST_DURATION=4s、WAVE_BREAK_SECONDS=1.2s、TARGET_SCORE、MAX_COLLECTIBLES=6、TIME_LIMIT 显式化），v2 的 PLAYER_SCALE/PLAYER_SPEED/SPAWN_INTERVAL_*/LIFETIME_* 默认值与钳制原样保留。
+> 3. **节奏曲线改波次状态机**：刷间隔/寿命端点（0.8→0.45s、6→3s）不变，插值改为三波锚点（WAVE_INTERVAL_FRAC=[0,0.45,0.75,1.0]），末波终点取 TARGET-1 保本文「满难度收敛到 MIN」断言同值；刷出改「同屏 ≤6 件补齐制」。
+> 4. **冒烟帧预算 240→320**（game-6 加预算先例），判定协议三条件不变；断言 13 项既有全保留 + 9 项 v3 新增（共 22 项）。
+> 5. **部署状态**：线上（version 5 @ `1089e4b`）仍是 v2——本文 §三的 pck/wasm sha256 对线上继续有效；v3 pck（sha256 `4e3c42fa…`）已就绪待上线，部署 403 卡点与一键恢复命令见 v3 结论文档 §六。
+
 
 ## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
 
@@ -22729,6 +23832,151 @@ v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 
 ## 八、衔接声明
 
 本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
+
+
+## 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+# 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+> **文档定位**：固化 game-8 v3「玩法扩展与体验升级」的机制清单（**策划案 v2 → 实现 `bfce9152` 的落账差异，实现为准**）、触屏操控实现方案、美术/音效/数值基线与门禁实测结论，并登记**唯一未闭环项——v3 部署上线卡点（403 授权）与一键恢复路径**（§六）。后续迭代与同类休闲收集小游戏直接按本文对齐，不必重新勘探。
+> **一手实测声明**：本文全部数字为一手实测（2026-10-14 取证）——`git show bfce9152` 逐文件核对、线上与本地产物 sha256 实算、`godot --headless --main-pack <pck> --quit-after 320 res://tests/smoke.tscn` 本机复跑，非转述估算。
+> **权威基准**：v3 需求（`cmv6vkith000gjotytp4v915c`，tag `goal-cmujpml1e006rm99i9hc33huu#wf-sg-v3-req-r4`）；策划案 v2 GameDesignSpec（`cmv6weob6000sjotyffuhjca6`，status=approved，create_design_spec 首次走通）；v2 参数基线（doc `843ddfec-62e1-4e02-b277-21155f7595bc`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）。
+> **实现基线（v3）**：分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`（feat 提交，远端 tip 已 `git ls-remote` 核实），数值唯一对齐点 `games/game-8/autoload/game_state.gd` 数值区（18 个 `TUNING_META` 声明键），禁止散点改代码对数值。
+> **部署现状（关键）**：线上 = HostedApp `cmujpmjsy006pm99ip9yws3wl` **version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`，仍是 v2 构建**（线上 pck sha256 实测 = v2 基线 `5f556ad9…`）；**v3 已实现、已过门禁、已推送，但部署被 403 拦下**——恢复命令见 §六。
+
+## 〇、v3 现状一图流
+
+| 环节 | 状态 | 一手证据 |
+|---|---|---|
+| v3 需求登记 | ✅ | requirement `cmv6vkith000gjotytp4v915c`（HTTP 201，戳记 `#wf-sg-v3-req-r4` 无重复） |
+| 策划案 v2 落账 | ✅ | GameDesignSpec `cmv6weob6000sjotyffuhjca6`（HTTP 201，schemaVersion v0，status approved——平台 create_design_spec 能力恢复后的首次成功） |
+| 工坊工作流 run（v3） | ❌ failed | routine 入参 `gameDecisions` 含 shell 元字符 `#` 被拒绝替换（step 命令经 `bash -c` 拼接的安全守卫），**零实现遗留** |
+| v3 实现补齐 | ✅ | 线上验收 agent 代做全链路：commit `bfce9152`（11 文件，+1348/−153），`1089e4b..bfce9152` 已推送成功 |
+| 门禁 | ✅ | preflight 13 类×40 文件 PASS；smoke @320 帧 3 连 PASS（零 SCRIPT ERROR）；input-fuzz PASS（seed=20260913，6 批次）；v3 pck 自跑冒烟 PASS（§五，本机复跑） |
+| **部署上线** | **⛔ 403** | `POST /api/v1/apphost/apps/…/deployments` 仅 app owner（`cmuimu6w…`）或系统管理员；agent 代行主体 `cmoqv70b8`（含 dryRun）均被拒（2026-10-14 复测仍 403） |
+
+## 一、v3 机制清单（实现落账口径，`game_state.gd` @ `bfce9152` 为唯一来源）
+
+### 1.1 目标物 5 类（需求「≥3 种、分值/效果互异」超额落账）
+
+| 类型 | 造型（半径≈14px 多边形） | 分值 | 效果 | 配色 RGB | 波次权重 W0/W1/W2 |
+|---|---|---|---|---|---|
+| normal 青草垛 | 菱形 | +1 | 无（**恒 +1，Combo 不加成**，保护 50 次触碰台账） | (0.55,0.8,0.3) 草绿 | 0.80 / 0.68 / 0.55 |
+| rare 金铃铛 | 十点星形 | +3 | 高分物，吃 Combo 加成 | (1.0,0.82,0.25) 亮金 | 0.10 / 0.17 / 0.25 |
+| clock 时钟 | 八边形 | +2 | 得分 +2 且**加时 +4s**（钳到 TIME_LIMIT） | (0.45,0.75,1.0) 天蓝 | 0.05 / 0.08 / 0.10 |
+| magnet 磁铁 | U 形 | 0（道具） | 生效 5s：半径 100px 内计分物以 170px/s 被拉向牛牛（`MAGNET_PULL_SPEED`） | (0.9,0.4,0.75) 品红 | 0.025 / 0.035 / 0.05 |
+| boost 加速 | 闪电形 | 0（道具） | 生效 4s：实际移速 = `PLAYER_SPEED × 1.5`（`current_speed()` 机判口径） | (0.35,0.9,0.85) 青碧 | 0.025 / 0.035 / 0.05 |
+
+- 每波权重表合计恒为 1.0；**越往后稀有物与道具占比越高**（「值得追」补偿「越来越快」），波次断言含 rare 权重单调不降。
+- 刷出改为**同屏上限补齐制**：`MAX_COLLECTIBLES=6`，低于上限由生成器补充（v1「寿命÷间隔自然收敛 ≈7±1」的推导口径被取代）。
+
+### 1.2 Combo 连击
+
+- 窗口 `COMBO_WINDOW=2.0s`：窗口内连续收集 combo +1（`_advance_combo`：窗口活着递增、断链从 1 起算），超时/暂停/重开清零；`_process` 仅 RUNNING 推进窗口倒计时。
+- 加成 `combo_bonus_for = (combo<2 ? 0 : min(combo-1, COMBO_BONUS_MAX=5))`，每级 +1。
+- **`gain_for` 关键设计**：加成只作用于分值 ≥2 的高分物（rare/clock）；普通物恒 +1 → 需求「50 次真实触碰每次恰好 +1」基线在多类型下零回退（冒烟 MASS 阶段只碰普通物，台账零重构）。
+- 档案新增 `best_combo` 持久化字段（`user://niuniu_game8_save.json`：best_score / total_collected / best_combo 三键）。
+
+### 1.3 波次状态机（替代 v1 单一线性收紧曲线）
+
+- 波次按**分数**切分：`wave_index_for` 以 `third=max(⌊T/3⌋,1)`、`two_thirds=max(⌊2T/3⌋,third+1)` 分三段（默认 T=20 → 0..6 / 7..13 / 14..19），随 TARGET_SCORE 自适应。
+- 波内插值锚点：`WAVE_INTERVAL_FRAC=[0, 0.45, 0.75, 1.0]`、`WAVE_LIFETIME_FRAC=[0, 0.55, 0.8, 1.0]`——刷新间隔 0.8s→0.45s、寿命 6s→3s 三段线性、**全局单调不增、有界**，端点与 v1/v2 断言同值。
+- **末波终点取 `TARGET_SCORE-1` 的兼容性设计**：达标分当帧即通关、曲线不再被查询，因此「满难度（score=19）收敛到 SPAWN_INTERVAL_MIN」的 v2 断言原样成立（曾实测 score=19 时插值到 0.4625≠0.45 的回归，已修）。
+- 跨波：`wave_changed` → 场景层接管**波间停顿 `WAVE_BREAK_SECONDS=1.2s`**（生成器暂停 + 横幅提示），三段副标题：「青草垛大量刷出，热身收集」→「金铃铛变多，瞄准高分」→「最后冲刺，连击冲分！」。
+
+### 1.4 单局阶段机与流程（需求 ④2）
+
+- `enum Phase { RUNNING, WON, LOST, READY, PAUSED }`——新增 READY（开始面板，确认/触摸进入）与 PAUSED（键盘 P 或触摸暂停按钮，恢复前时限冻结）。
+- `start_run()` 统一「开始/重开」入口：score 归零、时限重置、combo/run_max_combo/wave_index 复位、牛牛归位、道具清空（`clear_powerups`）、场上重铺、刷点仍避出生点 ≥96px。
+- 结算（WON/LOST 都结算）：刷新 best_score / best_combo 并 `save_progress()`——**失败也保留累计收集进度**。
+- **通关口径迁移**：`TARGET_SCORE=20` 的口径由 v1/v2 的「件数」改为「**分数**」（普通 +1 / 金铃铛 +3 / 时钟 +2，另计高分物 Combo 加成）——后续所有「集满 20」表述一律按分数理解。
+
+### 1.5 策划案 v2 → 实现落账差异（防后人拿错口径，实现为准）
+
+| 项 | 策划案 v2（设计稿） | 实现 `bfce9152`（权威） |
+|---|---|---|
+| 目标物 | 3 类：青草垛 +1 / 金铃铛 +5 / 三叶草 +1+效果，另设树桩惩罚物 | **5 类**（§1.1）：树桩取消，磁铁/加速两道具直接入权重池刷出；金铃铛 +5→**+3**；三叶草改为 **clock 时钟 +2 加时 4s** |
+| 道具参数 | 磁铁 180px·5s、蹄铁 ×1.5 速·5s | 磁铁 **100px**（拉速 170px/s）·5s；加速 ×1.5·**4s** |
+| Combo | 窗口 3s，加成 `ceil(分值×(1+0.1×等级))` | 窗口 **2s**，**每级 +1 封顶 5**，且**只作用 ≥2 分高分物** |
+| 波间停顿 | 2s | **1.2s** |
+| 通关口径 | 目标收集量 20（件数） | **20 分（分数口径）** |
+
+## 二、数值基线（18 个 TUNING_META 声明键，默认值 = 钳制区间/步长）
+
+| 键 | 默认 | min~max/step | 键 | 默认 | min~max/step |
+|---|---|---|---|---|---|
+| TARGET_SCORE | 20 | 5~60/1 | PLAYER_SCALE（v2 继承） | 1.4 | 0.5~2.0/0.05 |
+| TIME_LIMIT | 60 | 15~180/5 | PLAYER_SPEED（v2 继承） | 145 | 60~300/5 |
+| MAX_COLLECTIBLES | 6 | 1~20/1 | COMBO_WINDOW | 2.0s | 0.5~5/0.1 |
+| SPAWN_INTERVAL_START | 0.8s | 0.3~3/0.05 | COMBO_BONUS_MAX | 5 | 0~10/1 |
+| SPAWN_INTERVAL_MIN | 0.45s | 0.2~2/0.05 | TIME_BONUS_CLOCK | 4.0s | 0~10/0.5 |
+| LIFETIME_START | 6.0s | 2~15/0.5 | MAGNET_RADIUS | 100px | 60~200/5 |
+| LIFETIME_MIN | 3.0s | 1~10/0.5 | MAGNET_DURATION | 5.0s | 1~10/0.5 |
+| WAVE_BREAK_SECONDS | 1.2s | 0~3/0.1 | BOOST_MULT | 1.5 | 1.1~2.5/0.05 |
+| BOOST_DURATION | 4.0s | 1~10/0.5 | LIFETIME_WARN_SECONDS | 1.5s（const，临期闪烁阈值） | — |
+
+- 调参协议（SKILL.md §3C，v3 延续）：`apply_tuning()` 唯一应用入口——只认声明键（未声明键拒绝）、按 min/max 钳制、**保序约束**（`SPAWN_INTERVAL_MIN ≤ SPAWN_INTERVAL_START`、`LIFETIME_MIN ≤ LIFETIME_START`，防单调性被调坏）；改 TIME_LIMIT 立即重置本局剩余时间。双通道保留：游戏内调参面板 + 壳页 `?tuning=<JSON>` → `window.__GAME_TUNING__`。
+- 冒烟含调参协议断言：新增声明键可应用/钳制、未声明键必须被拒绝。
+- 判定几何（沿用 v2 实测口径）：PickupShape 本体 r=22×1.4≈30.8px + 收集物 r=14px → 触发距离 ≈44.8px；刷点安全间距 96px ≈ 2.14× 余量；刷点距场地边缘 ≥48px（`SPAWN_MARGIN`）。
+
+## 三、触屏操控实现方案（现网既有形态 + v3 延续加固）
+
+- **移动管线单一化**：左下角**虚拟摇杆**（`virtual_joystick.gd`，v2 包内既有、v3 延续）→ `InputEventAction` 注入 `move_left/right/up/down` → 与键盘共用 `_unhandled_input` 同一管线。摇杆参数：底座 `BASE_RADIUS=56px`、摇杆头 `STICK_RADIUS=26px`、死区 `DEADZONE_RATIO=0.25`。方向不反向由冒烟方向符号断言钉死（A/← 后 position.x 减小、D/→ 后增大）。
+- **按钮触达**：`touch_confirm_button.gd` 确认按钮半径 **44px**（满足「触达区 ≥44×44px」），点击注入 `confirm` 动作、与键盘同路径；局内暂停按钮仅触摸设备显示（桌面键盘环境完全不可见，`TouchUI` CanvasLayer 统一管理）。
+- **视口适配**：竖屏 **720×1280** 基线，`stretch/mode=canvas_items` + `aspect=keep` 等比缩放，`handheld/orientation=portrait`；HUD 操作提示按输入设备切换文案。
+- **壳页硬契约**（`server/src/game-page.ts`，随部署上线，实测在位）：viewport meta（user-scalable=no）、`touch-action:none`、调参桥（非法 JSON 按无调参处理绝不阻塞启动）、**音频手势解锁器**（包装 AudioContext 捕获引擎实例 + touchstart/touchend/pointerdown/keydown/click 五类事件 capture+passive 同步 resume，覆盖 suspended 与 interrupted；visibilitychange 回前台再解锁；`__audioDebug` 取证出口）、**AudioWorklet addModule 补丁**（worklet 是移动端音频单一故障点：真实资产端点优先、失败降级原路径重试一次、仍失败显式 console.error + audioLog 记 `worklet-dead`）。
+
+## 四、美术/音效基线
+
+- **分层背景**：视差远/近两层（全部代码创建，`_update_parallax` 随角色移动产生轻视差），统一牧场绿主题。
+- **目标物动效**：5 类专属多边形造型 + 专属配色（§1.1 表）；待机呼吸（缩放 1±0.08 正弦脉动，`breathing_scale()` 可观测）；临期 ≤1.5s 时 alpha 闪烁警示；收集/消失动画播放完整且节点无残留（`remove_child→queue_free` 清场纪律不回退）。
+- **反馈三件套**：收集音效 + 粒子 + 飘字同帧触发；飘字生命周期 `FLOAT_TEXT_LIFETIME=0.6s`、颜色与目标物呼应；粒子随用随建、动画完自动回收。
+- **UI 主题五色**：`THEME_PANEL_BG=(0.07,0.14,0.10,0.94)` / `BORDER=草绿(0.55,0.8,0.3,0.9)` / `TEXT=(0.96,0.97,0.92)` / `ACCENT=草绿` / `COMBO=橙(1.0,0.62,0.2)`；开始/HUD/结算/暂停面板统一主题；v3 增量 UI（背景层/连击/横幅/开始面板/暂停面板/粒子/飘字）**全部代码创建，.tscn 零新增节点**（规避场景手写风险）。
+- **字体**：Noto Sans SC（OFL，子集化）保留，`theme/custom_font` 全局生效。
+- **音效基线（「零音效」缺陷闭环）**：新增 `sfx.gd` autoload——**程序化合成、零外部资产、确定性**：7 个音色（collect=880Hz blip / rare=987.77·1174.66·1396.91Hz 琶音 / clock=660+880Hz 双音 / powerup=320→960Hz 扫频 / wave=293.66Hz / win=523.25·659.25·783.99·1046.5Hz 琶音 / lose=440→174.61Hz 下滑），22.05kHz 16-bit PCM、复音池 6（池满抢占最老播放器）、主增益 0.5、pitch 参数支持连击音高爬升；`played_count` 供冒烟机判「收集后真的播了声」。Web/iOS 出声前提 = 壳页手势解锁器（§三），引擎侧只负责「有可播的流、调用不报错」。
+
+## 五、门禁与验收（22 项断言，帧预算 240→320）
+
+### 5.1 smoke.gd 断言清单（13 项既有全保留 + 9 项 v3 新增）
+
+1. 场景实例化与接线；2. autoload 注册与约定信号；3. InputMap 键位契约 + **方向符号**（A/← 减小、D/→ 增大）；4. 信号到达订阅方；5. 收集判定触碰 +1；6. **跨 3 局 50 次真实触碰每次恰好 +1**（只碰普通物，含清场静置反例）；7. 难度梯度按**波次曲线**单调收紧有界 + 首收后 SpawnTimer 真实变快；8. 过期回收不计分；9. 通关可达（第 20 分 → WON + 结算「通关」）；10. 失败可达（时限归零 → LOST + HUD ≤10s 红色警示）；11. 一键重开全复位；12. 持久化落盘回读一致（含 best_combo）；13. **v2 手感基线**（体型 1.3~1.5×、移速 60~70% 且接线到根节点/碰撞体/PickupArea）——以上既有；v3 新增：14. 开始流程（READY→确认→RUNNING）；15. 多类型计分（rare +3、clock +2 加时 4s）；16. Combo（窗口内递增/高分物加成/UI 可见/超时清零）；17. 磁铁（85px 测试距内目标被吸至判定距离并收集）；18. 加速（实测位移 > 基线 ×1.3，BOOST_MULT=1.5 留工程余量）；19. 暂停/恢复（P 键冻结时限）；20. 波次（按分数切分、权重表逐波合计 1 且 rare 单调不降）；21. 音效（Sfx 库 ≥6 音色、收集后 played_count 真增长）；22. 调参协议（声明键可应用钳制、未声明键拒绝）。
+
+### 5.2 门禁实测（本机复跑，2026-10-14）
+
+- **v3 pck 自跑冒烟 PASS**（对 `bfce9152` 导出的 `index.pck`，2,544,432B，sha256 `4e3c42fa5dcbfa8b31d5b7c1d65df2ccd9024dcfd40f2e3edde95bce55c70aca`）：
+  `GODOT_SMOKE: PASS 场景实例化/输入映射/移动方向符号(A/←减小,D/→增大)/收集判定/50 连击一致性/波次梯度/过期回收/胜负/一键重开/持久化/v2手感基线(体型1.3~1.5x·移速60~70%)/v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环) 全部通过`（exit 0、零 SCRIPT ERROR）
+- wasm 与 v2 **逐字节一致**（`fe5cebc5…`，35,376,909B，引擎零漂移，pck 是唯一内容载体）。
+- 帧预算 **240→320**（game-6「加预算」先例路线，verify.sh 内 `GODOT_SMOKE_FRAMES:-320`）：v3 新增 6 个真实交互断言阶段约 +75 帧；判定协议（PASS 标记 + 退出码 0 + 零 SCRIPT ERROR）不变，预算只放宽兜底不改判定语义。
+- input-fuzz PASS（seed=20260913，6 批次，agent 实测）；**playtest.sh 模板资产仍缺失，D2 维持 blocked，不代写不伪造**。
+- 「新机制不破坏旧断言」四个可复用手法：①普通物恒 +1（Combo 加成只给高分物）；②末波插值终点取 TARGET-1（保 v2 收敛断言）；③断言阶段入口把分数白盒归零（防多类型/Combo 阶段误触 20 分通关线）；④持久化回读前强制 `save_progress()`（断言语义=「落盘→回读一致」而非内存值）。
+
+## 六、部署上线卡点（唯一未闭环项）与一键恢复
+
+- **现状**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`，liveUrl `https://leomac-studio.tail49399e.ts.net/apps/game-8/`）current deployment = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`（2026-10-02，v2）；线上 pck sha256 实测 = `5f556ad9…`（= v2 基线，无版本漂移），线上健康 200 `{"ok":true,...}`。
+- **卡点**：`POST /api/v1/apphost/apps/:id/deployments` 校验「仅应用所有者（`cmuimu6w…`）或系统管理员」；执行链 agent 的 token 代行主体为 `cmoqv70b8`（≠ owner），POST 与 dryRun 均 403（2026-10-13 首测、2026-10-14 复测一致）。这是平台授权缺口，不是工程问题——**不许绕过校验、不许直改平台库**。
+- **一键恢复（需 @MyRD Admin / 应用所有者或系统管理员身份执行）**：
+
+```bash
+# ① 干跑（不落部署，验证权限与构建配置；403 则需换有权限身份）
+curl -s -X POST -H "Authorization: Bearer $MYRD_TOKEN" -H "Content-Type: application/json" \
+  "$PLATFORM_API_URL/api/v1/apphost/apps/cmujpmjsy006pm99ip9yws3wl/deployments" \
+  -d '{"mode":"bundle","dryRun":true,"deployedBy":"agent","gitRef":"myrd/game-8-goal-cmujpml1e006rm99i9hc33huu","sourceId":"cmujpml1e006rm99i9hc33huu","goalId":"cmujpml1e006rm99i9hc33huu"}'
+# ② 正式部署：同体去掉 "dryRun":true；带 goalId 会把可玩产物自动回写目标卡片（= artifacts 回写）
+```
+
+- **部署 gitRef 红线**：必须是 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu`（tip=`bfce9152`，已含 v3 全部实现与导出产物），**绝不落 main**。
+- **上线核对清单（照抄即用）**：① `/apps/game-8/health` → 200 ok:true；② `GET /apps/game-8/api/public/assets/index.pck.gz.b64` → base64 解码 gunzip → sha256 应为 **`4e3c42fa…70aca`（2,544,432B）**；index.wasm.gz.b64 解码 sha256 应仍为 `fe5cebc5…`；③ 线上 pck 自跑冒烟：签名必须含「v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环)」字样；④ 移动端模拟门禁（webapp-smoke 390×844 六项：网络/console/首屏内容/触摸管线/视口等——工具链已对线上 v2 验证全绿，证据 `games/game-8/qa/mobile-live-v2/`）。
+- ⚠️ 交接文档提交 `29f982f`（v3-release-handoff.md）推送超时未上远端（`git ls-remote` tip 实测 = `bfce9152`），**恢复命令与核对口径以本文为准**。
+
+## 七、复用要点（同类小游戏照抄）
+
+1. **结构性加机制走「表 + 纯函数」**：类型表（ITEM_SCORES）/波次权重表（WAVE_WEIGHTS）/波内插值锚点（FRAC 数组）全部数据化，口径纯函数（`item_score_for/gain_for/wave_index_for/spawn_interval_now`）运行时与 smoke 共用单一事实源——断言可直接调纯函数机判。
+2. **新机制不得污染旧基线**：给旧断言留「隔离带」（普通物恒 +1、末波终点 TARGET-1、断言阶段分数白盒归零、回读前强制落盘），比放宽旧断言正确一百倍。
+3. **Godot 4.3 实测**：`const` 里写 `PackedVector2Array(...)` 构造会 Parse Error 并连锁炸掉所有引用该类型的脚本——造型表用 `static var`。
+4. **程序化音效闭环「零音效」**：合成 AudioStreamWAV（确定性、零资产、可机判 played_count）+ 壳页手势解锁器是 Web/iOS 出声的双件套，缺一即无声。
+5. **UI 增量全代码创建、.tscn 零改动**：规避场景手写风险（load_steps/ext_resource 极易错），节点随用随建、动画完自动回收。
+6. **工作流 routine 参数带 `#` 会被注入守卫拒绝**（step 命令经 bash -c 拼接）——gameDecisions 里不要带 shell 元字符，或改在 routine step 里写死。
+7. **执行链 token 与 app/goal owner 不一致时**，部署/回写会 403：按纪律停下上报、证据落盘、给出一键恢复命令（本文 §六格式），不绕权限、不伪造「已上线」。
 
 
 ---
@@ -22752,38 +24000,44 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
-
-# 失败模式：Worker SIGINT 关闭中断
-
-## 背景
-自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
-
-## 现象
-- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
-- 输出摘要为空（进程在产出任何结果前被杀）；
-- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
-
-## 根因
-- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
-- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
-- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
-
-## 排查与处置
-1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
-2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
-3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
-4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
-5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
-
-## 预防
-- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
-- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
-- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
 ## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
 negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -22988,44 +24242,38 @@ agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
 - fix: 修复 bug
 - docs: 文档更新
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
 修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+
+## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
+
+# 失败模式：Worker SIGINT 关闭中断
+
+## 背景
+自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
+
+## 现象
+- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
+- 输出摘要为空（进程在产出任何结果前被杀）；
+- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
+
+## 根因
+- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
+- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
+- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
+
+## 排查与处置
+1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
+2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
+3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
+4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
+5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
+
+## 预防
+- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
+- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
+- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
 ## 架构设计文档
 
@@ -24349,6 +25597,17 @@ smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的�
 
 **来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
 
+---
+
+## 五、v3 增补（2026-10-14）：v2 数值基线在 v3 中的延续与口径迁移
+
+> v3「玩法扩展与体验升级」已完成实现与门禁（分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`），**本文 §一~§四的 v2 基线全部继承、零回退**（v3 冒烟签名仍含「v2手感基线(体型1.3~1.5x·移速60~70%)」且本机对 v3 pck 复跑 PASS）。变化与迁移以 v3 结论文档为准（doc `b0a9a7ff-3339-43dc-9602-6477e562bd4f`，§一/§二），要点：
+> 1. **通关口径迁移**：`TARGET_SCORE=20` 由「件数」改为「**分数**」（normal +1 / rare 金铃铛 +3 / clock 时钟 +2 且加时 4s；Combo 加成只作用 ≥2 分高分物，普通物恒 +1——本文 §一的 50 次触碰口径在 v3 下原样成立）。
+> 2. **数值区新增 11 个声明键**（COMBO_WINDOW=2.0s、COMBO_BONUS_MAX=5、TIME_BONUS_CLOCK=4.0s、MAGNET_RADIUS=100px、MAGNET_DURATION=5s、BOOST_MULT=1.5、BOOST_DURATION=4s、WAVE_BREAK_SECONDS=1.2s、TARGET_SCORE、MAX_COLLECTIBLES=6、TIME_LIMIT 显式化），v2 的 PLAYER_SCALE/PLAYER_SPEED/SPAWN_INTERVAL_*/LIFETIME_* 默认值与钳制原样保留。
+> 3. **节奏曲线改波次状态机**：刷间隔/寿命端点（0.8→0.45s、6→3s）不变，插值改为三波锚点（WAVE_INTERVAL_FRAC=[0,0.45,0.75,1.0]），末波终点取 TARGET-1 保本文「满难度收敛到 MIN」断言同值；刷出改「同屏 ≤6 件补齐制」。
+> 4. **冒烟帧预算 240→320**（game-6 加预算先例），判定协议三条件不变；断言 13 项既有全保留 + 9 项 v3 新增（共 22 项）。
+> 5. **部署状态**：线上（version 5 @ `1089e4b`）仍是 v2——本文 §三的 pck/wasm sha256 对线上继续有效；v3 pck（sha256 `4e3c42fa…`）已就绪待上线，部署 403 卡点与一键恢复命令见 v3 结论文档 §六。
+
 
 ## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
 
@@ -25556,6 +26815,151 @@ v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 
 ## 八、衔接声明
 
 本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
+
+
+## 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+# 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+> **文档定位**：固化 game-8 v3「玩法扩展与体验升级」的机制清单（**策划案 v2 → 实现 `bfce9152` 的落账差异，实现为准**）、触屏操控实现方案、美术/音效/数值基线与门禁实测结论，并登记**唯一未闭环项——v3 部署上线卡点（403 授权）与一键恢复路径**（§六）。后续迭代与同类休闲收集小游戏直接按本文对齐，不必重新勘探。
+> **一手实测声明**：本文全部数字为一手实测（2026-10-14 取证）——`git show bfce9152` 逐文件核对、线上与本地产物 sha256 实算、`godot --headless --main-pack <pck> --quit-after 320 res://tests/smoke.tscn` 本机复跑，非转述估算。
+> **权威基准**：v3 需求（`cmv6vkith000gjotytp4v915c`，tag `goal-cmujpml1e006rm99i9hc33huu#wf-sg-v3-req-r4`）；策划案 v2 GameDesignSpec（`cmv6weob6000sjotyffuhjca6`，status=approved，create_design_spec 首次走通）；v2 参数基线（doc `843ddfec-62e1-4e02-b277-21155f7595bc`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）。
+> **实现基线（v3）**：分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`（feat 提交，远端 tip 已 `git ls-remote` 核实），数值唯一对齐点 `games/game-8/autoload/game_state.gd` 数值区（18 个 `TUNING_META` 声明键），禁止散点改代码对数值。
+> **部署现状（关键）**：线上 = HostedApp `cmujpmjsy006pm99ip9yws3wl` **version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`，仍是 v2 构建**（线上 pck sha256 实测 = v2 基线 `5f556ad9…`）；**v3 已实现、已过门禁、已推送，但部署被 403 拦下**——恢复命令见 §六。
+
+## 〇、v3 现状一图流
+
+| 环节 | 状态 | 一手证据 |
+|---|---|---|
+| v3 需求登记 | ✅ | requirement `cmv6vkith000gjotytp4v915c`（HTTP 201，戳记 `#wf-sg-v3-req-r4` 无重复） |
+| 策划案 v2 落账 | ✅ | GameDesignSpec `cmv6weob6000sjotyffuhjca6`（HTTP 201，schemaVersion v0，status approved——平台 create_design_spec 能力恢复后的首次成功） |
+| 工坊工作流 run（v3） | ❌ failed | routine 入参 `gameDecisions` 含 shell 元字符 `#` 被拒绝替换（step 命令经 `bash -c` 拼接的安全守卫），**零实现遗留** |
+| v3 实现补齐 | ✅ | 线上验收 agent 代做全链路：commit `bfce9152`（11 文件，+1348/−153），`1089e4b..bfce9152` 已推送成功 |
+| 门禁 | ✅ | preflight 13 类×40 文件 PASS；smoke @320 帧 3 连 PASS（零 SCRIPT ERROR）；input-fuzz PASS（seed=20260913，6 批次）；v3 pck 自跑冒烟 PASS（§五，本机复跑） |
+| **部署上线** | **⛔ 403** | `POST /api/v1/apphost/apps/…/deployments` 仅 app owner（`cmuimu6w…`）或系统管理员；agent 代行主体 `cmoqv70b8`（含 dryRun）均被拒（2026-10-14 复测仍 403） |
+
+## 一、v3 机制清单（实现落账口径，`game_state.gd` @ `bfce9152` 为唯一来源）
+
+### 1.1 目标物 5 类（需求「≥3 种、分值/效果互异」超额落账）
+
+| 类型 | 造型（半径≈14px 多边形） | 分值 | 效果 | 配色 RGB | 波次权重 W0/W1/W2 |
+|---|---|---|---|---|---|
+| normal 青草垛 | 菱形 | +1 | 无（**恒 +1，Combo 不加成**，保护 50 次触碰台账） | (0.55,0.8,0.3) 草绿 | 0.80 / 0.68 / 0.55 |
+| rare 金铃铛 | 十点星形 | +3 | 高分物，吃 Combo 加成 | (1.0,0.82,0.25) 亮金 | 0.10 / 0.17 / 0.25 |
+| clock 时钟 | 八边形 | +2 | 得分 +2 且**加时 +4s**（钳到 TIME_LIMIT） | (0.45,0.75,1.0) 天蓝 | 0.05 / 0.08 / 0.10 |
+| magnet 磁铁 | U 形 | 0（道具） | 生效 5s：半径 100px 内计分物以 170px/s 被拉向牛牛（`MAGNET_PULL_SPEED`） | (0.9,0.4,0.75) 品红 | 0.025 / 0.035 / 0.05 |
+| boost 加速 | 闪电形 | 0（道具） | 生效 4s：实际移速 = `PLAYER_SPEED × 1.5`（`current_speed()` 机判口径） | (0.35,0.9,0.85) 青碧 | 0.025 / 0.035 / 0.05 |
+
+- 每波权重表合计恒为 1.0；**越往后稀有物与道具占比越高**（「值得追」补偿「越来越快」），波次断言含 rare 权重单调不降。
+- 刷出改为**同屏上限补齐制**：`MAX_COLLECTIBLES=6`，低于上限由生成器补充（v1「寿命÷间隔自然收敛 ≈7±1」的推导口径被取代）。
+
+### 1.2 Combo 连击
+
+- 窗口 `COMBO_WINDOW=2.0s`：窗口内连续收集 combo +1（`_advance_combo`：窗口活着递增、断链从 1 起算），超时/暂停/重开清零；`_process` 仅 RUNNING 推进窗口倒计时。
+- 加成 `combo_bonus_for = (combo<2 ? 0 : min(combo-1, COMBO_BONUS_MAX=5))`，每级 +1。
+- **`gain_for` 关键设计**：加成只作用于分值 ≥2 的高分物（rare/clock）；普通物恒 +1 → 需求「50 次真实触碰每次恰好 +1」基线在多类型下零回退（冒烟 MASS 阶段只碰普通物，台账零重构）。
+- 档案新增 `best_combo` 持久化字段（`user://niuniu_game8_save.json`：best_score / total_collected / best_combo 三键）。
+
+### 1.3 波次状态机（替代 v1 单一线性收紧曲线）
+
+- 波次按**分数**切分：`wave_index_for` 以 `third=max(⌊T/3⌋,1)`、`two_thirds=max(⌊2T/3⌋,third+1)` 分三段（默认 T=20 → 0..6 / 7..13 / 14..19），随 TARGET_SCORE 自适应。
+- 波内插值锚点：`WAVE_INTERVAL_FRAC=[0, 0.45, 0.75, 1.0]`、`WAVE_LIFETIME_FRAC=[0, 0.55, 0.8, 1.0]`——刷新间隔 0.8s→0.45s、寿命 6s→3s 三段线性、**全局单调不增、有界**，端点与 v1/v2 断言同值。
+- **末波终点取 `TARGET_SCORE-1` 的兼容性设计**：达标分当帧即通关、曲线不再被查询，因此「满难度（score=19）收敛到 SPAWN_INTERVAL_MIN」的 v2 断言原样成立（曾实测 score=19 时插值到 0.4625≠0.45 的回归，已修）。
+- 跨波：`wave_changed` → 场景层接管**波间停顿 `WAVE_BREAK_SECONDS=1.2s`**（生成器暂停 + 横幅提示），三段副标题：「青草垛大量刷出，热身收集」→「金铃铛变多，瞄准高分」→「最后冲刺，连击冲分！」。
+
+### 1.4 单局阶段机与流程（需求 ④2）
+
+- `enum Phase { RUNNING, WON, LOST, READY, PAUSED }`——新增 READY（开始面板，确认/触摸进入）与 PAUSED（键盘 P 或触摸暂停按钮，恢复前时限冻结）。
+- `start_run()` 统一「开始/重开」入口：score 归零、时限重置、combo/run_max_combo/wave_index 复位、牛牛归位、道具清空（`clear_powerups`）、场上重铺、刷点仍避出生点 ≥96px。
+- 结算（WON/LOST 都结算）：刷新 best_score / best_combo 并 `save_progress()`——**失败也保留累计收集进度**。
+- **通关口径迁移**：`TARGET_SCORE=20` 的口径由 v1/v2 的「件数」改为「**分数**」（普通 +1 / 金铃铛 +3 / 时钟 +2，另计高分物 Combo 加成）——后续所有「集满 20」表述一律按分数理解。
+
+### 1.5 策划案 v2 → 实现落账差异（防后人拿错口径，实现为准）
+
+| 项 | 策划案 v2（设计稿） | 实现 `bfce9152`（权威） |
+|---|---|---|
+| 目标物 | 3 类：青草垛 +1 / 金铃铛 +5 / 三叶草 +1+效果，另设树桩惩罚物 | **5 类**（§1.1）：树桩取消，磁铁/加速两道具直接入权重池刷出；金铃铛 +5→**+3**；三叶草改为 **clock 时钟 +2 加时 4s** |
+| 道具参数 | 磁铁 180px·5s、蹄铁 ×1.5 速·5s | 磁铁 **100px**（拉速 170px/s）·5s；加速 ×1.5·**4s** |
+| Combo | 窗口 3s，加成 `ceil(分值×(1+0.1×等级))` | 窗口 **2s**，**每级 +1 封顶 5**，且**只作用 ≥2 分高分物** |
+| 波间停顿 | 2s | **1.2s** |
+| 通关口径 | 目标收集量 20（件数） | **20 分（分数口径）** |
+
+## 二、数值基线（18 个 TUNING_META 声明键，默认值 = 钳制区间/步长）
+
+| 键 | 默认 | min~max/step | 键 | 默认 | min~max/step |
+|---|---|---|---|---|---|
+| TARGET_SCORE | 20 | 5~60/1 | PLAYER_SCALE（v2 继承） | 1.4 | 0.5~2.0/0.05 |
+| TIME_LIMIT | 60 | 15~180/5 | PLAYER_SPEED（v2 继承） | 145 | 60~300/5 |
+| MAX_COLLECTIBLES | 6 | 1~20/1 | COMBO_WINDOW | 2.0s | 0.5~5/0.1 |
+| SPAWN_INTERVAL_START | 0.8s | 0.3~3/0.05 | COMBO_BONUS_MAX | 5 | 0~10/1 |
+| SPAWN_INTERVAL_MIN | 0.45s | 0.2~2/0.05 | TIME_BONUS_CLOCK | 4.0s | 0~10/0.5 |
+| LIFETIME_START | 6.0s | 2~15/0.5 | MAGNET_RADIUS | 100px | 60~200/5 |
+| LIFETIME_MIN | 3.0s | 1~10/0.5 | MAGNET_DURATION | 5.0s | 1~10/0.5 |
+| WAVE_BREAK_SECONDS | 1.2s | 0~3/0.1 | BOOST_MULT | 1.5 | 1.1~2.5/0.05 |
+| BOOST_DURATION | 4.0s | 1~10/0.5 | LIFETIME_WARN_SECONDS | 1.5s（const，临期闪烁阈值） | — |
+
+- 调参协议（SKILL.md §3C，v3 延续）：`apply_tuning()` 唯一应用入口——只认声明键（未声明键拒绝）、按 min/max 钳制、**保序约束**（`SPAWN_INTERVAL_MIN ≤ SPAWN_INTERVAL_START`、`LIFETIME_MIN ≤ LIFETIME_START`，防单调性被调坏）；改 TIME_LIMIT 立即重置本局剩余时间。双通道保留：游戏内调参面板 + 壳页 `?tuning=<JSON>` → `window.__GAME_TUNING__`。
+- 冒烟含调参协议断言：新增声明键可应用/钳制、未声明键必须被拒绝。
+- 判定几何（沿用 v2 实测口径）：PickupShape 本体 r=22×1.4≈30.8px + 收集物 r=14px → 触发距离 ≈44.8px；刷点安全间距 96px ≈ 2.14× 余量；刷点距场地边缘 ≥48px（`SPAWN_MARGIN`）。
+
+## 三、触屏操控实现方案（现网既有形态 + v3 延续加固）
+
+- **移动管线单一化**：左下角**虚拟摇杆**（`virtual_joystick.gd`，v2 包内既有、v3 延续）→ `InputEventAction` 注入 `move_left/right/up/down` → 与键盘共用 `_unhandled_input` 同一管线。摇杆参数：底座 `BASE_RADIUS=56px`、摇杆头 `STICK_RADIUS=26px`、死区 `DEADZONE_RATIO=0.25`。方向不反向由冒烟方向符号断言钉死（A/← 后 position.x 减小、D/→ 后增大）。
+- **按钮触达**：`touch_confirm_button.gd` 确认按钮半径 **44px**（满足「触达区 ≥44×44px」），点击注入 `confirm` 动作、与键盘同路径；局内暂停按钮仅触摸设备显示（桌面键盘环境完全不可见，`TouchUI` CanvasLayer 统一管理）。
+- **视口适配**：竖屏 **720×1280** 基线，`stretch/mode=canvas_items` + `aspect=keep` 等比缩放，`handheld/orientation=portrait`；HUD 操作提示按输入设备切换文案。
+- **壳页硬契约**（`server/src/game-page.ts`，随部署上线，实测在位）：viewport meta（user-scalable=no）、`touch-action:none`、调参桥（非法 JSON 按无调参处理绝不阻塞启动）、**音频手势解锁器**（包装 AudioContext 捕获引擎实例 + touchstart/touchend/pointerdown/keydown/click 五类事件 capture+passive 同步 resume，覆盖 suspended 与 interrupted；visibilitychange 回前台再解锁；`__audioDebug` 取证出口）、**AudioWorklet addModule 补丁**（worklet 是移动端音频单一故障点：真实资产端点优先、失败降级原路径重试一次、仍失败显式 console.error + audioLog 记 `worklet-dead`）。
+
+## 四、美术/音效基线
+
+- **分层背景**：视差远/近两层（全部代码创建，`_update_parallax` 随角色移动产生轻视差），统一牧场绿主题。
+- **目标物动效**：5 类专属多边形造型 + 专属配色（§1.1 表）；待机呼吸（缩放 1±0.08 正弦脉动，`breathing_scale()` 可观测）；临期 ≤1.5s 时 alpha 闪烁警示；收集/消失动画播放完整且节点无残留（`remove_child→queue_free` 清场纪律不回退）。
+- **反馈三件套**：收集音效 + 粒子 + 飘字同帧触发；飘字生命周期 `FLOAT_TEXT_LIFETIME=0.6s`、颜色与目标物呼应；粒子随用随建、动画完自动回收。
+- **UI 主题五色**：`THEME_PANEL_BG=(0.07,0.14,0.10,0.94)` / `BORDER=草绿(0.55,0.8,0.3,0.9)` / `TEXT=(0.96,0.97,0.92)` / `ACCENT=草绿` / `COMBO=橙(1.0,0.62,0.2)`；开始/HUD/结算/暂停面板统一主题；v3 增量 UI（背景层/连击/横幅/开始面板/暂停面板/粒子/飘字）**全部代码创建，.tscn 零新增节点**（规避场景手写风险）。
+- **字体**：Noto Sans SC（OFL，子集化）保留，`theme/custom_font` 全局生效。
+- **音效基线（「零音效」缺陷闭环）**：新增 `sfx.gd` autoload——**程序化合成、零外部资产、确定性**：7 个音色（collect=880Hz blip / rare=987.77·1174.66·1396.91Hz 琶音 / clock=660+880Hz 双音 / powerup=320→960Hz 扫频 / wave=293.66Hz / win=523.25·659.25·783.99·1046.5Hz 琶音 / lose=440→174.61Hz 下滑），22.05kHz 16-bit PCM、复音池 6（池满抢占最老播放器）、主增益 0.5、pitch 参数支持连击音高爬升；`played_count` 供冒烟机判「收集后真的播了声」。Web/iOS 出声前提 = 壳页手势解锁器（§三），引擎侧只负责「有可播的流、调用不报错」。
+
+## 五、门禁与验收（22 项断言，帧预算 240→320）
+
+### 5.1 smoke.gd 断言清单（13 项既有全保留 + 9 项 v3 新增）
+
+1. 场景实例化与接线；2. autoload 注册与约定信号；3. InputMap 键位契约 + **方向符号**（A/← 减小、D/→ 增大）；4. 信号到达订阅方；5. 收集判定触碰 +1；6. **跨 3 局 50 次真实触碰每次恰好 +1**（只碰普通物，含清场静置反例）；7. 难度梯度按**波次曲线**单调收紧有界 + 首收后 SpawnTimer 真实变快；8. 过期回收不计分；9. 通关可达（第 20 分 → WON + 结算「通关」）；10. 失败可达（时限归零 → LOST + HUD ≤10s 红色警示）；11. 一键重开全复位；12. 持久化落盘回读一致（含 best_combo）；13. **v2 手感基线**（体型 1.3~1.5×、移速 60~70% 且接线到根节点/碰撞体/PickupArea）——以上既有；v3 新增：14. 开始流程（READY→确认→RUNNING）；15. 多类型计分（rare +3、clock +2 加时 4s）；16. Combo（窗口内递增/高分物加成/UI 可见/超时清零）；17. 磁铁（85px 测试距内目标被吸至判定距离并收集）；18. 加速（实测位移 > 基线 ×1.3，BOOST_MULT=1.5 留工程余量）；19. 暂停/恢复（P 键冻结时限）；20. 波次（按分数切分、权重表逐波合计 1 且 rare 单调不降）；21. 音效（Sfx 库 ≥6 音色、收集后 played_count 真增长）；22. 调参协议（声明键可应用钳制、未声明键拒绝）。
+
+### 5.2 门禁实测（本机复跑，2026-10-14）
+
+- **v3 pck 自跑冒烟 PASS**（对 `bfce9152` 导出的 `index.pck`，2,544,432B，sha256 `4e3c42fa5dcbfa8b31d5b7c1d65df2ccd9024dcfd40f2e3edde95bce55c70aca`）：
+  `GODOT_SMOKE: PASS 场景实例化/输入映射/移动方向符号(A/←减小,D/→增大)/收集判定/50 连击一致性/波次梯度/过期回收/胜负/一键重开/持久化/v2手感基线(体型1.3~1.5x·移速60~70%)/v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环) 全部通过`（exit 0、零 SCRIPT ERROR）
+- wasm 与 v2 **逐字节一致**（`fe5cebc5…`，35,376,909B，引擎零漂移，pck 是唯一内容载体）。
+- 帧预算 **240→320**（game-6「加预算」先例路线，verify.sh 内 `GODOT_SMOKE_FRAMES:-320`）：v3 新增 6 个真实交互断言阶段约 +75 帧；判定协议（PASS 标记 + 退出码 0 + 零 SCRIPT ERROR）不变，预算只放宽兜底不改判定语义。
+- input-fuzz PASS（seed=20260913，6 批次，agent 实测）；**playtest.sh 模板资产仍缺失，D2 维持 blocked，不代写不伪造**。
+- 「新机制不破坏旧断言」四个可复用手法：①普通物恒 +1（Combo 加成只给高分物）；②末波插值终点取 TARGET-1（保 v2 收敛断言）；③断言阶段入口把分数白盒归零（防多类型/Combo 阶段误触 20 分通关线）；④持久化回读前强制 `save_progress()`（断言语义=「落盘→回读一致」而非内存值）。
+
+## 六、部署上线卡点（唯一未闭环项）与一键恢复
+
+- **现状**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`，liveUrl `https://leomac-studio.tail49399e.ts.net/apps/game-8/`）current deployment = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`（2026-10-02，v2）；线上 pck sha256 实测 = `5f556ad9…`（= v2 基线，无版本漂移），线上健康 200 `{"ok":true,...}`。
+- **卡点**：`POST /api/v1/apphost/apps/:id/deployments` 校验「仅应用所有者（`cmuimu6w…`）或系统管理员」；执行链 agent 的 token 代行主体为 `cmoqv70b8`（≠ owner），POST 与 dryRun 均 403（2026-10-13 首测、2026-10-14 复测一致）。这是平台授权缺口，不是工程问题——**不许绕过校验、不许直改平台库**。
+- **一键恢复（需 @MyRD Admin / 应用所有者或系统管理员身份执行）**：
+
+```bash
+# ① 干跑（不落部署，验证权限与构建配置；403 则需换有权限身份）
+curl -s -X POST -H "Authorization: Bearer $MYRD_TOKEN" -H "Content-Type: application/json" \
+  "$PLATFORM_API_URL/api/v1/apphost/apps/cmujpmjsy006pm99ip9yws3wl/deployments" \
+  -d '{"mode":"bundle","dryRun":true,"deployedBy":"agent","gitRef":"myrd/game-8-goal-cmujpml1e006rm99i9hc33huu","sourceId":"cmujpml1e006rm99i9hc33huu","goalId":"cmujpml1e006rm99i9hc33huu"}'
+# ② 正式部署：同体去掉 "dryRun":true；带 goalId 会把可玩产物自动回写目标卡片（= artifacts 回写）
+```
+
+- **部署 gitRef 红线**：必须是 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu`（tip=`bfce9152`，已含 v3 全部实现与导出产物），**绝不落 main**。
+- **上线核对清单（照抄即用）**：① `/apps/game-8/health` → 200 ok:true；② `GET /apps/game-8/api/public/assets/index.pck.gz.b64` → base64 解码 gunzip → sha256 应为 **`4e3c42fa…70aca`（2,544,432B）**；index.wasm.gz.b64 解码 sha256 应仍为 `fe5cebc5…`；③ 线上 pck 自跑冒烟：签名必须含「v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环)」字样；④ 移动端模拟门禁（webapp-smoke 390×844 六项：网络/console/首屏内容/触摸管线/视口等——工具链已对线上 v2 验证全绿，证据 `games/game-8/qa/mobile-live-v2/`）。
+- ⚠️ 交接文档提交 `29f982f`（v3-release-handoff.md）推送超时未上远端（`git ls-remote` tip 实测 = `bfce9152`），**恢复命令与核对口径以本文为准**。
+
+## 七、复用要点（同类小游戏照抄）
+
+1. **结构性加机制走「表 + 纯函数」**：类型表（ITEM_SCORES）/波次权重表（WAVE_WEIGHTS）/波内插值锚点（FRAC 数组）全部数据化，口径纯函数（`item_score_for/gain_for/wave_index_for/spawn_interval_now`）运行时与 smoke 共用单一事实源——断言可直接调纯函数机判。
+2. **新机制不得污染旧基线**：给旧断言留「隔离带」（普通物恒 +1、末波终点 TARGET-1、断言阶段分数白盒归零、回读前强制落盘），比放宽旧断言正确一百倍。
+3. **Godot 4.3 实测**：`const` 里写 `PackedVector2Array(...)` 构造会 Parse Error 并连锁炸掉所有引用该类型的脚本——造型表用 `static var`。
+4. **程序化音效闭环「零音效」**：合成 AudioStreamWAV（确定性、零资产、可机判 played_count）+ 壳页手势解锁器是 Web/iOS 出声的双件套，缺一即无声。
+5. **UI 增量全代码创建、.tscn 零改动**：规避场景手写风险（load_steps/ext_resource 极易错），节点随用随建、动画完自动回收。
+6. **工作流 routine 参数带 `#` 会被注入守卫拒绝**（step 命令经 bash -c 拼接）——gameDecisions 里不要带 shell 元字符，或改在 routine step 里写死。
+7. **执行链 token 与 app/goal owner 不一致时**，部署/回写会 403：按纪律停下上报、证据落盘、给出一键恢复命令（本文 §六格式），不绕权限、不伪造「已上线」。
 
 
 ---
@@ -25587,38 +26991,44 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 
 ## 产品关联知识
 
-## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
-
-# 失败模式：Worker SIGINT 关闭中断
-
-## 背景
-自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
-
-## 现象
-- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
-- 输出摘要为空（进程在产出任何结果前被杀）；
-- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
-
-## 根因
-- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
-- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
-- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
-
-## 排查与处置
-1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
-2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
-3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
-4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
-5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
-
-## 预防
-- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
-- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
-- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
 ## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
 negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -25823,44 +27233,38 @@ agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
 - fix: 修复 bug
 - docs: 文档更新
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
 修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+
+## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
+
+# 失败模式：Worker SIGINT 关闭中断
+
+## 背景
+自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
+
+## 现象
+- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
+- 输出摘要为空（进程在产出任何结果前被杀）；
+- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
+
+## 根因
+- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
+- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
+- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
+
+## 排查与处置
+1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
+2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
+3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
+4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
+5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
+
+## 预防
+- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
+- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
+- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
 ## 架构设计文档
 
@@ -27184,6 +28588,17 @@ smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的�
 
 **来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
 
+---
+
+## 五、v3 增补（2026-10-14）：v2 数值基线在 v3 中的延续与口径迁移
+
+> v3「玩法扩展与体验升级」已完成实现与门禁（分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`），**本文 §一~§四的 v2 基线全部继承、零回退**（v3 冒烟签名仍含「v2手感基线(体型1.3~1.5x·移速60~70%)」且本机对 v3 pck 复跑 PASS）。变化与迁移以 v3 结论文档为准（doc `b0a9a7ff-3339-43dc-9602-6477e562bd4f`，§一/§二），要点：
+> 1. **通关口径迁移**：`TARGET_SCORE=20` 由「件数」改为「**分数**」（normal +1 / rare 金铃铛 +3 / clock 时钟 +2 且加时 4s；Combo 加成只作用 ≥2 分高分物，普通物恒 +1——本文 §一的 50 次触碰口径在 v3 下原样成立）。
+> 2. **数值区新增 11 个声明键**（COMBO_WINDOW=2.0s、COMBO_BONUS_MAX=5、TIME_BONUS_CLOCK=4.0s、MAGNET_RADIUS=100px、MAGNET_DURATION=5s、BOOST_MULT=1.5、BOOST_DURATION=4s、WAVE_BREAK_SECONDS=1.2s、TARGET_SCORE、MAX_COLLECTIBLES=6、TIME_LIMIT 显式化），v2 的 PLAYER_SCALE/PLAYER_SPEED/SPAWN_INTERVAL_*/LIFETIME_* 默认值与钳制原样保留。
+> 3. **节奏曲线改波次状态机**：刷间隔/寿命端点（0.8→0.45s、6→3s）不变，插值改为三波锚点（WAVE_INTERVAL_FRAC=[0,0.45,0.75,1.0]），末波终点取 TARGET-1 保本文「满难度收敛到 MIN」断言同值；刷出改「同屏 ≤6 件补齐制」。
+> 4. **冒烟帧预算 240→320**（game-6 加预算先例），判定协议三条件不变；断言 13 项既有全保留 + 9 项 v3 新增（共 22 项）。
+> 5. **部署状态**：线上（version 5 @ `1089e4b`）仍是 v2——本文 §三的 pck/wasm sha256 对线上继续有效；v3 pck（sha256 `4e3c42fa…`）已就绪待上线，部署 403 卡点与一键恢复命令见 v3 结论文档 §六。
+
 
 ## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
 
@@ -28391,6 +29806,151 @@ v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 
 ## 八、衔接声明
 
 本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
+
+
+## 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+# 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+> **文档定位**：固化 game-8 v3「玩法扩展与体验升级」的机制清单（**策划案 v2 → 实现 `bfce9152` 的落账差异，实现为准**）、触屏操控实现方案、美术/音效/数值基线与门禁实测结论，并登记**唯一未闭环项——v3 部署上线卡点（403 授权）与一键恢复路径**（§六）。后续迭代与同类休闲收集小游戏直接按本文对齐，不必重新勘探。
+> **一手实测声明**：本文全部数字为一手实测（2026-10-14 取证）——`git show bfce9152` 逐文件核对、线上与本地产物 sha256 实算、`godot --headless --main-pack <pck> --quit-after 320 res://tests/smoke.tscn` 本机复跑，非转述估算。
+> **权威基准**：v3 需求（`cmv6vkith000gjotytp4v915c`，tag `goal-cmujpml1e006rm99i9hc33huu#wf-sg-v3-req-r4`）；策划案 v2 GameDesignSpec（`cmv6weob6000sjotyffuhjca6`，status=approved，create_design_spec 首次走通）；v2 参数基线（doc `843ddfec-62e1-4e02-b277-21155f7595bc`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）。
+> **实现基线（v3）**：分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`（feat 提交，远端 tip 已 `git ls-remote` 核实），数值唯一对齐点 `games/game-8/autoload/game_state.gd` 数值区（18 个 `TUNING_META` 声明键），禁止散点改代码对数值。
+> **部署现状（关键）**：线上 = HostedApp `cmujpmjsy006pm99ip9yws3wl` **version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`，仍是 v2 构建**（线上 pck sha256 实测 = v2 基线 `5f556ad9…`）；**v3 已实现、已过门禁、已推送，但部署被 403 拦下**——恢复命令见 §六。
+
+## 〇、v3 现状一图流
+
+| 环节 | 状态 | 一手证据 |
+|---|---|---|
+| v3 需求登记 | ✅ | requirement `cmv6vkith000gjotytp4v915c`（HTTP 201，戳记 `#wf-sg-v3-req-r4` 无重复） |
+| 策划案 v2 落账 | ✅ | GameDesignSpec `cmv6weob6000sjotyffuhjca6`（HTTP 201，schemaVersion v0，status approved——平台 create_design_spec 能力恢复后的首次成功） |
+| 工坊工作流 run（v3） | ❌ failed | routine 入参 `gameDecisions` 含 shell 元字符 `#` 被拒绝替换（step 命令经 `bash -c` 拼接的安全守卫），**零实现遗留** |
+| v3 实现补齐 | ✅ | 线上验收 agent 代做全链路：commit `bfce9152`（11 文件，+1348/−153），`1089e4b..bfce9152` 已推送成功 |
+| 门禁 | ✅ | preflight 13 类×40 文件 PASS；smoke @320 帧 3 连 PASS（零 SCRIPT ERROR）；input-fuzz PASS（seed=20260913，6 批次）；v3 pck 自跑冒烟 PASS（§五，本机复跑） |
+| **部署上线** | **⛔ 403** | `POST /api/v1/apphost/apps/…/deployments` 仅 app owner（`cmuimu6w…`）或系统管理员；agent 代行主体 `cmoqv70b8`（含 dryRun）均被拒（2026-10-14 复测仍 403） |
+
+## 一、v3 机制清单（实现落账口径，`game_state.gd` @ `bfce9152` 为唯一来源）
+
+### 1.1 目标物 5 类（需求「≥3 种、分值/效果互异」超额落账）
+
+| 类型 | 造型（半径≈14px 多边形） | 分值 | 效果 | 配色 RGB | 波次权重 W0/W1/W2 |
+|---|---|---|---|---|---|
+| normal 青草垛 | 菱形 | +1 | 无（**恒 +1，Combo 不加成**，保护 50 次触碰台账） | (0.55,0.8,0.3) 草绿 | 0.80 / 0.68 / 0.55 |
+| rare 金铃铛 | 十点星形 | +3 | 高分物，吃 Combo 加成 | (1.0,0.82,0.25) 亮金 | 0.10 / 0.17 / 0.25 |
+| clock 时钟 | 八边形 | +2 | 得分 +2 且**加时 +4s**（钳到 TIME_LIMIT） | (0.45,0.75,1.0) 天蓝 | 0.05 / 0.08 / 0.10 |
+| magnet 磁铁 | U 形 | 0（道具） | 生效 5s：半径 100px 内计分物以 170px/s 被拉向牛牛（`MAGNET_PULL_SPEED`） | (0.9,0.4,0.75) 品红 | 0.025 / 0.035 / 0.05 |
+| boost 加速 | 闪电形 | 0（道具） | 生效 4s：实际移速 = `PLAYER_SPEED × 1.5`（`current_speed()` 机判口径） | (0.35,0.9,0.85) 青碧 | 0.025 / 0.035 / 0.05 |
+
+- 每波权重表合计恒为 1.0；**越往后稀有物与道具占比越高**（「值得追」补偿「越来越快」），波次断言含 rare 权重单调不降。
+- 刷出改为**同屏上限补齐制**：`MAX_COLLECTIBLES=6`，低于上限由生成器补充（v1「寿命÷间隔自然收敛 ≈7±1」的推导口径被取代）。
+
+### 1.2 Combo 连击
+
+- 窗口 `COMBO_WINDOW=2.0s`：窗口内连续收集 combo +1（`_advance_combo`：窗口活着递增、断链从 1 起算），超时/暂停/重开清零；`_process` 仅 RUNNING 推进窗口倒计时。
+- 加成 `combo_bonus_for = (combo<2 ? 0 : min(combo-1, COMBO_BONUS_MAX=5))`，每级 +1。
+- **`gain_for` 关键设计**：加成只作用于分值 ≥2 的高分物（rare/clock）；普通物恒 +1 → 需求「50 次真实触碰每次恰好 +1」基线在多类型下零回退（冒烟 MASS 阶段只碰普通物，台账零重构）。
+- 档案新增 `best_combo` 持久化字段（`user://niuniu_game8_save.json`：best_score / total_collected / best_combo 三键）。
+
+### 1.3 波次状态机（替代 v1 单一线性收紧曲线）
+
+- 波次按**分数**切分：`wave_index_for` 以 `third=max(⌊T/3⌋,1)`、`two_thirds=max(⌊2T/3⌋,third+1)` 分三段（默认 T=20 → 0..6 / 7..13 / 14..19），随 TARGET_SCORE 自适应。
+- 波内插值锚点：`WAVE_INTERVAL_FRAC=[0, 0.45, 0.75, 1.0]`、`WAVE_LIFETIME_FRAC=[0, 0.55, 0.8, 1.0]`——刷新间隔 0.8s→0.45s、寿命 6s→3s 三段线性、**全局单调不增、有界**，端点与 v1/v2 断言同值。
+- **末波终点取 `TARGET_SCORE-1` 的兼容性设计**：达标分当帧即通关、曲线不再被查询，因此「满难度（score=19）收敛到 SPAWN_INTERVAL_MIN」的 v2 断言原样成立（曾实测 score=19 时插值到 0.4625≠0.45 的回归，已修）。
+- 跨波：`wave_changed` → 场景层接管**波间停顿 `WAVE_BREAK_SECONDS=1.2s`**（生成器暂停 + 横幅提示），三段副标题：「青草垛大量刷出，热身收集」→「金铃铛变多，瞄准高分」→「最后冲刺，连击冲分！」。
+
+### 1.4 单局阶段机与流程（需求 ④2）
+
+- `enum Phase { RUNNING, WON, LOST, READY, PAUSED }`——新增 READY（开始面板，确认/触摸进入）与 PAUSED（键盘 P 或触摸暂停按钮，恢复前时限冻结）。
+- `start_run()` 统一「开始/重开」入口：score 归零、时限重置、combo/run_max_combo/wave_index 复位、牛牛归位、道具清空（`clear_powerups`）、场上重铺、刷点仍避出生点 ≥96px。
+- 结算（WON/LOST 都结算）：刷新 best_score / best_combo 并 `save_progress()`——**失败也保留累计收集进度**。
+- **通关口径迁移**：`TARGET_SCORE=20` 的口径由 v1/v2 的「件数」改为「**分数**」（普通 +1 / 金铃铛 +3 / 时钟 +2，另计高分物 Combo 加成）——后续所有「集满 20」表述一律按分数理解。
+
+### 1.5 策划案 v2 → 实现落账差异（防后人拿错口径，实现为准）
+
+| 项 | 策划案 v2（设计稿） | 实现 `bfce9152`（权威） |
+|---|---|---|
+| 目标物 | 3 类：青草垛 +1 / 金铃铛 +5 / 三叶草 +1+效果，另设树桩惩罚物 | **5 类**（§1.1）：树桩取消，磁铁/加速两道具直接入权重池刷出；金铃铛 +5→**+3**；三叶草改为 **clock 时钟 +2 加时 4s** |
+| 道具参数 | 磁铁 180px·5s、蹄铁 ×1.5 速·5s | 磁铁 **100px**（拉速 170px/s）·5s；加速 ×1.5·**4s** |
+| Combo | 窗口 3s，加成 `ceil(分值×(1+0.1×等级))` | 窗口 **2s**，**每级 +1 封顶 5**，且**只作用 ≥2 分高分物** |
+| 波间停顿 | 2s | **1.2s** |
+| 通关口径 | 目标收集量 20（件数） | **20 分（分数口径）** |
+
+## 二、数值基线（18 个 TUNING_META 声明键，默认值 = 钳制区间/步长）
+
+| 键 | 默认 | min~max/step | 键 | 默认 | min~max/step |
+|---|---|---|---|---|---|
+| TARGET_SCORE | 20 | 5~60/1 | PLAYER_SCALE（v2 继承） | 1.4 | 0.5~2.0/0.05 |
+| TIME_LIMIT | 60 | 15~180/5 | PLAYER_SPEED（v2 继承） | 145 | 60~300/5 |
+| MAX_COLLECTIBLES | 6 | 1~20/1 | COMBO_WINDOW | 2.0s | 0.5~5/0.1 |
+| SPAWN_INTERVAL_START | 0.8s | 0.3~3/0.05 | COMBO_BONUS_MAX | 5 | 0~10/1 |
+| SPAWN_INTERVAL_MIN | 0.45s | 0.2~2/0.05 | TIME_BONUS_CLOCK | 4.0s | 0~10/0.5 |
+| LIFETIME_START | 6.0s | 2~15/0.5 | MAGNET_RADIUS | 100px | 60~200/5 |
+| LIFETIME_MIN | 3.0s | 1~10/0.5 | MAGNET_DURATION | 5.0s | 1~10/0.5 |
+| WAVE_BREAK_SECONDS | 1.2s | 0~3/0.1 | BOOST_MULT | 1.5 | 1.1~2.5/0.05 |
+| BOOST_DURATION | 4.0s | 1~10/0.5 | LIFETIME_WARN_SECONDS | 1.5s（const，临期闪烁阈值） | — |
+
+- 调参协议（SKILL.md §3C，v3 延续）：`apply_tuning()` 唯一应用入口——只认声明键（未声明键拒绝）、按 min/max 钳制、**保序约束**（`SPAWN_INTERVAL_MIN ≤ SPAWN_INTERVAL_START`、`LIFETIME_MIN ≤ LIFETIME_START`，防单调性被调坏）；改 TIME_LIMIT 立即重置本局剩余时间。双通道保留：游戏内调参面板 + 壳页 `?tuning=<JSON>` → `window.__GAME_TUNING__`。
+- 冒烟含调参协议断言：新增声明键可应用/钳制、未声明键必须被拒绝。
+- 判定几何（沿用 v2 实测口径）：PickupShape 本体 r=22×1.4≈30.8px + 收集物 r=14px → 触发距离 ≈44.8px；刷点安全间距 96px ≈ 2.14× 余量；刷点距场地边缘 ≥48px（`SPAWN_MARGIN`）。
+
+## 三、触屏操控实现方案（现网既有形态 + v3 延续加固）
+
+- **移动管线单一化**：左下角**虚拟摇杆**（`virtual_joystick.gd`，v2 包内既有、v3 延续）→ `InputEventAction` 注入 `move_left/right/up/down` → 与键盘共用 `_unhandled_input` 同一管线。摇杆参数：底座 `BASE_RADIUS=56px`、摇杆头 `STICK_RADIUS=26px`、死区 `DEADZONE_RATIO=0.25`。方向不反向由冒烟方向符号断言钉死（A/← 后 position.x 减小、D/→ 后增大）。
+- **按钮触达**：`touch_confirm_button.gd` 确认按钮半径 **44px**（满足「触达区 ≥44×44px」），点击注入 `confirm` 动作、与键盘同路径；局内暂停按钮仅触摸设备显示（桌面键盘环境完全不可见，`TouchUI` CanvasLayer 统一管理）。
+- **视口适配**：竖屏 **720×1280** 基线，`stretch/mode=canvas_items` + `aspect=keep` 等比缩放，`handheld/orientation=portrait`；HUD 操作提示按输入设备切换文案。
+- **壳页硬契约**（`server/src/game-page.ts`，随部署上线，实测在位）：viewport meta（user-scalable=no）、`touch-action:none`、调参桥（非法 JSON 按无调参处理绝不阻塞启动）、**音频手势解锁器**（包装 AudioContext 捕获引擎实例 + touchstart/touchend/pointerdown/keydown/click 五类事件 capture+passive 同步 resume，覆盖 suspended 与 interrupted；visibilitychange 回前台再解锁；`__audioDebug` 取证出口）、**AudioWorklet addModule 补丁**（worklet 是移动端音频单一故障点：真实资产端点优先、失败降级原路径重试一次、仍失败显式 console.error + audioLog 记 `worklet-dead`）。
+
+## 四、美术/音效基线
+
+- **分层背景**：视差远/近两层（全部代码创建，`_update_parallax` 随角色移动产生轻视差），统一牧场绿主题。
+- **目标物动效**：5 类专属多边形造型 + 专属配色（§1.1 表）；待机呼吸（缩放 1±0.08 正弦脉动，`breathing_scale()` 可观测）；临期 ≤1.5s 时 alpha 闪烁警示；收集/消失动画播放完整且节点无残留（`remove_child→queue_free` 清场纪律不回退）。
+- **反馈三件套**：收集音效 + 粒子 + 飘字同帧触发；飘字生命周期 `FLOAT_TEXT_LIFETIME=0.6s`、颜色与目标物呼应；粒子随用随建、动画完自动回收。
+- **UI 主题五色**：`THEME_PANEL_BG=(0.07,0.14,0.10,0.94)` / `BORDER=草绿(0.55,0.8,0.3,0.9)` / `TEXT=(0.96,0.97,0.92)` / `ACCENT=草绿` / `COMBO=橙(1.0,0.62,0.2)`；开始/HUD/结算/暂停面板统一主题；v3 增量 UI（背景层/连击/横幅/开始面板/暂停面板/粒子/飘字）**全部代码创建，.tscn 零新增节点**（规避场景手写风险）。
+- **字体**：Noto Sans SC（OFL，子集化）保留，`theme/custom_font` 全局生效。
+- **音效基线（「零音效」缺陷闭环）**：新增 `sfx.gd` autoload——**程序化合成、零外部资产、确定性**：7 个音色（collect=880Hz blip / rare=987.77·1174.66·1396.91Hz 琶音 / clock=660+880Hz 双音 / powerup=320→960Hz 扫频 / wave=293.66Hz / win=523.25·659.25·783.99·1046.5Hz 琶音 / lose=440→174.61Hz 下滑），22.05kHz 16-bit PCM、复音池 6（池满抢占最老播放器）、主增益 0.5、pitch 参数支持连击音高爬升；`played_count` 供冒烟机判「收集后真的播了声」。Web/iOS 出声前提 = 壳页手势解锁器（§三），引擎侧只负责「有可播的流、调用不报错」。
+
+## 五、门禁与验收（22 项断言，帧预算 240→320）
+
+### 5.1 smoke.gd 断言清单（13 项既有全保留 + 9 项 v3 新增）
+
+1. 场景实例化与接线；2. autoload 注册与约定信号；3. InputMap 键位契约 + **方向符号**（A/← 减小、D/→ 增大）；4. 信号到达订阅方；5. 收集判定触碰 +1；6. **跨 3 局 50 次真实触碰每次恰好 +1**（只碰普通物，含清场静置反例）；7. 难度梯度按**波次曲线**单调收紧有界 + 首收后 SpawnTimer 真实变快；8. 过期回收不计分；9. 通关可达（第 20 分 → WON + 结算「通关」）；10. 失败可达（时限归零 → LOST + HUD ≤10s 红色警示）；11. 一键重开全复位；12. 持久化落盘回读一致（含 best_combo）；13. **v2 手感基线**（体型 1.3~1.5×、移速 60~70% 且接线到根节点/碰撞体/PickupArea）——以上既有；v3 新增：14. 开始流程（READY→确认→RUNNING）；15. 多类型计分（rare +3、clock +2 加时 4s）；16. Combo（窗口内递增/高分物加成/UI 可见/超时清零）；17. 磁铁（85px 测试距内目标被吸至判定距离并收集）；18. 加速（实测位移 > 基线 ×1.3，BOOST_MULT=1.5 留工程余量）；19. 暂停/恢复（P 键冻结时限）；20. 波次（按分数切分、权重表逐波合计 1 且 rare 单调不降）；21. 音效（Sfx 库 ≥6 音色、收集后 played_count 真增长）；22. 调参协议（声明键可应用钳制、未声明键拒绝）。
+
+### 5.2 门禁实测（本机复跑，2026-10-14）
+
+- **v3 pck 自跑冒烟 PASS**（对 `bfce9152` 导出的 `index.pck`，2,544,432B，sha256 `4e3c42fa5dcbfa8b31d5b7c1d65df2ccd9024dcfd40f2e3edde95bce55c70aca`）：
+  `GODOT_SMOKE: PASS 场景实例化/输入映射/移动方向符号(A/←减小,D/→增大)/收集判定/50 连击一致性/波次梯度/过期回收/胜负/一键重开/持久化/v2手感基线(体型1.3~1.5x·移速60~70%)/v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环) 全部通过`（exit 0、零 SCRIPT ERROR）
+- wasm 与 v2 **逐字节一致**（`fe5cebc5…`，35,376,909B，引擎零漂移，pck 是唯一内容载体）。
+- 帧预算 **240→320**（game-6「加预算」先例路线，verify.sh 内 `GODOT_SMOKE_FRAMES:-320`）：v3 新增 6 个真实交互断言阶段约 +75 帧；判定协议（PASS 标记 + 退出码 0 + 零 SCRIPT ERROR）不变，预算只放宽兜底不改判定语义。
+- input-fuzz PASS（seed=20260913，6 批次，agent 实测）；**playtest.sh 模板资产仍缺失，D2 维持 blocked，不代写不伪造**。
+- 「新机制不破坏旧断言」四个可复用手法：①普通物恒 +1（Combo 加成只给高分物）；②末波插值终点取 TARGET-1（保 v2 收敛断言）；③断言阶段入口把分数白盒归零（防多类型/Combo 阶段误触 20 分通关线）；④持久化回读前强制 `save_progress()`（断言语义=「落盘→回读一致」而非内存值）。
+
+## 六、部署上线卡点（唯一未闭环项）与一键恢复
+
+- **现状**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`，liveUrl `https://leomac-studio.tail49399e.ts.net/apps/game-8/`）current deployment = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`（2026-10-02，v2）；线上 pck sha256 实测 = `5f556ad9…`（= v2 基线，无版本漂移），线上健康 200 `{"ok":true,...}`。
+- **卡点**：`POST /api/v1/apphost/apps/:id/deployments` 校验「仅应用所有者（`cmuimu6w…`）或系统管理员」；执行链 agent 的 token 代行主体为 `cmoqv70b8`（≠ owner），POST 与 dryRun 均 403（2026-10-13 首测、2026-10-14 复测一致）。这是平台授权缺口，不是工程问题——**不许绕过校验、不许直改平台库**。
+- **一键恢复（需 @MyRD Admin / 应用所有者或系统管理员身份执行）**：
+
+```bash
+# ① 干跑（不落部署，验证权限与构建配置；403 则需换有权限身份）
+curl -s -X POST -H "Authorization: Bearer $MYRD_TOKEN" -H "Content-Type: application/json" \
+  "$PLATFORM_API_URL/api/v1/apphost/apps/cmujpmjsy006pm99ip9yws3wl/deployments" \
+  -d '{"mode":"bundle","dryRun":true,"deployedBy":"agent","gitRef":"myrd/game-8-goal-cmujpml1e006rm99i9hc33huu","sourceId":"cmujpml1e006rm99i9hc33huu","goalId":"cmujpml1e006rm99i9hc33huu"}'
+# ② 正式部署：同体去掉 "dryRun":true；带 goalId 会把可玩产物自动回写目标卡片（= artifacts 回写）
+```
+
+- **部署 gitRef 红线**：必须是 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu`（tip=`bfce9152`，已含 v3 全部实现与导出产物），**绝不落 main**。
+- **上线核对清单（照抄即用）**：① `/apps/game-8/health` → 200 ok:true；② `GET /apps/game-8/api/public/assets/index.pck.gz.b64` → base64 解码 gunzip → sha256 应为 **`4e3c42fa…70aca`（2,544,432B）**；index.wasm.gz.b64 解码 sha256 应仍为 `fe5cebc5…`；③ 线上 pck 自跑冒烟：签名必须含「v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环)」字样；④ 移动端模拟门禁（webapp-smoke 390×844 六项：网络/console/首屏内容/触摸管线/视口等——工具链已对线上 v2 验证全绿，证据 `games/game-8/qa/mobile-live-v2/`）。
+- ⚠️ 交接文档提交 `29f982f`（v3-release-handoff.md）推送超时未上远端（`git ls-remote` tip 实测 = `bfce9152`），**恢复命令与核对口径以本文为准**。
+
+## 七、复用要点（同类小游戏照抄）
+
+1. **结构性加机制走「表 + 纯函数」**：类型表（ITEM_SCORES）/波次权重表（WAVE_WEIGHTS）/波内插值锚点（FRAC 数组）全部数据化，口径纯函数（`item_score_for/gain_for/wave_index_for/spawn_interval_now`）运行时与 smoke 共用单一事实源——断言可直接调纯函数机判。
+2. **新机制不得污染旧基线**：给旧断言留「隔离带」（普通物恒 +1、末波终点 TARGET-1、断言阶段分数白盒归零、回读前强制落盘），比放宽旧断言正确一百倍。
+3. **Godot 4.3 实测**：`const` 里写 `PackedVector2Array(...)` 构造会 Parse Error 并连锁炸掉所有引用该类型的脚本——造型表用 `static var`。
+4. **程序化音效闭环「零音效」**：合成 AudioStreamWAV（确定性、零资产、可机判 played_count）+ 壳页手势解锁器是 Web/iOS 出声的双件套，缺一即无声。
+5. **UI 增量全代码创建、.tscn 零改动**：规避场景手写风险（load_steps/ext_resource 极易错），节点随用随建、动画完自动回收。
+6. **工作流 routine 参数带 `#` 会被注入守卫拒绝**（step 命令经 bash -c 拼接）——gameDecisions 里不要带 shell 元字符，或改在 routine step 里写死。
+7. **执行链 token 与 app/goal owner 不一致时**，部署/回写会 403：按纪律停下上报、证据落盘、给出一键恢复命令（本文 §六格式），不绕权限、不伪造「已上线」。
 
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
@@ -28442,38 +30002,44 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
-
-# 失败模式：Worker SIGINT 关闭中断
-
-## 背景
-自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
-
-## 现象
-- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
-- 输出摘要为空（进程在产出任何结果前被杀）；
-- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
-
-## 根因
-- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
-- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
-- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
-
-## 排查与处置
-1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
-2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
-3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
-4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
-5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
-
-## 预防
-- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
-- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
-- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
-
 ## [H9] 负反馈指标零值语义知识卡：no-data≠断链，最小样本红线与前置过程指标
 
 negativeFeedbackRate=null 的唯一代码路径是 artifactRating 表窗口内无行（src/services/platform-health/index.ts:166-167 查询仅时间窗条件；若查询失败健康包整体不会产出——health.json 有其它字段即证明查询成功返回空集）。因此该维度当前状态是『维度零样本』（没人打分），不是『采集断链』（打了分没进表）。知识卡沉淀三条判定规则供健康度 v2 引用：①零值三分法——no-data（零样本，不入异动结论）/zero-feedback（真实零负反馈，可入结论）/查询失败（健康包缺字段，立即升级采集缺陷）；②最小样本红线——负反馈类指标样本 <5 标『不可判定』（与 v2 全局样本量红线一致），不得进入周环比结论；③前置过程指标——观测『人工评分入口曝光/使用率』（artifactRating 写入速率）作为负反馈率的分母健康度指标，区分『没人打分』与『打了分丢数据』。
+
+## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
+
+# 目的
+本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
+
+## 一、常驻服务与端口（全部）
+- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
+- 前端 Web：3001
+- PostgreSQL：5432（库名 myrd）
+- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
+
+## 二、团队讨论 → 执行 → 部署的真实链路
+1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
+2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
+3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
+4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
+
+## 三、身份与权限
+- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
+- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
+- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
+
+## 四、当前部署台账（stack-tower，2026-09-26 核对）
+- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
+- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
+- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
+- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
+- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
+
+## 五、历史误报档案（不得再引用为环境基线）
+- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
+- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
+- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
+
 
 ## Agent 执行轨迹（agent_execution_trajectories）孤儿 running 记录：诊断、根因与自愈处置手册
 
@@ -28678,44 +30244,38 @@ agent 在涉及 MyRD 平台的任务中反复出现两类高成本问题：
 - fix: 修复 bug
 - docs: 文档更新
 
-## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
-
-# 目的
-本档是平台环境与能力的唯一权威事实源。Agent 在做环境探针、资源盘点、执行决策前，以本档为准；与本档冲突的任何转述、往轮记录、黑板条目一律按本档勘误。
-
-## 一、常驻服务与端口（全部）
-- 后端平台 API：http://localhost:3111（env PLATFORM_API_URL 指向它）
-- 前端 Web：3001
-- PostgreSQL：5432（库名 myrd）
-- 除此之外**不存在任何常驻平台服务**。特别地：**平台从未内置「Open Design / 设计工作台 daemon」，127.0.0.1:7456 无任何服务**。该说法源于 2026-09-11 一轮讨论中的臆测（随后被「交叉探针」误证实并写入黑板），已经主人 2026-09-26 核实销案。禁止再将其列为依赖、探针项或环境阻塞证据。
-
-## 二、团队讨论 → 执行 → 部署的真实链路
-1. 团队讨论收敛出 decidedAction（workflow / assign / pending）。
-2. decidedAction=workflow：平台**自动**启动团队默认工作流（lead 无需也无法手动调用引擎）。
-3. 部署（AppHost 导出 + 托管发布）**只发生在工作流的 deploy 节点**；assign 指派执行、纯讨论轮都不会触发部署。
-4. 判定某轮工作流的真实结局，唯一依据是 workflow run 的状态（completed / failed / running，见运行卡片），**「已启动」≠「已成功」**；无结局信息时如实写「结局未知」，禁止脑补「被中断/断点未知」。
-
-## 三、身份与权限
-- 工作流节点的平台身份 = 工作流触发人（triggeredByUserId）。
-- assign 指派执行 = 成员 agent 本人身份；平台会在编排启动时幂等补齐其在绑定项目的成员资格。
-- 若仍遇「非项目成员」「项目列表为空/注册表 0 仓库」类报错：属平台 bug 或权限缺口，正确做法是**如实上报等待修复**，不得自行降级为「环境不可用、改做纸面件」，也不得据此宣称整体环境故障。
-
-## 四、当前部署台账（stack-tower，2026-09-26 核对）
-- 坑位：appId cmugttipt000km9299oej5z9b · slug stack-tower-3（一游戏一坑，禁止再建）
-- liveUrl：https://leomac-studio.tail49399e.ts.net/apps/stack-tower-3/gw
-- 线上版本：commit 75debf9（2026-09-25 部署，M2.1「有声可装」全量含音效/移动端/PWA，线上冒烟 PASS）
-- 平台 spec 链：v1→v2→v3（v3 approved，id cmugok2uz000xm9ilx42t8pnl）；spec v1.1「登记就绪版」截至 2026-09-26 仍为纸面文件（.myrd/spec/stack-tower-spec-v1.1-ready.yaml），**尚未登记**，登记落点 = POST revisions 接在 v3 之后 version+1。
-- 分支：myrd/pixel-fives-m0-m1-cmtpb66pe000rm9e2ozdurf8d（远端 head 541323a > 线上 75debf9，差异均为 docs 提交，不影响游戏构建）。
-
-## 五、历史误报档案（不得再引用为环境基线）
-- 「Open Design daemon 127.0.0.1:7456 不可达」：幻觉 + 交叉误证实，销案（2026-09-26）。
-- 「代码图谱注册表 0 个注册仓库」（2026-09-11~09-26 多轮）：成员 agent 缺项目成员资格所致（2026-09-26 已修），非仓库缺失。
-- 「M2.1 执行被中断、断点位置未知」（2026-09-26 补跑轮）：往轮摘要缺执行结局导致的脑补，实际 M2.1 已于 2026-09-25 完成并部署上线。
-
-
 ## 演进提案（知识勘误）：修正平台规范「轨迹有界生命周期」:154-155 双处失真——agentExecutionTrajectory 已具备启动+5 分钟周期双通道自愈（H2-b，P2）
 
 修正 .myrd-platform/.claude/CLAUDE.md 两处失真：① :154「Worker 启动自愈…不覆盖 agentExecutionTrajectory 本身（src/index.ts 启动自愈清单中无该表）」→ 更正为「启动自愈已覆盖：src/index.ts:331-334 调用 WorkflowEngine.cleanupStaleTrajectories('启动')」；② :155「自愈均为启动时一次性执行，运行期没有周期性僵死检测」→ 更正为「周期自愈已覆盖：src/index.ts:535-559 每 5 分钟执行 periodicSelfHeal（SELF_HEAL_INTERVAL_MS=5*60*1000，覆盖 workflowRun→paused、轨迹 30min 超时→failed、孤儿流式占位清理；实现见 src/services/workflow/engine.ts:343-383，阈值 STALE_MS=30min @engine.ts:352）」。同时追加纪律：规范文档引用 file:line 时建立锚点复核机制——行号漂移 >5 行触发复核降权。执行方式：批准/刷新既有 pending 提案 cmtqlicg6002vm9bpvu7w7ai3（其内容即本勘误，score=60、evaluation=null，应先补评估再审批），禁止再注入同主题新提案（践行 H2 去重纪律）。
+
+## 知识：Worker SIGINT 关闭中断失败模式——现象、根因、处置与预防
+
+# 失败模式：Worker SIGINT 关闭中断
+
+## 背景
+自动化工作流节点执行长时命令时，Worker 会在命令挂起或超出预算时发送 SIGINT 关闭该 worker。此信号被归类为基础设施噪音而非 agent 缺陷，但后果是整条执行轨迹失败且经常没有任何输出，浪费后续分析与自愈资源。
+
+## 现象
+- 轨迹 status=failed，错误信息为「Worker SIGINT 关闭中断」；
+- 输出摘要为空（进程在产出任何结果前被杀）；
+- 可影响任意自动化节点类型：开发/本地测试、记忆蒸馏、进化分析等；分析类 agent 自身也会复现此失败（元失败模式）。
+
+## 根因
+- 节点命令无界挂起：等待 stdin 交互输入、等待子进程、未设超时预算；
+- 长时进程未增量保存结果、未 flush 输出，被中断后无可检查产物，形成零输出失败轨迹；
+- 上层补丁/自愈仅清理僵尸轨迹，未消除命令本身的悬挂根源，故失败持续复现。
+
+## 排查与处置
+1. 遇到 status=failed 且错误含 SIGINT：先判断是否为基础设施信号（Worker 关闭），不急于归因 agent 缺陷；
+2. 交叉核对 runId 与轨迹产物：status=failed 单独不可靠（存在僵尸轨迹误报），须核对是否有落盘产物或部分输出；
+3. 复现命令：在本地以 `timeout <sec> <cmd>` 复跑，观察是否挂起、是否在超时前有增量输出；
+4. 若为长时任务，改为临时文件增量写盘 + 完成后原子改名，确保被中断后部分产物可恢复；
+5. 对无输出的失败运行启用回收/自愈机制清理，避免僵尸轨迹污染失败统计。
+
+## 预防
+- 所有节点命令遵循「显式超时 + 非交互 + 增量落盘 + 优雅退出」纪律（见对应规范）；
+- 分析型 agent（蒸馏、进化分析等）应在开始阶段即建立输出产物、分阶段写入，避免整段结束后才一次性输出，降低中断损失；
+- 将反复出现的同类失败纳入评测用例，使修复效果可量化考核。
 
 ## 架构设计文档
 
@@ -30039,6 +31599,17 @@ smoke 常量 `[1.3,1.5]` / `[132,154]` 是从需求量化区间直接派生的�
 
 **来源链**：需求 `cmuqmej89000ym9gg6mom93o0` → 工作流 run `/workflows/cmujpml21006vm99iuw6jyoyz/runs/cmuqmf3ov0015m9ggu6mxso3g`（产物 `cmuqmf3ov0015m9ggu6mxso3g`）→ 诊断 agent 产物 `cmuiew3uo000tm9gc3cto2h1t` → 诊断报告 `games/game-8/docs/v2-liveurl-diagnosis.md` @ `1afec443`。
 
+---
+
+## 五、v3 增补（2026-10-14）：v2 数值基线在 v3 中的延续与口径迁移
+
+> v3「玩法扩展与体验升级」已完成实现与门禁（分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`），**本文 §一~§四的 v2 基线全部继承、零回退**（v3 冒烟签名仍含「v2手感基线(体型1.3~1.5x·移速60~70%)」且本机对 v3 pck 复跑 PASS）。变化与迁移以 v3 结论文档为准（doc `b0a9a7ff-3339-43dc-9602-6477e562bd4f`，§一/§二），要点：
+> 1. **通关口径迁移**：`TARGET_SCORE=20` 由「件数」改为「**分数**」（normal +1 / rare 金铃铛 +3 / clock 时钟 +2 且加时 4s；Combo 加成只作用 ≥2 分高分物，普通物恒 +1——本文 §一的 50 次触碰口径在 v3 下原样成立）。
+> 2. **数值区新增 11 个声明键**（COMBO_WINDOW=2.0s、COMBO_BONUS_MAX=5、TIME_BONUS_CLOCK=4.0s、MAGNET_RADIUS=100px、MAGNET_DURATION=5s、BOOST_MULT=1.5、BOOST_DURATION=4s、WAVE_BREAK_SECONDS=1.2s、TARGET_SCORE、MAX_COLLECTIBLES=6、TIME_LIMIT 显式化），v2 的 PLAYER_SCALE/PLAYER_SPEED/SPAWN_INTERVAL_*/LIFETIME_* 默认值与钳制原样保留。
+> 3. **节奏曲线改波次状态机**：刷间隔/寿命端点（0.8→0.45s、6→3s）不变，插值改为三波锚点（WAVE_INTERVAL_FRAC=[0,0.45,0.75,1.0]），末波终点取 TARGET-1 保本文「满难度收敛到 MIN」断言同值；刷出改「同屏 ≤6 件补齐制」。
+> 4. **冒烟帧预算 240→320**（game-6 加预算先例），判定协议三条件不变；断言 13 项既有全保留 + 9 项 v3 新增（共 22 项）。
+> 5. **部署状态**：线上（version 5 @ `1089e4b`）仍是 v2——本文 §三的 pck/wasm sha256 对线上继续有效；v3 pck（sha256 `4e3c42fa…`）已就绪待上线，部署 403 卡点与一键恢复命令见 v3 结论文档 §六。
+
 
 ## game-12 连点防重实现与 Godot Web 双门禁经验沉淀（极简计数页 · 300ms 防重窗口）
 
@@ -31246,4 +32817,149 @@ v4 窗口读数（首席 -o 独立复算）：pending 27→29（净增恰为 v3 
 ## 八、衔接声明
 
 本报告与 `actions.json`（7 条动作 = 9 Confirmed − H7/H8 两条 actionType=none，勾稽通过）为 ④节点交付物；**报告+台账+提案/工单仅在 ⑤deploy 节点导出发布**，产物追溯锚：health.json generatedAt=2026-10-11T07:18:43.499Z + meta week=2026-W41 + head SHA e81f3ae（base SHA 缺口已如实标注）。台账（findings-ledger-v4.json）、假设（findings-hypotheses.json）、取证（findings-audited.json）、裁决（findings-verified.json）随包移交，v5 轮转化率环比基线=0%（0/7）。
+
+
+## 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+# 《牛牛打游戏》game-8 · v3 玩法扩展与体验升级结论（机制清单/触控方案/美术基线）
+
+> **文档定位**：固化 game-8 v3「玩法扩展与体验升级」的机制清单（**策划案 v2 → 实现 `bfce9152` 的落账差异，实现为准**）、触屏操控实现方案、美术/音效/数值基线与门禁实测结论，并登记**唯一未闭环项——v3 部署上线卡点（403 授权）与一键恢复路径**（§六）。后续迭代与同类休闲收集小游戏直接按本文对齐，不必重新勘探。
+> **一手实测声明**：本文全部数字为一手实测（2026-10-14 取证）——`git show bfce9152` 逐文件核对、线上与本地产物 sha256 实算、`godot --headless --main-pack <pck> --quit-after 320 res://tests/smoke.tscn` 本机复跑，非转述估算。
+> **权威基准**：v3 需求（`cmv6vkith000gjotytp4v915c`，tag `goal-cmujpml1e006rm99i9hc33huu#wf-sg-v3-req-r4`）；策划案 v2 GameDesignSpec（`cmv6weob6000sjotyffuhjca6`，status=approved，create_design_spec 首次走通）；v2 参数基线（doc `843ddfec-62e1-4e02-b277-21155f7595bc`）；门禁与部署规范（doc `189a580e-5cdb-4837-a5fa-38e0c12ceb88`）。
+> **实现基线（v3）**：分支 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu` @ `bfce9152`（feat 提交，远端 tip 已 `git ls-remote` 核实），数值唯一对齐点 `games/game-8/autoload/game_state.gd` 数值区（18 个 `TUNING_META` 声明键），禁止散点改代码对数值。
+> **部署现状（关键）**：线上 = HostedApp `cmujpmjsy006pm99ip9yws3wl` **version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`，仍是 v2 构建**（线上 pck sha256 实测 = v2 基线 `5f556ad9…`）；**v3 已实现、已过门禁、已推送，但部署被 403 拦下**——恢复命令见 §六。
+
+## 〇、v3 现状一图流
+
+| 环节 | 状态 | 一手证据 |
+|---|---|---|
+| v3 需求登记 | ✅ | requirement `cmv6vkith000gjotytp4v915c`（HTTP 201，戳记 `#wf-sg-v3-req-r4` 无重复） |
+| 策划案 v2 落账 | ✅ | GameDesignSpec `cmv6weob6000sjotyffuhjca6`（HTTP 201，schemaVersion v0，status approved——平台 create_design_spec 能力恢复后的首次成功） |
+| 工坊工作流 run（v3） | ❌ failed | routine 入参 `gameDecisions` 含 shell 元字符 `#` 被拒绝替换（step 命令经 `bash -c` 拼接的安全守卫），**零实现遗留** |
+| v3 实现补齐 | ✅ | 线上验收 agent 代做全链路：commit `bfce9152`（11 文件，+1348/−153），`1089e4b..bfce9152` 已推送成功 |
+| 门禁 | ✅ | preflight 13 类×40 文件 PASS；smoke @320 帧 3 连 PASS（零 SCRIPT ERROR）；input-fuzz PASS（seed=20260913，6 批次）；v3 pck 自跑冒烟 PASS（§五，本机复跑） |
+| **部署上线** | **⛔ 403** | `POST /api/v1/apphost/apps/…/deployments` 仅 app owner（`cmuimu6w…`）或系统管理员；agent 代行主体 `cmoqv70b8`（含 dryRun）均被拒（2026-10-14 复测仍 403） |
+
+## 一、v3 机制清单（实现落账口径，`game_state.gd` @ `bfce9152` 为唯一来源）
+
+### 1.1 目标物 5 类（需求「≥3 种、分值/效果互异」超额落账）
+
+| 类型 | 造型（半径≈14px 多边形） | 分值 | 效果 | 配色 RGB | 波次权重 W0/W1/W2 |
+|---|---|---|---|---|---|
+| normal 青草垛 | 菱形 | +1 | 无（**恒 +1，Combo 不加成**，保护 50 次触碰台账） | (0.55,0.8,0.3) 草绿 | 0.80 / 0.68 / 0.55 |
+| rare 金铃铛 | 十点星形 | +3 | 高分物，吃 Combo 加成 | (1.0,0.82,0.25) 亮金 | 0.10 / 0.17 / 0.25 |
+| clock 时钟 | 八边形 | +2 | 得分 +2 且**加时 +4s**（钳到 TIME_LIMIT） | (0.45,0.75,1.0) 天蓝 | 0.05 / 0.08 / 0.10 |
+| magnet 磁铁 | U 形 | 0（道具） | 生效 5s：半径 100px 内计分物以 170px/s 被拉向牛牛（`MAGNET_PULL_SPEED`） | (0.9,0.4,0.75) 品红 | 0.025 / 0.035 / 0.05 |
+| boost 加速 | 闪电形 | 0（道具） | 生效 4s：实际移速 = `PLAYER_SPEED × 1.5`（`current_speed()` 机判口径） | (0.35,0.9,0.85) 青碧 | 0.025 / 0.035 / 0.05 |
+
+- 每波权重表合计恒为 1.0；**越往后稀有物与道具占比越高**（「值得追」补偿「越来越快」），波次断言含 rare 权重单调不降。
+- 刷出改为**同屏上限补齐制**：`MAX_COLLECTIBLES=6`，低于上限由生成器补充（v1「寿命÷间隔自然收敛 ≈7±1」的推导口径被取代）。
+
+### 1.2 Combo 连击
+
+- 窗口 `COMBO_WINDOW=2.0s`：窗口内连续收集 combo +1（`_advance_combo`：窗口活着递增、断链从 1 起算），超时/暂停/重开清零；`_process` 仅 RUNNING 推进窗口倒计时。
+- 加成 `combo_bonus_for = (combo<2 ? 0 : min(combo-1, COMBO_BONUS_MAX=5))`，每级 +1。
+- **`gain_for` 关键设计**：加成只作用于分值 ≥2 的高分物（rare/clock）；普通物恒 +1 → 需求「50 次真实触碰每次恰好 +1」基线在多类型下零回退（冒烟 MASS 阶段只碰普通物，台账零重构）。
+- 档案新增 `best_combo` 持久化字段（`user://niuniu_game8_save.json`：best_score / total_collected / best_combo 三键）。
+
+### 1.3 波次状态机（替代 v1 单一线性收紧曲线）
+
+- 波次按**分数**切分：`wave_index_for` 以 `third=max(⌊T/3⌋,1)`、`two_thirds=max(⌊2T/3⌋,third+1)` 分三段（默认 T=20 → 0..6 / 7..13 / 14..19），随 TARGET_SCORE 自适应。
+- 波内插值锚点：`WAVE_INTERVAL_FRAC=[0, 0.45, 0.75, 1.0]`、`WAVE_LIFETIME_FRAC=[0, 0.55, 0.8, 1.0]`——刷新间隔 0.8s→0.45s、寿命 6s→3s 三段线性、**全局单调不增、有界**，端点与 v1/v2 断言同值。
+- **末波终点取 `TARGET_SCORE-1` 的兼容性设计**：达标分当帧即通关、曲线不再被查询，因此「满难度（score=19）收敛到 SPAWN_INTERVAL_MIN」的 v2 断言原样成立（曾实测 score=19 时插值到 0.4625≠0.45 的回归，已修）。
+- 跨波：`wave_changed` → 场景层接管**波间停顿 `WAVE_BREAK_SECONDS=1.2s`**（生成器暂停 + 横幅提示），三段副标题：「青草垛大量刷出，热身收集」→「金铃铛变多，瞄准高分」→「最后冲刺，连击冲分！」。
+
+### 1.4 单局阶段机与流程（需求 ④2）
+
+- `enum Phase { RUNNING, WON, LOST, READY, PAUSED }`——新增 READY（开始面板，确认/触摸进入）与 PAUSED（键盘 P 或触摸暂停按钮，恢复前时限冻结）。
+- `start_run()` 统一「开始/重开」入口：score 归零、时限重置、combo/run_max_combo/wave_index 复位、牛牛归位、道具清空（`clear_powerups`）、场上重铺、刷点仍避出生点 ≥96px。
+- 结算（WON/LOST 都结算）：刷新 best_score / best_combo 并 `save_progress()`——**失败也保留累计收集进度**。
+- **通关口径迁移**：`TARGET_SCORE=20` 的口径由 v1/v2 的「件数」改为「**分数**」（普通 +1 / 金铃铛 +3 / 时钟 +2，另计高分物 Combo 加成）——后续所有「集满 20」表述一律按分数理解。
+
+### 1.5 策划案 v2 → 实现落账差异（防后人拿错口径，实现为准）
+
+| 项 | 策划案 v2（设计稿） | 实现 `bfce9152`（权威） |
+|---|---|---|
+| 目标物 | 3 类：青草垛 +1 / 金铃铛 +5 / 三叶草 +1+效果，另设树桩惩罚物 | **5 类**（§1.1）：树桩取消，磁铁/加速两道具直接入权重池刷出；金铃铛 +5→**+3**；三叶草改为 **clock 时钟 +2 加时 4s** |
+| 道具参数 | 磁铁 180px·5s、蹄铁 ×1.5 速·5s | 磁铁 **100px**（拉速 170px/s）·5s；加速 ×1.5·**4s** |
+| Combo | 窗口 3s，加成 `ceil(分值×(1+0.1×等级))` | 窗口 **2s**，**每级 +1 封顶 5**，且**只作用 ≥2 分高分物** |
+| 波间停顿 | 2s | **1.2s** |
+| 通关口径 | 目标收集量 20（件数） | **20 分（分数口径）** |
+
+## 二、数值基线（18 个 TUNING_META 声明键，默认值 = 钳制区间/步长）
+
+| 键 | 默认 | min~max/step | 键 | 默认 | min~max/step |
+|---|---|---|---|---|---|
+| TARGET_SCORE | 20 | 5~60/1 | PLAYER_SCALE（v2 继承） | 1.4 | 0.5~2.0/0.05 |
+| TIME_LIMIT | 60 | 15~180/5 | PLAYER_SPEED（v2 继承） | 145 | 60~300/5 |
+| MAX_COLLECTIBLES | 6 | 1~20/1 | COMBO_WINDOW | 2.0s | 0.5~5/0.1 |
+| SPAWN_INTERVAL_START | 0.8s | 0.3~3/0.05 | COMBO_BONUS_MAX | 5 | 0~10/1 |
+| SPAWN_INTERVAL_MIN | 0.45s | 0.2~2/0.05 | TIME_BONUS_CLOCK | 4.0s | 0~10/0.5 |
+| LIFETIME_START | 6.0s | 2~15/0.5 | MAGNET_RADIUS | 100px | 60~200/5 |
+| LIFETIME_MIN | 3.0s | 1~10/0.5 | MAGNET_DURATION | 5.0s | 1~10/0.5 |
+| WAVE_BREAK_SECONDS | 1.2s | 0~3/0.1 | BOOST_MULT | 1.5 | 1.1~2.5/0.05 |
+| BOOST_DURATION | 4.0s | 1~10/0.5 | LIFETIME_WARN_SECONDS | 1.5s（const，临期闪烁阈值） | — |
+
+- 调参协议（SKILL.md §3C，v3 延续）：`apply_tuning()` 唯一应用入口——只认声明键（未声明键拒绝）、按 min/max 钳制、**保序约束**（`SPAWN_INTERVAL_MIN ≤ SPAWN_INTERVAL_START`、`LIFETIME_MIN ≤ LIFETIME_START`，防单调性被调坏）；改 TIME_LIMIT 立即重置本局剩余时间。双通道保留：游戏内调参面板 + 壳页 `?tuning=<JSON>` → `window.__GAME_TUNING__`。
+- 冒烟含调参协议断言：新增声明键可应用/钳制、未声明键必须被拒绝。
+- 判定几何（沿用 v2 实测口径）：PickupShape 本体 r=22×1.4≈30.8px + 收集物 r=14px → 触发距离 ≈44.8px；刷点安全间距 96px ≈ 2.14× 余量；刷点距场地边缘 ≥48px（`SPAWN_MARGIN`）。
+
+## 三、触屏操控实现方案（现网既有形态 + v3 延续加固）
+
+- **移动管线单一化**：左下角**虚拟摇杆**（`virtual_joystick.gd`，v2 包内既有、v3 延续）→ `InputEventAction` 注入 `move_left/right/up/down` → 与键盘共用 `_unhandled_input` 同一管线。摇杆参数：底座 `BASE_RADIUS=56px`、摇杆头 `STICK_RADIUS=26px`、死区 `DEADZONE_RATIO=0.25`。方向不反向由冒烟方向符号断言钉死（A/← 后 position.x 减小、D/→ 后增大）。
+- **按钮触达**：`touch_confirm_button.gd` 确认按钮半径 **44px**（满足「触达区 ≥44×44px」），点击注入 `confirm` 动作、与键盘同路径；局内暂停按钮仅触摸设备显示（桌面键盘环境完全不可见，`TouchUI` CanvasLayer 统一管理）。
+- **视口适配**：竖屏 **720×1280** 基线，`stretch/mode=canvas_items` + `aspect=keep` 等比缩放，`handheld/orientation=portrait`；HUD 操作提示按输入设备切换文案。
+- **壳页硬契约**（`server/src/game-page.ts`，随部署上线，实测在位）：viewport meta（user-scalable=no）、`touch-action:none`、调参桥（非法 JSON 按无调参处理绝不阻塞启动）、**音频手势解锁器**（包装 AudioContext 捕获引擎实例 + touchstart/touchend/pointerdown/keydown/click 五类事件 capture+passive 同步 resume，覆盖 suspended 与 interrupted；visibilitychange 回前台再解锁；`__audioDebug` 取证出口）、**AudioWorklet addModule 补丁**（worklet 是移动端音频单一故障点：真实资产端点优先、失败降级原路径重试一次、仍失败显式 console.error + audioLog 记 `worklet-dead`）。
+
+## 四、美术/音效基线
+
+- **分层背景**：视差远/近两层（全部代码创建，`_update_parallax` 随角色移动产生轻视差），统一牧场绿主题。
+- **目标物动效**：5 类专属多边形造型 + 专属配色（§1.1 表）；待机呼吸（缩放 1±0.08 正弦脉动，`breathing_scale()` 可观测）；临期 ≤1.5s 时 alpha 闪烁警示；收集/消失动画播放完整且节点无残留（`remove_child→queue_free` 清场纪律不回退）。
+- **反馈三件套**：收集音效 + 粒子 + 飘字同帧触发；飘字生命周期 `FLOAT_TEXT_LIFETIME=0.6s`、颜色与目标物呼应；粒子随用随建、动画完自动回收。
+- **UI 主题五色**：`THEME_PANEL_BG=(0.07,0.14,0.10,0.94)` / `BORDER=草绿(0.55,0.8,0.3,0.9)` / `TEXT=(0.96,0.97,0.92)` / `ACCENT=草绿` / `COMBO=橙(1.0,0.62,0.2)`；开始/HUD/结算/暂停面板统一主题；v3 增量 UI（背景层/连击/横幅/开始面板/暂停面板/粒子/飘字）**全部代码创建，.tscn 零新增节点**（规避场景手写风险）。
+- **字体**：Noto Sans SC（OFL，子集化）保留，`theme/custom_font` 全局生效。
+- **音效基线（「零音效」缺陷闭环）**：新增 `sfx.gd` autoload——**程序化合成、零外部资产、确定性**：7 个音色（collect=880Hz blip / rare=987.77·1174.66·1396.91Hz 琶音 / clock=660+880Hz 双音 / powerup=320→960Hz 扫频 / wave=293.66Hz / win=523.25·659.25·783.99·1046.5Hz 琶音 / lose=440→174.61Hz 下滑），22.05kHz 16-bit PCM、复音池 6（池满抢占最老播放器）、主增益 0.5、pitch 参数支持连击音高爬升；`played_count` 供冒烟机判「收集后真的播了声」。Web/iOS 出声前提 = 壳页手势解锁器（§三），引擎侧只负责「有可播的流、调用不报错」。
+
+## 五、门禁与验收（22 项断言，帧预算 240→320）
+
+### 5.1 smoke.gd 断言清单（13 项既有全保留 + 9 项 v3 新增）
+
+1. 场景实例化与接线；2. autoload 注册与约定信号；3. InputMap 键位契约 + **方向符号**（A/← 减小、D/→ 增大）；4. 信号到达订阅方；5. 收集判定触碰 +1；6. **跨 3 局 50 次真实触碰每次恰好 +1**（只碰普通物，含清场静置反例）；7. 难度梯度按**波次曲线**单调收紧有界 + 首收后 SpawnTimer 真实变快；8. 过期回收不计分；9. 通关可达（第 20 分 → WON + 结算「通关」）；10. 失败可达（时限归零 → LOST + HUD ≤10s 红色警示）；11. 一键重开全复位；12. 持久化落盘回读一致（含 best_combo）；13. **v2 手感基线**（体型 1.3~1.5×、移速 60~70% 且接线到根节点/碰撞体/PickupArea）——以上既有；v3 新增：14. 开始流程（READY→确认→RUNNING）；15. 多类型计分（rare +3、clock +2 加时 4s）；16. Combo（窗口内递增/高分物加成/UI 可见/超时清零）；17. 磁铁（85px 测试距内目标被吸至判定距离并收集）；18. 加速（实测位移 > 基线 ×1.3，BOOST_MULT=1.5 留工程余量）；19. 暂停/恢复（P 键冻结时限）；20. 波次（按分数切分、权重表逐波合计 1 且 rare 单调不降）；21. 音效（Sfx 库 ≥6 音色、收集后 played_count 真增长）；22. 调参协议（声明键可应用钳制、未声明键拒绝）。
+
+### 5.2 门禁实测（本机复跑，2026-10-14）
+
+- **v3 pck 自跑冒烟 PASS**（对 `bfce9152` 导出的 `index.pck`，2,544,432B，sha256 `4e3c42fa5dcbfa8b31d5b7c1d65df2ccd9024dcfd40f2e3edde95bce55c70aca`）：
+  `GODOT_SMOKE: PASS 场景实例化/输入映射/移动方向符号(A/←减小,D/→增大)/收集判定/50 连击一致性/波次梯度/过期回收/胜负/一键重开/持久化/v2手感基线(体型1.3~1.5x·移速60~70%)/v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环) 全部通过`（exit 0、零 SCRIPT ERROR）
+- wasm 与 v2 **逐字节一致**（`fe5cebc5…`，35,376,909B，引擎零漂移，pck 是唯一内容载体）。
+- 帧预算 **240→320**（game-6「加预算」先例路线，verify.sh 内 `GODOT_SMOKE_FRAMES:-320`）：v3 新增 6 个真实交互断言阶段约 +75 帧；判定协议（PASS 标记 + 退出码 0 + 零 SCRIPT ERROR）不变，预算只放宽兜底不改判定语义。
+- input-fuzz PASS（seed=20260913，6 批次，agent 实测）；**playtest.sh 模板资产仍缺失，D2 维持 blocked，不代写不伪造**。
+- 「新机制不破坏旧断言」四个可复用手法：①普通物恒 +1（Combo 加成只给高分物）；②末波插值终点取 TARGET-1（保 v2 收敛断言）；③断言阶段入口把分数白盒归零（防多类型/Combo 阶段误触 20 分通关线）；④持久化回读前强制 `save_progress()`（断言语义=「落盘→回读一致」而非内存值）。
+
+## 六、部署上线卡点（唯一未闭环项）与一键恢复
+
+- **现状**：HostedApp `cmujpmjsy006pm99ip9yws3wl`（slug `game-8`，liveUrl `https://leomac-studio.tail49399e.ts.net/apps/game-8/`）current deployment = version 5 `cmuqny37h001ficf0mpmr71mv` @ `1089e4b`（2026-10-02，v2）；线上 pck sha256 实测 = `5f556ad9…`（= v2 基线，无版本漂移），线上健康 200 `{"ok":true,...}`。
+- **卡点**：`POST /api/v1/apphost/apps/:id/deployments` 校验「仅应用所有者（`cmuimu6w…`）或系统管理员」；执行链 agent 的 token 代行主体为 `cmoqv70b8`（≠ owner），POST 与 dryRun 均 403（2026-10-13 首测、2026-10-14 复测一致）。这是平台授权缺口，不是工程问题——**不许绕过校验、不许直改平台库**。
+- **一键恢复（需 @MyRD Admin / 应用所有者或系统管理员身份执行）**：
+
+```bash
+# ① 干跑（不落部署，验证权限与构建配置；403 则需换有权限身份）
+curl -s -X POST -H "Authorization: Bearer $MYRD_TOKEN" -H "Content-Type: application/json" \
+  "$PLATFORM_API_URL/api/v1/apphost/apps/cmujpmjsy006pm99ip9yws3wl/deployments" \
+  -d '{"mode":"bundle","dryRun":true,"deployedBy":"agent","gitRef":"myrd/game-8-goal-cmujpml1e006rm99i9hc33huu","sourceId":"cmujpml1e006rm99i9hc33huu","goalId":"cmujpml1e006rm99i9hc33huu"}'
+# ② 正式部署：同体去掉 "dryRun":true；带 goalId 会把可玩产物自动回写目标卡片（= artifacts 回写）
+```
+
+- **部署 gitRef 红线**：必须是 `myrd/game-8-goal-cmujpml1e006rm99i9hc33huu`（tip=`bfce9152`，已含 v3 全部实现与导出产物），**绝不落 main**。
+- **上线核对清单（照抄即用）**：① `/apps/game-8/health` → 200 ok:true；② `GET /apps/game-8/api/public/assets/index.pck.gz.b64` → base64 解码 gunzip → sha256 应为 **`4e3c42fa…70aca`（2,544,432B）**；index.wasm.gz.b64 解码 sha256 应仍为 `fe5cebc5…`；③ 线上 pck 自跑冒烟：签名必须含「v3扩展(开始面板·多类型计分·Combo·磁铁·加速·暂停·波次切分·音效闭环)」字样；④ 移动端模拟门禁（webapp-smoke 390×844 六项：网络/console/首屏内容/触摸管线/视口等——工具链已对线上 v2 验证全绿，证据 `games/game-8/qa/mobile-live-v2/`）。
+- ⚠️ 交接文档提交 `29f982f`（v3-release-handoff.md）推送超时未上远端（`git ls-remote` tip 实测 = `bfce9152`），**恢复命令与核对口径以本文为准**。
+
+## 七、复用要点（同类小游戏照抄）
+
+1. **结构性加机制走「表 + 纯函数」**：类型表（ITEM_SCORES）/波次权重表（WAVE_WEIGHTS）/波内插值锚点（FRAC 数组）全部数据化，口径纯函数（`item_score_for/gain_for/wave_index_for/spawn_interval_now`）运行时与 smoke 共用单一事实源——断言可直接调纯函数机判。
+2. **新机制不得污染旧基线**：给旧断言留「隔离带」（普通物恒 +1、末波终点 TARGET-1、断言阶段分数白盒归零、回读前强制落盘），比放宽旧断言正确一百倍。
+3. **Godot 4.3 实测**：`const` 里写 `PackedVector2Array(...)` 构造会 Parse Error 并连锁炸掉所有引用该类型的脚本——造型表用 `static var`。
+4. **程序化音效闭环「零音效」**：合成 AudioStreamWAV（确定性、零资产、可机判 played_count）+ 壳页手势解锁器是 Web/iOS 出声的双件套，缺一即无声。
+5. **UI 增量全代码创建、.tscn 零改动**：规避场景手写风险（load_steps/ext_resource 极易错），节点随用随建、动画完自动回收。
+6. **工作流 routine 参数带 `#` 会被注入守卫拒绝**（step 命令经 bash -c 拼接）——gameDecisions 里不要带 shell 元字符，或改在 routine step 里写死。
+7. **执行链 token 与 app/goal owner 不一致时**，部署/回写会 403：按纪律停下上报、证据落盘、给出一键恢复命令（本文 §六格式），不绕权限、不伪造「已上线」。
 

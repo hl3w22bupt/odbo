@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "1.0",
+  "reportId": "vrf_v010insightrev1",
+  "target": {
+    "type": "requirement",
+    "id": "xinban-v0.10-insight-p0",
+    "ref": "docs/v0.10/REQUIREMENTS.md",
+    "title": "心伴 v0.10 P0 情绪洞察最小版（insight）五节点接力交付"
+  },
+  "triggeredBy": {
+    "scenario": "explicit_invoke",
+    "actor": "review-agent（节点间独立验收）",
+    "at": "2026-10-13T08:20:00+08:00"
+  },
+  "criteria": [
+    { "id": "AC-01", "text": "三类洞察结论值 = 规则重算值（值级一致，非元素存在）", "weight": 2, "kind": "core", "verifiable": true, "originTarget": { "type": "requirement", "id": "xinban-v0.10-insight-p0" }, "parseNote": "契约 DoD T1" },
+    { "id": "AC-02", "text": "空态/降级/正常三层独立用例（纯函数层 + 路由层）", "weight": 2, "kind": "core", "verifiable": true, "originTarget": { "type": "requirement", "id": "xinban-v0.10-insight-p0" }, "parseNote": "契约 DoD T2" },
+    { "id": "AC-03", "text": "同输入多次调用输出稳定 + 黄金用例全结构快照", "weight": 1, "kind": "normal", "verifiable": true, "originTarget": { "type": "requirement", "id": "xinban-v0.10-insight-p0" }, "parseNote": "契约 DoD T3" },
+    { "id": "AC-04", "text": "类型枚举闭合于 3 值；第 4 类在客户端视图状态判红", "weight": 2, "kind": "core", "verifiable": true, "originTarget": { "type": "requirement", "id": "xinban-v0.10-insight-p0" }, "parseNote": "契约 DoD T4" },
+    { "id": "AC-05", "text": "UTC+8 周界：周日 23:59 与周一 00:00（CST）归属不同周期，双端用例", "weight": 2, "kind": "core", "verifiable": true, "originTarget": { "type": "requirement", "id": "xinban-v0.10-insight-p0" }, "parseNote": "契约 DoD T5" },
+    { "id": "AC-06", "text": "兼容回归：build / 全量 test / smoke（含 v0.10 增量步）/ persist:check 全绿", "weight": 2, "kind": "core", "verifiable": true, "originTarget": { "type": "requirement", "id": "xinban-v0.10-insight-p0" }, "parseNote": "契约 DoD T6" },
+    { "id": "AC-07", "text": "先红后绿日志归档 docs/v0.10/evidence/，内容真实且与索引一致", "weight": 2, "kind": "core", "verifiable": true, "originTarget": { "type": "requirement", "id": "xinban-v0.10-insight-p0" }, "parseNote": "契约 DoD T7；审查追加『内容真实且与索引一致』谓词（Verification P1/P4）" },
+    { "id": "AC-08", "text": "范围外 diff 拒收：v0.7 轨迹渲染零触碰、schema 零改、v0.9 基线零代码改动", "weight": 2, "kind": "core", "verifiable": true, "originTarget": { "type": "requirement", "id": "xinban-v0.10-insight-p0" }, "parseNote": "契约 DoD T8" },
+    { "id": "AC-09", "text": "空态/无该周期 → 200 合法空结构；聚合失败 → 降级空态 + degraded 标记 + logger.error 非静默（禁 404/500）", "weight": 2, "kind": "core", "verifiable": true, "originTarget": { "type": "requirement", "id": "xinban-v0.10-insight-p0" }, "parseNote": "契约 §2.2" },
+    { "id": "AC-10", "text": "deploy 发布后复跑冒烟闭环，全绿收工", "weight": 2, "kind": "core", "verifiable": true, "originTarget": { "type": "requirement", "id": "xinban-v0.10-insight-p0" }, "parseNote": "任务书节点 5" }
+  ],
+  "adjudications": [
+    { "criterionId": "AC-01", "verdict": "pass", "rationale": "EV-10 server lib 测试『结论值 = 规则重算值（值级一致，非元素存在）』用独立三元表达式从 report.summary.counts 重算 dominant 并 toEqual 全值比较；EV-01 冒烟步骤 50 复跑通过，其断言为 jq `.value == {\"mood\":\"NEGATIVE\",\"count\":2,\"share\":1}` 等全值相等（scripts/smoke.sh:461-465），非元素存在；路由层『emits value-level insights equal to recomputed rule values』亦 toEqual 值级。变异测试（平票优先级反转 → 1 failed | 10 passed）证明断言有牙齿。", "evidenceIds": ["EV-10", "EV-01"], "checkedAt": "2026-10-13T08:22:00+08:00" },
+    { "criterionId": "AC-02", "verdict": "pass", "rationale": "EV-10 moodPeriodInsight.test.ts 分『正常层/空态层/降级层』三个 describe（11 条 it）；路由层含『returns a legal empty structure when the user has no conversations』『degrades to an empty safe structure and logs loudly』独立用例；EV-01 全量 test 158 条 exit 0。", "evidenceIds": ["EV-10", "EV-01"], "checkedAt": "2026-10-13T08:22:00+08:00" },
+    { "criterionId": "AC-03", "verdict": "pass", "rationale": "EV-10 『同输入多次调用输出稳定』（toEqual 全等）+『golden：三类洞察全结构值级断言』（toEqual 全结构含 evidence/message）；EV-13 mobile 端『同一时刻多次调用输出稳定』。", "evidenceIds": ["EV-10", "EV-13"], "checkedAt": "2026-10-13T08:22:00+08:00" },
+    { "criterionId": "AC-04", "verdict": "pass", "rationale": "EV-10 『类型枚举闭合：集合长度 3，所有产出 type 均在集合内』；EV-13 『第 4 类判红：未知洞察类型使整个载荷不可信 → empty』（FUTURE_MOOD_TYPE）。红队双重变异（移除 INSIGHT_TYPES 守卫 + default 放行）使该用例变红（1 failed | 9 passed，RT-03 overturned），证明判红真实有效；单点变异不红系 isValidInsight 与 isValidInsightValue 双层防御的冗余设计。", "evidenceIds": ["EV-13", "EV-12"], "checkedAt": "2026-10-13T08:22:00+08:00" },
+    { "criterionId": "AC-05", "verdict": "pass", "rationale": "EV-10 『UTC+8 周界：周日 23:59（CST）属上周，周一 00:00（CST）属本周』双向用例（2026-10-11T15:59:59Z 属 2026-10-05；16:00:00Z 属 2026-10-12，且对错配周期为空态）；EV-13 currentPeriodId 同边界双用例（92-97 行）。两端均固定时钟注入。", "evidenceIds": ["EV-10", "EV-13"], "checkedAt": "2026-10-13T08:22:00+08:00" },
+    { "criterionId": "AC-06", "verdict": "pass", "rationale": "EV-01 验收方本机逐项复跑：TEST_EXIT=0（server 21 文件 112 条 + mobile 7 文件 46 条 = 158，与 QA-ACCEPTANCE 声称逐项一致）、BUILD_EXIT=0、SMOKE_EXIT=0（51/51，含 46-51）、PERSIST_EXIT=0（9 项）。四门禁全绿且与上游 gate-*.log 声称一致（EV-14）。", "evidenceIds": ["EV-01", "EV-14"], "checkedAt": "2026-10-13T08:22:00+08:00" },
+    { "criterionId": "AC-07", "verdict": "partial", "rationale": "6 条红绿文件中 5 条内容真实（EV-03『7 failed | 7 passed (14)』与新增用例数精确吻合；EV-04『1 failed / no tests』；绿三条 11/14/10 与 it 计数一致），但 EV-02 补证揭示 red-server-lib.txt 原实物仅含『RED_EXIT=0』（零失败输出、退出码与红矛盾），且原 RED-GREEN.md 对其描述（『1 failed / no tests』）与实物错位、时间线自述（红 07:39-07:44 / 绿 07:43 起）被实物戳破（red-route Start at 07:44:47、red-mobile mtime 07:48）。验收方已补真实红（EV-02，REAL_EXIT=1 + Cannot find module）并修正索引（EV-08），证据链现完整，但上游交付时该 core 证据失实，按 RT-01 major upheld 降 partial 记录在案。", "evidenceIds": ["EV-02", "EV-03", "EV-04", "EV-05", "EV-06", "EV-07", "EV-08"], "checkedAt": "2026-10-13T08:22:00+08:00", "downgradedBy": "RT-01" },
+    { "criterionId": "AC-08", "verdict": "pass", "rationale": "EV-16 全量 diff 核查：MoodTimelinePanel.tsx / conversationInsights.ts / utils/insights.ts / prisma/schema.prisma 零 diff；scripts/smoke.sh 仅删 2 行（版本注释与总数）新增 30 行（49-51 增量段），01-48 基线断言零改动；.myrd-platform 技能文件全部归属平台自动提交 ca20551，非 v0.10 交付提交；.gitignore 增 /node_modules/ 为工具链良性修复（已作 minor 备注记录）。契约 additive 清单整体成立。", "evidenceIds": ["EV-16"], "checkedAt": "2026-10-13T08:22:00+08:00" },
+    { "criterionId": "AC-09", "verdict": "pass", "rationale": "EV-11 路由实现：空态走 buildMoodPeriodInsight 返回 available=true/degraded=false/insights=[]（非 404/500），聚合异常 catch 后 logger.error('[period] insight degraded') + 200 降级信封，AppError 直抛保留 401/400；路由测试断言 errorSpy 恰调用 1 次且消息含 'insight degraded'，红队变异删除该调用后用例变红（1 failed | 13 passed）。EV-01 冒烟步骤 49/51 复跑通过。", "evidenceIds": ["EV-11", "EV-01"], "checkedAt": "2026-10-13T08:22:00+08:00" },
+    { "criterionId": "AC-10", "verdict": "pass", "rationale": "EV-01 验收方本机复跑 npm run deploy:v02（DEPLOY_EXIT=0，dist 启动 + /health up + build=0/start=0/test=0 复验）+ 发布后 npm run smoke（51/51，POST_SMOKE_EXIT=0）。保留（RT-02 minor）：冒烟为源码级复跑（dev:standalone + 临时 SQLite）而非对已部署 dist 实例冒烟，为 v0.9 以来既有流水线口径，未降低标准。", "evidenceIds": ["EV-01", "EV-15"], "checkedAt": "2026-10-13T08:22:00+08:00" }
+  ],
+  "evidence": [
+    { "id": "EV-01", "type": "test_run", "uri": "docs/v0.10/evidence/review-rerun-gates.log", "fetchedAt": "2026-10-13T08:20:00+08:00", "digest": "sha256:65d2afe74dc518cb4dc4ff6d11d2d5a5d943c2b03ff9fb69ca07b018a1f36659", "excerpt": "TEST_EXIT=0(112+46) BUILD_EXIT=0 SMOKE_EXIT=0(51/51) PERSIST_EXIT=0(9) DEPLOY_EXIT=0 POST_SMOKE_EXIT=0(51/51)", "reliability": "direct", "status": "ok" },
+    { "id": "EV-02", "type": "log", "uri": "docs/v0.10/evidence/red-server-lib-verified.txt", "fetchedAt": "2026-10-13T08:12:00+08:00", "digest": "sha256:b76c90795d3a0e33df998702188cc33b52325ccd87321a967f40886041f04e29", "excerpt": "Error: Cannot find module './moodPeriodInsight.js' … REAL_EXIT=1（验收补证：移除模块复现真实红）", "reliability": "direct", "status": "ok" },
+    { "id": "EV-03", "type": "log", "uri": "docs/v0.10/evidence/red-server-route.txt", "fetchedAt": "2026-10-13T07:58:00+08:00", "digest": "sha256:db0f21d9653fc08d2dee866606b13e850d0740c4e9b178e85e0f190c15953308", "excerpt": "Tests  7 failed | 7 passed (14)  Start at 07:44:47", "reliability": "direct", "status": "ok" },
+    { "id": "EV-04", "type": "log", "uri": "docs/v0.10/evidence/red-mobile-util.txt", "fetchedAt": "2026-10-13T07:58:00+08:00", "digest": "sha256:2354f1bc7f2bdb9572e7df070d2de556f545d40b60fc2f4896c193fa26f66406", "excerpt": "Test Files  1 failed (1) / Tests  no tests", "reliability": "direct", "status": "ok" },
+    { "id": "EV-05", "type": "log", "uri": "docs/v0.10/evidence/green-server-lib.txt", "fetchedAt": "2026-10-13T07:58:00+08:00", "digest": "sha256:20c6966f7f845dfcf7e820288714322b985d23b12dd9330b6c02964d99a03c6f", "excerpt": "Tests  11 passed (11)", "reliability": "direct", "status": "ok" },
+    { "id": "EV-06", "type": "log", "uri": "docs/v0.10/evidence/green-server-route.txt", "fetchedAt": "2026-10-13T07:58:00+08:00", "digest": "sha256:0f1f79c09059673fe8b307c57b3f6c0bc21ad7aef0ecd418051bfd13974c7cc1", "excerpt": "Tests  14 passed (14)", "reliability": "direct", "status": "ok" },
+    { "id": "EV-07", "type": "log", "uri": "docs/v0.10/evidence/green-mobile-util.txt", "fetchedAt": "2026-10-13T07:58:00+08:00", "digest": "sha256:b2464bab155f4247d2fe9d8508e3d315dccc19c632b69c295aebabb75b6c39e6", "excerpt": "Tests  10 passed (10)", "reliability": "direct", "status": "ok" },
+    { "id": "EV-08", "type": "doc_link", "uri": "docs/v0.10/evidence/RED-GREEN.md", "fetchedAt": "2026-10-13T08:25:00+08:00", "digest": "sha256:7eec42512bc7de0a1b95b5b19294ee5d98d0b8863c0955cb148e86219db9af2f", "excerpt": "验收复核补证节：真实红 REAL_EXIT=1 + 三处变异测试均变红；修订说明标注原记述与实物不符处", "reliability": "direct", "status": "ok" },
+    { "id": "EV-09", "type": "git_commit", "uri": "apps/server/src/lib/moodPeriodInsight.ts", "fetchedAt": "2026-10-13T08:05:00+08:00", "digest": "sha256:82042de9fdcb9f3b3fa13f0365faa3cc087faaaff7e3ddec7a9acf1495225843", "excerpt": "PERIOD_INSIGHT_TYPES 三值闭合；平票 NEGATIVE>NEUTRAL>POSITIVE；空态/降级分支；零 Date.now", "reliability": "direct", "status": "ok" },
+    { "id": "EV-10", "type": "test_run", "uri": "apps/server/src/lib/moodPeriodInsight.test.ts", "fetchedAt": "2026-10-13T08:05:00+08:00", "digest": "sha256:bb6811fbf4fa4af12d66df5244704464ad653e4d1beaf35e0a0be90c918f6fea", "excerpt": "结论值 = 规则重算值（值级一致，非元素存在）；UTC+8 周界；golden 全结构 toEqual；11 条 it", "reliability": "direct", "status": "ok" },
+    { "id": "EV-11", "type": "git_commit", "uri": "apps/server/src/routes/period.ts", "fetchedAt": "2026-10-13T08:05:00+08:00", "digest": "sha256:0a1034c8624532c712a641e068f7e709b12258c3ad5faebefaf1c056cfddee83", "excerpt": "additive GET /api/v1/periods/:periodId/insight；AppError 直抛；catch → logger.error + 降级信封", "reliability": "direct", "status": "ok" },
+    { "id": "EV-12", "type": "git_commit", "uri": "apps/mobile/src/utils/moodPeriodInsight.ts", "fetchedAt": "2026-10-13T08:05:00+08:00", "digest": "sha256:3c8b5b41eb6eb2d2fd83530fec531b836ac0021d997c5733429147c06cfc87d7", "excerpt": "periodInsightViewState ready/degraded/empty；currentPeriodId(now) 注入；第 4 类双层判红防御", "reliability": "direct", "status": "ok" },
+    { "id": "EV-13", "type": "test_run", "uri": "apps/mobile/src/utils/moodPeriodInsight.test.ts", "fetchedAt": "2026-10-13T08:05:00+08:00", "digest": "sha256:3a2975016edaee3e882e54e10b17b95c184e4a9426e8573922b3dafbdbc8aa5d", "excerpt": "第 4 类判红用例 + schema 违例判红 + currentPeriodId UTC+8 周界双用例；10 条 it", "reliability": "direct", "status": "ok" },
+    { "id": "EV-14", "type": "log", "uri": "docs/v0.10/evidence/gate-smoke.log", "fetchedAt": "2026-10-13T07:58:00+08:00", "digest": "sha256:89a4c8b9e70569f6497cb1a214a53e55f6b7fb2880acaccfc3f30b241c4d8032", "excerpt": "✅ 心伴 v0.10 冒烟通过：51 项 / 51 项 SMOKE_EXIT=0（上游归档）", "reliability": "indirect", "status": "ok" },
+    { "id": "EV-15", "type": "log", "uri": "docs/v0.10/evidence/deploy-post-smoke.log", "fetchedAt": "2026-10-13T07:58:00+08:00", "digest": "sha256:b845b3248179dda8d65891eda68abc5336924a9da2ba67f4e46a5a684f387cbb", "excerpt": "51 项 / 51 项 SMOKE_EXIT=0，seed 2026-10-13T00:02:13Z 晚于 deploy 复验 test 08:02:09（+0800）", "reliability": "indirect", "status": "ok" },
+    { "id": "EV-16", "type": "git_commit", "uri": "git diff 1db62c4..0f9c681 --name-status", "fetchedAt": "2026-10-13T08:10:00+08:00", "excerpt": "禁区四文件零 diff；smoke.sh +30/-2 仅增量段；技能文件归属 ca20551 平台自动提交", "digest": "sha256:77604ac98bf75a30cab4f9c5a58554ae5fa289f13c5af97322ce691cb60bc9ac", "reliability": "direct", "status": "ok" }
+  ],
+  "redTeam": {
+    "status": "completed",
+    "summary": "三类攻击全覆盖：模块缺失复现（falsification）+ 3 组变异测试（probing）+ 独立子 agent 证据链复核（含 sha256 抽查 13 份、时间线攻击）+ 全量 diff 范围攻击（scope）。RT-01 major upheld 导致 AC-07 降 partial；其余 overturned 或 minor 记录。",
+    "uncoveredAttackSurface": ["并发重复请求下的洞察端点行为（单用户单周期场景，风险低）", "超大数据量下 correctedSamplesInPeriod 的性能（当前 seed 量级 O(n) 可接受）"],
+    "challenges": [
+      { "id": "RT-01", "targetCriterionId": "AC-07", "attackType": "falsification", "severity": "major", "claim": "red-server-lib.txt 实物仅含 RED_EXIT=0（11 字节零失败输出，退出码与红矛盾），RED-GREEN.md 对其描述与实物错位（该描述实为 red-mobile-util.txt 内容），时间线自述（红 07:39-07:44 / 绿 07:43 起）被实物戳破（red-route Start at 07:44:47、red-mobile mtime 07:48、green 批量 07:54 无时间戳）——T7 不能记 clean pass。", "evidenceIds": ["EV-02", "EV-03", "EV-04", "EV-08"], "outcome": "upheld", "arbitrationNote": "事实全部成立（独立复核与本机复现双确认：真实红应为 1 failed / no tests + exit 1）。验收方补证 red-server-lib-verified.txt 并修正 RED-GREEN.md 后证据链完整，但上游交付时 core 证据失实，按 major upheld 规则 AC-07 降 partial（downgradedBy=RT-01）。" },
+      { "id": "RT-02", "targetCriterionId": "AC-10", "attackType": "probing", "severity": "minor", "claim": "『发布后复跑冒烟』实为 smoke.sh 自起源码 dev:standalone + 临时 SQLite，非对已部署 dist 实例冒烟；deploy-post-smoke.log 的 51/51 不能证明部署产物可用。", "evidenceIds": ["EV-15", "EV-01"], "outcome": "upheld", "arbitrationNote": "事实成立但为 v0.9 以来既有流水线口径，deploy:v02 本身已做 dist 启动 + /health + build/start/test 复验，本轮未降低标准；记 minor 不改判，建议后续版本将冒烟指向部署实例。" },
+      { "id": "RT-03", "targetCriterionId": "AC-04", "attackType": "probing", "severity": "minor", "claim": "第 4 类判红可能依赖双层防御（isValidInsight 的 INSIGHT_TYPES.includes 先行拦截 + isValidInsightValue 的 default false），单点变异 default 放行后测试仍 10 passed，质疑判红测试有效性。", "evidenceIds": ["EV-12", "EV-13"], "outcome": "overturned", "arbitrationNote": "双重变异（同时移除 includes 守卫与 default 放行）后『第 4 类判红』用例变红（1 failed | 9 passed），判红真实有效；双层结构系防御深度冗余设计，非测试无效。" },
+      { "id": "RT-04", "targetCriterionId": "AC-08", "attackType": "scope", "severity": "minor", "claim": "1db62c4..0f9c681 diff 含契约 additive 清单外文件：.gitignore 与大量 .myrd-platform/.claude/skills/ 平台技能文件。", "evidenceIds": ["EV-16"], "outcome": "overturned", "arbitrationNote": "技能文件全部归属平台自动提交 ca20551（myrd: workflow auto-commit [skip ci]），非 v0.10 交付提交（45560cb/0f9c681 中技能文件数为 0）；.gitignore 增 /node_modules/ 为 vitest 缓存工具链良性修复且注明非交付物语义；不构成范围违规。" }
+    ]
+  },
+  "scoring": {
+    "score": 95,
+    "passed": 9,
+    "partial": 1,
+    "failed": 0,
+    "unverified": 0,
+    "total": 10,
+    "breakdown": [
+      { "criterionId": "AC-01", "verdict": "pass", "weighted": 2.0 },
+      { "criterionId": "AC-02", "verdict": "pass", "weighted": 2.0 },
+      { "criterionId": "AC-03", "verdict": "pass", "weighted": 1.0 },
+      { "criterionId": "AC-04", "verdict": "pass", "weighted": 2.0 },
+      { "criterionId": "AC-05", "verdict": "pass", "weighted": 2.0 },
+      { "criterionId": "AC-06", "verdict": "pass", "weighted": 2.0 },
+      { "criterionId": "AC-07", "verdict": "partial", "weighted": 1.0 },
+      { "criterionId": "AC-08", "verdict": "pass", "weighted": 2.0 },
+      { "criterionId": "AC-09", "verdict": "pass", "weighted": 2.0 },
+      { "criterionId": "AC-10", "verdict": "pass", "weighted": 2.0 }
+    ]
+  },
+  "verdict": {
+    "value": "NEEDS_WORK",
+    "reasons": [
+      "RULE_PARTIAL_PRESENT: 1 条 partial（AC-07 红绿证据链，RT-01 major upheld 降级），不满足 CERTIFIED 的 partial=0 条件",
+      "RULE_NO_CORE_FAIL: 无 core 判 fail、无 upheld blocker、无造假实锤、score 95 ≥ 40，不触发 REJECTED"
+    ],
+    "summary": "技术实现与全部六项门禁实测全绿（score 95）；唯一差距为上游交付时 server lib 层先红证据失真（RED_EXIT=0），验收方已补真实红证据并修正索引，按规则记 NEEDS_WORK；修改意见已闭环，后续版本需保证红证据随跑随存。"
+  },
+  "durationMs": 2700000,
+  "createdAt": "2026-10-13T08:50:00+08:00",
+  "writeBack": {
+    "status": "pending",
+    "targets": [
+      { "kind": "commit_status", "ref": "git commit of docs/v0.10/VERIFICATION.md + evidence 补证（节点间审查场景，无平台 Requirement/Goal id 可回写）" }
+    ],
+    "attempts": 0
+  }
+}

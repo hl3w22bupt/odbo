@@ -61,9 +61,18 @@ node scripts/validate-review.mjs <packDir>
 # exit 0（REVIEW_VALID: PASS）→ 才可以做第 6 步；exit 1 → 按清单修正 review.json 后重跑
 ```
 
-### 6. 通知人类（仅当该产物有 goal 归属）
+### 6. 判定入账 + 通知人类（仅当该产物有 goal 归属）
 
-GET `/api/v1/goals/:id` 读现有 artifacts → 数组追加一条后 PATCH 合并（读-改-写，不覆盖他人条目）：
+先入账（统一判定账本 —— S1 影子对照 / judge-vs-human 校准 / platform-health 聚合都从这张表算）：
+
+```bash
+curl -X POST "$PLATFORM_API_URL/api/v1/eval-core/verdicts" -H "content-type: application/json" \
+  -d '{"targetKind":"experience_pack","targetId":"<包目录名>","position":"perceptual_review","judge":"llm",
+       "value":{"overall":3,"advisoryOnly":true,"dimensions":[{"id":"palette","score":3},…]},
+       "meta":{"packDir":"<packDir>","generatedBy":"experience-review@0.1.0"}}'
+```
+
+然后 GET `/api/v1/goals/:id` 读现有 artifacts → 数组追加一条后 PATCH 合并（读-改-写，不覆盖他人条目）：
 
 ```json
 { "op": "perceptual_advisory", "artifactType": "perceptual_advisory", "artifactId": "<包目录名>",

@@ -1,0 +1,150 @@
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv7ahqpj0029joty9f7s35tx/apps/server
+
+ ❯ src/lib/moodPeriodInsightComparison.test.ts (0 test)
+stdout | src/routes/periodInsightComparison.routes.test.ts
+◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
+
+ ❯ src/routes/periodInsightComparison.routes.test.ts (7 tests | 7 failed) 7ms
+     × exposes the additive route without changing existing route ids 5ms
+     × returns three-period value-level comparison for the authenticated user 0ms
+     × supports legal 1/2 periods and defaults to 3 0ms
+     × rejects over-limit and non-integer periods with the dedicated code 0ms
+     × rejects an invalid target period with the frozen 404 code 0ms
+     × returns all-empty 200 when the user has no active conversations 0ms
+     × degrades aggregation failures with a closed reason and loud log 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/moodPeriodInsightComparison.test.ts [ src/lib/moodPeriodInsightComparison.test.ts ]
+Error: Cannot find module './moodPeriodInsightComparison.js' imported from /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv7ahqpj0029joty9f7s35tx/apps/server/src/lib/moodPeriodInsightComparison.test.ts
+ ❯ src/lib/moodPeriodInsightComparison.test.ts:7:1
+      5| import { buildMoodPeriodInsight } from './moodPeriodInsight.js'
+      6| import { PERIOD_INSIGHT_TYPES } from './moodPeriodInsight.js'
+      7| import {
+       | ^
+      8|   buildMoodPeriodInsightComparison,
+      9|   moodPeriodInsightComparisonDegraded,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/routes/periodInsightComparison.routes.test.ts > period v0.11 insight comparison route > exposes the additive route without changing existing route ids
+AssertionError: expected [ { …(3) }, …(2) ] to deep equally contain { …(3) }
+
+- Expected:
+{
+  "method": "GET",
+  "name": "period::insight-comparison",
+  "path": "/api/v1/periods/:periodId/insight/comparison",
+}
+
++ Received:
+[
+  {
+    "method": "GET",
+    "name": "period::comparison",
+    "path": "/api/v1/periods/:periodId/comparison",
+  },
+  {
+    "method": "GET",
+    "name": "period::csv",
+    "path": "/api/v1/periods/:periodId/report.csv",
+  },
+  {
+    "method": "GET",
+    "name": "period::insight",
+    "path": "/api/v1/periods/:periodId/insight",
+  },
+]
+
+ ❯ src/routes/periodInsightComparison.routes.test.ts:64:24
+     62|       define(name, path, method) { registered.push({ name, path, metho…
+     63|     } as never)
+     64|     expect(registered).toContainEqual({
+       |                        ^
+     65|       name: 'period::insight-comparison',
+     66|       path: '/api/v1/periods/:periodId/insight/comparison',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  src/routes/periodInsightComparison.routes.test.ts > period v0.11 insight comparison route > returns three-period value-level comparison for the authenticated user
+TypeError: handlers(...).get(...) is not a function
+ ❯ src/routes/periodInsightComparison.routes.test.ts:72:67
+     70|
+     71|   it('returns three-period value-level comparison for the authenticate…
+     72|     const res = await handlers().get('period::insight-comparison')!(co…
+       |                                                                   ^
+     73|     expect(res.status_code).toBe(200)
+     74|     const data = res.body.data as Record<string, any>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  src/routes/periodInsightComparison.routes.test.ts > period v0.11 insight comparison route > supports legal 1/2 periods and defaults to 3
+TypeError: handlers(...).get(...) is not a function
+ ❯ src/routes/periodInsightComparison.routes.test.ts:100:67
+     98|
+     99|   it('supports legal 1/2 periods and defaults to 3', async () => {
+    100|     const one = await handlers().get('period::insight-comparison')!(co…
+       |                                                                   ^
+    101|     const two = await handlers().get('period::insight-comparison')!(co…
+    102|     expect(one.body.data).toMatchObject({ requestedPeriods: 1, periodI…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  src/routes/periodInsightComparison.routes.test.ts > period v0.11 insight comparison route > rejects over-limit and non-integer periods with the dedicated code
+TypeError: handlers(...).get(...) is not a function
+ ❯ src/routes/periodInsightComparison.routes.test.ts:107:62
+    105|
+    106|   it('rejects over-limit and non-integer periods with the dedicated co…
+    107|     await expect(handlers().get('period::insight-comparison')!(context…
+       |                                                              ^
+    108|       .rejects.toMatchObject({ statusCode: 400, code: 'PERIOD_INSIGHT_…
+    109|     await expect(handlers().get('period::insight-comparison')!(context…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  src/routes/periodInsightComparison.routes.test.ts > period v0.11 insight comparison route > rejects an invalid target period with the frozen 404 code
+TypeError: handlers(...).get(...) is not a function
+ ❯ src/routes/periodInsightComparison.routes.test.ts:114:62
+    112|
+    113|   it('rejects an invalid target period with the frozen 404 code', asyn…
+    114|     await expect(handlers().get('period::insight-comparison')!(context…
+       |                                                              ^
+    115|       .rejects.toMatchObject({ statusCode: 404, code: 'PERIOD_INSIGHT_…
+    116|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  src/routes/periodInsightComparison.routes.test.ts > period v0.11 insight comparison route > returns all-empty 200 when the user has no active conversations
+TypeError: handlers(...).get(...) is not a function
+ ❯ src/routes/periodInsightComparison.routes.test.ts:120:67
+    118|   it('returns all-empty 200 when the user has no active conversations'…
+    119|     prismaMock.conversation.findMany.mockResolvedValue([])
+    120|     const res = await handlers().get('period::insight-comparison')!(co…
+       |                                                                   ^
+    121|     expect(res.status_code).toBe(200)
+    122|     expect(res.body.data).toMatchObject({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  src/routes/periodInsightComparison.routes.test.ts > period v0.11 insight comparison route > degrades aggregation failures with a closed reason and loud log
+TypeError: handlers(...).get(...) is not a function
+ ❯ src/routes/periodInsightComparison.routes.test.ts:138:67
+    136|     const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() =…
+    137|     prismaMock.conversation.findMany.mockRejectedValue(new Error('sqli…
+    138|     const res = await handlers().get('period::insight-comparison')!(co…
+       |                                                                   ^
+    139|     expect(res.status_code).toBe(200)
+    140|     expect(res.body.data).toEqual({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  7 failed (7)
+   Start at  07:17:36
+   Duration  182ms (transform 83ms, setup 0ms, import 86ms, tests 7ms, environment 0ms)
+

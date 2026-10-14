@@ -1,0 +1,5 @@
+reviewer=standalone-verification-round3
+commit=24a7ba87eb33e7b6b38987940e7d24c689b5dcc7
+started=2026-10-14T07:51:36+08:00
+ended=2026-10-14 08:01:22
+scope=build,test,start,smoke,persist,deploy,post-deploy-smoke,sha-archive,e2e-baseline-diff,n1-p0-live

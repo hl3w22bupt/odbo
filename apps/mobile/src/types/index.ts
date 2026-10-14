@@ -243,6 +243,58 @@ export interface PeriodInsightResult {
   insights: PeriodInsightItem[];
 }
 
+export type PeriodInsightComparisonDirection = 'UP' | 'STABLE' | 'DOWN';
+export type PeriodInsightComparisonDegradedReason = 'SOURCE_DEGRADED' | 'AGGREGATION_FAILED';
+export type PeriodInsightComparisonEmptyReason = 'PERIOD_EMPTY' | 'METRIC_MISSING' | 'ZERO_BASE';
+
+export interface PeriodInsightComparisonValue {
+  direction: PeriodInsightComparisonDirection;
+  rate: number;
+  fromPeriodId: string;
+  toPeriodId: string;
+  fromValue: number;
+  toValue: number;
+}
+
+export interface PeriodInsightComparisonEvidence {
+  fromPeriodId: string;
+  toPeriodId: string;
+  fromSampleSize: number;
+  toSampleSize: number;
+  source: string;
+}
+
+export interface PeriodInsightComparisonItem {
+  type: PeriodInsightType;
+  status: 'READY' | 'EMPTY';
+  reason: PeriodInsightComparisonEmptyReason | null;
+  value: PeriodInsightComparisonValue | null;
+  evidence: PeriodInsightComparisonEvidence;
+  message: string;
+}
+
+export interface PeriodInsightComparisonPeriod {
+  periodId: string;
+  available: boolean;
+  degraded: boolean;
+  empty: boolean;
+  insights: PeriodInsightItem[];
+}
+
+export interface PeriodInsightComparisonResult {
+  conversationId: string;
+  available: boolean;
+  degraded: boolean;
+  degradedReason: PeriodInsightComparisonDegradedReason | null;
+  granularity: 'NATURAL_WEEK';
+  timezone: 'UTC+8';
+  targetPeriodId: string;
+  requestedPeriods: number;
+  periodIds: string[];
+  periods: PeriodInsightComparisonPeriod[];
+  insights: PeriodInsightComparisonItem[];
+}
+
 export interface QuotaStatus {
   used: number;
   limit: number;

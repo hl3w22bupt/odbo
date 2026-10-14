@@ -259,6 +259,14 @@ export function readableMoodPeriodComparison(
   }
 }
 
+/** v0.11 只读复用：跨周期洞察与 v0.9 对比共用同一 ±5% 趋势判定。 */
+export function comparisonRelativeTrend(
+  previous: number | null,
+  next: number | null,
+): { rate: number | null; direction: ComparisonTrend; empty: boolean } {
+  return relativeTrend(previous, next)
+}
+
 export function moodPeriodComparisonDegraded(conversationId: string, requestedPeriods: number): MoodPeriodComparison {
   return {
     conversationId,

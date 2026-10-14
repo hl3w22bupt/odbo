@@ -106,7 +106,7 @@ export GODOT_BIN=/path/to/Godot
    不要凭空发挥设计。
 2. **落点与命名跟 spec 走**：`entities[].script/scene`、`levels[].scene`、`acceptance[].check`
    声明的相对路径必须真实建出；实体/关卡/元素 id 用 spec 里的编号（`l1/e3` 这类），不要私改 ——
-   契约测试（`node scripts/contract-check.mjs`，routine id `game-contract`）会逐个断言。
+   契约测试（`node std-skills/godot-game-dev/scripts/contract-check.mjs`，routine id `game-contract`）会逐个断言。
 3. **数值只认 `spec.numeric`**：速度/血量/得分等调参字段集中在 `autoload/game_state.gd`（或同级）
    并与 spec.numeric 键名对应；改数值 = 改 spec（修订产生新版本）→ 同步代码，禁止两头各改各的。
 4. **修改产生新版本**：改策划案走 `POST /api/v1/game-design-specs/:id/revisions`（version+1，

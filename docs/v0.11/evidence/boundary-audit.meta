@@ -1,0 +1,8 @@
+finished=2026-10-13T23:24:53Z
+commit=a92cd5e9f3dbe745714fe6db6e2d233e85415511
+dead_test_count=0
+schema_diff_exit=0
+
+changed boundary candidates (empty means unchanged):
+schema_diff_exit=0
+apps/server/src/lib/moodPeriodInsight.ts

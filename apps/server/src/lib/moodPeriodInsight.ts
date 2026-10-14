@@ -83,7 +83,7 @@ function correctionIdOf(point: MoodSnapshotContract): number | string | null {
  * 标注关联计数：与 v0.8 周期报告同口径（有效 id + ACTIVE 记忆 + 可解析时间 +
  * 周期窗口 [from, to) + 合法 mood/score），在此之上要求带 correctionId，保证 correctedSamples ≤ sampleSize。
  */
-function correctedSamplesInPeriod(
+export function correctedSamplesInPeriod(
   timeline: MoodTimelineContract,
   memory: MemoryReadContract,
   fromMs: number,

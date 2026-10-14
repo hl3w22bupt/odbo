@@ -13,6 +13,7 @@ import { logger } from './lib/logger.js'
 
 export interface HttpRouteContext {
   body: Record<string, unknown>
+  rawBody?: string | Buffer
   query: Record<string, string>
   params: Record<string, string>
   headers: Record<string, string | string[] | undefined>

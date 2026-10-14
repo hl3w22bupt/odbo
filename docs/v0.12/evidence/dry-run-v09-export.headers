@@ -1,0 +1,17 @@
+HTTP/1.1 200 OK
+access-control-allow-origin: *
+access-control-allow-headers: content-type, authorization
+access-control-allow-methods: GET, POST, PATCH, PUT, DELETE, OPTIONS
+content-type: text/csv; charset=utf-8
+content-disposition: attachment; filename="mood-period-comparison.csv"
+x-report-row-count: 5
+x-report-generated-at: 2026-10-14T23:15:00.159Z
+x-report-empty: false
+x-report-available: true
+x-report-degraded: false
+x-report-partial: false
+Date: Wed, 14 Oct 2026 23:15:00 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+

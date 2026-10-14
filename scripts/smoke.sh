@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 心伴 v0.11 · 一条命令全链路冒烟（01-52 冻结基线 + 53-54 跨周期情绪洞察）
+# 心伴 v0.12 · 一条命令全链路冒烟（01-54 冻结基线 + 55-58 CSV 导入闭环）
 # 用法：npm run smoke
 # 可用环境变量：XINBAN_SMOKE_PORT（默认 13888）、KEEP_SMOKE_DIR=1（保留临时目录）
 set -euo pipefail
@@ -22,18 +22,34 @@ assert_eq() { if [ "$2" = "$3" ]; then green "$1"; else red "$1（expected=$2 ac
 assert_contains() { if printf '%s' "$2" | grep -qF -- "$3"; then green "$1"; else red "$1（missing=$3 body=$2）"; fi; }
 assert_contains_quiet() { if printf '%s' "$2" | grep -qF -- "$3"; then return 0; else red "断言失败（missing=$3 body=$2）"; fi; }
 
+kill_tree() {
+  local pid="$1"
+  [ -n "$pid" ] || return 0
+  local batch="$pid" next
+  while [ -n "$batch" ]; do
+    next=''
+    for pid in $batch; do
+      for child in $(pgrep -P "$pid" 2>/dev/null || true); do next="$next $child"; done
+      kill -9 "$pid" 2>/dev/null || true
+    done
+    batch="$next"
+  done
+}
+
 cleanup() {
   if [ -f "$PID_FILE" ]; then
-    pid="$(cat "$PID_FILE" 2>/dev/null || true)"
-    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-      children="$(pgrep -P "$pid" 2>/dev/null || true)"
-      kill "$pid" 2>/dev/null || true
-      for child in $children; do kill "$child" 2>/dev/null || true; done
-    fi
+    kill_tree "$(cat "$PID_FILE" 2>/dev/null || true)"
   fi
   if [ "${KEEP_SMOKE_DIR:-0}" != "1" ]; then rm -rf "$RUN_DIR"; else echo "smoke artifacts: $RUN_DIR"; fi
 }
 trap cleanup EXIT INT TERM
+
+http_csv() {
+  local path="$1" token="$2" file="$3"
+  curl -sS -m 20 -w '\n%{http_code}' -o "$BODY" -X POST "$BASE$path" \
+    -H 'content-type: text/csv' -H "Authorization: Bearer $token" --data-binary @"$file" >/dev/null
+  cat "$BODY"
+}
 
 http() {
   local method="$1" path="$2" token="${3:-}" data="${4:-}"
@@ -542,4 +558,56 @@ else
   red "❌ 跨周期洞察参数拒绝失败（status=$rejected_status body=${rejected_body}）"
 fi
 
-green "心伴 v0.11 冒烟通过：$PASS 项 / 54 项"
+# ---------- v0.12 增量段：CSV 导入 → 聚合 → 洞察 ----------
+import_period='2026-09-28'
+import_file="$RUN_DIR/period-import.csv"
+{
+  printf '\xef\xbb\xbfperiod_id,date,dimension,value\r\n'
+  printf '2026-09-28,2026-09-28,count,2\r\n'
+  printf '2026-09-28,2026-09-28,positive,1\r\n'
+  printf '2026-09-28,2026-09-28,neutral,0\r\n'
+  printf '2026-09-28,2026-09-28,negative,1\r\n'
+  printf '2026-09-28,2026-09-28,averageScore,0\r\n'
+} > "$import_file"
+
+import_result="$(http_csv "/api/v1/conversations/$CONVERSATION_ID/mood-period-comparison/import.csv" "$TOKEN" "$import_file")"
+if printf '%s' "$import_result" | jq -e '
+  .data.received == 5 and .data.imported == 5 and .data.skipped == 0 and
+  .data.failed == 0 and .data.failures_total == 0 and .data.result_code == "OK" and
+  (.data.imported + .data.skipped + .data.failed == .data.received)
+' >/dev/null; then
+  green '55 最小样本导入成功且计数不变量成立'
+else
+  red "❌ CSV 导入失败（body=${import_result}）"
+fi
+
+repeat_result="$(http_csv "/api/v1/conversations/$CONVERSATION_ID/mood-period-comparison/import.csv" "$TOKEN" "$import_file")"
+if printf '%s' "$repeat_result" | jq -e '
+  .data.received == 5 and .data.imported == 0 and .data.skipped == 5 and
+  .data.failed == 0 and .data.result_code == "OK"
+' >/dev/null; then
+  green '56 同文件重导全跳过且零重复'
+else
+  red "❌ CSV 幂等失败（body=${repeat_result}）"
+fi
+
+aggregate_status="$(curl -sS -m 20 -w '%{http_code}' -o /dev/null "$BASE/api/v1/periods/$import_period/report.csv" -H "Authorization: Bearer $TOKEN")"
+aggregate_csv="$(curl -sS -m 20 "$BASE/api/v1/periods/$import_period/report.csv" -H "Authorization: Bearer $TOKEN")"
+if [ "$aggregate_status" = 200 ] && printf '%s' "$aggregate_csv" | grep -q "^$import_period,$import_period,true,false,.*,1,0,1,2,0,1,7,PARTIAL"; then
+  green '57 导入值被既有周期聚合真实消费'
+else
+  red "❌ 周期聚合失败（status=${aggregate_status} csv=${aggregate_csv}）"
+fi
+
+imported_insight="$(http GET "/api/v1/periods/$import_period/insight" "$TOKEN")"
+if printf '%s' "$imported_insight" | jq -e '
+  .data.available == true and .data.degraded == false and .data.periodId == $pid and
+  (.data.insights[] | select(.type == "DOMINANT_MOOD") | .value.mood == "NEGATIVE" and .value.count == 1 and .value.share == 0.5) and
+  (.data.insights[] | select(.type == "PERIOD_TREND") | .value.sampleSize == 2 and .value.averageScore == 0)
+' --arg pid "$import_period" >/dev/null; then
+  green '58 导入值被既有洞察真实消费'
+else
+  red "❌ 导入洞察失败（body=${imported_insight}）"
+fi
+
+green "心伴 v0.12 冒烟通过：$PASS 项 / 58 项"

@@ -28,6 +28,7 @@ import type {
   PeriodComparisonResult,
   PeriodInsightComparisonResult,
   PeriodInsightResult,
+  PeriodCsvImportResult,
   MoodWeeklyReportResult,
   Message,
   Order,
@@ -69,6 +70,7 @@ export interface ApiClient {
   getPeriodComparison(periodId: string): Promise<PeriodComparisonResult>;
   getPeriodInsight(periodId: string): Promise<PeriodInsightResult>;
   getPeriodInsightComparison(periodId: string, periods?: number): Promise<PeriodInsightComparisonResult>;
+  importPeriodCsv(conversationId: string, csv: string): Promise<PeriodCsvImportResult>;
   sendMessage(params: SendMessageParams): Promise<ChatSendResult>;
   sendMultiMessage(params: SendMultiMessageParams): Promise<ChatMultiSendResult>;
   triggerProactive(characterId: string): Promise<{ triggered: boolean; messageId: string }>;
@@ -141,6 +143,13 @@ const realApi: ApiClient = {
     return request<PeriodInsightComparisonResult>(
       'GET',
       `/api/v1/periods/${encodeURIComponent(periodId)}/insight/comparison${query}`,
+    );
+  },
+  async importPeriodCsv(conversationId, csv) {
+    return request<PeriodCsvImportResult>(
+      'POST',
+      `/api/v1/conversations/${encodeURIComponent(conversationId)}/mood-period-comparison/import.csv`,
+      { csv },
     );
   },
   async sendMessage(params) {

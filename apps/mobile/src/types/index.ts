@@ -243,6 +243,36 @@ export interface PeriodInsightResult {
   insights: PeriodInsightItem[];
 }
 
+export type PeriodCsvImportErrorCode =
+  | 'EMPTY_FILE'
+  | 'INVALID_HEADER'
+  | 'MISSING_FIELD'
+  | 'INVALID_DATE'
+  | 'INVALID_VALUE'
+  | 'DUPLICATE'
+  | 'ROW_LIMIT_EXCEEDED'
+  | 'ENCODING_ERROR';
+
+export interface PeriodCsvImportFailure {
+  row: number;
+  line: number;
+  periodId: string | null;
+  date: string | null;
+  dimension: string | null;
+  code: PeriodCsvImportErrorCode;
+  message: string;
+}
+
+export interface PeriodCsvImportResult {
+  received: number;
+  imported: number;
+  skipped: number;
+  failed: number;
+  failures_total: number;
+  failures: PeriodCsvImportFailure[];
+  result_code: 'OK' | 'EMPTY_FILE';
+}
+
 export type PeriodInsightComparisonDirection = 'UP' | 'STABLE' | 'DOWN';
 export type PeriodInsightComparisonDegradedReason = 'SOURCE_DEGRADED' | 'AGGREGATION_FAILED';
 export type PeriodInsightComparisonEmptyReason = 'PERIOD_EMPTY' | 'METRIC_MISSING' | 'ZERO_BASE';

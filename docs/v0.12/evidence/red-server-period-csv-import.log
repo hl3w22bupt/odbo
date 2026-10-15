@@ -1,0 +1,25 @@
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv8q061l000ym95fwayuvswe/apps/server
+
+ ❯ src/lib/periodCsvImport.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/periodCsvImport.test.ts [ src/lib/periodCsvImport.test.ts ]
+Error: Cannot find module './periodCsvImport.js' imported from /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv8q061l000ym95fwayuvswe/apps/server/src/lib/periodCsvImport.test.ts
+ ❯ src/lib/periodCsvImport.test.ts:3:1
+      1| import { describe, expect, it } from 'vitest'
+      2| import { CSV_HEADER } from './csvExport.js'
+      3| import {
+       | ^
+      4|   CSV_IMPORT_ERROR_CODES,
+      5|   parsePeriodCsvImport,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  07:18:11
+   Duration  103ms (transform 16ms, setup 0ms, import 0ms, tests 0ms, environment 0ms)
+

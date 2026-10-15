@@ -1,0 +1,6 @@
+﻿period_id,date,dimension,value
+2026-08-31,2026-08-31,count,2
+2026-08-31,2026-08-31,positive,1
+2026-08-31,2026-08-31,neutral,1
+2026-08-31,2026-08-31,negative,0
+2026-08-31,2026-08-31,averageScore,0.25

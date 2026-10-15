@@ -1,0 +1,53 @@
+{
+  "byteLength": 205,
+  "bom": true,
+  "eol": true,
+  "header": "period_id,date,dimension,value",
+  "parsedRowCount": 5,
+  "parsed": [
+    {
+      "row": 2,
+      "line": 2,
+      "periodId": "2026-10-12",
+      "date": "2026-10-12",
+      "dimension": "count",
+      "value": 1
+    },
+    {
+      "row": 3,
+      "line": 3,
+      "periodId": "2026-10-12",
+      "date": "2026-10-12",
+      "dimension": "positive",
+      "value": 0
+    },
+    {
+      "row": 4,
+      "line": 4,
+      "periodId": "2026-10-12",
+      "date": "2026-10-12",
+      "dimension": "neutral",
+      "value": 1
+    },
+    {
+      "row": 5,
+      "line": 5,
+      "periodId": "2026-10-12",
+      "date": "2026-10-12",
+      "dimension": "negative",
+      "value": 0
+    },
+    {
+      "row": 6,
+      "line": 6,
+      "periodId": "2026-10-12",
+      "date": "2026-10-12",
+      "dimension": "averageScore",
+      "value": 0
+    }
+  ],
+  "precision": [
+    0
+  ],
+  "dateRule": "period_id === date === UTC+8 Monday YYYY-MM-DD"
+}

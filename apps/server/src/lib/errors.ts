@@ -25,6 +25,14 @@ export type ErrorCode =
   | 'PERIOD_INSIGHT_COUNT_REJECTED'
   | 'PERIOD_INSIGHT_TARGET_NOT_FOUND'
   | 'CSV_EXPORT_TOO_LARGE'
+  | 'EMPTY_FILE'
+  | 'INVALID_HEADER'
+  | 'MISSING_FIELD'
+  | 'INVALID_DATE'
+  | 'INVALID_VALUE'
+  | 'DUPLICATE'
+  | 'ROW_LIMIT_EXCEEDED'
+  | 'ENCODING_ERROR'
 
 export class AppError extends Error {
   readonly statusCode: number

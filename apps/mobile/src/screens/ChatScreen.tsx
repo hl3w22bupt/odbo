@@ -35,6 +35,7 @@ import type { Affection, Character, ChatMode, CustomizationPayload, Gift, Memory
 import { applyMoodCorrection, correctionFallbackNotice, createCorrectionForm, type MoodCorrectionForm } from '../utils/moodCorrections';
 import { currentPeriodId } from '../utils/moodPeriodInsight';
 import { affectionLevelLabel, genId } from '../utils/format';
+import { describePeriodCsvImport } from '../utils/csvImport';
 
 interface ChatScreenProps {
   mode: ChatMode;
@@ -75,6 +76,7 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
   const [loading, setLoading] = useState(Boolean(initConvId));
   const [greeted, setGreeted] = useState(false);
 
+  const [importingCsv, setImportingCsv] = useState(false);
   const [gifts, setGifts] = useState<Gift[]>([]);
   const [giftVisible, setGiftVisible] = useState(false);
   const [giftSending, setGiftSending] = useState(false);
@@ -142,6 +144,43 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
   );
 
   useEffect(() => () => stopPolling(), [stopPolling]);
+
+  // ===================== 周期 CSV 导入 =====================
+
+  const importPeriodCsv = useCallback(() => {
+    if (!conversationId) {
+      showToast({ title: '暂无可导入会话', message: '请先创建会话', type: 'error' });
+      return;
+    }
+    if (typeof document === 'undefined') {
+      showToast({ title: '当前端不支持文件选择', message: '请在 Web 版导入 CSV', type: 'error' });
+      return;
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,text/csv';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      setImportingCsv(true);
+      void file.text()
+        .then((csv) => api.importPeriodCsv(conversationId, csv))
+        .then((result) => {
+          showToast(describePeriodCsvImport(result));
+          return api.getPeriodInsight(currentPeriodId(new Date()));
+        })
+        .then((insight) => setMoodPeriodInsight(insight))
+        .catch((e: unknown) => {
+          showToast({
+            title: '导入失败',
+            message: e instanceof Error ? e.message : 'CSV 导入被拒绝',
+            type: 'error',
+          });
+        })
+        .finally(() => setImportingCsv(false));
+    };
+    input.click();
+  }, [conversationId, showToast]);
 
   // ===================== 主动分享见闻 =====================
 
@@ -525,6 +564,18 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
       <MoodInsightPanel value={moodInsight} />
       <MoodWeeklyReportPanel value={moodWeeklyReport} />
       <MoodPeriodInsightPanel value={moodPeriodInsight} />
+      <Pressable
+        onPress={importPeriodCsv}
+        disabled={importingCsv || !conversationId}
+        style={({ pressed }) => [
+          styles.csvImportButton,
+          (importingCsv || !conversationId || pressed) && styles.csvImportButtonInactive,
+        ]}
+      >
+        <Text style={styles.csvImportText}>
+          {importingCsv ? '正在导入 CSV…' : '导入周期 CSV'}
+        </Text>
+      </Pressable>
 
       <ScrollView
         ref={scrollRef}
@@ -628,6 +679,25 @@ export function ChatScreen({ mode, conversationId: initConvId, characters: initC
 }
 
 const styles = StyleSheet.create({
+  csvImportButton: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+  },
+  csvImportButtonInactive: {
+    opacity: 0.55,
+  },
+  csvImportText: {
+    color: colors.textPrimary,
+    fontSize: fontSizes.sm,
+    fontWeight: '600',
+  },
   root: {
     flex: 1,
     backgroundColor: colors.background,

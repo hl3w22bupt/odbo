@@ -32,6 +32,7 @@ import type {
   Order,
   PeriodComparisonResult,
   PeriodInsightComparisonResult,
+  PeriodCsvImportResult,
   PeriodInsightResult,
   PayResult,
   Product,
@@ -570,6 +571,12 @@ export const mockApi = {
       periodId,
       insights: [],
     };
+  },
+
+  async importPeriodCsv(conversationId: string, csv: string): Promise<PeriodCsvImportResult> {
+    void conversationId;
+    const rows = csv.trim() ? Math.max(0, csv.trim().split(/\r?\n/).length - 1) : 0;
+    return { received: rows, imported: rows, skipped: 0, failed: 0, failures_total: 0, failures: [], result_code: 'OK' };
   },
 
   async getPeriodInsightComparison(periodId: string, periods = 3): Promise<PeriodInsightComparisonResult> {

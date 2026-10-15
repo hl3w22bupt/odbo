@@ -1,0 +1,11 @@
+=== [08:27:45] GATE build START
+=== [08:27:51] GATE build EXIT=0
+=== [08:27:51] GATE test START
+=== [08:27:53] GATE test EXIT=0
+=== [08:27:53] GATE smoke START
+=== [08:28:04] GATE smoke EXIT=0
+=== [08:28:04] GATE persist START
+=== [08:28:08] GATE persist EXIT=0
+=== [08:28:08] GATE persistv02 START
+=== [08:28:15] GATE persistv02 EXIT=0
+=== CHAIN DONE 08:28:15

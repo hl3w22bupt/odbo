@@ -416,6 +416,22 @@ model MoodSnapshot {
   @@index([userId, createdAt])
 }
 
+/// v0.12 CSV 导入幂等台账：业务键以用户+会话分区；不参与聚合读取。
+model ImportedPeriodMetric {
+  id             String   @id @default(cuid())
+  conversationId String
+  userId         String
+  periodId       String
+  date           String
+  dimension      String
+  value          Float
+  createdAt      DateTime @default(now())
+
+  @@unique([userId, conversationId, periodId, date, dimension])
+  @@index([conversationId, periodId])
+  @@index([userId, createdAt])
+}
+
 /// v0.5 情绪修正追加记录：原始 MoodSnapshot 不改写，读侧 latest-wins。
 model MoodCorrection {
   id               Int      @id @default(autoincrement())

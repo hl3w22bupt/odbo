@@ -31,7 +31,7 @@ const CORS_HEADERS: Record<string, string> = {
   'access-control-allow-methods': 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
 }
 
-function readBody(req: http.IncomingMessage): Promise<unknown> {
+function readBody(req: http.IncomingMessage, rawText = false): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
     let size = 0
@@ -45,13 +45,17 @@ function readBody(req: http.IncomingMessage): Promise<unknown> {
       chunks.push(chunk)
     })
     req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8')
-      if (!raw) {
+      const raw = Buffer.concat(chunks)
+      if (raw.byteLength === 0) {
         resolve(undefined)
         return
       }
+      if (rawText) {
+        resolve(raw)
+        return
+      }
       try {
-        resolve(JSON.parse(raw))
+        resolve(JSON.parse(raw.toString('utf8')))
       } catch {
         reject(new Error('JSON 格式不正确'))
       }
@@ -104,12 +108,16 @@ export async function startLocalServer(port = config.httpPort): Promise<http.Ser
       const url = new URL(rawUrl, `http://${req.headers.host ?? 'localhost'}`)
       const query: Record<string, string> = {}
       for (const [key, value] of url.searchParams.entries()) query[key] = value
-      const body = req.method === 'GET' || req.method === 'HEAD' ? undefined : await readBody(req)
+      const wantsRawCsv = String(req.headers['content-type'] ?? '').toLowerCase().startsWith('text/csv')
+      const body = req.method === 'GET' || req.method === 'HEAD'
+        ? undefined
+        : await readBody(req, wantsRawCsv)
       const ctx: Omit<HttpRouteContext, 'method' | 'path'> = {
         body: (body && typeof body === 'object' && !Array.isArray(body) ? body : {}) as Record<string, unknown>,
         query,
         params: {},
         headers: req.headers,
+        ...(wantsRawCsv && Buffer.isBuffer(body) ? { rawBody: body } : {}),
       }
       const response = await router.dispatch(req.method ?? 'GET', url.pathname, ctx)
       if (typeof response.rawBody === 'string') {

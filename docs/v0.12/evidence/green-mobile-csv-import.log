@@ -1,0 +1,13 @@
+
+> xinban-ai-mobile@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmv8q061l000ym95fwayuvswe/apps/mobile
+
+
+ Test Files  9 passed (9)
+      Tests  51 passed (51)
+   Start at  07:28:16
+   Duration  147ms (transform 197ms, setup 0ms, import 304ms, tests 41ms, environment 0ms)
+

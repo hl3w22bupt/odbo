@@ -360,7 +360,6 @@ export function parsePeriodCsvImport(
   })
 
   const writableGroups = buildWritableGroups(validRows, rowNumberByRecord, failures)
-  const writableRowKeys = new Set(writableGroups.flatMap((group) => group.rows.map((row) => `${row.periodId}\n${row.date}\n${row.dimension}`)))
   failures.sort((a, b) => a.row - b.row)
 
   return {

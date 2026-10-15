@@ -1,0 +1,15 @@
+[recheck] run_dir=/tmp/v012-recheck.qYc2gl started=2026-10-15T08:00:37+0800
+✅ D0 临时库初始化（db push + seed）
+✅ D1 服务健康 /health status=up
+✅ D2 短信登录取得 accessToken
+✅ D3 会话就绪 id=cmv8rw3mv00041xm9yxb4l833
+✅ D4 最小样本导入 received=5/imported=5/计数不变量成立
+✅ D5 同文件重导 imported=0/skipped=5（幂等零重复）
+✅ D6 report.csv 值级行 pos=1/neu=0/neg=1/size=2/avg=0/PARTIAL
+✅ D7 洞察 DOMINANT_MOOD=NEGATIVE count=1 share=0.5；PERIOD_TREND size=2 avg=0
+✅ D8 干跑：v0.9 导出文件反向喂解析器 ok（{"kind":"ok","received":5,"resultCode":"OK","failures":0,"groups":1,"samples":2}）
+✅ D9 往返等价：export→import→export 字节级一致（205 bytes）
+-----------------------------
+[recheck] pass=10 fail=0 finished=2026-10-15T08:00:39+0800
+RECHECK_EXIT=0
+SCRIPT_EXIT=0

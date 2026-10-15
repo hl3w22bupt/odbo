@@ -39,6 +39,19 @@
 - 绿：parser 11/11、fixtures 8/8、persistence/route 7/7、mobile summary 2/2 并入全量。
 - 修复过程的真实失败调试：`green-server-period-csv-import-parser.log` 曾保留 3 failed 后转绿；smoke 中的 BOM/curl raw 失败在冻结契约实现内定位修复。
 
+## 3b. 独立复核轮（2026-10-15 复检接力）
+
+对上一轮交付不采信、全部独立重跑后的补充结论：
+
+| # | 复核项 | 机判证据 | 结果 |
+|---|---|---|---|
+| 16 | 四门禁独立重跑 | build/test/smoke/persist 退出码 0（build→`recheck-gate-build.log|exit`，test→server 27/166 + mobile 9/51，smoke→58/58，persist→9/9） | ☑ |
+| 17 | 死测试独立扫描 | 词边界正则 `\b(it|describe|test)\.(skip|only|todo)\(|x(it|describe|fit)` 命中 0（宽松正则的 7 处命中均为 `process.exit(`/`setOutfit(` 误报） | ☑ |
+| 18 | 冻结前干跑独立复证 | 真实 v0.9 导出 205 bytes 反向喂 dist 解析器：`kind=ok,received=5,groups=1,samples=2,failures=0`（`recheck-smoke.log` D8） | ☑ |
+| 19 | live 往返等价复证 | export → 干净会话 import → 再 export，`cmp` 字节级一致 205 bytes（D9） | ☑ |
+| 20 | 技术债清扫第二项 | 移除 `periodCsvImport.ts` 死代码 `writableRowKeys`（声明后零引用）；删除后四门禁复跑计数不变（166+51） | ☑ |
+| 21 | 证据脚本健壮性 | 修复复核脚本 `（$var）` 紧邻全角括号被 bash 5 并入变量名的雷（最小复现定位），全部改 `（${var}）`；`json_get` 按 JSON 边界截取 | ☑ |
+
 ## 4. 边界声明
 
 - 无既有 Prisma 字段/索引删除；仅新增 16 行模型。
@@ -46,4 +59,4 @@
 - 导入写侧新增路径不注入脏读数据；聚合仍只消费 ACTIVE P0 + MoodSnapshot。
 - 停车场未入本轮：journal 随笔、洞察证据锚点、技术债专项轮。
 
-结论：QA 通过，可执行 deploy 与 deploy 后 smoke。
+结论：QA 通过，可执行 deploy 与 deploy 后 smoke。独立复核轮维持同一结论。

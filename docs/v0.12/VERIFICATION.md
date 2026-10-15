@@ -45,3 +45,19 @@
 - 不触清单文件 diff bytes=0。
 - 只新增 `ImportedPeriodMetric`；schema 0 deletion。
 - 停车场未扩：journal、锚点可解释性、技术债专项。
+
+## 独立复核轮（2026-10-15 复检接力）
+
+复核轮不采信上轮声明，独立重跑全部门禁并重建用户链路（脚本 `scripts/v012-recheck-smoke.sh`）：
+
+| Gate | Count/Result | Exit | Evidence |
+|---|---|---:|---|
+| build（删除死代码后复跑） | server tsc + mobile typecheck + Web export | 0 | `evidence/recheck-gate-build.log|exit` |
+| test（删除死代码后复跑） | server 27 files / 166 passed；mobile 9 files / 51 passed | 0 | `evidence/recheck-gate-test.log|exit` |
+| smoke（删除死代码后复跑） | 58 / 58 | 0 | `evidence/recheck-gate-smoke.log|exit` |
+| persist:check（删除死代码后复跑） | 9 / 9 | 0 | `evidence/recheck-gate-persist.log|exit` |
+| 独立复核链 D0-D9 | 导入→幂等→聚合→洞察→干跑反向喂解析器→往返字节级一致 | 0 | `evidence/recheck-smoke.log|exit` |
+| 死测试独立扫描 | 词边界正则命中 0 | 0 | QA-ACCEPTANCE #17 |
+| 技术债清扫第二项 | `writableRowKeys` 死代码移除，门禁计数不变 | 0 | QA-ACCEPTANCE #20 |
+
+结论维持：**PASS / READY**。冻结边界零漂移，「导入/导出」数据自主权闭环在独立复核下成立。

@@ -47,3 +47,41 @@
 | deploy 后 smoke | 67 / 67 | 0 | `node5-post-deploy-smoke.log|exit` |
 
 结论：deploy 冒烟闭环完成。
+
+## 独立复核轮（2026-10-16 复检接力）
+
+复核轮不采信上轮声明，独立重跑四门禁并逐项核对 DoD 锚点（锚点 → 测试名 → 实际运行三点一线）：
+
+| Gate | Count/Result | Exit | Evidence |
+|---|---:|---:|---|
+| build | server tsc + mobile typecheck + Web 341 modules | 0 | `reverify-build.log\|exit` |
+| test | server 27 files / 175 + mobile 10 files / 59 | 0 | `reverify-test.log\|exit` |
+| smoke | 67 / 67（含 v0.13 第 59-67 步） | 0 | `reverify-smoke.log\|exit` |
+| persist:check | 9 / 9 | 0 | `reverify-persist.log\|exit` |
+| 聚合/洞察既有测试全集 | 7 files / 72 passed（零回归） | 0 | `reverify-aggregate-insight.log` |
+
+### DoD 锚点三点核对
+
+| 锚点 | 测试/步骤名 | 实测 |
+|---|---|---|
+| ① 回环幂等 | smoke 59-61 + `periodCsvImport.persistence.test.ts > imports a real export into a clean cycle, stays idempotent, and round-trips value-for-value` | PASS |
+| ② 未知周期容错 | smoke 63-66 + `period.routes.test.ts` / `periodInsightComparison.routes.test.ts` additive 提示位断言 | PASS |
+| ③ 前端值级断言 | `dataExchange.test.ts` 端点/方法 toEqual、Blob anchor click、RFC 5987；`csvImport.test.ts` 行号/原因封顶 | PASS |
+| ④ 防注入 | `escapeDisplayText('<script>alert(1)</script>')` → `&lt;script&gt;...` | PASS |
+| ⑤ 服务端权威双向 | `serverAuthoritativeImportResult` client 过限/server 过限双方向均返回 server | PASS |
+| ⑥ 只加不改契约回归 | `keeps every v0.12 result field unchanged...` 七字段 `Object.keys` 精确断言 | PASS |
+
+### 死测试与证据漂移
+
+- 死测试扫描（`.skip/.only/.todo/xit/fit`）：0（全仓 server+mobile src）。
+- 文档引用 evidence 文件漂移检查：0 缺失（51 个引用全部存在）。
+
+### v0.12 停车场随轮清账留痕
+
+| v0.12 停车场项 | 状态 | 依据 |
+|---|---|---|
+| 洞察证据锚点可解释性 | **已清账**（v0.12 PR #13 合并时随导入消费链路落地） | `moodPeriodInsight.ts` `InsightEvidence{type,value,evidence,message}` 四元组 + golden 值级断言（`moodPeriodInsight.test.ts` 80/89/98/225 行断言 evidence 结构与 sampleSize） |
+| journal 随笔最小版 | 继续停车 | 全仓无 journal 代码路径；无对应产品契约冻结 |
+| 技术债专项轮 | 继续停车 | 流程性事项，需独立轮次排期 |
+
+结论：复核轮维持 PASS / READY，未发现阻塞级漂移；v0.12 停车场中可随轮清账项已清账并留痕。

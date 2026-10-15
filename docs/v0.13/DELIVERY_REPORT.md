@@ -25,5 +25,6 @@ P0「数据导入/导出用户触达最小版 + v0.12 未知周期开放点定�
 | deploy 后 smoke | 67 / 67，exit 0 |
 | schema diff | 0 |
 | dead tests | 0 |
+| 独立复核轮（2026-10-16） | build/test/smoke/persist 全 0；聚合/洞察 72/72；死测试 0；证据漂移 0 |
 
 证据索引见 `QA-ACCEPTANCE.md` 与 `docs/smoke/v0.13.md`。

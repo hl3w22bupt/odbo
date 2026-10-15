@@ -350,9 +350,15 @@ async function conversationPeriodComparisonImportCsv(ctx: HttpRouteContext) {
     for (const row of group.rows) importRows.set(keyOf(row), row)
   }
 
+  // v0.12 review fix：组级校验失败的行（缺维度组/无损违反组）同时出现在 records 与 failures 中，
+  // 只允许计入 failed 一个桶；若混入 skipped 将触发下方不变量断言，把已提交的事务误报成 500。
+  const failedRowKeys = new Set(
+    parsed.failures.map((failure) => `${failure.periodId ?? ''}\n${failure.date ?? ''}\n${failure.dimension ?? ''}`),
+  )
   const importedKeys = new Set(importRows.keys())
   for (const row of parsed.records) {
     const key = keyOf(row)
+    if (failedRowKeys.has(key)) continue
     if (existingKeys.has(key) || skippedRows.has(key) || importedKeys.has(key)) continue
     skippedRows.add(key)
   }
@@ -360,7 +366,10 @@ async function conversationPeriodComparisonImportCsv(ctx: HttpRouteContext) {
     .filter((group) => group.rows.every((row) => importedKeys.has(keyOf(row))))
   const importedCount = await writePeriodGroups(conversation.id, user.id, groupsToWrite)
   const skippedCount = parsed.records.filter(
-    (row) => (existingKeys.has(keyOf(row)) || skippedRows.has(keyOf(row))) && !importedKeys.has(keyOf(row)),
+    (row) =>
+      !failedRowKeys.has(keyOf(row)) &&
+      (existingKeys.has(keyOf(row)) || skippedRows.has(keyOf(row))) &&
+      !importedKeys.has(keyOf(row)),
   ).length
   if (importedCount + skippedCount + parsed.failures.length !== parsed.received) {
     throw AppError.internal('CSV import count invariant failed', {

@@ -87,7 +87,7 @@ beforeAll(async () => {
   comparisonModule = loadedComparisonModule
   prisma = dbModule.prisma
   await prisma.user.create({ data: { id: authUser.id, phone: authUser.phone } })
-  for (const id of ['conv_source', 'conv_target', 'conv_new', 'conv_atomic']) {
+  for (const id of ['conv_source', 'conv_target', 'conv_new', 'conv_atomic', 'conv_mixed']) {
     await prisma.conversation.create({
       data: { id, userId: authUser.id, mode: 'SINGLE', title: id, status: 'ACTIVE' },
     })
@@ -221,6 +221,54 @@ describe('period csv import file contract', () => {
     })
     expect(result.body.data.failures.map((item: { line: number }) => item.line)).toEqual([2, 3])
     expect(await counts('conv_atomic')).toEqual({ memories: 0, snapshots: 0, ledger: 0 })
+  })
+
+  // v0.12 review fix 回归：行级合法但组级失败（缺维度/无损违反）必须保持 200 行级信封，
+  // 且每行只落入 failed 一个桶（修复前双计数触发 500 INTERNAL_ERROR，且在事务提交之后抛出）。
+  it('returns a 200 row-level envelope for a group with missing dimensions and writes nothing', async () => {
+    const result = await importHandler(importContext('conv_atomic', csv(['2026-10-12,2026-10-12,count,1'])))
+    expect(result.status_code).toBe(200)
+    expect(result.body.data).toMatchObject({
+      received: 1, imported: 0, skipped: 0, failed: 1, failures_total: 1, result_code: 'OK',
+    })
+    expect(result.body.data.failures[0]).toMatchObject({ code: 'MISSING_FIELD', row: 1, line: 2 })
+    expect(await counts('conv_atomic')).toEqual({ memories: 0, snapshots: 0, ledger: 0 })
+  })
+
+  it('returns a 200 row-level envelope for a lossless-violation group', async () => {
+    const lossless = csv([
+      '2026-08-31,2026-08-31,count,2',
+      '2026-08-31,2026-08-31,positive,1',
+      '2026-08-31,2026-08-31,neutral,1',
+      '2026-08-31,2026-08-31,negative,0',
+      '2026-08-31,2026-08-31,averageScore,0.25',
+    ])
+    const result = await importHandler(importContext('conv_atomic', lossless))
+    expect(result.status_code).toBe(200)
+    expect(result.body.data).toMatchObject({ received: 5, imported: 0, skipped: 0, failed: 5 })
+    expect(result.body.data.failures.every((item: { code: string }) => item.code === 'INVALID_VALUE')).toBe(true)
+    expect(await counts('conv_atomic')).toEqual({ memories: 0, snapshots: 0, ledger: 0 })
+  })
+
+  it('commits the valid group of a mixed file at 200 and stays 200 on re-import', async () => {
+    const mixed = csv([
+      ...sourceRows(NEW_PERIOD),
+      '2026-10-05,2026-10-05,count,1',
+    ])
+    const first = await importHandler(importContext('conv_mixed', mixed))
+    expect(first.status_code).toBe(200)
+    expect(first.body.data).toMatchObject({
+      received: 6, imported: 5, skipped: 0, failed: 1, failures_total: 1, result_code: 'OK',
+    })
+    expect(first.body.data.failures[0]).toMatchObject({ code: 'MISSING_FIELD', row: 6, line: 7 })
+    expect(await counts('conv_mixed')).toEqual({ memories: 2, snapshots: 2, ledger: 5 })
+
+    const second = await importHandler(importContext('conv_mixed', mixed))
+    expect(second.status_code).toBe(200)
+    expect(second.body.data).toMatchObject({
+      received: 6, imported: 0, skipped: 5, failed: 1, failures_total: 1, result_code: 'OK',
+    })
+    expect(await counts('conv_mixed')).toEqual({ memories: 2, snapshots: 2, ledger: 5 })
   })
 })
 

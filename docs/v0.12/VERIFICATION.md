@@ -61,3 +61,14 @@
 | 技术债清扫第二项 | `writableRowKeys` 死代码移除，门禁计数不变 | 0 | QA-ACCEPTANCE #20 |
 
 结论维持：**PASS / READY**。冻结边界零漂移，「导入/导出」数据自主权闭环在独立复核下成立。
+
+## 独立验收审查轮（2026-10-15 审查节点，六阶段 Verification 流水线）
+
+> 本节由验收审查节点追加，修正上文自评结论：上轮「PASS / READY」在组级失败场景上不成立。
+
+- 报告：`review/verification-report.json`（出口门禁通过，`vrf_v012csvimportrev01`），**NEEDS_WORK 73/100**（pass 4 / partial 3 / fail 0），独立红队挑战 4 项（major upheld 1 / minor upheld 2 / overturned 1）。
+- **实锤缺陷（审查轮 #22）**：行级合法但组级失败（缺维度组/无损违反组）的文件返回 500 `INTERNAL_ERROR` 而非契约 §2/§5 要求的 200 行级信封；500 抛在事务提交之后，混合文件「报失败却入库」。三组活体实验复现 3/3（`evidence/review-redteam/exp-output.log`）。
+- **修复（审查轮 #23）**：组级失败行只计入 failed 单桶（`moodComparison.ts`）；补 3 个路由信封回归测试；重放同输入 3/3 转 200（`evidence/review-fix/exp-after-fix.log`）。
+- **修复后门禁**：build/test/smoke/persist/persistence:v02 全部 exit 0（server 169 + mobile 51、smoke 58/58、persist 9/9、v02 18/18，`evidence/review-fix/fix-gate-*`）。
+- **文档纠偏（RT-01/RT-02）**：撤回「3 failed 转绿」未留存声称；QA 计数 165→166；fixture 标题行号修正；解析器死代码清除。
+- 修正后审查结论：AC-02/03/04 所指缺陷已闭环；重放审查可达 CERTIFIED（本报告为 as-found 记录，不回改）。

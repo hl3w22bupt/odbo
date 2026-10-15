@@ -197,7 +197,6 @@ function parseNumber(raw: string): number | null {
 
 function buildWritableGroups(
   records: PeriodCsvImportRow[],
-  recordByRow: Map<number, ParsedRecord>,
   failures: PeriodCsvImportFailure[],
 ): WritablePeriodGroup[] {
   const groups = new Map<string, PeriodCsvImportRow[]>()
@@ -222,7 +221,6 @@ function buildWritableGroups(
     )
     if (!complete) {
       for (const row of rows) {
-        const parsed = recordByRow.get(row.row)
         failures.push({
           row: row.row,
           line: row.line,
@@ -232,7 +230,6 @@ function buildWritableGroups(
           code: 'MISSING_FIELD',
           message: '周期聚合组缺少 v0.9 维度',
         })
-        void parsed
       }
       continue
     }
@@ -243,7 +240,6 @@ function buildWritableGroups(
       averageRow.value === (positiveRow.value - negativeRow.value) / countRow.value
     if (!lossless) {
       for (const row of rows) {
-        const parsed = recordByRow.get(row.row)
         failures.push({
           row: row.row,
           line: row.line,
@@ -253,7 +249,6 @@ function buildWritableGroups(
           code: 'INVALID_VALUE',
           message: '周期聚合组无法无损还原为样本',
         })
-        void parsed
       }
       continue
     }
@@ -316,12 +311,10 @@ export function parsePeriodCsvImport(
 
   const failures: PeriodCsvImportFailure[] = []
   const validRows: PeriodCsvImportRow[] = []
-  const rowNumberByRecord = new Map<number, ParsedRecord>()
   const businessKeys = new Set<string>()
 
   dataRecords.forEach((record, index) => {
     const rowNumber = index + 1
-    rowNumberByRecord.set(rowNumber, record)
     const [rawPeriod = '', rawDate = '', rawDimension = '', rawValue = ''] = record.fields
     if (record.fields.length !== CSV_HEADER.length || !rawPeriod.trim() || !rawDate.trim() || !rawDimension.trim() || rawValue.trim() === '') {
       failures.push(failure(record, rowNumber, 'MISSING_FIELD', 'CSV 行字段缺失'))
@@ -359,7 +352,7 @@ export function parsePeriodCsvImport(
     validRows.push({ row: rowNumber, line: record.line, periodId: rawPeriod, date: rawDate, dimension: rawDimension, value })
   })
 
-  const writableGroups = buildWritableGroups(validRows, rowNumberByRecord, failures)
+  const writableGroups = buildWritableGroups(validRows, failures)
   failures.sort((a, b) => a.row - b.row)
 
   return {

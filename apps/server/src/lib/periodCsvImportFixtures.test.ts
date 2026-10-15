@@ -41,7 +41,7 @@ describe('signed period csv import fixtures', () => {
     expect(result.failures).toEqual([expect.objectContaining({ code: 'INVALID_VALUE', row: 1, line: 2, dimension: 'count' })])
   })
 
-  it('DUPLICATE anchors the repeated business key at physical line 9', async () => {
+  it('DUPLICATE anchors the repeated business key at physical line 7', async () => {
     const result = parsePeriodCsvImport(await fixture('DUPLICATE.csv'))
     expect(result.kind).toBe('ok')
     if (result.kind !== 'ok') return

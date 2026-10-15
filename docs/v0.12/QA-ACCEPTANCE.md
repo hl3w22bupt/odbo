@@ -27,7 +27,7 @@
 | 门 | 结果 | 留证 |
 |---|---|---|
 | build | exit 0；Web 339 modules | `gate-build.log|exit` |
-| test | exit 0；server 27 files / 165 tests + mobile 9 files / 51 tests | `gate-test.log|exit` |
+| test | exit 0；server 27 files / 166 tests + mobile 9 files / 51 tests | `gate-test.log|exit` |
 | smoke | exit 0；58 / 58 | `gate-smoke.log|exit` |
 | persist | exit 0；9 / 9 | `gate-persist.log|exit` |
 | persistence:v02 | exit 0；18 / 18，kill -9 跨进程 | `gate-persist-v02.log|exit` |
@@ -35,9 +35,9 @@
 
 ## 3. 红绿证据
 
-- 红：`red-server-period-csv-import.log`（模块缺失 exit 1）、`red-mobile-csv-import.log`（模块缺失 exit 1）。
+- 红：`red-server-period-csv-import.log`（模块缺失套件级失败）、`red-mobile-csv-import.log`（同形态）。两者为 TDD 先红（0 条测试执行的模块缺失红灯），无配对 `.exit` 留痕——**v0.12 验收审查 RT-02 修正**：此前版本声称「exit 1 有留痕」与「parser 日志曾保留 3 failed 后转绿」，经 git 全历史核查该红阶段从未被归档，属引用未留存证据，现予撤回；后续轮次的红绿证据必须以 .log+.exit 对先红后绿留痕入库。
 - 绿：parser 11/11、fixtures 8/8、persistence/route 7/7、mobile summary 2/2 并入全量。
-- 修复过程的真实失败调试：`green-server-period-csv-import-parser.log` 曾保留 3 failed 后转绿；smoke 中的 BOM/curl raw 失败在冻结契约实现内定位修复。
+- smoke 中的 BOM/curl raw 失败在冻结契约实现内定位修复（过程调试输出未单独归档）。
 
 ## 3b. 独立复核轮（2026-10-15 复检接力）
 
@@ -60,3 +60,25 @@
 - 停车场未入本轮：journal 随笔、洞察证据锚点、技术债专项轮。
 
 结论：QA 通过，可执行 deploy 与 deploy 后 smoke。独立复核轮维持同一结论。
+
+## 5. 验收审查与缺陷闭环（2026-10-15 审查轮）
+
+独立验收审查（报告 `review/verification-report.json`，门禁通过 vrf_v012csvimportrev01，NEEDS_WORK 73/100）证实一处契约违约缺陷并当场闭环：
+
+| # | 审查项 | 机判证据 | 结果 |
+|---|---|---|---|
+| 22 | 组级失败信封缺陷（实锤复现 3/3） | 缺维度组/无损违反组/混合文件均曾返回 500 `INTERNAL_ERROR 'CSV import count invariant failed'`，且 500 抛在事务提交之后（混合文件报失败却入库）；根因为组级失败行被同时计入 skipped 与 failed（`moodComparison.ts` 计数归类）。证据：`evidence/review-redteam/exp-output.log` + 输入三件 | ☑ |
+| 23 | 修复与回归（先红后绿） | 修复：组级失败行只计入 failed 一个桶；回归测试 3 例（缺维度组 200+零写入 / 无损违反组 200+零写入 / 混合文件 200+重导仍 200）。修复前 `review-redteam/exp-output.log`（500×3）→ 修复后重放全 200（`review-fix/exp-after-fix.log`）；server 169/169、全量门禁重跑见 `review-fix/` | ☑ |
+| 24 | 审查轮文档纠偏 | QA §2 计数 165→166（与 `gate-test.log` 一致）；§3 撤回「3 failed 转绿」未留存声称（RT-01）；fixture 测试标题 line 9→line 7；解析器死代码 `recordByRow`/`void parsed` 清除（技术债第三项） | ☑ |
+
+审查轮门禁（修复后复跑，退出码见 `evidence/review-fix/*.exit`）：
+
+| 门 | 结果 | 留证 |
+|---|---|---|
+| build | exit 0 | `review-fix/fix-gate-build.log\|exit` |
+| test | exit 0；server 27 files / 169 tests + mobile 9 files / 51 tests | `review-fix/fix-gate-test.log\|exit` |
+| smoke | exit 0；58 / 58 | `review-fix/fix-gate-smoke.log\|exit` |
+| persist | exit 0；9 / 9 | `review-fix/fix-gate-persist.log\|exit` |
+| persistence:v02 | exit 0；18 / 18 | `review-fix/fix-gate-persistv02.log\|exit` |
+
+结论：验收审查发现的契约违约已闭环，五门禁在修复后全绿。

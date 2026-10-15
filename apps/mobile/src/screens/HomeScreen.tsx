@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AINoticeBar } from '../components/AINoticeBar';
+import { PeriodDataExchangeCard } from '../components/PeriodDataExchangeCard';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { QuotaPill } from '../components/QuotaPill';
 import { SegmentedToggle } from '../components/SegmentedToggle';
@@ -77,6 +78,7 @@ export function HomeScreen() {
 
         <View style={{ height: spacing.lg }} />
         <AINoticeBar />
+        <PeriodDataExchangeCard />
 
         <Pressable onPress={async () => { await logout(); }} style={styles.logout}>
           <Text style={styles.logoutText}>退出登录</Text>

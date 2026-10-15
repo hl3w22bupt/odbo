@@ -1,0 +1,30 @@
+# v0.13 implementation test 2026-10-16T07:22:53+08:00
+
+> xinban-v01@1.0.0 test
+> cd apps/server && npm test && cd ../mobile && npm test
+
+
+> @xinban/server@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmva5da83000vm9rsvmiyfjx7/apps/server
+
+
+ Test Files  27 passed (27)
+      Tests  175 passed (175)
+   Start at  07:22:53
+   Duration  1.20s (transform 1.26s, setup 0ms, import 1.96s, tests 3.23s, environment 2ms)
+
+
+> xinban-ai-mobile@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmva5da83000vm9rsvmiyfjx7/apps/mobile
+
+
+ Test Files  10 passed (10)
+      Tests  59 passed (59)
+   Start at  07:22:54
+   Duration  167ms (transform 234ms, setup 0ms, import 358ms, tests 58ms, environment 1ms)

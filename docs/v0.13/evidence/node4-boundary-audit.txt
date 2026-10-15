@@ -1,0 +1,8 @@
+# v0.13 boundary audit
+## schema diff numstat (added deleted path)
+schema_diff_lines=0
+## navigation route diff (should be empty)
+route_diff_bytes=0
+## card mount count (expected 2)
+2
+## prisma write surface diff

@@ -29,13 +29,37 @@ import {
   type MoodTimelineContract,
 } from '../lib/conversationInsights.js'
 
-function requireInsightComparisonPeriodId(value: string | undefined): string {
-  if (!value || !periodBoundsFromPeriodId(value)) {
-    throw new AppError(404, 'PERIOD_INSIGHT_TARGET_NOT_FOUND', '目标周期不存在或非法', { periodId: value ?? null })
-  }
-  return value
+/** v0.13 additive 提示位：未知周期标识不参与聚合/洞察，也不升级为新增错误码。 */
+interface UnknownPeriodNotice {
+  meta: { skippedUnknownPeriodCount: number; unknownPeriodIds: string[] }
+  warnings: ['UNKNOWN_PERIOD_SKIPPED']
 }
 
+function unknownPeriodNotice(periodIds: readonly (string | undefined)[]): UnknownPeriodNotice | Record<string, never> {
+  const unknownPeriodIds = [...new Set(periodIds.filter((id): id is string =>
+    Boolean(id) && !periodBoundsFromPeriodId(id!),
+  ))]
+  if (unknownPeriodIds.length === 0) return {}
+  return {
+    meta: { skippedUnknownPeriodCount: unknownPeriodIds.length, unknownPeriodIds },
+    warnings: ['UNKNOWN_PERIOD_SKIPPED'],
+  }
+}
+
+function explicitPeriodIds(query: Record<string, string>): string[] | null {
+  const raw = query.period_ids
+  if (raw === undefined) return null
+  const values = raw.split(',').map((value) => value.trim())
+  if (values.length < 1 || values.length > 3 || values.some((value) => value === '')) {
+    throw new AppError(
+      400,
+      'PERIOD_INSIGHT_COUNT_REJECTED',
+      'period_ids 必须是 1-3 个非空周期标识',
+      { maxPeriods: 3 },
+    )
+  }
+  return values
+}
 function requirePeriodComparisonCount(query: Record<string, string>): number {
   const raw = query.periods ?? '3'
   const value = Number.parseInt(raw, 10)
@@ -132,16 +156,24 @@ function previousMonday(periodId: string): string {
   return new Date(utcMonday - 7 * 24 * 3_600_000).toISOString().slice(0, 10)
 }
 
+function periodCsvDisposition(periodId: string): Record<string, string> {
+  const encodedFilename = encodeURIComponent(`心伴周期-${periodId}.csv`)
+  return {
+    'content-disposition': `attachment; filename="xinban-period-${periodId}.csv"; filename*=UTF-8''${encodedFilename}`,
+  }
+}
+
 async function getPeriodCsv(ctx: HttpRouteContext) {
   const user = await authenticate(ctx)
   const periodId = requirePeriodId(ctx.params.periodId)
+  const disposition = periodCsvDisposition(periodId)
   try {
     const input = await scopedUserPeriodInput(user.id)
     const report = readableScopedPeriodReport(user.id, input, periodId)
     return rawContent(
       moodPeriodReportCsv(report),
       'text/csv; charset=utf-8',
-      { 'content-disposition': `attachment; filename="xinban-period-${periodId}.csv"` },
+      disposition,
     )
   } catch (err) {
     if (err instanceof AppError) throw err
@@ -149,32 +181,59 @@ async function getPeriodCsv(ctx: HttpRouteContext) {
     return rawContent(
       moodPeriodReportCsv(moodPeriodReportDegraded(user.id)),
       'text/csv; charset=utf-8',
-      { 'content-disposition': `attachment; filename="xinban-period-${periodId}.csv"` },
+      disposition,
     )
   }
 }
 
 /** v0.10 单周期情绪洞察：输入 = 既有聚合输出，三类封顶；空态/降级均 200 合法结构。 */
+/** v0.13 定案：未知周期不抛 400；返回 200 合法降级空态，并只加不改挂 additive 提示位。 */
 async function getPeriodInsight(ctx: HttpRouteContext) {
   const user = await authenticate(ctx)
-  const periodId = requirePeriodId(ctx.params.periodId)
+  const periodId = ctx.params.periodId ?? ''
+  const notice = unknownPeriodNotice([periodId])
+  if ('warnings' in notice) {
+    return ok({ ...moodPeriodInsightDegraded(user.id, periodId), ...notice })
+  }
   try {
     const input = await scopedUserPeriodInput(user.id)
     const report = readableScopedPeriodReport(user.id, input, periodId)
-    return ok(buildMoodPeriodInsight(report, input.timeline, input.memory, periodId))
+    const insight = buildMoodPeriodInsight(report, input.timeline, input.memory, periodId)
+    return ok({ ...insight, ...notice })
   } catch (err) {
     if (err instanceof AppError) throw err
     logger.error('[period] insight degraded', { err: String(err), periodId, userId: user.id })
-    return ok(moodPeriodInsightDegraded(user.id, periodId))
+    return ok({ ...moodPeriodInsightDegraded(user.id, periodId), ...notice })
   }
 }
 
 /** v0.11 跨周期情绪洞察：新只读端点，不改造既有 comparison/insight handler。 */
 async function getPeriodInsightComparison(ctx: HttpRouteContext) {
   const user = await authenticate(ctx)
-  const periodId = requireInsightComparisonPeriodId(ctx.params.periodId)
+  const explicitIds = explicitPeriodIds(ctx.query)
+  const targetId = ctx.params.periodId ?? ''
+  if (!explicitIds && !periodBoundsFromPeriodId(targetId)) {
+    const notice = unknownPeriodNotice([targetId])
+    return ok({
+      ...moodPeriodInsightComparisonDegraded(user.id, targetId, [], requirePeriodComparisonCount(ctx.query), 'SOURCE_DEGRADED'),
+      ...notice,
+    })
+  }
   const requestedPeriods = requirePeriodComparisonCount(ctx.query)
-  const periodIds = previousPeriodIds(periodId, requestedPeriods)
+  const periodIds = explicitIds ?? previousPeriodIds(targetId, requestedPeriods)
+  const notice = unknownPeriodNotice(periodIds)
+  if ('warnings' in notice) {
+    return ok({
+      ...moodPeriodInsightComparisonDegraded(
+        user.id,
+        periodIds[periodIds.length - 1] ?? targetId,
+        periodIds,
+        periodIds.length,
+        'SOURCE_DEGRADED',
+      ),
+      ...notice,
+    })
+  }
   try {
     const input = await scopedUserPeriodInput(user.id)
     const reports = periodIds.map((id) => readableScopedPeriodReport(user.id, input, id))
@@ -193,17 +252,20 @@ async function getPeriodInsightComparison(ctx: HttpRouteContext) {
     if (err instanceof AppError) throw err
     logger.error('[period] insight comparison degraded', {
       err: String(err),
-      periodId,
+      targetPeriodId: targetId,
       requestedPeriods,
       userId: user.id,
     })
-    return ok(moodPeriodInsightComparisonDegraded(
-      user.id,
-      periodId,
-      periodIds,
-      requestedPeriods,
-      'AGGREGATION_FAILED',
-    ))
+    return ok({
+      ...moodPeriodInsightComparisonDegraded(
+        user.id,
+        periodIds[periodIds.length - 1] ?? targetId,
+        periodIds,
+        requestedPeriods,
+        'AGGREGATION_FAILED',
+      ),
+      ...notice,
+    })
   }
 }
 

@@ -110,9 +110,69 @@ describe('period v0.11 insight comparison route', () => {
       .rejects.toMatchObject({ statusCode: 400, code: 'PERIOD_INSIGHT_COUNT_REJECTED' })
   })
 
-  it('rejects an invalid target period with the frozen 404 code', async () => {
-    await expect(handlers().get('period::insight-comparison')!(context('2026-10-06')))
-      .rejects.toMatchObject({ statusCode: 404, code: 'PERIOD_INSIGHT_TARGET_NOT_FOUND' })
+  it('returns a legal degraded structure for an unknown target period', async () => {
+    const res = await handlers().get('period::insight-comparison')!(context('2026-10-06'))
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toEqual({
+      conversationId: 'user_1',
+      available: false,
+      degraded: true,
+      degradedReason: 'SOURCE_DEGRADED',
+      granularity: 'NATURAL_WEEK',
+      timezone: 'UTC+8',
+      targetPeriodId: '2026-10-06',
+      requestedPeriods: 3,
+      periodIds: [],
+      periods: [],
+      insights: [],
+      meta: { skippedUnknownPeriodCount: 1, unknownPeriodIds: ['2026-10-06'] },
+      warnings: ['UNKNOWN_PERIOD_SKIPPED'],
+    })
+  })
+
+  it('skips mixed known and unknown explicit period ids while returning a 200 degraded structure', async () => {
+    const res = await handlers().get('period::insight-comparison')!(context(
+      '2026-10-05',
+      { period_ids: '2026-09-28,not-monday,2026-10-05' },
+    ))
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toMatchObject({
+      available: false,
+      degraded: true,
+      degradedReason: 'SOURCE_DEGRADED',
+      targetPeriodId: '2026-10-05',
+      requestedPeriods: 3,
+      periodIds: ['2026-09-28', 'not-monday', '2026-10-05'],
+      periods: [],
+      insights: [],
+      meta: { skippedUnknownPeriodCount: 1, unknownPeriodIds: ['not-monday'] },
+      warnings: ['UNKNOWN_PERIOD_SKIPPED'],
+    })
+  })
+
+  it('returns the empty degraded contract for all unknown explicit period ids', async () => {
+    const res = await handlers().get('period::insight-comparison')!(context(
+      'not-monday',
+      { period_ids: '2026-10-06,not-monday' },
+    ))
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toMatchObject({
+      available: false,
+      degraded: true,
+      requestedPeriods: 2,
+      periodIds: ['2026-10-06', 'not-monday'],
+      periods: [],
+      insights: [],
+      meta: { skippedUnknownPeriodCount: 2, unknownPeriodIds: ['2026-10-06', 'not-monday'] },
+      warnings: ['UNKNOWN_PERIOD_SKIPPED'],
+    })
+  })
+
+  it('rejects an over-limit explicit period id list with the existing count code', async () => {
+    await expect(handlers().get('period::insight-comparison')!(context(
+      '2026-10-05',
+      { period_ids: '2026-09-21,2026-09-28,2026-10-05,2026-10-12' },
+    ))).rejects.toMatchObject({ statusCode: 400, code: 'PERIOD_INSIGHT_COUNT_REJECTED' })
   })
 
   it('returns all-empty 200 when the user has no active conversations', async () => {

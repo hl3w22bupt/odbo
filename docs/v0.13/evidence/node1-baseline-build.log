@@ -1,0 +1,47 @@
+# v0.13 baseline build 2026-10-16T07:08:39+08:00
+
+> xinban-v01@1.0.0 build
+> cd apps/server && npm run build && cd ../mobile && npm run typecheck && EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-http://127.0.0.1:3888} npm run export -- --platform web --output-dir dist-web --clear
+
+
+> @xinban/server@1.0.0 build
+> tsc -p tsconfig.build.json
+
+
+> xinban-ai-mobile@1.0.0 typecheck
+> tsc --noEmit
+
+
+> xinban-ai-mobile@1.0.0 export
+> expo export --platform web --output-dir dist-web --clear
+
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+| (node:96237) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:96237) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:96237) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:96237) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:96237) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:96237) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:96237) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:96237) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+Web Bundled 2456ms index.ts (339 modules)
+
+› web bundles (1):
+_expo/static/js/web/index-b0c58bd9690c4dde3130a93c6fc8ab1a.js (678KB)
+
+› Files (3):
+favicon.ico (15KB)
+index.html (1.2KB)
+metadata.json (49B)
+
+Exported: dist-web

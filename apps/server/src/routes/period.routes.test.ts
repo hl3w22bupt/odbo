@@ -153,6 +153,10 @@ describe('period v0.9 routes', () => {
     expect(lines[1].startsWith('2026-10-05,2026-10-05,true,false,')).toBe(true)
     expect(lines[2].startsWith('2026-10-05,2026-10-06,true,false,')).toBe(true)
     expect(res.rawBody).not.toContain('row_count')
+    expect(res.headers['content-disposition']).toBe(
+      'attachment; filename="xinban-period-2026-10-05.csv"; filename*=UTF-8\'\''
+      + encodeURIComponent('心伴周期-2026-10-05.csv'),
+    )
   })
 })
 
@@ -191,10 +195,17 @@ describe('period v0.10 insight routes', () => {
     })
   })
 
-  it('rejects non-Monday period ids with 400', async () => {
-    await expect(handlers().get('period::insight')!(context('2026-10-06'))).rejects.toMatchObject({
-      statusCode: 400,
-      code: 'BAD_REQUEST',
+  it('returns an additive legal degraded empty state for an unknown insight period', async () => {
+    const res = await handlers().get('period::insight')!(context('2026-10-06'))
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toEqual({
+      conversationId: 'user_1',
+      available: false,
+      degraded: true,
+      periodId: '2026-10-06',
+      insights: [],
+      meta: { skippedUnknownPeriodCount: 1, unknownPeriodIds: ['2026-10-06'] },
+      warnings: ['UNKNOWN_PERIOD_SKIPPED'],
     })
   })
 

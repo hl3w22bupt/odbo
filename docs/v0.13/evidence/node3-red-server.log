@@ -1,0 +1,689 @@
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmva5da83000vm9rsvmiyfjx7/apps/server
+
+stdout | src/routes/period.routes.test.ts
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+
+ ❯ src/routes/period.routes.test.ts (14 tests | 2 failed) 11ms
+     × exports raw CSV with the frozen header and no row-count metadata 3ms
+     × returns an additive legal degraded empty state for an unknown insight period 1ms
+stdout | src/routes/periodInsightComparison.routes.test.ts
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+
+ ❯ src/routes/periodInsightComparison.routes.test.ts (10 tests | 4 failed) 14ms
+     × returns a legal degraded structure for an unknown target period 2ms
+     × skips mixed known and unknown explicit period ids while returning a 200 degraded structure 5ms
+     × returns the empty degraded contract for all unknown explicit period ids 0ms
+     × rejects an over-limit explicit period id list with the existing count code 1ms
+stdout | src/routes/periodCsvImport.persistence.test.ts
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+
+ ❯ src/routes/periodCsvImport.persistence.test.ts (13 tests | 6 failed) 834ms
+     × keeps every v0.12 result field unchanged for a successful known-period import 6ms
+     × appends unknown-period skip metadata while keeping the seven base import fields unchanged 3ms
+     × returns a legal failed-empty unknown-period result without writes 1ms
+     × keeps the received count invariant for an all-invalid file 1ms
+     × returns a 200 row-level envelope for a group with missing dimensions and writes nothing 1ms
+     × returns a 200 row-level envelope for a lossless-violation group 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/routes/period.routes.test.ts > period v0.9 routes > exports raw CSV with the frozen header and no row-count metadata
+AssertionError: expected 'attachment; filename="xinban-period-2…' to be 'attachment; filename="xinban-period-2…' // Object.is equality
+
+Expected: "attachment; filename="xinban-period-2026-10-05.csv"; filename*=UTF-8''%E5%BF%83%E4%BC%B4%E5%91%A8%E6%9C%9F-2026-10-05.csv"
+Received: "attachment; filename="xinban-period-2026-10-05.csv""
+
+ ❯ src/routes/period.routes.test.ts:156:48
+    154|     expect(lines[2].startsWith('2026-10-05,2026-10-06,true,false,')).t…
+    155|     expect(res.rawBody).not.toContain('row_count')
+    156|     expect(res.headers['content-disposition']).toBe(
+       |                                                ^
+    157|       'attachment; filename="xinban-period-2026-10-05.csv"; filename*=…
+    158|       + encodeURIComponent('心伴周期-2026-10-05.csv'),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯
+
+ FAIL  src/routes/period.routes.test.ts > period v0.10 insight routes > returns an additive legal degraded empty state for an unknown insight period
+AppError: periodId 必须是东八区周一日期 YYYY-MM-DD
+ ❯ AppError.badRequest src/lib/errors.ts:51:12
+     49|
+     50|   static badRequest(message: string, detail?: unknown): AppError {
+     51|     return new AppError(400, 'BAD_REQUEST', message, detail)
+       |            ^
+     52|   }
+     53|
+ ❯ requirePeriodId src/routes/period.ts:62:56
+ ❯ getPeriodInsight src/routes/period.ts:160:20
+ ❯ src/routes/period.routes.test.ts:199:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯
+
+ FAIL  src/routes/periodCsvImport.persistence.test.ts > period csv import file contract > keeps every v0.12 result field unchanged for a successful known-period import
+AssertionError: expected { Object (memories, snapshots, ...) } to deeply equal { Object (memories, snapshots, ...) }
+
+- Expected
++ Received
+
+  {
+    "ledger": 5,
+-   "memories": 1,
+-   "snapshots": 1,
++   "memories": 2,
++   "snapshots": 2,
+  }
+
+ ❯ src/routes/periodCsvImport.persistence.test.ts:222:41
+    220|       failures_total: 0, failures: [], result_code: 'OK',
+    221|     })
+    222|     expect(await counts('conv_atomic')).toEqual({ memories: 1, snapsho…
+       |                                         ^
+    223|   })
+    224|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯
+
+ FAIL  src/routes/periodCsvImport.persistence.test.ts > period csv import file contract > appends unknown-period skip metadata while keeping the seven base import fields unchanged
+AssertionError: expected { received: 6, imported: 5, …(5) } to match object { received: 6, imported: 5, …(6) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "failed": 1,
+    "failures_total": 1,
+    "imported": 5,
+-   "meta": {
+-     "skippedUnknownPeriodCount": 1,
+-     "unknownPeriodIds": [
+-       "2026-10-06",
+-     ],
+-   },
+    "received": 6,
+    "result_code": "OK",
+    "skipped": 0,
+-   "warnings": [
+-     "UNKNOWN_PERIOD_SKIPPED",
+-   ],
+  }
+
+ ❯ src/routes/periodCsvImport.persistence.test.ts:232:30
+    230|     const result = await importHandler(importContext('conv_atomic', mi…
+    231|     expect(result.status_code).toBe(200)
+    232|     expect(result.body.data).toMatchObject({
+       |                              ^
+    233|       received: 6, imported: 5, skipped: 0, failed: 1,
+    234|       failures_total: 1, result_code: 'OK',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/12]⎯
+
+ FAIL  src/routes/periodCsvImport.persistence.test.ts > period csv import file contract > returns a legal failed-empty unknown-period result without writes
+AssertionError: expected { received: 1, imported: +0, …(5) } to match object { received: 1, imported: +0, …(6) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "failed": 1,
+    "failures_total": 1,
+    "imported": 0,
+-   "meta": {
+-     "skippedUnknownPeriodCount": 1,
+-     "unknownPeriodIds": [
+-       "2026-10-06",
+-     ],
+-   },
+    "received": 1,
+    "result_code": "OK",
+    "skipped": 0,
+-   "warnings": [
+-     "UNKNOWN_PERIOD_SKIPPED",
+-   ],
+  }
+
+ ❯ src/routes/periodCsvImport.persistence.test.ts:246:30
+    244|     const result = await importHandler(importContext('conv_atomic', un…
+    245|     expect(result.status_code).toBe(200)
+    246|     expect(result.body.data).toMatchObject({
+       |                              ^
+    247|       received: 1, imported: 0, skipped: 0, failed: 1,
+    248|       failures_total: 1, result_code: 'OK',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/12]⎯
+
+ FAIL  src/routes/periodCsvImport.persistence.test.ts > period csv import file contract > keeps the received count invariant for an all-invalid file
+AssertionError: expected { memories: 4, snapshots: 4, …(1) } to deeply equal { memories: +0, snapshots: +0, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "ledger": 0,
+-   "memories": 0,
+-   "snapshots": 0,
++   "ledger": 10,
++   "memories": 4,
++   "snapshots": 4,
+  }
+
+ ❯ src/routes/periodCsvImport.persistence.test.ts:266:41
+    264|     })
+    265|     expect(result.body.data.failures.map((item: { line: number }) => i…
+    266|     expect(await counts('conv_atomic')).toEqual({ memories: 0, snapsho…
+       |                                         ^
+    267|   })
+    268|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/12]⎯
+
+ FAIL  src/routes/periodCsvImport.persistence.test.ts > period csv import file contract > returns a 200 row-level envelope for a group with missing dimensions and writes nothing
+AssertionError: expected { memories: 4, snapshots: 4, …(1) } to deeply equal { memories: +0, snapshots: +0, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "ledger": 0,
+-   "memories": 0,
+-   "snapshots": 0,
++   "ledger": 10,
++   "memories": 4,
++   "snapshots": 4,
+  }
+
+ ❯ src/routes/periodCsvImport.persistence.test.ts:278:41
+    276|     })
+    277|     expect(result.body.data.failures[0]).toMatchObject({ code: 'MISSIN…
+    278|     expect(await counts('conv_atomic')).toEqual({ memories: 0, snapsho…
+       |                                         ^
+    279|   })
+    280|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/12]⎯
+
+ FAIL  src/routes/periodCsvImport.persistence.test.ts > period csv import file contract > returns a 200 row-level envelope for a lossless-violation group
+AssertionError: expected { memories: 4, snapshots: 4, …(1) } to deeply equal { memories: +0, snapshots: +0, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "ledger": 0,
+-   "memories": 0,
+-   "snapshots": 0,
++   "ledger": 10,
++   "memories": 4,
++   "snapshots": 4,
+  }
+
+ ❯ src/routes/periodCsvImport.persistence.test.ts:293:41
+    291|     expect(result.body.data).toMatchObject({ received: 5, imported: 0,…
+    292|     expect(result.body.data.failures.every((item: { code: string }) =>…
+    293|     expect(await counts('conv_atomic')).toEqual({ memories: 0, snapsho…
+       |                                         ^
+    294|   })
+    295|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/12]⎯
+
+ FAIL  src/routes/periodInsightComparison.routes.test.ts > period v0.11 insight comparison route > returns a legal degraded structure for an unknown target period
+AppError: 目标周期不存在或非法
+ ❯ requireInsightComparisonPeriodId src/routes/period.ts:34:11
+     32| function requireInsightComparisonPeriodId(value: string | undefined): …
+     33|   if (!value || !periodBoundsFromPeriodId(value)) {
+     34|     throw new AppError(404, 'PERIOD_INSIGHT_TARGET_NOT_FOUND', '目标周期不存…
+       |           ^
+     35|   }
+     36|   return value
+ ❯ getPeriodInsightComparison src/routes/period.ts:175:20
+ ❯ src/routes/periodInsightComparison.routes.test.ts:114:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/12]⎯
+
+ FAIL  src/routes/periodInsightComparison.routes.test.ts > period v0.11 insight comparison route > skips mixed known and unknown explicit period ids while returning a 200 degraded structure
+AssertionError: expected { conversationId: 'user_1', …(10) } to match object { available: false, …(9) }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "available": false,
+-   "degraded": true,
+-   "degradedReason": "SOURCE_DEGRADED",
+-   "insights": [],
+-   "meta": {
+-     "skippedUnknownPeriodCount": 1,
+-     "unknownPeriodIds": [
+-       "not-monday",
++   "available": true,
++   "degraded": false,
++   "degradedReason": null,
++   "insights": [
++     {
++       "evidence": {
++         "fromPeriodId": "2026-09-21",
++         "fromSampleSize": 1,
++         "source": "moodPeriodInsightComparison.dominant",
++         "toPeriodId": "2026-10-05",
++         "toSampleSize": 1,
++       },
++       "message": "周期 2026-09-21 vs 2026-10-05：主导情绪记录数持平 +0%。",
++       "reason": null,
++       "status": "READY",
++       "type": "DOMINANT_MOOD",
++       "value": {
++         "direction": "STABLE",
++         "fromPeriodId": "2026-09-21",
++         "fromValue": 1,
++         "rate": 0,
++         "toPeriodId": "2026-10-05",
++         "toValue": 1,
++       },
++     },
++     {
++       "evidence": {
++         "fromPeriodId": "2026-09-21",
++         "fromSampleSize": 1,
++         "source": "moodPeriodInsightComparison.trend",
++         "toPeriodId": "2026-10-05",
++         "toSampleSize": 1,
++       },
++       "message": "周期 2026-09-21 vs 2026-10-05：平均分下降趋势 -100%。",
++       "reason": null,
++       "status": "READY",
++       "type": "PERIOD_TREND",
++       "value": {
++         "direction": "DOWN",
++         "fromPeriodId": "2026-09-21",
++         "fromValue": 1,
++         "rate": -1,
++         "toPeriodId": "2026-10-05",
++         "toValue": 0,
++       },
++     },
+    ],
+-   },
+    "periodIds": [
++     "2026-09-21",
+      "2026-09-28",
+-     "not-monday",
+      "2026-10-05",
+    ],
+-   "periods": [],
++   "periods": [
++     {
++       "available": true,
++       "degraded": false,
++       "empty": false,
++       "insights": [
++         {
++           "evidence": {
++             "from": "2026-09-20T16:00:00.000Z",
++             "periodId": "2026-09-21",
++             "sampleSize": 1,
++             "source": "moodPeriodReport.summary.counts",
++             "to": "2026-09-27T16:00:00.000Z",
++           },
++           "message": "本周期以积极为主：1/1 条记录为积极。",
++           "type": "DOMINANT_MOOD",
++           "value": {
++             "count": 1,
++             "mood": "POSITIVE",
++             "share": 1,
++           },
++         },
++         {
++           "evidence": {
++             "from": "2026-09-20T16:00:00.000Z",
++             "periodId": "2026-09-21",
++             "sampleSize": 1,
++             "source": "moodPeriodReport.summary.trend",
++             "to": "2026-09-27T16:00:00.000Z",
++           },
++           "message": "样本 1 条、覆盖 1/7 天，平均 1，趋势平稳。",
++           "type": "PERIOD_TREND",
++           "value": {
++             "averageScore": 1,
++             "coverageDays": 1,
++             "sampleSize": 1,
++             "trend": "STABLE",
++           },
++         },
++       ],
++       "periodId": "2026-09-21",
++     },
++     {
++       "available": true,
++       "degraded": false,
++       "empty": false,
++       "insights": [
++         {
++           "evidence": {
++             "from": "2026-09-27T16:00:00.000Z",
++             "periodId": "2026-09-28",
++             "sampleSize": 1,
++             "source": "moodPeriodReport.summary.counts",
++             "to": "2026-10-04T16:00:00.000Z",
++           },
++           "message": "本周期以平稳为主：1/1 条记录为平稳。",
++           "type": "DOMINANT_MOOD",
++           "value": {
++             "count": 1,
++             "mood": "NEUTRAL",
++             "share": 1,
++           },
++         },
++         {
++           "evidence": {
++             "from": "2026-09-27T16:00:00.000Z",
++             "periodId": "2026-09-28",
++             "sampleSize": 1,
++             "source": "moodPeriodReport.summary.trend",
++             "to": "2026-10-04T16:00:00.000Z",
++           },
++           "message": "样本 1 条、覆盖 1/7 天，平均 0，趋势平稳。",
++           "type": "PERIOD_TREND",
++           "value": {
++             "averageScore": 0,
++             "coverageDays": 1,
++             "sampleSize": 1,
++             "trend": "STABLE",
++           },
++         },
++       ],
++       "periodId": "2026-09-28",
++     },
++     {
++       "available": true,
++       "degraded": false,
++       "empty": false,
++       "insights": [
++         {
++           "evidence": {
++             "from": "2026-10-04T16:00:00.000Z",
++             "periodId": "2026-10-05",
++             "sampleSize": 1,
++             "source": "moodPeriodReport.summary.counts",
++             "to": "2026-10-11T16:00:00.000Z",
++           },
++           "message": "本周期以平稳为主：1/1 条记录为平稳。",
++           "type": "DOMINANT_MOOD",
++           "value": {
++             "count": 1,
++             "mood": "NEUTRAL",
++             "share": 1,
++           },
++         },
++         {
++           "evidence": {
++             "from": "2026-10-04T16:00:00.000Z",
++             "periodId": "2026-10-05",
++             "sampleSize": 1,
++             "source": "moodPeriodReport.summary.trend",
++             "to": "2026-10-11T16:00:00.000Z",
++           },
++           "message": "样本 1 条、覆盖 1/7 天，平均 0，趋势平稳。",
++           "type": "PERIOD_TREND",
++           "value": {
++             "averageScore": 0,
++             "coverageDays": 1,
++             "sampleSize": 1,
++             "trend": "STABLE",
++           },
++         },
++       ],
++       "periodId": "2026-10-05",
++     },
++   ],
+    "requestedPeriods": 3,
+    "targetPeriodId": "2026-10-05",
+-   "warnings": [
+-     "UNKNOWN_PERIOD_SKIPPED",
+-   ],
+  }
+
+ ❯ src/routes/periodInsightComparison.routes.test.ts:139:27
+    137|     ))
+    138|     expect(res.status_code).toBe(200)
+    139|     expect(res.body.data).toMatchObject({
+       |                           ^
+    140|       available: false,
+    141|       degraded: true,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/12]⎯
+
+ FAIL  src/routes/periodInsightComparison.routes.test.ts > period v0.11 insight comparison route > returns the empty degraded contract for all unknown explicit period ids
+AppError: 目标周期不存在或非法
+ ❯ requireInsightComparisonPeriodId src/routes/period.ts:34:11
+     32| function requireInsightComparisonPeriodId(value: string | undefined): …
+     33|   if (!value || !periodBoundsFromPeriodId(value)) {
+     34|     throw new AppError(404, 'PERIOD_INSIGHT_TARGET_NOT_FOUND', '目标周期不存…
+       |           ^
+     35|   }
+     36|   return value
+ ❯ getPeriodInsightComparison src/routes/period.ts:175:20
+ ❯ src/routes/periodInsightComparison.routes.test.ts:154:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/12]⎯
+
+ FAIL  src/routes/periodInsightComparison.routes.test.ts > period v0.11 insight comparison route > rejects an over-limit explicit period id list with the existing count code
+AssertionError: promise resolved "{ status_code: 200, …(2) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "body": {
++     "code": "OK",
++     "data": {
++       "available": true,
++       "conversationId": "user_1",
++       "degraded": false,
++       "degradedReason": null,
++       "granularity": "NATURAL_WEEK",
++       "insights": [
++         {
++           "evidence": {
++             "fromPeriodId": "2026-09-21",
++             "fromSampleSize": 1,
++             "source": "moodPeriodInsightComparison.dominant",
++             "toPeriodId": "2026-10-05",
++             "toSampleSize": 1,
++           },
++           "message": "周期 2026-09-21 vs 2026-10-05：主导情绪记录数持平 +0%。",
++           "reason": null,
++           "status": "READY",
++           "type": "DOMINANT_MOOD",
++           "value": {
++             "direction": "STABLE",
++             "fromPeriodId": "2026-09-21",
++             "fromValue": 1,
++             "rate": 0,
++             "toPeriodId": "2026-10-05",
++             "toValue": 1,
++           },
++         },
++         {
++           "evidence": {
++             "fromPeriodId": "2026-09-21",
++             "fromSampleSize": 1,
++             "source": "moodPeriodInsightComparison.trend",
++             "toPeriodId": "2026-10-05",
++             "toSampleSize": 1,
++           },
++           "message": "周期 2026-09-21 vs 2026-10-05：平均分下降趋势 -100%。",
++           "reason": null,
++           "status": "READY",
++           "type": "PERIOD_TREND",
++           "value": {
++             "direction": "DOWN",
++             "fromPeriodId": "2026-09-21",
++             "fromValue": 1,
++             "rate": -1,
++             "toPeriodId": "2026-10-05",
++             "toValue": 0,
++           },
++         },
++       ],
++       "periodIds": [
++         "2026-09-21",
++         "2026-09-28",
++         "2026-10-05",
++       ],
++       "periods": [
++         {
++           "available": true,
++           "degraded": false,
++           "empty": false,
++           "insights": [
++             {
++               "evidence": {
++                 "from": "2026-09-20T16:00:00.000Z",
++                 "periodId": "2026-09-21",
++                 "sampleSize": 1,
++                 "source": "moodPeriodReport.summary.counts",
++                 "to": "2026-09-27T16:00:00.000Z",
++               },
++               "message": "本周期以积极为主：1/1 条记录为积极。",
++               "type": "DOMINANT_MOOD",
++               "value": {
++                 "count": 1,
++                 "mood": "POSITIVE",
++                 "share": 1,
++               },
++             },
++             {
++               "evidence": {
++                 "from": "2026-09-20T16:00:00.000Z",
++                 "periodId": "2026-09-21",
++                 "sampleSize": 1,
++                 "source": "moodPeriodReport.summary.trend",
++                 "to": "2026-09-27T16:00:00.000Z",
++               },
++               "message": "样本 1 条、覆盖 1/7 天，平均 1，趋势平稳。",
++               "type": "PERIOD_TREND",
++               "value": {
++                 "averageScore": 1,
++                 "coverageDays": 1,
++                 "sampleSize": 1,
++                 "trend": "STABLE",
++               },
++             },
++           ],
++           "periodId": "2026-09-21",
++         },
++         {
++           "available": true,
++           "degraded": false,
++           "empty": false,
++           "insights": [
++             {
++               "evidence": {
++                 "from": "2026-09-27T16:00:00.000Z",
++                 "periodId": "2026-09-28",
++                 "sampleSize": 1,
++                 "source": "moodPeriodReport.summary.counts",
++                 "to": "2026-10-04T16:00:00.000Z",
++               },
++               "message": "本周期以平稳为主：1/1 条记录为平稳。",
++               "type": "DOMINANT_MOOD",
++               "value": {
++                 "count": 1,
++                 "mood": "NEUTRAL",
++                 "share": 1,
++               },
++             },
++             {
++               "evidence": {
++                 "from": "2026-09-27T16:00:00.000Z",
++                 "periodId": "2026-09-28",
++                 "sampleSize": 1,
++                 "source": "moodPeriodReport.summary.trend",
++                 "to": "2026-10-04T16:00:00.000Z",
++               },
++               "message": "样本 1 条、覆盖 1/7 天，平均 0，趋势平稳。",
++               "type": "PERIOD_TREND",
++               "value": {
++                 "averageScore": 0,
++                 "coverageDays": 1,
++                 "sampleSize": 1,
++                 "trend": "STABLE",
++               },
++             },
++           ],
++           "periodId": "2026-09-28",
++         },
++         {
++           "available": true,
++           "degraded": false,
++           "empty": false,
++           "insights": [
++             {
++               "evidence": {
++                 "from": "2026-10-04T16:00:00.000Z",
++                 "periodId": "2026-10-05",
++                 "sampleSize": 1,
++                 "source": "moodPeriodReport.summary.counts",
++                 "to": "2026-10-11T16:00:00.000Z",
++               },
++               "message": "本周期以平稳为主：1/1 条记录为平稳。",
++               "type": "DOMINANT_MOOD",
++               "value": {
++                 "count": 1,
++                 "mood": "NEUTRAL",
++                 "share": 1,
++               },
++             },
++             {
++               "evidence": {
++                 "from": "2026-10-04T16:00:00.000Z",
++                 "periodId": "2026-10-05",
++                 "sampleSize": 1,
++                 "source": "moodPeriodReport.summary.trend",
++                 "to": "2026-10-11T16:00:00.000Z",
++               },
++               "message": "样本 1 条、覆盖 1/7 天，平均 0，趋势平稳。",
++               "type": "PERIOD_TREND",
++               "value": {
++                 "averageScore": 0,
++                 "coverageDays": 1,
++                 "sampleSize": 1,
++                 "trend": "STABLE",
++               },
++             },
++           ],
++           "periodId": "2026-10-05",
++         },
++       ],
++       "requestedPeriods": 3,
++       "targetPeriodId": "2026-10-05",
++       "timezone": "UTC+8",
++     },
++     "message": "ok",
++   },
++   "headers": {
++     "content-type": "application/json; charset=utf-8",
++   },
++   "status_code": 200,
+  }
+
+ ❯ src/routes/periodInsightComparison.routes.test.ts:175:8
+    173|       '2026-10-05',
+    174|       { period_ids: '2026-09-21,2026-09-28,2026-10-05,2026-10-12' },
+    175|     ))).rejects.toMatchObject({ statusCode: 400, code: 'PERIOD_INSIGHT…
+       |        ^
+    176|   })
+    177|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/12]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  12 failed | 25 passed (37)
+   Start at  07:16:40
+   Duration  966ms (transform 257ms, setup 0ms, import 258ms, tests 859ms, environment 0ms)

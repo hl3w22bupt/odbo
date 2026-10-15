@@ -1,0 +1,29 @@
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": SQLite database "baseline.db" at "file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-v013-baseline.AStazY/baseline.db"
+
+SQLite database baseline.db created at file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-v013-baseline.AStazY/baseline.db
+
+🚀  Your database is now in sync with your Prisma schema. Done in 34ms
+
+
+> @xinban/server@1.0.0 prisma:seed
+> tsx prisma/seed.ts
+
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+[2026-10-15T23:09:43.555Z] [INFO] 开始初始化种子数据…
+[2026-10-15T23:09:43.622Z] [INFO] 角色已创建：林晚晴（温婉知己 · FREE）
+[2026-10-15T23:09:43.623Z] [INFO] 角色已创建：阿秀（爽朗直爽 · FREE）
+[2026-10-15T23:09:43.623Z] [INFO] 角色已创建：小满（俏皮灵动 · VIP）
+[2026-10-15T23:09:43.624Z] [INFO] 角色已创建：苏雅（成熟通透 · VIP）
+[2026-10-15T23:09:43.628Z] [INFO] 商品已创建：5 个
+[2026-10-15T23:09:43.632Z] [INFO] 礼物已创建：5 个
+[2026-10-15T23:09:43.638Z] [INFO] 管理账号就绪：13800000000（role=ADMIN）
+[2026-10-15T23:09:43.640Z] [INFO] 敏感词已创建：4 条
+[2026-10-15T23:09:43.640Z] [INFO] 种子数据初始化完成 ✔
+start_exit=0
+port=16888
+run_dir=/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-v013-baseline.AStazY
+checked_at=2026-10-16T07:09:44+08:00

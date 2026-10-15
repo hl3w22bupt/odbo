@@ -87,7 +87,7 @@ beforeAll(async () => {
   comparisonModule = loadedComparisonModule
   prisma = dbModule.prisma
   await prisma.user.create({ data: { id: authUser.id, phone: authUser.phone } })
-  for (const id of ['conv_source', 'conv_target', 'conv_new', 'conv_atomic', 'conv_mixed']) {
+  for (const id of ['conv_source', 'conv_target', 'conv_new', 'conv_atomic', 'conv_mixed', 'conv_unknown']) {
     await prisma.conversation.create({
       data: { id, userId: authUser.id, mode: 'SINGLE', title: id, status: 'ACTIVE' },
     })
@@ -207,6 +207,49 @@ describe('period csv import file contract', () => {
     await expect(importHandler(anonymous)).rejects.toMatchObject({ statusCode: 401, code: 'UNAUTHORIZED' })
     await expect(importHandler(importContext('not_owner', csv(sourceRows()))))
       .rejects.toMatchObject({ statusCode: 404, code: 'NOT_FOUND' })
+  })
+
+  it('keeps every v0.12 result field unchanged for a successful known-period import', async () => {
+    const result = await importHandler(importContext('conv_unknown', csv(sourceRows())))
+    expect(Object.keys(result.body.data)).toEqual([
+      'received', 'imported', 'skipped', 'failed',
+      'failures_total', 'failures', 'result_code',
+    ])
+    expect(result.body.data).toEqual({
+      received: 5, imported: 5, skipped: 0, failed: 0,
+      failures_total: 0, failures: [], result_code: 'OK',
+    })
+    expect(await counts('conv_unknown')).toEqual({ memories: 2, snapshots: 2, ledger: 5 })
+  })
+
+  it('appends unknown-period skip metadata while keeping the seven base import fields unchanged', async () => {
+    const mixed = csv([
+      ...sourceRows('2026-08-31'),
+      '2026-10-06,2026-10-06,count,1',
+    ])
+    const result = await importHandler(importContext('conv_unknown', mixed))
+    expect(result.status_code).toBe(200)
+    expect(result.body.data).toMatchObject({
+      received: 6, imported: 5, skipped: 0, failed: 1,
+      failures_total: 1, result_code: 'OK',
+      meta: { skippedUnknownPeriodCount: 1, unknownPeriodIds: ['2026-10-06'] },
+      warnings: ['UNKNOWN_PERIOD_SKIPPED'],
+    })
+    expect(result.body.data.failures[0]).toMatchObject({ row: 6, line: 7, code: 'INVALID_DATE' })
+    expect(await counts('conv_unknown')).toEqual({ memories: 4, snapshots: 4, ledger: 10 })
+  })
+
+  it('returns a legal failed-empty unknown-period result without writes', async () => {
+    const unknown = csv(['2026-10-06,2026-10-06,count,1'])
+    const result = await importHandler(importContext('conv_unknown', unknown))
+    expect(result.status_code).toBe(200)
+    expect(result.body.data).toMatchObject({
+      received: 1, imported: 0, skipped: 0, failed: 1,
+      failures_total: 1, result_code: 'OK',
+      meta: { skippedUnknownPeriodCount: 1, unknownPeriodIds: ['2026-10-06'] },
+      warnings: ['UNKNOWN_PERIOD_SKIPPED'],
+    })
+    expect(await counts('conv_unknown')).toEqual({ memories: 4, snapshots: 4, ledger: 10 })
   })
 
   it('keeps the received count invariant for an all-invalid file', async () => {

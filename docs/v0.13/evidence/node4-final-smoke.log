@@ -1,9 +1,9 @@
-# v0.13 final smoke 2026-10-16T07:30:41+08:00
+# v0.13 final smoke 2026-10-16T07:34:19+08:00
 
 > xinban-v01@1.0.0 smoke
 > ./scripts/smoke.sh
 
-◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
 Loaded Prisma config from prisma.config.ts.
 
 Prisma schema loaded from prisma/schema.prisma.
@@ -20,13 +20,13 @@ Prisma schema loaded from prisma/schema.prisma.
 
 ✔ Generated Prisma Client (7.9.1) to ./src/generated/prisma in 79ms
 
-◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
 Loaded Prisma config from prisma.config.ts.
 
 Prisma schema loaded from prisma/schema.prisma.
-Datasource "db": SQLite database "xinban-smoke.db" at "file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-smoke.NQbtdz/xinban-smoke.db"
+Datasource "db": SQLite database "xinban-smoke.db" at "file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-smoke.NsT0Ib/xinban-smoke.db"
 
-SQLite database xinban-smoke.db created at file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-smoke.NQbtdz/xinban-smoke.db
+SQLite database xinban-smoke.db created at file:/var/folders/6k/5kg2yg311tddgw7vn2jyky6m0000gn/T//xinban-smoke.NsT0Ib/xinban-smoke.db
 
 🚀  Your database is now in sync with your Prisma schema. Done in 31ms
 
@@ -34,17 +34,17 @@ SQLite database xinban-smoke.db created at file:/var/folders/6k/5kg2yg311tddgw7v
 > @xinban/server@1.0.0 prisma:seed
 > tsx prisma/seed.ts
 
-◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
-[2026-10-15T23:30:42.985Z] [INFO] 开始初始化种子数据…
-[2026-10-15T23:30:43.053Z] [INFO] 角色已创建：林晚晴（温婉知己 · FREE）
-[2026-10-15T23:30:43.054Z] [INFO] 角色已创建：阿秀（爽朗直爽 · FREE）
-[2026-10-15T23:30:43.055Z] [INFO] 角色已创建：小满（俏皮灵动 · VIP）
-[2026-10-15T23:30:43.055Z] [INFO] 角色已创建：苏雅（成熟通透 · VIP）
-[2026-10-15T23:30:43.058Z] [INFO] 商品已创建：5 个
-[2026-10-15T23:30:43.062Z] [INFO] 礼物已创建：5 个
-[2026-10-15T23:30:43.068Z] [INFO] 管理账号就绪：13800000000（role=ADMIN）
-[2026-10-15T23:30:43.070Z] [INFO] 敏感词已创建：4 条
-[2026-10-15T23:30:43.070Z] [INFO] 种子数据初始化完成 ✔
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+[2026-10-15T23:34:21.122Z] [INFO] 开始初始化种子数据…
+[2026-10-15T23:34:21.189Z] [INFO] 角色已创建：林晚晴（温婉知己 · FREE）
+[2026-10-15T23:34:21.190Z] [INFO] 角色已创建：阿秀（爽朗直爽 · FREE）
+[2026-10-15T23:34:21.191Z] [INFO] 角色已创建：小满（俏皮灵动 · VIP）
+[2026-10-15T23:34:21.191Z] [INFO] 角色已创建：苏雅（成熟通透 · VIP）
+[2026-10-15T23:34:21.195Z] [INFO] 商品已创建：5 个
+[2026-10-15T23:34:21.198Z] [INFO] 礼物已创建：5 个
+[2026-10-15T23:34:21.204Z] [INFO] 管理账号就绪：13800000000（role=ADMIN）
+[2026-10-15T23:34:21.206Z] [INFO] 敏感词已创建：4 条
+[2026-10-15T23:34:21.206Z] [INFO] 种子数据初始化完成 ✔
 [32m✅ 01 健康检查[0m
 [32m✅ 02 发送验证码[0m
 [32m✅ 03 注册并登录[0m
@@ -113,4 +113,4 @@ SQLite database xinban-smoke.db created at file:/var/folders/6k/5kg2yg311tddgw7v
 [32m✅ 66 跨周期混合未知序列保持 200 合法降级结构[0m
 [32m✅ 67 前端导出/导入值级契约（端点、Blob、RFC5987、行号原因、转义、服务端权威）[0m
 [32m✅ 心伴 v0.13 冒烟通过：67 项 / 67 项[0m
-./scripts/smoke.sh: line 39: 18984 Killed: 9               DATABASE_URL="file:$DB_PATH" HTTP_PORT="$PORT" SMS_PROVIDER=dev PAY_PROVIDER=mock LLM_PROVIDER=mock CONTENT_FILTER_ENABLED=true ANTI_ADDICTION_LATE_NIGHT=false npm run dev:standalone >> "$LOG_PATH" 2>&1
+./scripts/smoke.sh: line 39: 25428 Killed: 9               DATABASE_URL="file:$DB_PATH" HTTP_PORT="$PORT" SMS_PROVIDER=dev PAY_PROVIDER=mock LLM_PROVIDER=mock CONTENT_FILTER_ENABLED=true ANTI_ADDICTION_LATE_NIGHT=false npm run dev:standalone >> "$LOG_PATH" 2>&1

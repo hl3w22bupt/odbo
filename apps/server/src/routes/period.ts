@@ -11,7 +11,11 @@ import {
   readableMoodPeriodReport,
   type MoodPeriodReport,
 } from '../lib/moodPeriodReport.js'
-import { compareMoodPeriods, periodComparisonDegraded } from '../lib/periodComparison.js'
+import {
+  compareMoodPeriods,
+  periodComparisonDegraded,
+  periodComparisonUnknownPeriod,
+} from '../lib/periodComparison.js'
 import { moodPeriodReportCsv } from '../lib/periodCsv.js'
 import { buildMoodPeriodInsight, moodPeriodInsightDegraded } from '../lib/moodPeriodInsight.js'
 import {
@@ -138,16 +142,21 @@ function readableScopedPeriodReport(userId: string, input: ScopedPeriodInput, pe
 
 async function getPeriodComparison(ctx: HttpRouteContext) {
   const user = await authenticate(ctx)
-  const periodId = requirePeriodId(ctx.params.periodId)
+  const periodId = ctx.params.periodId ?? ''
+  const notice = unknownPeriodNotice([periodId])
+  if ('warnings' in notice) {
+    return ok({ ...periodComparisonUnknownPeriod(periodId), ...notice })
+  }
+  const targetPeriodId = requirePeriodId(periodId)
   try {
     const input = await scopedUserPeriodInput(user.id)
-    const current = readableScopedPeriodReport(user.id, input, periodId)
-    const previous = readableScopedPeriodReport(user.id, input, previousMonday(periodId))
-    return ok(compareMoodPeriods(periodId, current, previous))
+    const current = readableScopedPeriodReport(user.id, input, targetPeriodId)
+    const previous = readableScopedPeriodReport(user.id, input, previousMonday(targetPeriodId))
+    return ok(compareMoodPeriods(targetPeriodId, current, previous))
   } catch (err) {
     if (err instanceof AppError) throw err
-    logger.error('[period] comparison degraded', { err: String(err), periodId, userId: user.id })
-    return ok(periodComparisonDegraded(periodId))
+    logger.error('[period] comparison degraded', { err: String(err), periodId: targetPeriodId, userId: user.id })
+    return ok(periodComparisonDegraded(targetPeriodId))
   }
 }
 

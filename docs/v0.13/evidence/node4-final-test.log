@@ -1,4 +1,4 @@
-# v0.13 final test 2026-10-16T07:30:20+08:00
+# v0.13 final test 2026-10-16T07:33:59+08:00
 
 > xinban-v01@1.0.0 test
 > cd apps/server && npm test && cd ../mobile && npm test
@@ -13,8 +13,8 @@
 
  Test Files  27 passed (27)
       Tests  175 passed (175)
-   Start at  07:30:20
-   Duration  1.23s (transform 1.50s, setup 0ms, import 2.33s, tests 3.24s, environment 2ms)
+   Start at  07:34:00
+   Duration  1.21s (transform 1.36s, setup 0ms, import 2.14s, tests 3.21s, environment 2ms)
 
 
 > xinban-ai-mobile@1.0.0 test
@@ -26,5 +26,5 @@
 
  Test Files  10 passed (10)
       Tests  59 passed (59)
-   Start at  07:30:22
-   Duration  160ms (transform 247ms, setup 0ms, import 367ms, tests 52ms, environment 1ms)
+   Start at  07:34:01
+   Duration  171ms (transform 252ms, setup 0ms, import 361ms, tests 55ms, environment 1ms)

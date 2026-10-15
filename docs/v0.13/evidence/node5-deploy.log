@@ -1,4 +1,4 @@
-# v0.13 deploy 2026-10-16T07:31:24+08:00
+# v0.13 deploy final 2026-10-16T07:34:41+08:00
 
 > xinban-v01@1.0.0 deploy:v02
 > ./scripts/deploy-v02.sh
@@ -23,23 +23,23 @@
 Starting Metro Bundler
 
 warning: Bundler cache is empty, rebuilding (this may take a minute)
-| (node:20371) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:26478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:20371) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:26478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:20371) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:26478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:20371) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:26478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:20371) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:26478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:20371) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:26478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:20371) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:26478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:20371) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:26478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-Web Bundled 2395ms index.ts (341 modules)
+Web Bundled 2450ms index.ts (341 modules)
 
 › web bundles (1):
 _expo/static/js/web/index-06248b53221da4dcc6745621b439f519.js (683KB)
@@ -50,15 +50,13 @@ index.html (1.2KB)
 metadata.json (49B)
 
 Exported: dist-web
-◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
 Loaded Prisma config from prisma.config.ts.
 
 Prisma schema loaded from prisma/schema.prisma.
 Datasource "db": SQLite database "xinban-deploy-v02.db" at "file:./data/xinban-deploy-v02.db"
 
-SQLite database xinban-deploy-v02.db created at file:./data/xinban-deploy-v02.db
-
-🚀  Your database is now in sync with your Prisma schema. Done in 30ms
+The database is already in sync with the Prisma schema.
 
 == deploy start ==
 deploy /health: 0
@@ -82,23 +80,23 @@ deploy /health: 0
 Starting Metro Bundler
 
 warning: Bundler cache is empty, rebuilding (this may take a minute)
-| (node:20881) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:26991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:20881) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:26991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:20881) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:26991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:20881) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:26991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:20881) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:26991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:20881) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:26991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:20881) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:26991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:20881) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:26991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-Web Bundled 2394ms index.ts (341 modules)
+Web Bundled 2406ms index.ts (341 modules)
 
 › web bundles (1):
 _expo/static/js/web/index-06248b53221da4dcc6745621b439f519.js (683KB)
@@ -128,8 +126,8 @@ start exit: 0
 
  Test Files  27 passed (27)
       Tests  175 passed (175)
-   Start at  07:31:38
-   Duration  1.21s (transform 1.32s, setup 0ms, import 2.08s, tests 3.22s, environment 2ms)
+   Start at  07:34:54
+   Duration  1.21s (transform 1.26s, setup 0ms, import 1.98s, tests 3.22s, environment 2ms)
 
 
 > xinban-ai-mobile@1.0.0 test
@@ -141,8 +139,8 @@ start exit: 0
 
  Test Files  10 passed (10)
       Tests  59 passed (59)
-   Start at  07:31:39
-   Duration  166ms (transform 267ms, setup 0ms, import 377ms, tests 57ms, environment 1ms)
+   Start at  07:34:56
+   Duration  160ms (transform 230ms, setup 0ms, import 364ms, tests 53ms, environment 1ms)
 
 test exit: 0
 

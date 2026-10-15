@@ -81,10 +81,26 @@ describe('period v0.9 routes', () => {
     })
   })
 
-  it('rejects non-Monday or malformed period ids with 400', async () => {
-    await expect(handlers().get('period::comparison')!(context('2026-10-06'))).rejects.toMatchObject({
-      statusCode: 400,
-      code: 'BAD_REQUEST',
+  it('returns a legal degraded comparison for an unknown period id', async () => {
+    const res = await handlers().get('period::comparison')!(context('2026-10-06'))
+    expect(res.status_code).toBe(200)
+    expect(res.body.data).toEqual({
+      available: false,
+      degraded: true,
+      periodId: '2026-10-06',
+      previousPeriodId: '2026-10-06',
+      current: {
+        periodId: '2026-10-06', from: '', to: '', sampleSize: 0, coverageDays: 0,
+        totalDays: 7, averageScore: 0, completeness: 'EMPTY',
+      },
+      previous: {
+        periodId: '2026-10-06', from: '', to: '', sampleSize: 0, coverageDays: 0,
+        totalDays: 7, averageScore: 0, completeness: 'EMPTY',
+      },
+      trend: { currentAverage: 0, previousAverage: 0, deltaScore: 0 },
+      completeness: { current: 'EMPTY', previous: 'EMPTY', overall: 'EMPTY' },
+      meta: { skippedUnknownPeriodCount: 1, unknownPeriodIds: ['2026-10-06'] },
+      warnings: ['UNKNOWN_PERIOD_SKIPPED'],
     })
   })
 

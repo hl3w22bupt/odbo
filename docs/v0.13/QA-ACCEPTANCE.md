@@ -6,7 +6,7 @@
 
 - Red server：`evidence/node3-red-server.log|exit`（12 failed / 25 passed）。
 - Red mobile：`evidence/node3-red-mobile.log|exit`（2 files executed，4 failed；新模块缺失与明细契约失败）。
-- Green aggregate/insight suite：`evidence/node4-aggregate-insight-suite.log|exit`（6 files / 57 passed）。
+- Green aggregate/insight suite：`evidence/node4-aggregate-insight-suite.log|exit`（7 files / 60 passed，覆盖 comparison/insight 与导入持久化）。
 - Green full test：`evidence/node4-final-test.log|exit`（server 27 files / 175；mobile 10 files / 59）。
 - Green smoke：`evidence/node4-final-smoke.log|exit`（67 / 67）。
 
@@ -15,7 +15,7 @@
 | # | 验收 | 机判锚点 | 结果 |
 |---|---|---|---|
 | 1 | 导入↔导出回环 | smoke 59-61：真实 v0.9 export → clean conversation import `imported=received`；重导 `skipped=received/imported=0`；另有 `periodCsvImport.persistence.test.ts` export→import→export 字节一致 | PASS |
-| 2 | 未知周期容错 | smoke 63-66 + route tests：混合 `skippedUnknownPeriodCount=1`；纯未知 200、零写；单/跨周期洞察降级标记存在 | PASS |
+| 2 | 未知周期容错 | smoke 63-66 + route tests：混合 `skippedUnknownPeriodCount=1`；纯未知 200、零写；comparison/单周期/跨周期洞察降级标记存在 | PASS |
 | 3 | 前端值级断言 | `dataExchange.test.ts` 断言 GET endpoint、Blob、anchor download、RFC5987；`csvImport.test.ts` 断言行号/原因、3 条封顶、`+N 行` | PASS |
 | 4 | 防注入 | `<script>alert(1)</script>` → `&lt;script&gt;...`；UI 明细仅经 RN `Text`，无 innerHTML/dangerouslySetInnerHTML | PASS |
 | 5 | 预检/服务端不一致双向 | `serverAuthoritativeImportResult` two-direction tests：client invalid/server valid 返回 server；client valid/server invalid 返回 server | PASS |
@@ -30,7 +30,7 @@
 | final smoke | 67 / 67 | 0 | `node4-final-smoke.log|exit` |
 | persist:check | 9 / 9（kill -9 重启） | 0 | `node4-final-persist.log|exit` |
 | persistence:v02 | 18 / 18（kill -9 多轮） | 0 | `node4-persist-v02.log|exit` |
-| aggregate/insight suite | 57 / 57 | 0 | `node4-aggregate-insight-suite.log|exit` |
+| aggregate/insight suite | 60 / 60 | 0 | `node4-aggregate-insight-suite.log|exit` |
 | mobile src lint | 0 problems | 0 | `node4-mobile-src-lint.log|exit` |
 | dead test scan | 0 | 0 | `node4-dead-test-scan.log|count` |
 

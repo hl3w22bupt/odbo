@@ -1,0 +1,147 @@
+# v0.13 deploy final 2026-10-16T07:34:41+08:00
+
+> xinban-v01@1.0.0 deploy:v02
+> ./scripts/deploy-v02.sh
+
+== deploy build ==
+
+> xinban-v01@1.0.0 build
+> cd apps/server && npm run build && cd ../mobile && npm run typecheck && EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-http://127.0.0.1:3888} npm run export -- --platform web --output-dir dist-web --clear
+
+
+> @xinban/server@1.0.0 build
+> tsc -p tsconfig.build.json
+
+
+> xinban-ai-mobile@1.0.0 typecheck
+> tsc --noEmit
+
+
+> xinban-ai-mobile@1.0.0 export
+> expo export --platform web --output-dir dist-web --clear
+
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+| (node:26478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:26478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:26478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:26478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:26478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:26478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:26478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:26478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+Web Bundled 2450ms index.ts (341 modules)
+
+› web bundles (1):
+_expo/static/js/web/index-06248b53221da4dcc6745621b439f519.js (683KB)
+
+› Files (3):
+favicon.ico (15KB)
+index.html (1.2KB)
+metadata.json (49B)
+
+Exported: dist-web
+◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": SQLite database "xinban-deploy-v02.db" at "file:./data/xinban-deploy-v02.db"
+
+The database is already in sync with the Prisma schema.
+
+== deploy start ==
+deploy /health: 0
+== post-deploy rerun: build ==
+
+> xinban-v01@1.0.0 build
+> cd apps/server && npm run build && cd ../mobile && npm run typecheck && EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-http://127.0.0.1:3888} npm run export -- --platform web --output-dir dist-web --clear
+
+
+> @xinban/server@1.0.0 build
+> tsc -p tsconfig.build.json
+
+
+> xinban-ai-mobile@1.0.0 typecheck
+> tsc --noEmit
+
+
+> xinban-ai-mobile@1.0.0 export
+> expo export --platform web --output-dir dist-web --clear
+
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+| (node:26991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:26991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:26991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:26991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:26991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:26991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:26991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:26991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+Web Bundled 2406ms index.ts (341 modules)
+
+› web bundles (1):
+_expo/static/js/web/index-06248b53221da4dcc6745621b439f519.js (683KB)
+
+› Files (3):
+favicon.ico (15KB)
+index.html (1.2KB)
+metadata.json (49B)
+
+Exported: dist-web
+build exit: 0
+== post-deploy rerun: start ==
+start /health: 0
+start exit: 0
+== post-deploy rerun: test ==
+
+> xinban-v01@1.0.0 test
+> cd apps/server && npm test && cd ../mobile && npm test
+
+
+> @xinban/server@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmva5da83000vm9rsvmiyfjx7/apps/server
+
+
+ Test Files  27 passed (27)
+      Tests  175 passed (175)
+   Start at  07:34:54
+   Duration  1.21s (transform 1.26s, setup 0ms, import 1.98s, tests 3.22s, environment 2ms)
+
+
+> xinban-ai-mobile@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmva5da83000vm9rsvmiyfjx7/apps/mobile
+
+
+ Test Files  10 passed (10)
+      Tests  59 passed (59)
+   Start at  07:34:56
+   Duration  160ms (transform 230ms, setup 0ms, import 364ms, tests 53ms, environment 1ms)
+
+test exit: 0
+
+心伴 v0.2 deploy 复验：build=0 start=0 test=0

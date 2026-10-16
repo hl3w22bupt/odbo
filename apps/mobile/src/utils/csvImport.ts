@@ -1,3 +1,5 @@
+import { escapeDisplayText } from './dataExchange';
+
 export type PeriodCsvImportErrorCode =
   | 'EMPTY_FILE'
   | 'INVALID_HEADER'
@@ -32,6 +34,8 @@ export interface ImportSummary {
   title: string;
   message: string;
   type: 'success' | 'error';
+  details: string[];
+  hiddenDetailCount: number;
 }
 
 const CODE_LABELS: Record<PeriodCsvImportErrorCode, string> = {
@@ -45,16 +49,40 @@ const CODE_LABELS: Record<PeriodCsvImportErrorCode, string> = {
   ENCODING_ERROR: '编码非法',
 };
 
-/** 服务端是唯一计数事实源；客户端只做结构化摘要，不静默、不修数。 */
+const DETAIL_LIMIT = 3;
+
+function failureText(failure: PeriodCsvImportFailure): string {
+  return [
+    `第 ${failure.row} 行 · 第 ${failure.line} 行`,
+    `${CODE_LABELS[failure.code] ?? '导入失败'}：${escapeDisplayText(failure.message)}`,
+  ].join('：');
+}
+
+/** 服务端是唯一计数事实源；客户端只做结构化摘要，不静默、不修数、不注入 HTML。 */
 export function describePeriodCsvImport(value: PeriodCsvImportResult): ImportSummary {
   const summary = `成功 ${value.imported}，跳过 ${value.skipped}，失败 ${value.failed}（总 ${value.received}）`;
+  const details = value.failures.slice(0, DETAIL_LIMIT).map(failureText);
+  const hiddenDetailCount = Math.max(0, value.failures.length - details.length);
+  const folded = hiddenDetailCount > 0 ? `；+${hiddenDetailCount} 行` : '';
   if (value.result_code === 'EMPTY_FILE' || value.received === 0) {
-    return { title: '导入完成', message: `${CODE_LABELS.EMPTY_FILE}：${summary}`, type: 'error' };
+    return {
+      title: '导入完成',
+      message: `${CODE_LABELS.EMPTY_FILE}：${summary}`,
+      type: 'error',
+      details: [],
+      hiddenDetailCount: 0,
+    };
   }
   if (value.failed > 0) {
     const first = value.failures[0];
     const detail = first ? `；首错 ${CODE_LABELS[first.code]}` : '';
-    return { title: '导入完成', message: `${summary}${detail}`, type: 'error' };
+    return {
+      title: '导入完成',
+      message: `${summary}${detail}${folded}`,
+      type: 'error',
+      details,
+      hiddenDetailCount,
+    };
   }
-  return { title: '导入完成', message: summary, type: 'success' };
+  return { title: '导入完成', message: summary, type: 'success', details, hiddenDetailCount };
 }

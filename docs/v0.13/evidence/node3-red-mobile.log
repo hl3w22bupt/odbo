@@ -1,0 +1,125 @@
+
+ RUN  v4.1.10 /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmva5da83000vm9rsvmiyfjx7/apps/mobile
+
+ ❯ src/utils/dataExchange.test.ts (0 test)
+ ❯ src/utils/csvImport.test.ts (4 tests | 4 failed) 6ms
+     × shows a non-silent count summary on success 4ms
+     × renders at most three line/reason details and folds the remainder 0ms
+     × keeps script payloads escaped in renderable details 0ms
+     × uses the structured empty marker and keeps failure visible 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/utils/dataExchange.test.ts [ src/utils/dataExchange.test.ts ]
+Error: Cannot find module './dataExchange' imported from /Users/leo/.myrd/workspaces/cms1g8itk000am9fyr4l0vp35/run-cmva5da83000vm9rsvmiyfjx7/apps/mobile/src/utils/dataExchange.test.ts
+ ❯ src/utils/dataExchange.test.ts:2:1
+      1| import { describe, expect, it } from 'vitest';
+      2| import {
+       | ^
+      3|   periodExportContract,
+      4|   periodImportContract,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/utils/csvImport.test.ts > period csv import summary > shows a non-silent count summary on success
+AssertionError: expected { title: '导入完成', …(2) } to deeply equal { title: '导入完成', …(4) }
+
+- Expected
++ Received
+
+  {
+-   "details": [
+-     "第 2 行 · 第 2 行：数值非法：bad",
+-   ],
+-   "hiddenDetailCount": 0,
+    "message": "成功 7，跳过 2，失败 1（总 10）；首错 数值非法",
+    "title": "导入完成",
+    "type": "error",
+  }
+
+ ❯ src/utils/csvImport.test.ts:12:45
+     10|       result_code: 'OK',
+     11|     }
+     12|     expect(describePeriodCsvImport(result)).toEqual({
+       |                                             ^
+     13|       title: '导入完成',
+     14|       message: '成功 7，跳过 2，失败 1（总 10）；首错 数值非法',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/utils/csvImport.test.ts > period csv import summary > renders at most three line/reason details and folds the remainder
+AssertionError: expected undefined to deeply equal [ '第 1 行 · 第 2 行：日期非法：bad-1', …(2) ]
+
+- Expected:
+[
+  "第 1 行 · 第 2 行：日期非法：bad-1",
+  "第 2 行 · 第 3 行：日期非法：bad-2",
+  "第 3 行 · 第 4 行：日期非法：bad-3",
+]
+
++ Received:
+undefined
+
+ ❯ src/utils/csvImport.test.ts:31:29
+     29|     }
+     30|     const summary = describePeriodCsvImport(result)
+     31|     expect(summary.details).toEqual([
+       |                             ^
+     32|       '第 1 行 · 第 2 行：日期非法：bad-1',
+     33|       '第 2 行 · 第 3 行：日期非法：bad-2',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/utils/csvImport.test.ts > period csv import summary > keeps script payloads escaped in renderable details
+AssertionError: expected undefined to deeply equal [ Array(1) ]
+
+- Expected:
+[
+  "第 1 行 · 第 2 行：数值非法：&lt;script&gt;alert(1)&lt;/script&gt;",
+]
+
++ Received:
+undefined
+
+ ❯ src/utils/csvImport.test.ts:47:53
+     45|       result_code: 'OK',
+     46|     }
+     47|     expect(describePeriodCsvImport(result).details).toEqual([
+       |                                                     ^
+     48|       '第 1 行 · 第 2 行：数值非法：&lt;script&gt;alert(1)&lt;/script&gt;',
+     49|     ])
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/utils/csvImport.test.ts > period csv import summary > uses the structured empty marker and keeps failure visible
+AssertionError: expected { title: '导入完成', …(2) } to deeply equal { title: '导入完成', …(4) }
+
+- Expected
++ Received
+
+  {
+-   "details": [],
+-   "hiddenDetailCount": 0,
+    "message": "文件为空：成功 0，跳过 0，失败 0（总 0）",
+    "title": "导入完成",
+    "type": "error",
+  }
+
+ ❯ src/utils/csvImport.test.ts:57:45
+     55|       failures_total: 0, failures: [], result_code: 'EMPTY_FILE',
+     56|     }
+     57|     expect(describePeriodCsvImport(result)).toEqual({
+       |                                             ^
+     58|       title: '导入完成',
+     59|       message: '文件为空：成功 0，跳过 0，失败 0（总 0）',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed (4)
+   Start at  07:17:21
+   Duration  113ms (transform 30ms, setup 0ms, import 23ms, tests 6ms, environment 0ms)

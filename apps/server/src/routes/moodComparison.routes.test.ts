@@ -245,6 +245,10 @@ describe('mood period comparison and CSV export', () => {
     const res = await handlers.get('chat::conversation-period-comparison-csv')!(context(conversationId, { periods: '2' }))
     expect(res.status_code).toBe(200)
     expect(res.headers['content-type']).toBe('text/csv; charset=utf-8')
+    expect(res.headers['content-disposition']).toBe(
+      'attachment; filename="xinban-period-2026-10-05.csv"; filename*=UTF-8\'\''
+      + encodeURIComponent('心伴周期-2026-10-05.csv'),
+    )
     expect(res.headers['x-report-row-count']).toBe('10')
     expect(res.headers['x-report-empty']).toBe('false')
     expect(res.headers['x-report-degraded']).toBe('false')

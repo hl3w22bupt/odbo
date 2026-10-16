@@ -92,6 +92,30 @@ export function periodComparisonDegraded(periodId: string): PeriodComparisonCont
   }
 }
 
+/** v0.13 开放点定案：未知周期返回既有比较信封的合法空结构，不抛 400/404。 */
+export function periodComparisonUnknownPeriod(periodId: string): PeriodComparisonContract {
+  const empty = (id: string): PeriodMetricsContract => ({
+    periodId: id,
+    from: '',
+    to: '',
+    sampleSize: 0,
+    coverageDays: 0,
+    totalDays: 7,
+    averageScore: 0,
+    completeness: 'EMPTY',
+  })
+  return {
+    available: false,
+    degraded: true,
+    periodId,
+    previousPeriodId: periodId,
+    current: empty(periodId),
+    previous: empty(periodId),
+    trend: { currentAverage: 0, previousAverage: 0, deltaScore: 0 },
+    completeness: { current: 'EMPTY', previous: 'EMPTY', overall: 'EMPTY' },
+  }
+}
+
 export function compareMoodPeriods(
   periodId: string,
   current: MoodPeriodReport,

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 心伴 v0.12 · 一条命令全链路冒烟（01-54 冻结基线 + 55-58 CSV 导入闭环）
+# 心伴 v0.13 · 一条命令全链路冒烟（01-58 冻结基线 + 59-66 导入导出触达与未知周期容错）
 # 用法：npm run smoke
 # 可用环境变量：XINBAN_SMOKE_PORT（默认 13888）、KEEP_SMOKE_DIR=1（保留临时目录）
 set -euo pipefail
@@ -610,4 +610,97 @@ else
   red "❌ 导入洞察失败（body=${imported_insight}）"
 fi
 
-green "心伴 v0.12 冒烟通过：$PASS 项 / 58 项"
+# ---------- v0.13 增量段：回环 / RFC5987 / 未知周期 / 前端契约 ----------
+export_file="$RUN_DIR/v09-export.csv"
+export_headers="$RUN_DIR/export.headers"
+roundtrip_conv="$(http POST /api/v1/conversations "$TOKEN" "{\"characterId\":\"$CHARACTER_ID\"}" | json_get id)"
+[ -n "$roundtrip_conv" ] || red '❌ 回环会话创建失败'
+curl -sS -m 20 -D "$export_headers" -o "$export_file" \
+  "$BASE/api/v1/conversations/$CONVERSATION_ID/mood-period-comparison/export.csv?periods=3" \
+  -H "Authorization: Bearer $TOKEN"
+export_rows=$([ -s "$export_file" ] && expr "$(tr -d '\r' < "$export_file" | wc -l | tr -d ' ')" - 1 || echo 0)
+if [ "$export_rows" -gt 0 ]; then green '59 v0.9 导出文件真实生成'; else red "❌ 导出文件为空（rows=$export_rows）"; fi
+
+reverse_first="$(http_csv "/api/v1/conversations/$roundtrip_conv/mood-period-comparison/import.csv" "$TOKEN" "$export_file")"
+if printf '%s' "$reverse_first" | jq -e --argjson total "$export_rows" '
+  .data.received == $total and .data.imported == $total and .data.skipped == 0 and .data.failed == 0
+' >/dev/null; then
+  green '60 导出文件原样反向喂导入且计数一致'
+else
+  red "❌ 导出导入回环失败（rows=$export_rows body=${reverse_first}）"
+fi
+
+reverse_second="$(http_csv "/api/v1/conversations/$roundtrip_conv/mood-period-comparison/import.csv" "$TOKEN" "$export_file")"
+if printf '%s' "$reverse_second" | jq -e --argjson total "$export_rows" '
+  .data.received == $total and .data.imported == 0 and .data.skipped == $total and .data.failed == 0
+' >/dev/null; then
+  green '61 回环重导幂等跳过等于记录总数'
+else
+  red "❌ 回环幂等失败（rows=$export_rows body=${reverse_second}）"
+fi
+
+rfc5987="$(node -e "process.stdout.write('attachment; filename=\"xinban-period-$period_id.csv\"; filename*=UTF-8\'\'' + encodeURIComponent('心伴周期-' + process.argv[1] + '.csv'))" "$period_id")"
+if grep -qiF "content-disposition: $rfc5987" "$export_headers"; then
+  green '62 导出中文文件名走 RFC 5987'
+else
+  red "❌ RFC 5987 头缺失（expected=$rfc5987 headers=$(cat "$export_headers")）"
+fi
+
+mixed_unknown="$RUN_DIR/mixed-unknown.csv"
+{
+  printf '\xef\xbb\xbfperiod_id,date,dimension,value\r\n'
+  printf '2026-08-31,2026-08-31,count,2\r\n'
+  printf '2026-08-31,2026-08-31,positive,1\r\n'
+  printf '2026-08-31,2026-08-31,neutral,0\r\n'
+  printf '2026-08-31,2026-08-31,negative,1\r\n'
+  printf '2026-08-31,2026-08-31,averageScore,0\r\n'
+  printf '2026-10-06,2026-10-06,count,1\r\n'
+} > "$mixed_unknown"
+mixed_result="$(http_csv "/api/v1/conversations/$CONVERSATION_ID/mood-period-comparison/import.csv" "$TOKEN" "$mixed_unknown")"
+if printf '%s' "$mixed_result" | jq -e '
+  .data.received == 6 and .data.imported == 5 and .data.failed == 1 and
+  .data.meta.skippedUnknownPeriodCount == 1 and .data.meta.unknownPeriodIds == ["2026-10-06"] and
+  .data.warnings == ["UNKNOWN_PERIOD_SKIPPED"]
+' >/dev/null; then
+  green '63 混合已知未知周期跳过计数与降级标记正确'
+else
+  red "❌ 混合未知周期失败（body=${mixed_result}）"
+fi
+
+pure_unknown="$RUN_DIR/pure-unknown.csv"
+{ printf '\xef\xbb\xbfperiod_id,date,dimension,value\r\n'; printf 'not-monday,not-monday,count,1\r\n'; } > "$pure_unknown"
+pure_result="$(http_csv "/api/v1/conversations/$CONVERSATION_ID/mood-period-comparison/import.csv" "$TOKEN" "$pure_unknown")"
+if printf '%s' "$pure_result" | jq -e '
+  .data.received == 1 and .data.imported == 0 and .data.skipped == 0 and .data.failed == 1 and
+  .data.meta.skippedUnknownPeriodCount == 1 and .data.warnings == ["UNKNOWN_PERIOD_SKIPPED"]
+' >/dev/null; then
+  green '64 纯未知极端输入保持 200 合法空写'
+else
+  red "❌ 纯未知周期失败（body=${pure_result}）"
+fi
+
+unknown_insight="$(http GET '/api/v1/periods/2026-10-06/insight' "$TOKEN")"
+if printf '%s' "$unknown_insight" | jq -e '
+  .data.available == false and .data.degraded == true and .data.insights == [] and
+  .data.meta.skippedUnknownPeriodCount == 1 and .data.warnings == ["UNKNOWN_PERIOD_SKIPPED"]
+' >/dev/null; then
+  green '65 单周期未知目标返回 200 合法降级空态'
+else
+  red "❌ 单周期未知目标失败（body=${unknown_insight}）"
+fi
+
+mixed_cross="$(http GET "/api/v1/periods/$period_id/insight/comparison?period_ids=$cross_period_b,not-monday,$period_id" "$TOKEN")"
+if printf '%s' "$mixed_cross" | jq -e --arg b "$cross_period_b" --arg pid "$period_id" '
+  .data.available == false and .data.degraded == true and .data.periods == [] and .data.insights == [] and
+  .data.periodIds == [$b,"not-monday",$pid] and .data.meta.skippedUnknownPeriodCount == 1 and
+  .data.warnings == ["UNKNOWN_PERIOD_SKIPPED"]
+' >/dev/null; then
+  green '66 跨周期混合未知序列保持 200 合法降级结构'
+else
+  red "❌ 跨周期未知序列失败（body=${mixed_cross}）"
+fi
+
+(cd "$ROOT/apps/mobile" && npx vitest run src/utils/dataExchange.test.ts src/utils/csvImport.test.ts >/dev/null)
+green '67 前端导出/导入值级契约（端点、Blob、RFC5987、行号原因、转义、服务端权威）'
+
+green "心伴 v0.13 冒烟通过：$PASS 项 / 67 项"

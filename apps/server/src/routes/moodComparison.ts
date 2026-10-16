@@ -10,6 +10,7 @@ import {
   readableMoodPeriodComparison,
   type MoodPeriodComparison,
 } from '../lib/moodPeriodComparison.js'
+import { periodBoundsFromPeriodId } from '../lib/moodPeriodReport.js'
 import { encodeCsv, encodeCsvCell } from '../lib/csvExport.js'
 import {
   CSV_IMPORT_ROW_LIMIT,
@@ -221,11 +222,13 @@ async function conversationPeriodComparisonCsv(
   })
 
   const csv = encodeCsv(rows)
+  const periodId = comparison.periods[comparison.periods.length - 1]?.id ?? ''
+  const filename = periodId ? `心伴周期-${periodId}.csv` : '心伴周期对比.csv'
   return {
     status_code: 200,
     headers: {
       'content-type': 'text/csv; charset=utf-8',
-      'content-disposition': 'attachment; filename="mood-period-comparison.csv"',
+      'content-disposition': `attachment; filename="xinban-period-${periodId}.csv"; filename*=UTF-8''${encodeURIComponent(filename)}`,
       'x-report-row-count': String(rows.length),
       'x-report-generated-at': new Date().toISOString(),
       'x-report-empty': 'false',
@@ -380,6 +383,17 @@ async function conversationPeriodComparisonImportCsv(ctx: HttpRouteContext) {
     })
   }
 
+  // v0.13 只加不改：未知周期已在 parser 中失败并排除写侧；这里追加既有信封外的提示位。
+  const unknownPeriodIds = [...new Set(parsed.failures
+    .filter((failure) => failure.code === 'INVALID_DATE' &&
+      Boolean(failure.periodId) && !periodBoundsFromPeriodId(failure.periodId!))
+    .map((failure) => failure.periodId)
+    .filter((periodId): periodId is string => Boolean(periodId)))]
+  const unknownPeriodNotice = unknownPeriodIds.length === 0 ? {} : {
+    meta: { skippedUnknownPeriodCount: unknownPeriodIds.length, unknownPeriodIds },
+    warnings: ['UNKNOWN_PERIOD_SKIPPED'] as const,
+  }
+
   return ok({
     received: parsed.received,
     imported: importedCount,
@@ -388,6 +402,7 @@ async function conversationPeriodComparisonImportCsv(ctx: HttpRouteContext) {
     failures_total: parsed.failures.length,
     failures: parsed.failures.slice(0, 20),
     result_code: 'OK',
+    ...unknownPeriodNotice,
   }, 'CSV 导入完成')
 }
 

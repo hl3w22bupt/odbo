@@ -94,9 +94,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 mkdirSync(QA, { recursive: true });
 let shotN = 0;
 async function shot(tag) {
-  const r = await send('Page.captureScreenshot', { format: 'png' });
+  const r = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  const data = r.result?.data;
+  if (!data) die(`captureScreenshot 无数据：${JSON.stringify(r.error || r.result || {}).slice(0, 200)}`);
   const file = join(QA, `${String(++shotN).padStart(2, '0')}-${tag}.png`);
-  writeFileSync(file, Buffer.from(r.data, 'base64'));
+  writeFileSync(file, Buffer.from(data, 'base64'));
   say(`  📸 ${file}`);
 }
 
@@ -107,9 +109,9 @@ await sleep(2500);
 let ready = false;
 for (let i = 0; i < 40 && !ready; i += 1) { await sleep(250); ready = await evalJs('!!document.querySelector(".title-screen")'); }
 if (!ready) die('线上开屏超时\n' + consoleErrors.join('\n'));
-const audio = await evalJs('JSON.stringify(window.__audioDebug ? window.__audioDebug() : null)');
-if (!audio) die('__audioDebug 壳契约缺失');
-say(`开屏 ✓ 壳契约 __audioDebug=${audio.state}`);
+const audio = await evalJs('window.__audioDebug ? JSON.stringify(window.__audioDebug()) : "MISSING"');
+if (audio === 'MISSING') die('__audioDebug 壳契约缺失');
+say(`开屏 ✓ 壳契约 __audioDebug=${audio}`);
 await shot('01-title-375w');
 
 await evalJs(`document.querySelector('.start-btn').click()`); await sleep(250);

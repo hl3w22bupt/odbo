@@ -65,13 +65,8 @@ export function renderScheduleBoard(root, state, ctx) {
     : null;
 
   root.append(
-    header,
-    statRow(idol),
-    h('div', { class: 'chapter-goal', text: chapterHint(state) }),
-    rehearsalPreview,
-    actions,
-    endBtn,
-    logBox,
+    ...[header, statRow(idol), h('div', { class: 'chapter-goal', text: chapterHint(state) }), rehearsalPreview, actions, endBtn, logBox]
+      .filter((n) => n != null),
   );
 }
 

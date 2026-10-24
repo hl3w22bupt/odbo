@@ -11,7 +11,7 @@ export function h(tag, attrs = {}, ...children) {
     else if (v == null) continue; // null/undefined = 不设置该属性（如 disabled:null 必须可点）
     else node.setAttribute(k, v);
   }
-  for (const child of children) {
+  for (const child of children.flat(Infinity)) {
     if (child == null) continue;
     node.append(child instanceof Node ? child : document.createTextNode(String(child)));
   }

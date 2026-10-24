@@ -29,21 +29,6 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 
 ## 产品关联知识
 
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
 ## 情绪陪伴 App 产品调研框架
 
 ## 情绪陪伴 App 产品调研分析框架
@@ -81,6 +66,21 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
 
 ## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
 
@@ -217,6 +217,53 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 `godot-smoke` routine 必须把 `{{gamePath}}`/`{{smokeFrames}}` 参数化，工
 
 （装配注入已截断，全文 11096 字符：需要完整内容时用 search_knowledge 检索）
+
+## 小游戏移动端模拟门禁取证 SOP：375w 仿真、分阶段截帧与 report.json 证据契约（范例 games/talent-nurture）
+
+# 小游戏移动端模拟门禁取证 SOP
+
+> 把小游戏「上线前移动端机器取证」固化为可复跑、可归档、可回放的门禁流程。范例与判例出处：才艺养成 Demo「星光练习生：才艺养成物语」，`games/talent-nurture/tools/smoke-mobile.mjs` + `qa/mobile/`，2026-10-24 收口于提交 `5f729c7`（分支 `myrd/talent-nurture-goal-*`），9/9 项 PASS。后续小游戏上线门禁直接照此复用。
+
+## 1. 定位与边界
+
+- **是什么**：对**线上 liveUrl**（AppHost 部署产物，非 localhost）做 375w 移动仿真的端到端取证，产出 `qa/mobile/report.json` + 分阶段截图，并 git 归档。作为小游戏「可上线」的机器可判门禁。
+- **机器判定 ≠ 使用验收**：好玩/画面审美/四问量表等主观体验**不在机器取证范围**，report 的 `evidenceMethod.outOfScope` 必须显式声明「待用户试玩回填」，绝不能代填主观结论。
+- **零 npm 依赖**：直接裸 CDP（WebSocket）驱动 headless Chrome，不引 puppeteer/playwright，脚本可在任何有 Chrome 的机器上跑。判例承同仓 `tools/smoke-live.mjs`（桌面版冒烟）。
+
+## 2. 移动仿真口径（375w）
+
+```js
+const VIEWPORT = { w: 375, h: 720 };  // 竖屏基线，对应主流移动端最小宽
+// headless Chrome：--headless=new --remote-debugging-port=0，从 DevToolsActivePort 文件取 ws 地址
+await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 720, deviceScaleFactor: 2, mobile: true });
+await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+```
+
+- **点击必须走真实触摸管线**：`Input.dispatchTouchEvent` 的 `touchStart→touchEnd`，**禁止 JS 直调 onclick**——直调测不出事件绑定缺失、热区错位、覆盖遮挡这类真机才会暴露的问题。
+- 导航后先 sleep 2.5s，再按场景标志（如 `.title-screen`）轮询就绪（40×250ms），超时即 DIE 并带 console 错误上下文。
+- 资产路径按**网关部署形态**处理：产物经网关以 `assets/` 前缀伺服，html 入口形态会被 308 规范化（见 §8 缺陷②）。
+
+## 3. 九项机器判定检查（基线集）
+
+| id | 判据 |
+|---|---|
+| network | 关键资产经 375×720 仿真加载全 2xx、无 404/加载失败；html/css/main.mjs/scenes 齐备 |
+| first-screen | 首屏标题渲染、开始按钮在视口内、`elementFromPoint` 命中自身、非 disabled |
+| touch-start | touch 管线点「开始」生效（phase title→intro） |
+| viewport | `scrollWidth ≤375` 且选项按钮完整在视口内（无横向溢出） |
+| touch-event | 分支事件选项 touch 生效，且**连点 3 次只计 1 次**（防重判定反取证） |
+| touch-train | 训练按钮 touch 生效且状态真实推进（如 vocal 10→16、actionsLeft 5→4） |
+| touch-pipeline | 全程 touch 主循环推进至结局判定（phase=ended、舞台场次、touch 步数全生效） |
+| hotzone | 可点按钮**两两无重叠**且高度 ≥40px（多阶段采样，报最矮值） |
+| console | 全流程 console 零 error（warning 仅计数不判失败） |
+
+每个检查项落 `checks[{id,name,pass,detail}]`，detail 必须带**可核查的量化证据**（命中坐标、尺寸、前后状态值），不许只写「通过」。
+
+## 4. 分阶段截图规范
+
+-
+
+（装配注入已截断，全文 5629 字符：需要完整内容时用 search_knowledge 检索）
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
 
@@ -377,21 +424,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
 ## 情绪陪伴 App 产品调研框架
 
 ## 情绪陪伴 App 产品调研分析框架
@@ -429,6 +461,21 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
 
 ## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
 
@@ -565,6 +612,53 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 `godot-smoke` routine 必须把 `{{gamePath}}`/`{{smokeFrames}}` 参数化，工
 
 （装配注入已截断，全文 11096 字符：需要完整内容时用 search_knowledge 检索）
+
+## 小游戏移动端模拟门禁取证 SOP：375w 仿真、分阶段截帧与 report.json 证据契约（范例 games/talent-nurture）
+
+# 小游戏移动端模拟门禁取证 SOP
+
+> 把小游戏「上线前移动端机器取证」固化为可复跑、可归档、可回放的门禁流程。范例与判例出处：才艺养成 Demo「星光练习生：才艺养成物语」，`games/talent-nurture/tools/smoke-mobile.mjs` + `qa/mobile/`，2026-10-24 收口于提交 `5f729c7`（分支 `myrd/talent-nurture-goal-*`），9/9 项 PASS。后续小游戏上线门禁直接照此复用。
+
+## 1. 定位与边界
+
+- **是什么**：对**线上 liveUrl**（AppHost 部署产物，非 localhost）做 375w 移动仿真的端到端取证，产出 `qa/mobile/report.json` + 分阶段截图，并 git 归档。作为小游戏「可上线」的机器可判门禁。
+- **机器判定 ≠ 使用验收**：好玩/画面审美/四问量表等主观体验**不在机器取证范围**，report 的 `evidenceMethod.outOfScope` 必须显式声明「待用户试玩回填」，绝不能代填主观结论。
+- **零 npm 依赖**：直接裸 CDP（WebSocket）驱动 headless Chrome，不引 puppeteer/playwright，脚本可在任何有 Chrome 的机器上跑。判例承同仓 `tools/smoke-live.mjs`（桌面版冒烟）。
+
+## 2. 移动仿真口径（375w）
+
+```js
+const VIEWPORT = { w: 375, h: 720 };  // 竖屏基线，对应主流移动端最小宽
+// headless Chrome：--headless=new --remote-debugging-port=0，从 DevToolsActivePort 文件取 ws 地址
+await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 720, deviceScaleFactor: 2, mobile: true });
+await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+```
+
+- **点击必须走真实触摸管线**：`Input.dispatchTouchEvent` 的 `touchStart→touchEnd`，**禁止 JS 直调 onclick**——直调测不出事件绑定缺失、热区错位、覆盖遮挡这类真机才会暴露的问题。
+- 导航后先 sleep 2.5s，再按场景标志（如 `.title-screen`）轮询就绪（40×250ms），超时即 DIE 并带 console 错误上下文。
+- 资产路径按**网关部署形态**处理：产物经网关以 `assets/` 前缀伺服，html 入口形态会被 308 规范化（见 §8 缺陷②）。
+
+## 3. 九项机器判定检查（基线集）
+
+| id | 判据 |
+|---|---|
+| network | 关键资产经 375×720 仿真加载全 2xx、无 404/加载失败；html/css/main.mjs/scenes 齐备 |
+| first-screen | 首屏标题渲染、开始按钮在视口内、`elementFromPoint` 命中自身、非 disabled |
+| touch-start | touch 管线点「开始」生效（phase title→intro） |
+| viewport | `scrollWidth ≤375` 且选项按钮完整在视口内（无横向溢出） |
+| touch-event | 分支事件选项 touch 生效，且**连点 3 次只计 1 次**（防重判定反取证） |
+| touch-train | 训练按钮 touch 生效且状态真实推进（如 vocal 10→16、actionsLeft 5→4） |
+| touch-pipeline | 全程 touch 主循环推进至结局判定（phase=ended、舞台场次、touch 步数全生效） |
+| hotzone | 可点按钮**两两无重叠**且高度 ≥40px（多阶段采样，报最矮值） |
+| console | 全流程 console 零 error（warning 仅计数不判失败） |
+
+每个检查项落 `checks[{id,name,pass,detail}]`，detail 必须带**可核查的量化证据**（命中坐标、尺寸、前后状态值），不许只写「通过」。
+
+## 4. 分阶段截图规范
+
+-
+
+（装配注入已截断，全文 5629 字符：需要完整内容时用 search_knowledge 检索）
 
 ---
 
@@ -587,21 +681,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
 ## 情绪陪伴 App 产品调研框架
 
 ## 情绪陪伴 App 产品调研分析框架
@@ -639,6 +718,21 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
 
 ## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
 
@@ -775,6 +869,53 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 `godot-smoke` routine 必须把 `{{gamePath}}`/`{{smokeFrames}}` 参数化，工
 
 （装配注入已截断，全文 11096 字符：需要完整内容时用 search_knowledge 检索）
+
+## 小游戏移动端模拟门禁取证 SOP：375w 仿真、分阶段截帧与 report.json 证据契约（范例 games/talent-nurture）
+
+# 小游戏移动端模拟门禁取证 SOP
+
+> 把小游戏「上线前移动端机器取证」固化为可复跑、可归档、可回放的门禁流程。范例与判例出处：才艺养成 Demo「星光练习生：才艺养成物语」，`games/talent-nurture/tools/smoke-mobile.mjs` + `qa/mobile/`，2026-10-24 收口于提交 `5f729c7`（分支 `myrd/talent-nurture-goal-*`），9/9 项 PASS。后续小游戏上线门禁直接照此复用。
+
+## 1. 定位与边界
+
+- **是什么**：对**线上 liveUrl**（AppHost 部署产物，非 localhost）做 375w 移动仿真的端到端取证，产出 `qa/mobile/report.json` + 分阶段截图，并 git 归档。作为小游戏「可上线」的机器可判门禁。
+- **机器判定 ≠ 使用验收**：好玩/画面审美/四问量表等主观体验**不在机器取证范围**，report 的 `evidenceMethod.outOfScope` 必须显式声明「待用户试玩回填」，绝不能代填主观结论。
+- **零 npm 依赖**：直接裸 CDP（WebSocket）驱动 headless Chrome，不引 puppeteer/playwright，脚本可在任何有 Chrome 的机器上跑。判例承同仓 `tools/smoke-live.mjs`（桌面版冒烟）。
+
+## 2. 移动仿真口径（375w）
+
+```js
+const VIEWPORT = { w: 375, h: 720 };  // 竖屏基线，对应主流移动端最小宽
+// headless Chrome：--headless=new --remote-debugging-port=0，从 DevToolsActivePort 文件取 ws 地址
+await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 720, deviceScaleFactor: 2, mobile: true });
+await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+```
+
+- **点击必须走真实触摸管线**：`Input.dispatchTouchEvent` 的 `touchStart→touchEnd`，**禁止 JS 直调 onclick**——直调测不出事件绑定缺失、热区错位、覆盖遮挡这类真机才会暴露的问题。
+- 导航后先 sleep 2.5s，再按场景标志（如 `.title-screen`）轮询就绪（40×250ms），超时即 DIE 并带 console 错误上下文。
+- 资产路径按**网关部署形态**处理：产物经网关以 `assets/` 前缀伺服，html 入口形态会被 308 规范化（见 §8 缺陷②）。
+
+## 3. 九项机器判定检查（基线集）
+
+| id | 判据 |
+|---|---|
+| network | 关键资产经 375×720 仿真加载全 2xx、无 404/加载失败；html/css/main.mjs/scenes 齐备 |
+| first-screen | 首屏标题渲染、开始按钮在视口内、`elementFromPoint` 命中自身、非 disabled |
+| touch-start | touch 管线点「开始」生效（phase title→intro） |
+| viewport | `scrollWidth ≤375` 且选项按钮完整在视口内（无横向溢出） |
+| touch-event | 分支事件选项 touch 生效，且**连点 3 次只计 1 次**（防重判定反取证） |
+| touch-train | 训练按钮 touch 生效且状态真实推进（如 vocal 10→16、actionsLeft 5→4） |
+| touch-pipeline | 全程 touch 主循环推进至结局判定（phase=ended、舞台场次、touch 步数全生效） |
+| hotzone | 可点按钮**两两无重叠**且高度 ≥40px（多阶段采样，报最矮值） |
+| console | 全流程 console 零 error（warning 仅计数不判失败） |
+
+每个检查项落 `checks[{id,name,pass,detail}]`，detail 必须带**可核查的量化证据**（命中坐标、尺寸、前后状态值），不许只写「通过」。
+
+## 4. 分阶段截图规范
+
+-
+
+（装配注入已截断，全文 5629 字符：需要完整内容时用 search_knowledge 检索）
 
 ---
 
@@ -807,21 +948,6 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 
 ## 产品关联知识
 
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
 ## 情绪陪伴 App 产品调研框架
 
 ## 情绪陪伴 App 产品调研分析框架
@@ -859,6 +985,21 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
 
 ## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
 
@@ -995,6 +1136,53 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 `godot-smoke` routine 必须把 `{{gamePath}}`/`{{smokeFrames}}` 参数化，工
 
 （装配注入已截断，全文 11096 字符：需要完整内容时用 search_knowledge 检索）
+
+## 小游戏移动端模拟门禁取证 SOP：375w 仿真、分阶段截帧与 report.json 证据契约（范例 games/talent-nurture）
+
+# 小游戏移动端模拟门禁取证 SOP
+
+> 把小游戏「上线前移动端机器取证」固化为可复跑、可归档、可回放的门禁流程。范例与判例出处：才艺养成 Demo「星光练习生：才艺养成物语」，`games/talent-nurture/tools/smoke-mobile.mjs` + `qa/mobile/`，2026-10-24 收口于提交 `5f729c7`（分支 `myrd/talent-nurture-goal-*`），9/9 项 PASS。后续小游戏上线门禁直接照此复用。
+
+## 1. 定位与边界
+
+- **是什么**：对**线上 liveUrl**（AppHost 部署产物，非 localhost）做 375w 移动仿真的端到端取证，产出 `qa/mobile/report.json` + 分阶段截图，并 git 归档。作为小游戏「可上线」的机器可判门禁。
+- **机器判定 ≠ 使用验收**：好玩/画面审美/四问量表等主观体验**不在机器取证范围**，report 的 `evidenceMethod.outOfScope` 必须显式声明「待用户试玩回填」，绝不能代填主观结论。
+- **零 npm 依赖**：直接裸 CDP（WebSocket）驱动 headless Chrome，不引 puppeteer/playwright，脚本可在任何有 Chrome 的机器上跑。判例承同仓 `tools/smoke-live.mjs`（桌面版冒烟）。
+
+## 2. 移动仿真口径（375w）
+
+```js
+const VIEWPORT = { w: 375, h: 720 };  // 竖屏基线，对应主流移动端最小宽
+// headless Chrome：--headless=new --remote-debugging-port=0，从 DevToolsActivePort 文件取 ws 地址
+await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 720, deviceScaleFactor: 2, mobile: true });
+await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+```
+
+- **点击必须走真实触摸管线**：`Input.dispatchTouchEvent` 的 `touchStart→touchEnd`，**禁止 JS 直调 onclick**——直调测不出事件绑定缺失、热区错位、覆盖遮挡这类真机才会暴露的问题。
+- 导航后先 sleep 2.5s，再按场景标志（如 `.title-screen`）轮询就绪（40×250ms），超时即 DIE 并带 console 错误上下文。
+- 资产路径按**网关部署形态**处理：产物经网关以 `assets/` 前缀伺服，html 入口形态会被 308 规范化（见 §8 缺陷②）。
+
+## 3. 九项机器判定检查（基线集）
+
+| id | 判据 |
+|---|---|
+| network | 关键资产经 375×720 仿真加载全 2xx、无 404/加载失败；html/css/main.mjs/scenes 齐备 |
+| first-screen | 首屏标题渲染、开始按钮在视口内、`elementFromPoint` 命中自身、非 disabled |
+| touch-start | touch 管线点「开始」生效（phase title→intro） |
+| viewport | `scrollWidth ≤375` 且选项按钮完整在视口内（无横向溢出） |
+| touch-event | 分支事件选项 touch 生效，且**连点 3 次只计 1 次**（防重判定反取证） |
+| touch-train | 训练按钮 touch 生效且状态真实推进（如 vocal 10→16、actionsLeft 5→4） |
+| touch-pipeline | 全程 touch 主循环推进至结局判定（phase=ended、舞台场次、touch 步数全生效） |
+| hotzone | 可点按钮**两两无重叠**且高度 ≥40px（多阶段采样，报最矮值） |
+| console | 全流程 console 零 error（warning 仅计数不判失败） |
+
+每个检查项落 `checks[{id,name,pass,detail}]`，detail 必须带**可核查的量化证据**（命中坐标、尺寸、前后状态值），不许只写「通过」。
+
+## 4. 分阶段截图规范
+
+-
+
+（装配注入已截断，全文 5629 字符：需要完整内容时用 search_knowledge 检索）
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
 
@@ -1162,21 +1350,6 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 
 ## 产品关联知识
 
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
 ## 情绪陪伴 App 产品调研框架
 
 ## 情绪陪伴 App 产品调研分析框架
@@ -1214,6 +1387,21 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
 
 ## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
 
@@ -1350,6 +1538,53 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 `godot-smoke` routine 必须把 `{{gamePath}}`/`{{smokeFrames}}` 参数化，工
 
 （装配注入已截断，全文 11096 字符：需要完整内容时用 search_knowledge 检索）
+
+## 小游戏移动端模拟门禁取证 SOP：375w 仿真、分阶段截帧与 report.json 证据契约（范例 games/talent-nurture）
+
+# 小游戏移动端模拟门禁取证 SOP
+
+> 把小游戏「上线前移动端机器取证」固化为可复跑、可归档、可回放的门禁流程。范例与判例出处：才艺养成 Demo「星光练习生：才艺养成物语」，`games/talent-nurture/tools/smoke-mobile.mjs` + `qa/mobile/`，2026-10-24 收口于提交 `5f729c7`（分支 `myrd/talent-nurture-goal-*`），9/9 项 PASS。后续小游戏上线门禁直接照此复用。
+
+## 1. 定位与边界
+
+- **是什么**：对**线上 liveUrl**（AppHost 部署产物，非 localhost）做 375w 移动仿真的端到端取证，产出 `qa/mobile/report.json` + 分阶段截图，并 git 归档。作为小游戏「可上线」的机器可判门禁。
+- **机器判定 ≠ 使用验收**：好玩/画面审美/四问量表等主观体验**不在机器取证范围**，report 的 `evidenceMethod.outOfScope` 必须显式声明「待用户试玩回填」，绝不能代填主观结论。
+- **零 npm 依赖**：直接裸 CDP（WebSocket）驱动 headless Chrome，不引 puppeteer/playwright，脚本可在任何有 Chrome 的机器上跑。判例承同仓 `tools/smoke-live.mjs`（桌面版冒烟）。
+
+## 2. 移动仿真口径（375w）
+
+```js
+const VIEWPORT = { w: 375, h: 720 };  // 竖屏基线，对应主流移动端最小宽
+// headless Chrome：--headless=new --remote-debugging-port=0，从 DevToolsActivePort 文件取 ws 地址
+await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 720, deviceScaleFactor: 2, mobile: true });
+await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+```
+
+- **点击必须走真实触摸管线**：`Input.dispatchTouchEvent` 的 `touchStart→touchEnd`，**禁止 JS 直调 onclick**——直调测不出事件绑定缺失、热区错位、覆盖遮挡这类真机才会暴露的问题。
+- 导航后先 sleep 2.5s，再按场景标志（如 `.title-screen`）轮询就绪（40×250ms），超时即 DIE 并带 console 错误上下文。
+- 资产路径按**网关部署形态**处理：产物经网关以 `assets/` 前缀伺服，html 入口形态会被 308 规范化（见 §8 缺陷②）。
+
+## 3. 九项机器判定检查（基线集）
+
+| id | 判据 |
+|---|---|
+| network | 关键资产经 375×720 仿真加载全 2xx、无 404/加载失败；html/css/main.mjs/scenes 齐备 |
+| first-screen | 首屏标题渲染、开始按钮在视口内、`elementFromPoint` 命中自身、非 disabled |
+| touch-start | touch 管线点「开始」生效（phase title→intro） |
+| viewport | `scrollWidth ≤375` 且选项按钮完整在视口内（无横向溢出） |
+| touch-event | 分支事件选项 touch 生效，且**连点 3 次只计 1 次**（防重判定反取证） |
+| touch-train | 训练按钮 touch 生效且状态真实推进（如 vocal 10→16、actionsLeft 5→4） |
+| touch-pipeline | 全程 touch 主循环推进至结局判定（phase=ended、舞台场次、touch 步数全生效） |
+| hotzone | 可点按钮**两两无重叠**且高度 ≥40px（多阶段采样，报最矮值） |
+| console | 全流程 console 零 error（warning 仅计数不判失败） |
+
+每个检查项落 `checks[{id,name,pass,detail}]`，detail 必须带**可核查的量化证据**（命中坐标、尺寸、前后状态值），不许只写「通过」。
+
+## 4. 分阶段截图规范
+
+-
+
+（装配注入已截断，全文 5629 字符：需要完整内容时用 search_knowledge 检索）
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
 
@@ -1507,21 +1742,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
 ## 情绪陪伴 App 产品调研框架
 
 ## 情绪陪伴 App 产品调研分析框架
@@ -1559,6 +1779,21 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
 
 ## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
 
@@ -1695,6 +1930,53 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 `godot-smoke` routine 必须把 `{{gamePath}}`/`{{smokeFrames}}` 参数化，工
 
 （装配注入已截断，全文 11096 字符：需要完整内容时用 search_knowledge 检索）
+
+## 小游戏移动端模拟门禁取证 SOP：375w 仿真、分阶段截帧与 report.json 证据契约（范例 games/talent-nurture）
+
+# 小游戏移动端模拟门禁取证 SOP
+
+> 把小游戏「上线前移动端机器取证」固化为可复跑、可归档、可回放的门禁流程。范例与判例出处：才艺养成 Demo「星光练习生：才艺养成物语」，`games/talent-nurture/tools/smoke-mobile.mjs` + `qa/mobile/`，2026-10-24 收口于提交 `5f729c7`（分支 `myrd/talent-nurture-goal-*`），9/9 项 PASS。后续小游戏上线门禁直接照此复用。
+
+## 1. 定位与边界
+
+- **是什么**：对**线上 liveUrl**（AppHost 部署产物，非 localhost）做 375w 移动仿真的端到端取证，产出 `qa/mobile/report.json` + 分阶段截图，并 git 归档。作为小游戏「可上线」的机器可判门禁。
+- **机器判定 ≠ 使用验收**：好玩/画面审美/四问量表等主观体验**不在机器取证范围**，report 的 `evidenceMethod.outOfScope` 必须显式声明「待用户试玩回填」，绝不能代填主观结论。
+- **零 npm 依赖**：直接裸 CDP（WebSocket）驱动 headless Chrome，不引 puppeteer/playwright，脚本可在任何有 Chrome 的机器上跑。判例承同仓 `tools/smoke-live.mjs`（桌面版冒烟）。
+
+## 2. 移动仿真口径（375w）
+
+```js
+const VIEWPORT = { w: 375, h: 720 };  // 竖屏基线，对应主流移动端最小宽
+// headless Chrome：--headless=new --remote-debugging-port=0，从 DevToolsActivePort 文件取 ws 地址
+await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 720, deviceScaleFactor: 2, mobile: true });
+await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+```
+
+- **点击必须走真实触摸管线**：`Input.dispatchTouchEvent` 的 `touchStart→touchEnd`，**禁止 JS 直调 onclick**——直调测不出事件绑定缺失、热区错位、覆盖遮挡这类真机才会暴露的问题。
+- 导航后先 sleep 2.5s，再按场景标志（如 `.title-screen`）轮询就绪（40×250ms），超时即 DIE 并带 console 错误上下文。
+- 资产路径按**网关部署形态**处理：产物经网关以 `assets/` 前缀伺服，html 入口形态会被 308 规范化（见 §8 缺陷②）。
+
+## 3. 九项机器判定检查（基线集）
+
+| id | 判据 |
+|---|---|
+| network | 关键资产经 375×720 仿真加载全 2xx、无 404/加载失败；html/css/main.mjs/scenes 齐备 |
+| first-screen | 首屏标题渲染、开始按钮在视口内、`elementFromPoint` 命中自身、非 disabled |
+| touch-start | touch 管线点「开始」生效（phase title→intro） |
+| viewport | `scrollWidth ≤375` 且选项按钮完整在视口内（无横向溢出） |
+| touch-event | 分支事件选项 touch 生效，且**连点 3 次只计 1 次**（防重判定反取证） |
+| touch-train | 训练按钮 touch 生效且状态真实推进（如 vocal 10→16、actionsLeft 5→4） |
+| touch-pipeline | 全程 touch 主循环推进至结局判定（phase=ended、舞台场次、touch 步数全生效） |
+| hotzone | 可点按钮**两两无重叠**且高度 ≥40px（多阶段采样，报最矮值） |
+| console | 全流程 console 零 error（warning 仅计数不判失败） |
+
+每个检查项落 `checks[{id,name,pass,detail}]`，detail 必须带**可核查的量化证据**（命中坐标、尺寸、前后状态值），不许只写「通过」。
+
+## 4. 分阶段截图规范
+
+-
+
+（装配注入已截断，全文 5629 字符：需要完整内容时用 search_knowledge 检索）
 
 ---
 
@@ -1717,21 +1999,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
 ## 情绪陪伴 App 产品调研框架
 
 ## 情绪陪伴 App 产品调研分析框架
@@ -1769,6 +2036,21 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
 
 ## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
 
@@ -1905,6 +2187,53 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 `godot-smoke` routine 必须把 `{{gamePath}}`/`{{smokeFrames}}` 参数化，工
 
 （装配注入已截断，全文 11096 字符：需要完整内容时用 search_knowledge 检索）
+
+## 小游戏移动端模拟门禁取证 SOP：375w 仿真、分阶段截帧与 report.json 证据契约（范例 games/talent-nurture）
+
+# 小游戏移动端模拟门禁取证 SOP
+
+> 把小游戏「上线前移动端机器取证」固化为可复跑、可归档、可回放的门禁流程。范例与判例出处：才艺养成 Demo「星光练习生：才艺养成物语」，`games/talent-nurture/tools/smoke-mobile.mjs` + `qa/mobile/`，2026-10-24 收口于提交 `5f729c7`（分支 `myrd/talent-nurture-goal-*`），9/9 项 PASS。后续小游戏上线门禁直接照此复用。
+
+## 1. 定位与边界
+
+- **是什么**：对**线上 liveUrl**（AppHost 部署产物，非 localhost）做 375w 移动仿真的端到端取证，产出 `qa/mobile/report.json` + 分阶段截图，并 git 归档。作为小游戏「可上线」的机器可判门禁。
+- **机器判定 ≠ 使用验收**：好玩/画面审美/四问量表等主观体验**不在机器取证范围**，report 的 `evidenceMethod.outOfScope` 必须显式声明「待用户试玩回填」，绝不能代填主观结论。
+- **零 npm 依赖**：直接裸 CDP（WebSocket）驱动 headless Chrome，不引 puppeteer/playwright，脚本可在任何有 Chrome 的机器上跑。判例承同仓 `tools/smoke-live.mjs`（桌面版冒烟）。
+
+## 2. 移动仿真口径（375w）
+
+```js
+const VIEWPORT = { w: 375, h: 720 };  // 竖屏基线，对应主流移动端最小宽
+// headless Chrome：--headless=new --remote-debugging-port=0，从 DevToolsActivePort 文件取 ws 地址
+await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 720, deviceScaleFactor: 2, mobile: true });
+await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+```
+
+- **点击必须走真实触摸管线**：`Input.dispatchTouchEvent` 的 `touchStart→touchEnd`，**禁止 JS 直调 onclick**——直调测不出事件绑定缺失、热区错位、覆盖遮挡这类真机才会暴露的问题。
+- 导航后先 sleep 2.5s，再按场景标志（如 `.title-screen`）轮询就绪（40×250ms），超时即 DIE 并带 console 错误上下文。
+- 资产路径按**网关部署形态**处理：产物经网关以 `assets/` 前缀伺服，html 入口形态会被 308 规范化（见 §8 缺陷②）。
+
+## 3. 九项机器判定检查（基线集）
+
+| id | 判据 |
+|---|---|
+| network | 关键资产经 375×720 仿真加载全 2xx、无 404/加载失败；html/css/main.mjs/scenes 齐备 |
+| first-screen | 首屏标题渲染、开始按钮在视口内、`elementFromPoint` 命中自身、非 disabled |
+| touch-start | touch 管线点「开始」生效（phase title→intro） |
+| viewport | `scrollWidth ≤375` 且选项按钮完整在视口内（无横向溢出） |
+| touch-event | 分支事件选项 touch 生效，且**连点 3 次只计 1 次**（防重判定反取证） |
+| touch-train | 训练按钮 touch 生效且状态真实推进（如 vocal 10→16、actionsLeft 5→4） |
+| touch-pipeline | 全程 touch 主循环推进至结局判定（phase=ended、舞台场次、touch 步数全生效） |
+| hotzone | 可点按钮**两两无重叠**且高度 ≥40px（多阶段采样，报最矮值） |
+| console | 全流程 console 零 error（warning 仅计数不判失败） |
+
+每个检查项落 `checks[{id,name,pass,detail}]`，detail 必须带**可核查的量化证据**（命中坐标、尺寸、前后状态值），不许只写「通过」。
+
+## 4. 分阶段截图规范
+
+-
+
+（装配注入已截断，全文 5629 字符：需要完整内容时用 search_knowledge 检索）
 
 ---
 
@@ -1927,21 +2256,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
 ## 情绪陪伴 App 产品调研框架
 
 ## 情绪陪伴 App 产品调研分析框架
@@ -1979,6 +2293,21 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
 
 ## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
 
@@ -2115,6 +2444,53 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 `godot-smoke` routine 必须把 `{{gamePath}}`/`{{smokeFrames}}` 参数化，工
 
 （装配注入已截断，全文 11096 字符：需要完整内容时用 search_knowledge 检索）
+
+## 小游戏移动端模拟门禁取证 SOP：375w 仿真、分阶段截帧与 report.json 证据契约（范例 games/talent-nurture）
+
+# 小游戏移动端模拟门禁取证 SOP
+
+> 把小游戏「上线前移动端机器取证」固化为可复跑、可归档、可回放的门禁流程。范例与判例出处：才艺养成 Demo「星光练习生：才艺养成物语」，`games/talent-nurture/tools/smoke-mobile.mjs` + `qa/mobile/`，2026-10-24 收口于提交 `5f729c7`（分支 `myrd/talent-nurture-goal-*`），9/9 项 PASS。后续小游戏上线门禁直接照此复用。
+
+## 1. 定位与边界
+
+- **是什么**：对**线上 liveUrl**（AppHost 部署产物，非 localhost）做 375w 移动仿真的端到端取证，产出 `qa/mobile/report.json` + 分阶段截图，并 git 归档。作为小游戏「可上线」的机器可判门禁。
+- **机器判定 ≠ 使用验收**：好玩/画面审美/四问量表等主观体验**不在机器取证范围**，report 的 `evidenceMethod.outOfScope` 必须显式声明「待用户试玩回填」，绝不能代填主观结论。
+- **零 npm 依赖**：直接裸 CDP（WebSocket）驱动 headless Chrome，不引 puppeteer/playwright，脚本可在任何有 Chrome 的机器上跑。判例承同仓 `tools/smoke-live.mjs`（桌面版冒烟）。
+
+## 2. 移动仿真口径（375w）
+
+```js
+const VIEWPORT = { w: 375, h: 720 };  // 竖屏基线，对应主流移动端最小宽
+// headless Chrome：--headless=new --remote-debugging-port=0，从 DevToolsActivePort 文件取 ws 地址
+await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 720, deviceScaleFactor: 2, mobile: true });
+await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+```
+
+- **点击必须走真实触摸管线**：`Input.dispatchTouchEvent` 的 `touchStart→touchEnd`，**禁止 JS 直调 onclick**——直调测不出事件绑定缺失、热区错位、覆盖遮挡这类真机才会暴露的问题。
+- 导航后先 sleep 2.5s，再按场景标志（如 `.title-screen`）轮询就绪（40×250ms），超时即 DIE 并带 console 错误上下文。
+- 资产路径按**网关部署形态**处理：产物经网关以 `assets/` 前缀伺服，html 入口形态会被 308 规范化（见 §8 缺陷②）。
+
+## 3. 九项机器判定检查（基线集）
+
+| id | 判据 |
+|---|---|
+| network | 关键资产经 375×720 仿真加载全 2xx、无 404/加载失败；html/css/main.mjs/scenes 齐备 |
+| first-screen | 首屏标题渲染、开始按钮在视口内、`elementFromPoint` 命中自身、非 disabled |
+| touch-start | touch 管线点「开始」生效（phase title→intro） |
+| viewport | `scrollWidth ≤375` 且选项按钮完整在视口内（无横向溢出） |
+| touch-event | 分支事件选项 touch 生效，且**连点 3 次只计 1 次**（防重判定反取证） |
+| touch-train | 训练按钮 touch 生效且状态真实推进（如 vocal 10→16、actionsLeft 5→4） |
+| touch-pipeline | 全程 touch 主循环推进至结局判定（phase=ended、舞台场次、touch 步数全生效） |
+| hotzone | 可点按钮**两两无重叠**且高度 ≥40px（多阶段采样，报最矮值） |
+| console | 全流程 console 零 error（warning 仅计数不判失败） |
+
+每个检查项落 `checks[{id,name,pass,detail}]`，detail 必须带**可核查的量化证据**（命中坐标、尺寸、前后状态值），不许只写「通过」。
+
+## 4. 分阶段截图规范
+
+-
+
+（装配注入已截断，全文 5629 字符：需要完整内容时用 search_knowledge 检索）
 
 ---
 
@@ -2137,21 +2513,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
 ## 情绪陪伴 App 产品调研框架
 
 ## 情绪陪伴 App 产品调研分析框架
@@ -2189,6 +2550,21 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
 
 ## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
 
@@ -2325,6 +2701,53 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 `godot-smoke` routine 必须把 `{{gamePath}}`/`{{smokeFrames}}` 参数化，工
 
 （装配注入已截断，全文 11096 字符：需要完整内容时用 search_knowledge 检索）
+
+## 小游戏移动端模拟门禁取证 SOP：375w 仿真、分阶段截帧与 report.json 证据契约（范例 games/talent-nurture）
+
+# 小游戏移动端模拟门禁取证 SOP
+
+> 把小游戏「上线前移动端机器取证」固化为可复跑、可归档、可回放的门禁流程。范例与判例出处：才艺养成 Demo「星光练习生：才艺养成物语」，`games/talent-nurture/tools/smoke-mobile.mjs` + `qa/mobile/`，2026-10-24 收口于提交 `5f729c7`（分支 `myrd/talent-nurture-goal-*`），9/9 项 PASS。后续小游戏上线门禁直接照此复用。
+
+## 1. 定位与边界
+
+- **是什么**：对**线上 liveUrl**（AppHost 部署产物，非 localhost）做 375w 移动仿真的端到端取证，产出 `qa/mobile/report.json` + 分阶段截图，并 git 归档。作为小游戏「可上线」的机器可判门禁。
+- **机器判定 ≠ 使用验收**：好玩/画面审美/四问量表等主观体验**不在机器取证范围**，report 的 `evidenceMethod.outOfScope` 必须显式声明「待用户试玩回填」，绝不能代填主观结论。
+- **零 npm 依赖**：直接裸 CDP（WebSocket）驱动 headless Chrome，不引 puppeteer/playwright，脚本可在任何有 Chrome 的机器上跑。判例承同仓 `tools/smoke-live.mjs`（桌面版冒烟）。
+
+## 2. 移动仿真口径（375w）
+
+```js
+const VIEWPORT = { w: 375, h: 720 };  // 竖屏基线，对应主流移动端最小宽
+// headless Chrome：--headless=new --remote-debugging-port=0，从 DevToolsActivePort 文件取 ws 地址
+await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 720, deviceScaleFactor: 2, mobile: true });
+await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+```
+
+- **点击必须走真实触摸管线**：`Input.dispatchTouchEvent` 的 `touchStart→touchEnd`，**禁止 JS 直调 onclick**——直调测不出事件绑定缺失、热区错位、覆盖遮挡这类真机才会暴露的问题。
+- 导航后先 sleep 2.5s，再按场景标志（如 `.title-screen`）轮询就绪（40×250ms），超时即 DIE 并带 console 错误上下文。
+- 资产路径按**网关部署形态**处理：产物经网关以 `assets/` 前缀伺服，html 入口形态会被 308 规范化（见 §8 缺陷②）。
+
+## 3. 九项机器判定检查（基线集）
+
+| id | 判据 |
+|---|---|
+| network | 关键资产经 375×720 仿真加载全 2xx、无 404/加载失败；html/css/main.mjs/scenes 齐备 |
+| first-screen | 首屏标题渲染、开始按钮在视口内、`elementFromPoint` 命中自身、非 disabled |
+| touch-start | touch 管线点「开始」生效（phase title→intro） |
+| viewport | `scrollWidth ≤375` 且选项按钮完整在视口内（无横向溢出） |
+| touch-event | 分支事件选项 touch 生效，且**连点 3 次只计 1 次**（防重判定反取证） |
+| touch-train | 训练按钮 touch 生效且状态真实推进（如 vocal 10→16、actionsLeft 5→4） |
+| touch-pipeline | 全程 touch 主循环推进至结局判定（phase=ended、舞台场次、touch 步数全生效） |
+| hotzone | 可点按钮**两两无重叠**且高度 ≥40px（多阶段采样，报最矮值） |
+| console | 全流程 console 零 error（warning 仅计数不判失败） |
+
+每个检查项落 `checks[{id,name,pass,detail}]`，detail 必须带**可核查的量化证据**（命中坐标、尺寸、前后状态值），不许只写「通过」。
+
+## 4. 分阶段截图规范
+
+-
+
+（装配注入已截断，全文 5629 字符：需要完整内容时用 search_knowledge 检索）
 
 ---
 
@@ -2355,21 +2778,6 @@ GitHub: https://github.com/hl3w22bupt/myrd-playground.git
 
 ## 产品关联知识
 
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
 ## 情绪陪伴 App 产品调研框架
 
 ## 情绪陪伴 App 产品调研分析框架
@@ -2407,6 +2815,21 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
 
 ## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
 
@@ -2543,6 +2966,53 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 `godot-smoke` routine 必须把 `{{gamePath}}`/`{{smokeFrames}}` 参数化，工
 
 （装配注入已截断，全文 11096 字符：需要完整内容时用 search_knowledge 检索）
+
+## 小游戏移动端模拟门禁取证 SOP：375w 仿真、分阶段截帧与 report.json 证据契约（范例 games/talent-nurture）
+
+# 小游戏移动端模拟门禁取证 SOP
+
+> 把小游戏「上线前移动端机器取证」固化为可复跑、可归档、可回放的门禁流程。范例与判例出处：才艺养成 Demo「星光练习生：才艺养成物语」，`games/talent-nurture/tools/smoke-mobile.mjs` + `qa/mobile/`，2026-10-24 收口于提交 `5f729c7`（分支 `myrd/talent-nurture-goal-*`），9/9 项 PASS。后续小游戏上线门禁直接照此复用。
+
+## 1. 定位与边界
+
+- **是什么**：对**线上 liveUrl**（AppHost 部署产物，非 localhost）做 375w 移动仿真的端到端取证，产出 `qa/mobile/report.json` + 分阶段截图，并 git 归档。作为小游戏「可上线」的机器可判门禁。
+- **机器判定 ≠ 使用验收**：好玩/画面审美/四问量表等主观体验**不在机器取证范围**，report 的 `evidenceMethod.outOfScope` 必须显式声明「待用户试玩回填」，绝不能代填主观结论。
+- **零 npm 依赖**：直接裸 CDP（WebSocket）驱动 headless Chrome，不引 puppeteer/playwright，脚本可在任何有 Chrome 的机器上跑。判例承同仓 `tools/smoke-live.mjs`（桌面版冒烟）。
+
+## 2. 移动仿真口径（375w）
+
+```js
+const VIEWPORT = { w: 375, h: 720 };  // 竖屏基线，对应主流移动端最小宽
+// headless Chrome：--headless=new --remote-debugging-port=0，从 DevToolsActivePort 文件取 ws 地址
+await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 720, deviceScaleFactor: 2, mobile: true });
+await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+```
+
+- **点击必须走真实触摸管线**：`Input.dispatchTouchEvent` 的 `touchStart→touchEnd`，**禁止 JS 直调 onclick**——直调测不出事件绑定缺失、热区错位、覆盖遮挡这类真机才会暴露的问题。
+- 导航后先 sleep 2.5s，再按场景标志（如 `.title-screen`）轮询就绪（40×250ms），超时即 DIE 并带 console 错误上下文。
+- 资产路径按**网关部署形态**处理：产物经网关以 `assets/` 前缀伺服，html 入口形态会被 308 规范化（见 §8 缺陷②）。
+
+## 3. 九项机器判定检查（基线集）
+
+| id | 判据 |
+|---|---|
+| network | 关键资产经 375×720 仿真加载全 2xx、无 404/加载失败；html/css/main.mjs/scenes 齐备 |
+| first-screen | 首屏标题渲染、开始按钮在视口内、`elementFromPoint` 命中自身、非 disabled |
+| touch-start | touch 管线点「开始」生效（phase title→intro） |
+| viewport | `scrollWidth ≤375` 且选项按钮完整在视口内（无横向溢出） |
+| touch-event | 分支事件选项 touch 生效，且**连点 3 次只计 1 次**（防重判定反取证） |
+| touch-train | 训练按钮 touch 生效且状态真实推进（如 vocal 10→16、actionsLeft 5→4） |
+| touch-pipeline | 全程 touch 主循环推进至结局判定（phase=ended、舞台场次、touch 步数全生效） |
+| hotzone | 可点按钮**两两无重叠**且高度 ≥40px（多阶段采样，报最矮值） |
+| console | 全流程 console 零 error（warning 仅计数不判失败） |
+
+每个检查项落 `checks[{id,name,pass,detail}]`，detail 必须带**可核查的量化证据**（命中坐标、尺寸、前后状态值），不许只写「通过」。
+
+## 4. 分阶段截图规范
+
+-
+
+（装配注入已截断，全文 5629 字符：需要完整内容时用 search_knowledge 检索）
 
 ## 僵尸/孤儿运行轨迹识别与处置手册（status=failed 不可单独为凭）
 
@@ -2700,21 +3170,6 @@ GitHub: https://github.com/hl3w22bupt/odbo
 
 ## 产品关联知识
 
-## 项目开发规范
-
-# 项目开发规范
-
-## 代码风格
-- 使用 TypeScript
-- - 遵循 ESLint 规范
-- 提交前运行 lint 检查
-
-## Git 提交规范
-- 使用 Conventional Commits 格式
-- feat: 新功能
-- fix: 修复 bug
-- docs: 文档更新
-
 ## 情绪陪伴 App 产品调研框架
 
 ## 情绪陪伴 App 产品调研分析框架
@@ -2752,6 +3207,21 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 1. 竞品深度拆解：挑选 2-3 款 AI 聊天+游戏元素的应用进行分析
 2. MVP 核心功能定义
 3. 商业模式确定
+
+## 项目开发规范
+
+# 项目开发规范
+
+## 代码风格
+- 使用 TypeScript
+- - 遵循 ESLint 规范
+- 提交前运行 lint 检查
+
+## Git 提交规范
+- 使用 Conventional Commits 格式
+- feat: 新功能
+- fix: 修复 bug
+- docs: 文档更新
 
 ## MyRD 平台能力与环境事实源（Agent 防臆造基线 · 2026-09-26 主人核定）
 
@@ -2888,3 +3358,50 @@ MyRD Admin 提出设计一款以"情绪价值"为核心的陪伴类 App，并引
 `godot-smoke` routine 必须把 `{{gamePath}}`/`{{smokeFrames}}` 参数化，工
 
 （装配注入已截断，全文 11096 字符：需要完整内容时用 search_knowledge 检索）
+
+## 小游戏移动端模拟门禁取证 SOP：375w 仿真、分阶段截帧与 report.json 证据契约（范例 games/talent-nurture）
+
+# 小游戏移动端模拟门禁取证 SOP
+
+> 把小游戏「上线前移动端机器取证」固化为可复跑、可归档、可回放的门禁流程。范例与判例出处：才艺养成 Demo「星光练习生：才艺养成物语」，`games/talent-nurture/tools/smoke-mobile.mjs` + `qa/mobile/`，2026-10-24 收口于提交 `5f729c7`（分支 `myrd/talent-nurture-goal-*`），9/9 项 PASS。后续小游戏上线门禁直接照此复用。
+
+## 1. 定位与边界
+
+- **是什么**：对**线上 liveUrl**（AppHost 部署产物，非 localhost）做 375w 移动仿真的端到端取证，产出 `qa/mobile/report.json` + 分阶段截图，并 git 归档。作为小游戏「可上线」的机器可判门禁。
+- **机器判定 ≠ 使用验收**：好玩/画面审美/四问量表等主观体验**不在机器取证范围**，report 的 `evidenceMethod.outOfScope` 必须显式声明「待用户试玩回填」，绝不能代填主观结论。
+- **零 npm 依赖**：直接裸 CDP（WebSocket）驱动 headless Chrome，不引 puppeteer/playwright，脚本可在任何有 Chrome 的机器上跑。判例承同仓 `tools/smoke-live.mjs`（桌面版冒烟）。
+
+## 2. 移动仿真口径（375w）
+
+```js
+const VIEWPORT = { w: 375, h: 720 };  // 竖屏基线，对应主流移动端最小宽
+// headless Chrome：--headless=new --remote-debugging-port=0，从 DevToolsActivePort 文件取 ws 地址
+await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 720, deviceScaleFactor: 2, mobile: true });
+await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+```
+
+- **点击必须走真实触摸管线**：`Input.dispatchTouchEvent` 的 `touchStart→touchEnd`，**禁止 JS 直调 onclick**——直调测不出事件绑定缺失、热区错位、覆盖遮挡这类真机才会暴露的问题。
+- 导航后先 sleep 2.5s，再按场景标志（如 `.title-screen`）轮询就绪（40×250ms），超时即 DIE 并带 console 错误上下文。
+- 资产路径按**网关部署形态**处理：产物经网关以 `assets/` 前缀伺服，html 入口形态会被 308 规范化（见 §8 缺陷②）。
+
+## 3. 九项机器判定检查（基线集）
+
+| id | 判据 |
+|---|---|
+| network | 关键资产经 375×720 仿真加载全 2xx、无 404/加载失败；html/css/main.mjs/scenes 齐备 |
+| first-screen | 首屏标题渲染、开始按钮在视口内、`elementFromPoint` 命中自身、非 disabled |
+| touch-start | touch 管线点「开始」生效（phase title→intro） |
+| viewport | `scrollWidth ≤375` 且选项按钮完整在视口内（无横向溢出） |
+| touch-event | 分支事件选项 touch 生效，且**连点 3 次只计 1 次**（防重判定反取证） |
+| touch-train | 训练按钮 touch 生效且状态真实推进（如 vocal 10→16、actionsLeft 5→4） |
+| touch-pipeline | 全程 touch 主循环推进至结局判定（phase=ended、舞台场次、touch 步数全生效） |
+| hotzone | 可点按钮**两两无重叠**且高度 ≥40px（多阶段采样，报最矮值） |
+| console | 全流程 console 零 error（warning 仅计数不判失败） |
+
+每个检查项落 `checks[{id,name,pass,detail}]`，detail 必须带**可核查的量化证据**（命中坐标、尺寸、前后状态值），不许只写「通过」。
+
+## 4. 分阶段截图规范
+
+-
+
+（装配注入已截断，全文 5629 字符：需要完整内容时用 search_knowledge 检索）

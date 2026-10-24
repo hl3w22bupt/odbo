@@ -32,9 +32,10 @@ description: "Three.js 3D 网页游戏开发技能包：单文件全程序化路
 |---|---|
 | `templates/minimal-3d/` | 最小可跑 3D 工程骨架（内核/表现分离 + 画质配方 + 程序化资产 + 构建复现 + 门禁），**实测通过** |
 | `scripts/preflight.mjs` | 静态前置一致性检查（零依赖 Node，秒级）：依赖钉版/内核纯度/状态机/输入双端/单文件产物 |
-| `scripts/browser-smoke.mjs` | CDP 真浏览器冒烟门禁：headless Chrome 打开产物 `?smoke=`，断言零异常 + 循环推进 |
+| `scripts/browser-smoke.mjs` | CDP 真浏览器冒烟门禁：headless Chrome 打开产物 `?smoke=`，**桌面+移动双视口**逐视口断言零异常 + 循环推进 + **截图像素采样** + **性能快照证据** |
 | `references/rendering-quality-recipe.md` | 画质配方：Bloom + ACES + 雾 + 重布光 + 软阴影的具体参数与坑 |
 | `references/procedural-assets.md` | 程序化资产管线：几何拼装 / canvas 贴图 / WebAudio 合成的配方库 |
+| `references/external-assets-optin.md` | 外部生成 opt-in 通道 + 资产来源台账：hero 资产的凭据探测 → 外部生成/程序化回退，产物登记台账 |
 | `references/error-signatures.md` | 错误签名 → 根因 → 修复动作 对照表 |
 
 ---
@@ -106,6 +107,10 @@ src/
 spec 的 assets 段治理，见 webgame-prototype §7B，且构建后必须内联）。
 `tests/singlefile.contract.mjs` 机判产物零外链。
 
+**唯一的例外通道（opt-in）**：hero 资产（主角/载具/Boss/宣传图/主题曲）允许走外部生成
+（Tripo/Gemini/ElevenLabs 类）——凭据探测、缺 key 回退程序化、产物一律进来源台账，
+红线与门禁全部不变。完整协议见 `references/external-assets-optin.md`。
+
 ---
 
 ## 4. 画质配方（对标产物逆向出的四要素）
@@ -166,8 +171,18 @@ node <技能目录>/scripts/browser-smoke.mjs <工程目录> [--seconds 5] [--ch
 
 - 产物支持 `index.html?smoke=<秒>` 协议：跳过交互直接快进内核，把结果 JSON 写进
   `#ts-smoke` 与 `document.title`（`SMOKE {...}`）供无头断言 —— 模板已内置。
-- 断言口径：payload 可解析、`exceptions === 0`、渲染确已开始（frames > 0）、
-  状态机按快进时长推进到 gameover、帧率 ≥ 10fps（headless SwiftShader 下限）。
+- **双视口**：桌面（1280×720）+ 移动（720×1280，触摸仿真 + 移动 UA）各跑一遍，逐视口独立断言
+  ——「移动端会不会坏」不能靠桌面视口代言（构图/裁剪/帧率都随视口变）。
+- 断言口径（逐视口）：payload 可解析、`exceptions === 0`、渲染确已开始（frames > 0）、
+  状态机按快进时长推进到 gameover、帧率 ≥ 10fps（headless SwiftShader 下限）、
+  **截图 400 点 16 级量化采样非纯色**（纯色 = 黑屏/白屏/没渲染出来，移植自 cocos smoke 的
+  像素断言）。
+- **性能快照进证据链（不做硬门禁）**：payload 的 `render` 字段（drawCalls / triangles /
+  geometries / textures / programs，整帧全 pass 统计——EffectComposer 下必须关
+  `renderer.info.autoReset` 否则只读到链尾 OutputPass 的 1 次 drawCall）。headless SwiftShader
+  是软件渲染，测不出真实性能，阈值待采集基线；证据落盘 `qa/smoke/`（双视口截图 + report.json）。
+  **触发纪律：画面、资产、shader 或后处理变更时必跑本门禁** —— 让每次视觉变更都留一份
+  性能与截图证据，而不是只在交付前跑一次。
 - 门禁不过 → 按 `references/error-signatures.md` 的签名修；新签名修复成功后按
   `签名 → 根因 → 修复动作` 三段沉淀进该表。
 

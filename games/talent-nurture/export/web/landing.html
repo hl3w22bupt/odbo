@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>星光练习生：才艺养成物语</title>
+<link rel="stylesheet" href="api/public/assets/style.css">
+<script>
+(function () {
+  'use strict';
+  // ---- 调参桥（SKILL §3C 硬契约：引擎加载前落全局）----
+  try {
+    var rawTuning = new URLSearchParams(location.search).get('tuning');
+    if (rawTuning) {
+      var t = JSON.parse(rawTuning);
+      if (t && typeof t === 'object' && !Array.isArray(t)) window.__GAME_TUNING__ = t;
+    }
+  } catch (e) { /* 非 JSON 忽略 */ }
+
+  // ---- 移动端音频手势解锁器（iOS/Android WebKit：创建即 suspended、打断后 interrupted）----
+  var audioCtx = null;
+  var audioLog = [];
+  var NativeAudioContext = window.AudioContext || window.webkitAudioContext;
+  if (NativeAudioContext) {
+    var Wrapped = function (options) {
+      var ctx = new NativeAudioContext(options);
+      audioCtx = ctx;
+      try { ctx.addEventListener('statechange', function () { audioLog.push({ t: Date.now(), state: ctx.state }); }); } catch (e) {}
+      return ctx;
+    };
+    Wrapped.prototype = NativeAudioContext.prototype;
+    window.AudioContext = Wrapped;
+  }
+  function unlockAudio() {
+    if (!audioCtx || audioCtx.state === 'running') return;
+    try { var p = audioCtx.resume(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+  }
+  ['touchstart', 'touchend', 'pointerdown', 'keydown', 'click'].forEach(function (type) {
+    document.addEventListener(type, unlockAudio, { capture: true, passive: true });
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) unlockAudio();
+  }, { passive: true });
+  window.__audioDebug = function () {
+    return { state: audioCtx ? audioCtx.state : 'no-ctx', addModules: 0, log: audioLog };
+  };
+})();
+</script>
+</head>
+<body>
+<div id="game-root"></div>
+<script type="module" src="api/public/assets/main.mjs"></script>
+</body>
+</html>

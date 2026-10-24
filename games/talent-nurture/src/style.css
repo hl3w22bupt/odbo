@@ -1,0 +1,130 @@
+/* 星光练习生：才艺养成物语 —— 移动端竖屏优先（AC⑤：≤375px 不破版，热区 ≥44px） */
+:root {
+  --bg: #141021;
+  --panel: #1f1834;
+  --panel-2: #2a2240;
+  --line: #3d3358;
+  --text: #f3eaff;
+  --dim: #b9a8dd;
+  --gold: #ffd166;
+  --pink: #ff7eb6;
+  --green: #7ee8a2;
+  --red: #ff8f8f;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: radial-gradient(circle at 50% 0%, #241a3f 0%, var(--bg) 60%);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+#game-root { max-width: 430px; margin: 0 auto; padding: 14px 12px 32px; }
+h1, h2, h3 { margin: 0 0 8px; }
+button { font-family: inherit; touch-action: manipulation; }
+
+/* —— 标题页 —— */
+.title-screen { text-align: center; padding-top: 8vh; }
+.game-title { font-size: 1.55rem; letter-spacing: .06em; color: var(--gold); text-shadow: 0 0 22px rgba(255, 209, 102, .35); }
+.tagline { color: var(--dim); font-size: .9rem; line-height: 1.6; }
+.howto { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin: 14px 0; }
+.howto p { margin: 4px 0; font-size: .8rem; color: var(--dim); line-height: 1.55; }
+.cast { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0 16px; }
+.cast span { font-size: .78rem; color: var(--dim); background: var(--panel-2); border-radius: 999px; padding: 4px 10px; }
+
+/* —— 按钮 —— */
+.primary {
+  display: block; width: 100%; min-height: 48px; border: 0; border-radius: 12px;
+  background: linear-gradient(135deg, #ff7eb6, #b388ff); color: #fff; font-size: 1rem; font-weight: 600;
+  cursor: pointer; margin: 10px 0;
+}
+.primary:disabled { opacity: .45; cursor: not-allowed; }
+.ghost { display: block; width: 100%; min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: transparent; color: var(--dim); font-size: .9rem; cursor: pointer; }
+
+/* —— 周面板 —— */
+.week-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.week-title { font-size: 1.1rem; font-weight: 700; color: var(--gold); }
+.week-sub { font-size: .74rem; color: var(--dim); text-align: right; }
+.chapter-goal { font-size: .76rem; color: var(--pink); margin: 6px 2px; }
+.preview { font-size: .78rem; color: var(--green); margin: 4px 2px 0; }
+
+.stats { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+.stat-pair { display: flex; gap: 10px; }
+.stat-pair .stat { flex: 1; }
+.stat { display: grid; grid-template-columns: 62px 1fr 34px; align-items: center; gap: 6px; margin: 5px 0; }
+.stat-label { font-size: .74rem; color: var(--dim); white-space: nowrap; }
+.stat-track { height: 8px; background: var(--panel-2); border-radius: 999px; overflow: hidden; }
+.stat-fill { height: 100%; border-radius: 999px; }
+.stat-fill.vocal { background: linear-gradient(90deg, #b388ff, #7ee8ff); }
+.stat-fill.dance { background: linear-gradient(90deg, #ffd166, #ff7eb6); }
+.stat-fill.stamina { background: linear-gradient(90deg, #7ee8a2, #b8f3cd); }
+.stat-fill.mood { background: linear-gradient(90deg, #ffd166, #ffb38a); }
+.stat-fill.stress { background: linear-gradient(90deg, #ff8f8f, #ff6b6b); }
+.stat-value { font-size: .74rem; text-align: right; }
+.fans { text-align: right; font-size: .8rem; color: var(--pink); margin-top: 4px; }
+
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.action-btn {
+  min-height: 58px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel);
+  color: var(--text); cursor: pointer; text-align: left; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px;
+}
+.action-btn:last-child { grid-column: 1 / -1; }
+.action-btn:disabled { opacity: .4; cursor: not-allowed; }
+.action-btn.guided { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(255, 209, 102, .35); }
+.action-name { font-size: .9rem; font-weight: 600; }
+.action-desc { font-size: .66rem; color: var(--dim); line-height: 1.35; }
+
+.log { margin-top: 12px; }
+.log-line { display: flex; justify-content: space-between; gap: 8px; font-size: .74rem; color: var(--dim); padding: 3px 2px; border-bottom: 1px dashed var(--line); }
+.deltas { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.delta { font-size: .68rem; border-radius: 6px; padding: 1px 6px; }
+.delta.up { color: var(--green); background: rgba(126, 232, 162, .12); }
+.delta.down { color: var(--red); background: rgba(255, 143, 143, .12); }
+
+/* —— 对话框（事件 / 舞台 / 结局）—— */
+.dialog { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px 14px; margin-top: 10px; }
+.event-tag { display: inline-block; font-size: .68rem; color: var(--bg); background: var(--gold); border-radius: 999px; padding: 2px 10px; margin-bottom: 8px; }
+.event-title { font-size: 1.15rem; }
+.event-text { font-size: .86rem; line-height: 1.7; color: var(--text); }
+.event-choices { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.choice-btn {
+  min-height: 48px; text-align: left; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font-size: .9rem; cursor: pointer;
+}
+.choice-btn:disabled { opacity: .45; cursor: not-allowed; }
+.choice-btn.chosen { border-color: var(--pink); }
+.event-result { margin-top: 10px; font-size: .8rem; color: var(--dim); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.continue-btn { margin-top: 10px; }
+
+.gate-line { font-size: .8rem; color: var(--gold); }
+.stage-actions { display: flex; flex-direction: column; gap: 8px; }
+.score-big { font-size: 2rem; font-weight: 800; text-align: center; margin: 10px 0; }
+.t-fail { color: var(--red); }
+.t-pass { color: var(--text); }
+.t-good { color: var(--gold); }
+.t-perfect { color: var(--pink); text-shadow: 0 0 18px rgba(255, 126, 182, .5); }
+.rival-line { text-align: center; font-size: .9rem; }
+.rival-line.win { color: var(--green); }
+.rival-line.lose { color: var(--red); }
+.fans-line { text-align: center; color: var(--pink); font-size: .9rem; }
+
+.ending-title { font-size: 1.5rem; color: var(--gold); text-align: center; }
+.ending-text { font-size: .88rem; line-height: 1.8; }
+.ending-flavor { font-size: .82rem; line-height: 1.7; color: var(--pink); }
+.ending-stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.ending-stats span { font-size: .78rem; background: var(--panel-2); border-radius: 8px; padding: 4px 8px; }
+.gallery h3 { font-size: .85rem; color: var(--dim); }
+.gallery-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.gallery-item { font-size: .7rem; border-radius: 999px; padding: 3px 10px; border: 1px solid var(--line); }
+.gallery-item.got { color: var(--gold); border-color: var(--gold); }
+.gallery-item.unknown { color: var(--dim); opacity: .5; }
+.restart-btn { margin-top: 14px; }
+
+@media (max-width: 375px) {
+  #game-root { padding: 10px 8px 24px; }
+  .actions { grid-template-columns: 1fr; }
+  .action-btn:last-child { grid-column: auto; }
+  .game-title { font-size: 1.25rem; }
+  .score-big { font-size: 1.6rem; }
+}

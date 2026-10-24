@@ -1,0 +1,789 @@
+{
+  "acceptance": [
+    {
+      "check": "tests/contract/vocal-growth.spec.ts",
+      "id": "acc-vocal-growth",
+      "statement": "执行一次「唱功特训」后：vocal 增加 randint(3,9)（gainBase±gainVariance；vocal≥60 后增益 ×0.5 向下取整），stamina -18，stress +8；vocal clamp 至 [0,100]"
+    },
+    {
+      "check": "tests/contract/dance-growth.spec.ts",
+      "id": "acc-dance-growth",
+      "statement": "执行一次「舞蹈特训」后：dance 遵循与唱功完全相同的增益公式（含 60 点软上限减半）与消耗（stamina -18、stress +8）"
+    },
+    {
+      "check": "tests/contract/week-loop.spec.ts",
+      "id": "acc-week-loop",
+      "statement": "每周提供 5 次行动机会；用完或点「结束本周」后结算 weeklyMoodDecay -4、weeklyStressDecay -3（clamp [0,100]）；「休息」单次 stamina +45、stress -25、mood +6；第 12 周结算后强制进入结局判定并禁止任何行动"
+    },
+    {
+      "check": "tests/contract/event-branch.spec.ts",
+      "id": "acc-event-branch",
+      "statement": "每章触发 2~3 个互动事件；每个事件展示 2~3 个互斥选项，选择后立即按事件效果表修改数值并锁定（irreversible=true），不可回退重选；效果表单条数值变动绝对值 ≤30"
+    },
+    {
+      "check": "tests/contract/stage-scoring.spec.ts",
+      "id": "acc-stage-scoring",
+      "statement": "舞台得分 = vocal×0.5 + dance×0.35 + mood×0.15（各输入 clamp [0,100]）；得分 <55 失败、55~69 及格、70~84 良好、≥85 完美；登台前置 stamina ≥25，登台后 stamina -25、stress +12"
+    },
+    {
+      "check": "tests/contract/fans-growth.spec.ts",
+      "id": "acc-fans-growth",
+      "statement": "舞台得分 ≥55 时 fans += round((得分-55)×15×(1±0.20))，clamp [0,9999]；得分 <55 粉丝不变；答谢祭舞台粉丝收益 ×1.5"
+    },
+    {
+      "check": "tests/contract/ending-judge.spec.ts",
+      "id": "acc-ending-judge",
+      "statement": "第 12 周结束后按优先级【双冠传奇→歌姬→舞灵→顺利出道→遗憾回校】短路判定唯一结局：双冠传奇 = vocal≥80 且 dance≥80 且公演得分≥85 且 fans≥1800；歌姬 = vocal≥80 且 vocal>dance 且得分≥55；舞灵 = dance≥80 且 dance>vocal 且得分≥55；顺利出道 = 得分≥55；否则遗憾回校。五结局互斥且必居其一"
+    },
+    {
+      "check": "tests/contract/resource-guard.spec.ts",
+      "id": "acc-resource-guard",
+      "statement": "stress ≥70 时强制休息并跳过本周剩余行动；mood=0 时全部训练增益 ×0.5；任意数值（vocal/dance/stamina/mood/stress/fans）越界时 clamp 到定义域，不出现负数或越上限"
+    }
+  ],
+  "assets": [
+    {
+      "file": "assets/portraits/hero.png",
+      "generator": "text-to-image",
+      "id": "asset-portrait-hero",
+      "kind": "image",
+      "source": "generated"
+    },
+    {
+      "file": "assets/portraits/mentor-vocal.png",
+      "generator": "text-to-image",
+      "id": "asset-portrait-mentor-vocal",
+      "kind": "image",
+      "source": "generated"
+    },
+    {
+      "file": "assets/portraits/mentor-dance.png",
+      "generator": "text-to-image",
+      "id": "asset-portrait-mentor-dance",
+      "kind": "image",
+      "source": "generated"
+    },
+    {
+      "file": "assets/portraits/rival.png",
+      "generator": "text-to-image",
+      "id": "asset-portrait-rival",
+      "kind": "image",
+      "source": "generated"
+    },
+    {
+      "file": "assets/bg/rehearsal-room.png",
+      "generator": "text-to-image",
+      "id": "asset-bg-rehearsal-room",
+      "kind": "image",
+      "source": "generated"
+    },
+    {
+      "file": "assets/bg/stage.png",
+      "generator": "text-to-image",
+      "id": "asset-bg-stage",
+      "kind": "image",
+      "source": "generated"
+    },
+    {
+      "file": "assets/audio/bgm-main.mp3",
+      "generator": "music-ai",
+      "id": "asset-bgm-main",
+      "kind": "audio",
+      "source": "generated"
+    },
+    {
+      "file": "assets/audio/bgm-finale.mp3",
+      "generator": "music-ai",
+      "id": "asset-bgm-finale",
+      "kind": "audio",
+      "source": "generated"
+    },
+    {
+      "file": "assets/audio/sfx-applause.mp3",
+      "generator": "sfx-ai",
+      "id": "asset-sfx-applause",
+      "kind": "audio",
+      "source": "generated"
+    },
+    {
+      "file": "assets/audio/sfx-click.mp3",
+      "generator": "sfx-ai",
+      "id": "asset-sfx-ui-click",
+      "kind": "audio",
+      "source": "generated"
+    },
+    {
+      "file": "assets/fonts/NotoSansSC-Regular.ttf",
+      "id": "asset-font-main",
+      "kind": "font",
+      "license": "SIL Open Font License 1.1（Noto Sans SC）",
+      "source": "licensed"
+    },
+    {
+      "file": "assets/ui/logo.png",
+      "id": "asset-logo-title",
+      "kind": "image",
+      "license": "原创内部手绘，仅本项目使用",
+      "source": "manual"
+    }
+  ],
+  "content": {
+    "levelCount": 6,
+    "replayHooks": [
+      "五结局全收集，点亮结局画廊",
+      "隐藏事件「巨星的深夜」：vocal 或 dance 达到 S 级（85）时触发",
+      "传奇线挑战：单周目 fans ≥1800 且双技能 ≥80",
+      "对手隐藏线：连续赢下苏晴全部 3 次对决解锁隐藏对话"
+    ],
+    "sessionSeconds": 900,
+    "unlocks": [
+      {
+        "id": "unlock-live-mode",
+        "name": "Live 舞台模式（第 9 周粉丝答谢祭解锁）"
+      },
+      {
+        "id": "unlock-mentor-course",
+        "name": "导师特训课程（首次公开舞台后解锁）"
+      },
+      {
+        "id": "unlock-event-archive",
+        "name": "事件图鉴（任意通关后解锁）"
+      },
+      {
+        "id": "unlock-ending-gallery",
+        "name": "结局画廊（达成任一结局后解锁）"
+      }
+    ]
+  },
+  "entities": [
+    {
+      "id": "idol-player",
+      "name": "主角练习生·小星",
+      "script": "src/entities/idol.ts",
+      "tags": [
+        "player",
+        "growth"
+      ]
+    },
+    {
+      "id": "sys-stat-growth",
+      "name": "唱舞数值成长系统（含软上限）",
+      "script": "src/systems/stat-growth.ts",
+      "tags": [
+        "core"
+      ]
+    },
+    {
+      "id": "sys-week-scheduler",
+      "name": "周计划行动系统（5 行动槽/周）",
+      "script": "src/systems/scheduler.ts",
+      "tags": [
+        "core"
+      ]
+    },
+    {
+      "id": "sys-event-engine",
+      "name": "互动事件引擎（事件调度与分支执行）",
+      "script": "src/systems/event-engine.ts",
+      "tags": [
+        "core",
+        "branch"
+      ]
+    },
+    {
+      "id": "sys-stage-scoring",
+      "name": "舞台评分系统",
+      "script": "src/systems/stage-score.ts",
+      "tags": [
+        "core",
+        "stage"
+      ]
+    },
+    {
+      "id": "sys-ending-judge",
+      "name": "结局判定器（优先级短路求值）",
+      "script": "src/systems/ending-judge.ts",
+      "tags": [
+        "core",
+        "ending"
+      ]
+    },
+    {
+      "id": "data-event-library",
+      "name": "互动事件库（≥18 事件 × 2~3 分支）",
+      "script": "src/data/events.ts",
+      "tags": [
+        "data",
+        "branch"
+      ]
+    },
+    {
+      "id": "data-endings",
+      "name": "结局定义数据（5 结局 + 判定优先级）",
+      "script": "src/data/endings.ts",
+      "tags": [
+        "data",
+        "ending"
+      ]
+    },
+    {
+      "id": "npc-mentor-vocal",
+      "name": "声乐导师·林澜",
+      "script": "src/entities/mentor-vocal.ts",
+      "tags": [
+        "npc",
+        "vocal"
+      ]
+    },
+    {
+      "id": "npc-mentor-dance",
+      "name": "舞蹈导师·K哥",
+      "script": "src/entities/mentor-dance.ts",
+      "tags": [
+        "npc",
+        "dance"
+      ]
+    },
+    {
+      "id": "npc-rival",
+      "name": "对手练习生·苏晴",
+      "script": "src/entities/rival.ts",
+      "tags": [
+        "npc",
+        "rival"
+      ]
+    },
+    {
+      "id": "ui-schedule-board",
+      "name": "周日程面板（5 行动槽 + 数值面板）",
+      "scene": "src/scenes/schedule-board.ts",
+      "tags": [
+        "ui"
+      ]
+    },
+    {
+      "id": "ui-event-dialog",
+      "name": "事件对话框（分支选项 UI）",
+      "scene": "src/scenes/event-dialog.ts",
+      "tags": [
+        "ui",
+        "branch"
+      ]
+    },
+    {
+      "id": "ui-stage-live",
+      "name": "舞台演出与结算场景",
+      "scene": "src/scenes/stage-live.ts",
+      "tags": [
+        "ui",
+        "stage"
+      ]
+    },
+    {
+      "id": "ui-ending-screen",
+      "name": "结局画面与结局图鉴",
+      "scene": "src/scenes/ending-screen.ts",
+      "tags": [
+        "ui",
+        "ending"
+      ]
+    }
+  ],
+  "levels": [
+    {
+      "elements": [
+        {
+          "desc": "林澜与 K 哥开场对话，介绍 12 周出道教则与数值面板",
+          "id": "el-pro-intro",
+          "type": "story"
+        },
+        {
+          "action": "train-vocal",
+          "desc": "引导执行第一次唱功特训，展示 vocal +3~9、stamina -18",
+          "id": "el-pro-tutorial-vocal",
+          "type": "tutorial"
+        },
+        {
+          "action": "train-dance",
+          "desc": "引导执行第一次舞蹈特训",
+          "id": "el-pro-tutorial-dance",
+          "type": "tutorial"
+        },
+        {
+          "desc": "试镜检查点：得分 = vocal×0.5 + dance×0.35 + mood×0.15，≥30 通过（教程保护）",
+          "id": "el-pro-audition",
+          "passThreshold": 30,
+          "stage": "audition",
+          "type": "checkpoint"
+        }
+      ],
+      "goal": "完成入社试镜教学：vocal 与 dance 各执行 1 次特训、休息 1 次，学会日程面板操作；试镜检查点得分 ≥30 即通过（教程保护，不可失败）",
+      "id": "level-prologue",
+      "name": "序章·入社试镜",
+      "scene": "src/levels/prologue.ts"
+    },
+    {
+      "elements": [
+        {
+          "choices": [
+            {
+              "effects": {
+                "stamina": -12,
+                "stress": 8,
+                "vocal": 5
+              },
+              "id": "opt-keep-training",
+              "text": "留下来加练"
+            },
+            {
+              "effects": {
+                "mood": 5,
+                "stamina": 20
+              },
+              "id": "opt-go-rest",
+              "text": "回去睡觉"
+            }
+          ],
+          "id": "el-ch1-ev-midnight",
+          "title": "深夜加练的诱惑",
+          "type": "branch-event"
+        },
+        {
+          "choices": [
+            {
+              "effects": {
+                "mood": 12,
+                "stamina": -8
+              },
+              "id": "opt-join-party",
+              "text": "去参加生日会"
+            },
+            {
+              "effects": {
+                "dance": 4,
+                "mood": -6
+              },
+              "id": "opt-keep-rehearsal",
+              "text": "留下排练"
+            }
+          ],
+          "id": "el-ch1-ev-birthday",
+          "title": "室友的生日会",
+          "type": "branch-event"
+        },
+        {
+          "desc": "周末内部考核：≥45 达标（不影响主线，只影响导师好感）",
+          "id": "el-ch1-stage-internal",
+          "passThreshold": 45,
+          "stage": "internal-check",
+          "type": "stage"
+        }
+      ],
+      "goal": "vocal 或 dance 至少一项达到 25（C 级）；本章触发 2 个互动事件并通过周末内部考核（≥45）",
+      "id": "level-ch1-foundation",
+      "name": "第一章·特训第一课（第 1-2 周）",
+      "scene": "src/levels/ch1-foundation.ts"
+    },
+    {
+      "elements": [
+        {
+          "choices": [
+            {
+              "effects": {
+                "mood": 8
+              },
+              "id": "opt-breathe",
+              "text": "后台深呼吸"
+            },
+            {
+              "effects": {
+                "mentorVocalAffinity": 10,
+                "mood": 12
+              },
+              "id": "opt-talk-linlan",
+              "text": "找林澜倾诉"
+            },
+            {
+              "effects": {
+                "stress": 10,
+                "vocal": 3
+              },
+              "id": "opt-push-through",
+              "text": "硬撑上台"
+            }
+          ],
+          "id": "el-ch2-ev-nerves",
+          "title": "上台前怯场",
+          "type": "branch-event"
+        },
+        {
+          "desc": "首次公开舞台，按 fansGainPerPoint 结算粉丝",
+          "id": "el-ch2-stage-debut",
+          "passThreshold": 55,
+          "stage": "public-debut",
+          "type": "stage"
+        },
+        {
+          "choices": [
+            {
+              "effects": {
+                "fans": 30,
+                "mood": 5
+              },
+              "id": "opt-humble",
+              "text": "谦虚感谢团队"
+            },
+            {
+              "effects": {
+                "fans": 60,
+                "stress": 8
+              },
+              "id": "opt-declare",
+              "text": "放话要超越苏晴"
+            }
+          ],
+          "id": "el-ch2-ev-interview",
+          "title": "赛后采访",
+          "type": "branch-event"
+        }
+      ],
+      "goal": "完成首次公开小舞台并得分 ≥55（及格线），粉丝 ≥100；解锁导师特训课程",
+      "id": "level-ch2-first-stage",
+      "name": "第二章·首次登台（第 3-4 周）",
+      "scene": "src/levels/ch2-first-stage.ts"
+    },
+    {
+      "elements": [
+        {
+          "choices": [
+            {
+              "effects": {
+                "dance": 6,
+                "stamina": -15
+              },
+              "id": "opt-accept-battle",
+              "text": "应战"
+            },
+            {
+              "effects": {
+                "stress": 12
+              },
+              "id": "opt-avoid",
+              "text": "回避"
+            }
+          ],
+          "id": "el-ch3-ev-battle-invite",
+          "title": "练习室对决邀请",
+          "type": "branch-event"
+        },
+        {
+          "choices": [
+            {
+              "effects": {
+                "mood": -8
+              },
+              "id": "opt-clarify",
+              "text": "公开澄清"
+            },
+            {
+              "effects": {
+                "nextStageScoreBuff": 5
+              },
+              "id": "opt-prove-by-stage",
+              "text": "用实力回应"
+            }
+          ],
+          "id": "el-ch3-ev-rumor",
+          "title": "被造谣事件",
+          "type": "branch-event"
+        },
+        {
+          "choices": [
+            {
+              "effects": {
+                "fans": 80,
+                "stress": 6
+              },
+              "id": "opt-rescue",
+              "text": "临场救场清唱"
+            },
+            {
+              "effects": {
+                "fans": -30,
+                "mood": -10
+              },
+              "id": "opt-apologize-off",
+              "text": "道歉下播"
+            }
+          ],
+          "id": "el-ch3-ev-live-crash",
+          "title": "直播翻车危机",
+          "type": "branch-event"
+        },
+        {
+          "id": "el-ch3-stage-vs-rival-1",
+          "passThreshold": 55,
+          "rivalScore": 50,
+          "stage": "rival-battle-1",
+          "type": "stage"
+        },
+        {
+          "id": "el-ch3-stage-vs-rival-2",
+          "passThreshold": 55,
+          "rivalScore": 62,
+          "stage": "rival-battle-2",
+          "type": "stage"
+        },
+        {
+          "id": "el-ch3-stage-vs-rival-3",
+          "passThreshold": 55,
+          "rivalScore": 70,
+          "stage": "rival-battle-3",
+          "type": "stage"
+        }
+      ],
+      "goal": "vocal 与 dance 双双 ≥45（B 级）；三次对决舞台（对手得分 50/62/70）至少赢 1 次",
+      "id": "level-ch3-rival-crisis",
+      "name": "第三章·苏晴的挑战书（第 5-8 周）",
+      "scene": "src/levels/ch3-rival-crisis.ts"
+    },
+    {
+      "elements": [
+        {
+          "choices": [
+            {
+              "effects": {
+                "fans": 50,
+                "mood": 10
+              },
+              "id": "opt-reply-personal",
+              "text": "亲自回信"
+            },
+            {
+              "effects": {
+                "fans": 20
+              },
+              "id": "opt-reply-official",
+              "text": "统一官方回复"
+            }
+          ],
+          "id": "el-ch4-ev-fan-letter",
+          "title": "粉丝来信",
+          "type": "branch-event"
+        },
+        {
+          "choices": [
+            {
+              "effects": {
+                "stamina": -10,
+                "vocal": 8
+              },
+              "id": "opt-vocal-camp",
+              "text": "参加林澜声乐营"
+            },
+            {
+              "effects": {
+                "dance": 8,
+                "stamina": -10
+              },
+              "id": "opt-dance-camp",
+              "text": "参加K哥舞蹈营"
+            }
+          ],
+          "id": "el-ch4-ev-mentor-pick",
+          "title": "导师特训二选一",
+          "type": "branch-event"
+        },
+        {
+          "desc": "答谢祭舞台：及格线提高到 70，粉丝收益 ×1.5",
+          "fansGainMultiplier": 1.5,
+          "id": "el-ch4-stage-fanfest",
+          "passThreshold": 70,
+          "stage": "fan-festival",
+          "type": "stage"
+        }
+      ],
+      "goal": "粉丝 ≥800，解锁 Live 舞台模式；答谢祭舞台得分 ≥70（良好线）",
+      "id": "level-ch4-fanfest",
+      "name": "第四章·粉丝答谢祭（第 9-10 周）",
+      "scene": "src/levels/ch4-fanfest.ts"
+    },
+    {
+      "elements": [
+        {
+          "choices": [
+            {
+              "effects": {
+                "nextStageScoreBuff": 2,
+                "stress": -15
+              },
+              "id": "opt-safe-rehearsal",
+              "text": "保守稳练"
+            },
+            {
+              "effects": {
+                "nextStageScoreBuff": 6,
+                "stress": 15
+              },
+              "id": "opt-hard-choreo",
+              "text": "挑战高难编舞"
+            }
+          ],
+          "id": "el-fin-ev-last-choice",
+          "title": "公演前夜",
+          "type": "branch-event"
+        },
+        {
+          "desc": "最终公演，得分永久记录进结局判定",
+          "id": "el-fin-stage-showcase",
+          "passThreshold": 55,
+          "rivalScore": 72,
+          "stage": "debut-showcase",
+          "type": "stage"
+        },
+        {
+          "id": "el-fin-ending-judge",
+          "order": [
+            "legend-dual",
+            "vocal-specialist",
+            "dance-specialist",
+            "normal-debut",
+            "fail-return"
+          ],
+          "ref": "data-endings",
+          "type": "ending-judge"
+        }
+      ],
+      "goal": "公演得分 ≥55 判出道成功；随后按 vocal/dance/得分/粉丝四项指标在 5 个互斥结局中判定唯一结局",
+      "id": "level-finale-showcase",
+      "name": "终章·新人出道公演（第 11-12 周）",
+      "scene": "src/levels/finale-showcase.ts"
+    }
+  ],
+  "meta": {
+    "engine": "TypeScript + Canvas 自研轻量引擎",
+    "genre": "剧情式养成（Raising Sim + 互动视觉小说）",
+    "oneLiner": "扮演新人练习生小星，用 12 周把唱功与舞技磨成出道舞台的高光——每一次分支选择都在改写 5 个结局的走向。",
+    "platform": "Web 浏览器（HTML5，桌面与移动端竖屏优先）",
+    "title": "星光练习生：才艺养成物语"
+  },
+  "numeric": {
+    "cycle": {
+      "actionsPerWeek": 5,
+      "weeksTotal": 12
+    },
+    "ending": {
+      "debutPass": 55,
+      "dualElite": 80,
+      "judgeOrder": [
+        "legend-dual",
+        "vocal-specialist",
+        "dance-specialist",
+        "normal-debut",
+        "fail-return"
+      ],
+      "legendFans": 1800,
+      "legendScore": 85,
+      "specialist": 80
+    },
+    "event": {
+      "choiceEffectClamp": 30,
+      "choiceSkillGain": 8,
+      "choicesPerEvent": [
+        2,
+        3
+      ],
+      "irreversible": true,
+      "perChapterRange": [
+        2,
+        3
+      ]
+    },
+    "guard": {
+      "forcedRestStress": 70,
+      "stageMinStamina": 25,
+      "statCap": 100,
+      "zeroMoodTrainingFactor": 0.5
+    },
+    "player": {
+      "dance": 10,
+      "fans": 0,
+      "fansMax": 9999,
+      "mood": 70,
+      "moodMax": 100,
+      "moodMin": 0,
+      "stamina": 100,
+      "staminaMax": 100,
+      "stress": 0,
+      "stressMax": 100,
+      "vocal": 10
+    },
+    "recovery": {
+      "restMood": 6,
+      "restStamina": 45,
+      "restStress": 25,
+      "weeklyMoodDecay": 4,
+      "weeklyStressDecay": 3
+    },
+    "rehearsal": {
+      "scorePreview": true,
+      "staminaCost": 10,
+      "weightScale": 0.5
+    },
+    "rival": {
+      "scoreBattle1": 50,
+      "scoreBattle2": 62,
+      "scoreBattle3": 70,
+      "scoreFinale": 72
+    },
+    "skillRank": [
+      {
+        "min": 0,
+        "rank": "D"
+      },
+      {
+        "min": 25,
+        "rank": "C"
+      },
+      {
+        "min": 45,
+        "rank": "B"
+      },
+      {
+        "min": 65,
+        "rank": "A"
+      },
+      {
+        "min": 85,
+        "rank": "S"
+      }
+    ],
+    "social": {
+      "fansGain": 15,
+      "moodGain": 8,
+      "staminaCost": 10
+    },
+    "stage": {
+      "danceWeight": 0.35,
+      "fansGainPerPoint": 15,
+      "fansGainVariance": 0.2,
+      "goodThreshold": 70,
+      "moodWeight": 0.15,
+      "passThreshold": 55,
+      "perfectThreshold": 85,
+      "staminaCost": 25,
+      "stressGain": 12,
+      "vocalWeight": 0.5
+    },
+    "training": {
+      "gainBase": 6,
+      "gainVariance": 3,
+      "mentorAffinityGain": 5,
+      "softCapFactor": 0.5,
+      "softCapStart": 60,
+      "staminaCost": 18,
+      "stressGain": 8
+    }
+  },
+  "world": "星辉市，娱乐产业竞争最残酷的城市。玩家扮演尚声娱乐新签下的 18 岁练习生「小星」，公司只给 12 周时间：第 12 周末的「新人出道公演」评分达标即可出道，否则解约回校。玩家每周拥有 5 次行动机会，行动类型 5 种：唱功特训、舞蹈特训、休息、社交、彩排。声乐导师林澜与舞蹈导师 K 哥负责指导，同期对手练习生苏晴会在第 5-8 周连续发起对决施压。养成途中按章节触发互动事件（深夜加练的诱惑、上台怯场、直播翻车危机、粉丝来信……），每个事件提供 2~3 个互斥分支，一次性改写数值、心情、粉丝或后续舞台增益。最终由唱功、舞技、公演得分与粉丝数，按固定优先级在 5 个互斥结局（双冠传奇 / 歌姬之路 / 舞灵之路 / 顺利出道 / 遗憾回校）中判定唯一结局。"
+}

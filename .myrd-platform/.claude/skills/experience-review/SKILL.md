@@ -93,8 +93,28 @@ node scripts/calibrate.mjs --packs <包根目录> --human <人类评分.json>
 
 ENFORCE_ELIGIBLE 只是「有资格申请转正」，转正与否由人类拍板。改 rubric / 改打分习惯后必须重跑校准——校准数据不会说谎，但会过期。
 
+## premium 声明伴生要求（声明必须带证据）
+
+凡是向频道/验收**宣称「premium / 商业化品质 / 达到画面下限以上」**的交付，声明与证据必须成对出现
+（对齐 threejs-game-skills 的原话：premium/AAA claims should not rely on a static scene,
+placeholder cubes…）：
+
+1. **必须附五维 scorecard**：即本技能产出的 `review.json`（palette / typography / composition /
+   motion / polish 五维评分 + overall）。没有 scorecard 的「画面很好」只是未评级的自我评价，
+   不得以评级口径表述。
+2. **必须附主动游玩截图**：证据须来自**真实对局进行中**的画面（experience-harness 证据包的
+   `steps/*.png` 或帧序列，带 HUD 与交互反馈），不得用静态场景、占位几何体（方块/胶囊）、
+   开场标题帧或渲染一张就停的截图充当「商业品质」证据。
+3. **advisory 定位不变**：本条只约束「声明怎么说」，不改变 review 的 advisory-only 职责 ——
+   scorecard 不给 pass/fail、不打回交付，放行权仍在人类；反向亦然：scorecard 分数低不构成
+   「不许宣称 premium」的机判拦截，只是声明与证据自相矛盾、验收侧应要求解释。
+4. 未跑评审就宣称 premium 的交付，验收侧可要求补跑（体验证据包 → review.json →
+   `validate-review.mjs` 过证据链门禁）后再声明。
+
 ## 纪律
 
 1. **advisory-only**：review.json 与产物 detail 里不得出现 pass/fail、放行/打回类结论字段。
 2. **rubric 不外流**：五维锚点是本技能内部资产，不要把它复述进游戏开发 agent 的提示词——盲评（被评者不知道评分标准）是防迎合的第一道墙。
 3. **改脚本必跑自测**：`bash scripts/selftest.sh`（合法样本过、五类非法样本全拦、calibrate 形状检查）。
+4. **premium 声明必须带 scorecard + 主动游玩截图**（见上一节）：向频道/验收说「商业化品质」之前，
+   先确认 review.json 与真实对局截图已经存在且成对可溯——缺一样就把声明降级为「未评级，待评审」。

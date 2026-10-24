@@ -40,7 +40,15 @@ node ../../scripts/browser-smoke.mjs .    # ③ CDP 真浏览器冒烟（需本�
 ```
 
 无头冒烟协议：`index.html?smoke=<秒>` 跳过交互直接快进内核，结果 JSON 写 `#ts-smoke` +
-`document.title`（`SMOKE {...}`）—— 含 state/score/collected/timeLeft/fps/exceptions。
+`document.title`（`SMOKE {...}`）—— 含 state/score/collected/timeLeft/fps/exceptions +
+viewport（宽高/dpr）+ render 性能快照（drawCalls/triangles/geometries/textures/programs，
+取自 `renderer.info`，已关 autoReset 按整帧全 pass 统计）。
+
+browser-smoke 以**桌面（1280×720）+ 移动（720×1280）双视口各跑一遍**，逐视口断言
+payload/零异常/渲染开始/帧率/状态机推进/**截图 400 点采样非纯色**；证据落盘 `qa/smoke/`
+（双视口截图 + report.json，`.gitignore` 已排除）。`render` 字段是证据记录不做硬门禁 ——
+headless SwiftShader 软渲染测不出真实性能，阈值待采集基线；触发纪律见 SKILL.md §7：
+**画面/资产/shader/后处理变更时必跑**。
 
 ## 派生新游戏时
 

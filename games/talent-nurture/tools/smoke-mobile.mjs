@@ -154,9 +154,12 @@ async function tapSelector(sel) {
     const cx = Math.round(r.left + r.width / 2), cy = Math.round(r.top + r.height / 2);
     const hit = document.elementFromPoint(cx, cy);
     return JSON.stringify({ cx, cy, w: Math.round(r.width), h: Math.round(r.height),
+      disabled: !!el.disabled,
       inVp: r.top >= 0 && r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && r.width > 0 && r.height > 0,
       hitOk: !!(hit && (hit === el || el.contains(hit))) }); })()`));
   if (geo.err) return { ok: false, reason: geo.err, sel };
+  // disabled 按钮点了也无效（如体力不足时的「登台演出」）：必须跳过，让 tapAny 落到可用的替代按钮（如「弃权」）
+  if (geo.disabled) return { ok: false, reason: 'disabled', sel, geo };
   if (!geo.inVp || !geo.hitOk) return { ok: false, reason: !geo.inVp ? 'out-of-viewport' : 'covered-by-other', sel, geo };
   await tapAt(geo.cx, geo.cy);
   return { ok: true, sel, geo };
@@ -224,8 +227,9 @@ if (!ready) die('线上开屏超时\n' + consoleErrors.join('\n'));
   ];
   const loaded = netResponses.map((r) => r.url);
   // 部署产物经网关以 assets/ 前缀伺服（build.mjs → landing.html + api/public/assets/*），按形态动态探测
+  // html 入口按响应 mime 识别（网关 308 会把 /apps/x/ 规范化为无尾斜杠、无扩展名形态，按 URL 后缀判会漏）
   const assets = loaded.filter((u) => /\.(mjs|css|html)(\?|$)/.test(u));
-  const htmlEntry = assets.filter((u) => u.endsWith('landing.html') || u.endsWith('index.html') || u.replace(/\/$/, '').length < u.length);
+  const htmlEntry = netResponses.filter((r) => r.status < 400 && (r.mime === 'text/html' || r.type === 'document' || r.url.endsWith('landing.html') || r.url.endsWith('index.html') || r.url.replace(/\/$/, '').length < r.url.length)).map((r) => r.url);
   const cssEntry = assets.filter((u) => u.endsWith('style.css'));
   const mainEntry = assets.filter((u) => /(^|\/)main\.mjs(\?|$)/.test(u));
   const sceneEntry = assets.filter((u) => /scenes\/[\w-]+\.mjs(\?|$)/.test(u));

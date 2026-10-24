@@ -1,0 +1,3483 @@
+{
+  "verdict": "FAIL",
+  "generatedAt": "2026-10-24T09:07:38.697Z",
+  "target": {
+    "liveUrl": "https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/",
+    "gamePath": "games/talent-nurture",
+    "viewport": "375x720"
+  },
+  "emulation": {
+    "deviceMetrics": {
+      "width": 375,
+      "height": 720,
+      "deviceScaleFactor": 2,
+      "mobile": true
+    },
+    "touchEmulation": true
+  },
+  "checks": [
+    {
+      "id": "network",
+      "name": "关键资产经 375×720 移动仿真加载全 200、无 404",
+      "pass": false,
+      "detail": "请求 30 个（资产 28：html 0、css 1、main.mjs 1、scenes 5）、非 2xx/3xx 或加载失败 0 个；缺失：html 入口(landing/index)"
+    },
+    {
+      "id": "first-screen",
+      "name": "首屏标题与开始按钮渲染且可点",
+      "pass": true,
+      "detail": "标题「🌟 星光练习生：才艺养成物语」按钮 359×48px 在视口内=true elementFromPoint 命中=true disabled=false"
+    },
+    {
+      "id": "touch-start",
+      "name": "touch 管线点击「开始」按钮生效（title→intro）",
+      "pass": true,
+      "detail": "phase title→intro @ (188,425) 359×48px"
+    },
+    {
+      "id": "viewport",
+      "name": "scrollWidth ≤375 且选项按钮完整在视口内",
+      "pass": true,
+      "detail": "scrollWidth=375/375（上限 375）；选项 2 个，全部在视口内=true；首个 329×48px @(23,190)"
+    },
+    {
+      "id": "touch-event",
+      "name": "分支事件选项 touch 点击生效且连点 3 次只计 1 次",
+      "pass": true,
+      "detail": "fired 0→1（+1）、效果徽标块 1 个、chosen 1 个 @(188,214)"
+    },
+    {
+      "id": "touch-train",
+      "name": "touch 点击训练按钮生效（状态推进）",
+      "pass": true,
+      "detail": "vocal 10→18、actionsLeft 5→4"
+    },
+    {
+      "id": "touch-pipeline",
+      "name": "全程 touch 管线推进至结局",
+      "pass": false,
+      "detail": "phase=stage-confirm 结局=null 公演=null分 舞台 823 场、touch 步骤 4 步全生效=true"
+    },
+    {
+      "id": "hotzone",
+      "name": "可点按钮热区两两无重叠且高度 ≥40px",
+      "pass": true,
+      "detail": "采样 826 屏（title×1个、event×2个、week-board×2个、stage-confirm×2个、stage-confirm×2个、stage-confirm×2个、stage-confirm×2个、stage-confirm×2个、stage-confirm×2个、stage-confirm×2个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个、stage-confirm×1个）；重叠 0 对；矮于 40px 的按钮 0 个；最矮 44px"
+    },
+    {
+      "id": "console",
+      "name": "全流程 console 零 error",
+      "pass": true,
+      "detail": "error=0；warning=0（仅计数不判失败）"
+    }
+  ],
+  "screenshots": [
+    "01-title.png",
+    "02-intro.png",
+    "03-event-choose.png",
+    "04-week-board.png",
+    "05-stage-result.png",
+    "06-ending.png"
+  ],
+  "summary": {
+    "total": 9,
+    "passed": 7,
+    "failed": 2,
+    "touchSteps": 4,
+    "stageVisits": 823,
+    "ending": null,
+    "finalScore": null
+  },
+  "console": {
+    "errors": 0,
+    "warnings": 0,
+    "errorSamples": []
+  },
+  "network": {
+    "totalResponses": 31,
+    "failures": [],
+    "assets": [
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/style.css",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/main.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/scheduler.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/stage-score.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/entities/idol.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/numeric.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/stage-live.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/ending-judge.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/entities/mentor-dance.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/ch1-foundation.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/event-dialog.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/ui.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/data/events-conditional.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/entities/mentor-vocal.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/prologue.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/schedule-board.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/ch3-rival-crisis.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/data/events-placed.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/ch2-first-stage.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/rng.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/entities/rival.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/event-engine.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/ch4-fanfest.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/finale-showcase.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/ending-screen.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/stat-growth.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/data/endings.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/data/events.mjs"
+    ]
+  },
+  "hotzone": {
+    "samples": [
+      {
+        "phase": "title",
+        "count": 1
+      },
+      {
+        "phase": "event",
+        "count": 2
+      },
+      {
+        "phase": "week-board",
+        "count": 2
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 2
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 2
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 2
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 2
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 2
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 2
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 2
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      },
+      {
+        "phase": "stage-confirm",
+        "count": 1
+      }
+    ]
+  },
+  "touchLog": [
+    {
+      "step": "start-btn",
+      "tapOk": true,
+      "geo": {
+        "cx": 188,
+        "cy": 425,
+        "w": 359,
+        "h": 48,
+        "inVp": true,
+        "hitOk": true
+      },
+      "before": "title",
+      "after": "intro"
+    },
+    {
+      "step": "begin-prologue",
+      "tapOk": true,
+      "after": "event"
+    },
+    {
+      "step": "event-choice x3",
+      "tapOk": true,
+      "firedDelta": 1,
+      "resultBoxes": 1,
+      "chosenCount": 1
+    },
+    {
+      "step": "tutorial-train",
+      "tapOk": true,
+      "trained": true
+    }
+  ],
+  "failures": [
+    {
+      "id": "network",
+      "name": "关键资产经 375×720 移动仿真加载全 200、无 404",
+      "detail": "请求 30 个（资产 28：html 0、css 1、main.mjs 1、scenes 5）、非 2xx/3xx 或加载失败 0 个；缺失：html 入口(landing/index)"
+    },
+    {
+      "id": "touch-pipeline",
+      "name": "全程 touch 管线推进至结局",
+      "detail": "phase=stage-confirm 结局=null 公演=null分 舞台 823 场、touch 步骤 4 步全生效=true"
+    }
+  ]
+}

@@ -28,7 +28,9 @@ if (!existsSync(join(WEB, 'landing.html'))) die('export/web 缺位——先 node
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.mjs': 'text/javascript', '.css': 'text/css' };
 server = createServer((req, res) => {
-  const url = (req.url || '/').split('?')[0];
+  let url = (req.url || '/').split('?')[0];
+  // 模拟网关两种入口形态：/（根）与 /apps/talent-nurture（无尾斜杠子路径）
+  url = url.replace(/^\/apps\/talent-nurture/, '') || '/';
   const rel = url === '/' ? 'landing.html' : url.replace(/^\/api\/public\/assets\//, '');
   const p = join(WEB, rel);
   if (!p.startsWith(WEB) || !existsSync(p)) { res.writeHead(404); res.end('nf'); return; }
@@ -114,8 +116,8 @@ const evalJs = async (expr) => {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const nav = async (url) => { await send('Page.navigate', { url }); await sleep(1200); };
 
-// ---- ① 开屏 + 壳契约 ----
-await nav(`http://127.0.0.1:${port}/`);
+// ---- ① 开屏 + 壳契约（无尾斜杠子路径入口，与网关 /apps/talent-nurture 同构）----
+await nav(`http://127.0.0.1:${port}/apps/talent-nurture`);
 let ready = false;
 for (let i = 0; i < 40 && !ready; i += 1) { await sleep(250); ready = await evalJs('!!document.querySelector(".title-screen")'); }
 if (!ready) die('开屏超时\n' + consoleErrors.join('\n'));
@@ -217,3 +219,5 @@ say(`调参桥 ✓ gainBase 999→钳到 12，passThreshold=88 生效`);
 if (consoleErrors.length) die(`console 有错误：\n${consoleErrors.join('\n')}`);
 say('console ✓ 零错误');
 say('SMOKE: PASS');
+try { ws.close(); } catch {}
+process.exit(0);

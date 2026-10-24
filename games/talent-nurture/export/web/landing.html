@@ -4,10 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>星光练习生：才艺养成物语</title>
-<link rel="stylesheet" href="api/public/assets/style.css">
 <script>
 (function () {
   'use strict';
+  // ---- 资产基路径（game-9 判例）：公网入口 /apps/<slug>（无尾斜杠）下，裸相对路径会
+  // 解析到 /apps/*（网关 404）。按页面路径推导：/apps/talent-nurture → /apps/talent-nurture/。
+  var BASE_PATH = (function () {
+    var p = location.pathname.replace(/index\.html$/, '');
+    return p.charAt(p.length - 1) === '/' ? p : p + '/';
+  })();
+
   // ---- 调参桥（SKILL §3C 硬契约：引擎加载前落全局）----
   try {
     var rawTuning = new URLSearchParams(location.search).get('tuning');
@@ -44,11 +50,24 @@
   window.__audioDebug = function () {
     return { state: audioCtx ? audioCtx.state : 'no-ctx', addModules: 0, log: audioLog };
   };
+
+  // ---- 样式与游戏模块：动态注入（静态 src 在无尾斜杠入口下会 404）----
+  function onload() {
+    var link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = BASE_PATH + 'api/public/assets/style.css';
+    document.head.appendChild(link);
+    var s = document.createElement('script');
+    s.type = 'module';
+    s.src = BASE_PATH + 'api/public/assets/main.mjs';
+    document.head.appendChild(s);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onload);
+  else onload();
 })();
 </script>
 </head>
 <body>
 <div id="game-root"></div>
-<script type="module" src="api/public/assets/main.mjs"></script>
 </body>
 </html>

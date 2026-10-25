@@ -1,0 +1,136 @@
+{
+  "generatedAt": "2026-10-25T10:50:15.695Z",
+  "liveUrl": "https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/",
+  "runs": [
+    {
+      "run": 1,
+      "liveUrl": "https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/",
+      "viewport": "375x720",
+      "framesCaptured": 34,
+      "distinctShas": 12,
+      "tapAtFrame": 5,
+      "tapPt": 6884,
+      "curtain": {
+        "framesWithCurtain": 5,
+        "distinctCurtainShas": 5,
+        "spanMs": 277,
+        "coverageSequence": [
+          0.975,
+          0.853,
+          0.687,
+          0.432,
+          0.193
+        ],
+        "maxCoverageDrop": 0.782,
+        "firstFrame": {
+          "file": "006-frame.png",
+          "pt": 7054,
+          "cov": 0.975
+        },
+        "lastFrame": {
+          "file": "010-frame.png",
+          "pt": 7331,
+          "cov": 0.193
+        },
+        "halfWidths": [
+          [
+            183,
+            183
+          ],
+          [
+            160,
+            160
+          ],
+          [
+            129,
+            129
+          ],
+          [
+            81,
+            81
+          ],
+          [
+            36,
+            36
+          ]
+        ]
+      },
+      "mountsRecorded": [
+        {
+          "at": 6949,
+          "goneAt": 7479
+        }
+      ],
+      "firstEventPhaseFrame": {
+        "file": "006-frame.png",
+        "pt": 7054
+      },
+      "consoleErrorsDuringRun": 0
+    },
+    {
+      "run": 2,
+      "liveUrl": "https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/",
+      "viewport": "375x720",
+      "framesCaptured": 34,
+      "distinctShas": 10,
+      "tapAtFrame": 5,
+      "tapPt": 4379,
+      "curtain": {
+        "framesWithCurtain": 5,
+        "distinctCurtainShas": 5,
+        "spanMs": 323,
+        "coverageSequence": [
+          0.997,
+          0.853,
+          0.64,
+          0.374,
+          0.063
+        ],
+        "maxCoverageDrop": 0.934,
+        "firstFrame": {
+          "file": "006-frame.png",
+          "pt": 4536,
+          "cov": 0.997
+        },
+        "lastFrame": {
+          "file": "010-frame.png",
+          "pt": 4859,
+          "cov": 0.063
+        },
+        "halfWidths": [
+          [
+            187,
+            187
+          ],
+          [
+            160,
+            160
+          ],
+          [
+            120,
+            120
+          ],
+          [
+            70,
+            70
+          ],
+          [
+            12,
+            12
+          ]
+        ]
+      },
+      "mountsRecorded": [
+        {
+          "at": 4439,
+          "goneAt": 4969
+        }
+      ],
+      "firstEventPhaseFrame": {
+        "file": "006-frame.png",
+        "pt": 4536
+      },
+      "consoleErrorsDuringRun": 0
+    }
+  ]
+}

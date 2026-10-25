@@ -1,0 +1,666 @@
+{
+  "run": 1,
+  "liveUrl": "https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/",
+  "viewport": "375x720",
+  "framesCaptured": 34,
+  "distinctShas": 12,
+  "tapAtFrame": 5,
+  "tapPt": 6884,
+  "curtain": {
+    "framesWithCurtain": 5,
+    "distinctCurtainShas": 5,
+    "spanMs": 277,
+    "coverageSequence": [
+      0.975,
+      0.853,
+      0.687,
+      0.432,
+      0.193
+    ],
+    "maxCoverageDrop": 0.782,
+    "firstFrame": {
+      "file": "006-frame.png",
+      "pt": 7054,
+      "cov": 0.975
+    },
+    "lastFrame": {
+      "file": "010-frame.png",
+      "pt": 7331,
+      "cov": 0.193
+    },
+    "halfWidths": [
+      [
+        183,
+        183
+      ],
+      [
+        160,
+        160
+      ],
+      [
+        129,
+        129
+      ],
+      [
+        81,
+        81
+      ],
+      [
+        36,
+        36
+      ]
+    ]
+  },
+  "mountsRecorded": [
+    {
+      "at": 6949,
+      "goneAt": 7479
+    }
+  ],
+  "firstEventPhaseFrame": {
+    "file": "006-frame.png",
+    "pt": 7054
+  },
+  "consoleErrorsDuringRun": 0,
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-frame.png",
+      "hostT": 1792925404307,
+      "sha256": "f5cc43b376717e799e0194b8518cdf5b98367c470b51687662fbc0e1101fe87f",
+      "bytes": 655369,
+      "tapped": false,
+      "probe": {
+        "pt": 4740,
+        "phase": "intro",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 2,
+      "file": "002-frame.png",
+      "hostT": 1792925406007,
+      "sha256": "302a39e3f82c2a0c34cb3864ec8c5f1e244dc8db777ed4e4a577bd74e33ac408",
+      "bytes": 693381,
+      "tapped": false,
+      "probe": {
+        "pt": 6439,
+        "phase": "intro",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 3,
+      "file": "003-frame.png",
+      "hostT": 1792925406068,
+      "sha256": "066a622fd9a74cb6eef6742ddd8c3a0b64fdc27de5fa79b2b0c07bb68e00aa63",
+      "bytes": 133022,
+      "tapped": false,
+      "probe": {
+        "pt": 6501,
+        "phase": "intro",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 4,
+      "file": "004-frame.png",
+      "hostT": 1792925406135,
+      "sha256": "066a622fd9a74cb6eef6742ddd8c3a0b64fdc27de5fa79b2b0c07bb68e00aa63",
+      "bytes": 133022,
+      "tapped": false,
+      "probe": {
+        "pt": 6567,
+        "phase": "intro",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 5,
+      "file": "005-frame.png",
+      "hostT": 1792925406452,
+      "sha256": "31846696cdb2361d11c4e65470d0bfe0d3915a8a350ae3c46f2d615954b5148e",
+      "bytes": 134133,
+      "tapped": false,
+      "probe": {
+        "pt": 6884,
+        "phase": "intro",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 6,
+      "file": "006-frame.png",
+      "hostT": 1792925406622,
+      "sha256": "b393295070ff6dd2c1ff782181f70a4568694dbb976c669261bf433c80729dae",
+      "bytes": 102226,
+      "tapped": true,
+      "probe": {
+        "pt": 7054,
+        "phase": "event",
+        "curtain": true,
+        "cov": 0.975,
+        "halves": [
+          183,
+          183
+        ],
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 7,
+      "file": "007-frame.png",
+      "hostT": 1792925406693,
+      "sha256": "fd3865ea9c7ed471ef96644434957dd60b0e2df790f5e18c6606a4e13e87ac88",
+      "bytes": 119446,
+      "tapped": false,
+      "probe": {
+        "pt": 7125,
+        "phase": "event",
+        "curtain": true,
+        "cov": 0.853,
+        "halves": [
+          160,
+          160
+        ],
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 8,
+      "file": "008-frame.png",
+      "hostT": 1792925406755,
+      "sha256": "110500762f63250e0997da547a2bbbd95499b052cf36210a16a949e68d5f55de",
+      "bytes": 125656,
+      "tapped": false,
+      "probe": {
+        "pt": 7187,
+        "phase": "event",
+        "curtain": true,
+        "cov": 0.687,
+        "halves": [
+          129,
+          129
+        ],
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 9,
+      "file": "009-frame.png",
+      "hostT": 1792925406843,
+      "sha256": "9bb4590c4e537d42e14cd1436131ed98df497385ebb587130dd85775265f97d1",
+      "bytes": 126815,
+      "tapped": false,
+      "probe": {
+        "pt": 7275,
+        "phase": "event",
+        "curtain": true,
+        "cov": 0.432,
+        "halves": [
+          81,
+          81
+        ],
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 10,
+      "file": "010-frame.png",
+      "hostT": 1792925406899,
+      "sha256": "34a0d3bb222fd196ba5dc0d34d9122cfa21319bfcbfbc802dee2024402cb2c1f",
+      "bytes": 112402,
+      "tapped": false,
+      "probe": {
+        "pt": 7331,
+        "phase": "event",
+        "curtain": true,
+        "cov": 0.193,
+        "halves": [
+          36,
+          36
+        ],
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 11,
+      "file": "011-frame.png",
+      "hostT": 1792925406964,
+      "sha256": "42fe276cd602e89626431839b043a39af242cb7d5e4865a3cc1a729824c21baf",
+      "bytes": 105132,
+      "tapped": false,
+      "probe": {
+        "pt": 7396,
+        "phase": "event",
+        "curtain": true,
+        "cov": 0,
+        "halves": [
+          0,
+          0
+        ],
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 12,
+      "file": "012-frame.png",
+      "hostT": 1792925407030,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 7462,
+        "phase": "event",
+        "curtain": true,
+        "cov": 0,
+        "halves": [
+          0,
+          0
+        ],
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 13,
+      "file": "013-frame.png",
+      "hostT": 1792925407079,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 7511,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 14,
+      "file": "014-frame.png",
+      "hostT": 1792925407145,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 7577,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 15,
+      "file": "015-frame.png",
+      "hostT": 1792925407196,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 7628,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 16,
+      "file": "016-frame.png",
+      "hostT": 1792925407263,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 7695,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 17,
+      "file": "017-frame.png",
+      "hostT": 1792925407313,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 7745,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 18,
+      "file": "018-frame.png",
+      "hostT": 1792925407381,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 7813,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 19,
+      "file": "019-frame.png",
+      "hostT": 1792925407526,
+      "sha256": "16cbdfe3830b9dd3b101b551d483b38248b7d8664c75a51e947b0a17697f88c2",
+      "bytes": 105118,
+      "tapped": false,
+      "probe": {
+        "pt": 7958,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 20,
+      "file": "020-frame.png",
+      "hostT": 1792925407577,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 8009,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 21,
+      "file": "021-frame.png",
+      "hostT": 1792925407646,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 8078,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 22,
+      "file": "022-frame.png",
+      "hostT": 1792925407693,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 8125,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 23,
+      "file": "023-frame.png",
+      "hostT": 1792925407764,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 8196,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 24,
+      "file": "024-frame.png",
+      "hostT": 1792925407813,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 8245,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 25,
+      "file": "025-frame.png",
+      "hostT": 1792925407879,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 8311,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 26,
+      "file": "026-frame.png",
+      "hostT": 1792925407928,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 8359,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 27,
+      "file": "027-frame.png",
+      "hostT": 1792925407997,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 8428,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 28,
+      "file": "028-frame.png",
+      "hostT": 1792925408045,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 8477,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 29,
+      "file": "029-frame.png",
+      "hostT": 1792925408113,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 8545,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 30,
+      "file": "030-frame.png",
+      "hostT": 1792925408162,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 8594,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 31,
+      "file": "031-frame.png",
+      "hostT": 1792925408229,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 8661,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 32,
+      "file": "032-frame.png",
+      "hostT": 1792925408279,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 8711,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 33,
+      "file": "033-frame.png",
+      "hostT": 1792925408346,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 8778,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    },
+    {
+      "frame": 34,
+      "file": "034-frame.png",
+      "hostT": 1792925408395,
+      "sha256": "b9b4cabdd541180e0c751c1b179c3ca71738e523d8f68bf2ad6ecc80e2d92bda",
+      "bytes": 105008,
+      "tapped": false,
+      "probe": {
+        "pt": 8827,
+        "phase": "event",
+        "curtain": false,
+        "cov": 0,
+        "halves": null,
+        "vw": 375,
+        "vh": 720
+      }
+    }
+  ]
+}

@@ -4,7 +4,7 @@ import { getAsset } from "./lib/asset-store";
 
 // 构建版本标识（每次发布手动 bump；与落地页 #build-badge / window.__BUILD_VERSION 对应，
 // 用于冒烟复核区分新旧部署——线上页面注入的是部署 ref 的 git 短哈希，此处是发布代号）
-const APP_VERSION = "v2-visual-1";
+const APP_VERSION = "v2-curtain-fix-1";
 
 const app = new Hono();
 

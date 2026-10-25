@@ -1,0 +1,73 @@
+{
+  "label": "reveal",
+  "out": "games/talent-nurture/qa/visual-acceptance/transitions/ev-costume-choice-reveal",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-reveal.png",
+      "sha256": "2161c4bfea5ecc79dce0f057719e5ea6a7797ed39fabda70401b1febb6f565e6",
+      "bytes": 45634,
+      "probedAt": "2026-10-25T03:10:12.786Z",
+      "probe": "{\"curtain\":false,\"ava\":0,\"t\":\"剧情事件|第一套练习服||更衣柜里挂着印有你名字的练习服。镜子里的自己看起来像个\"}"
+    },
+    {
+      "frame": 2,
+      "file": "002-reveal.png",
+      "sha256": "6e1fb2121a6445e6380db9e816f04a74ac8979a6c8a2800e677fac74d55a8bef",
+      "bytes": 51894,
+      "probedAt": "2026-10-25T03:10:13.009Z",
+      "probe": "{\"curtain\":false,\"ava\":0,\"t\":\"剧情事件|第一套练习服||更衣柜里挂着印有你名字的练习服。镜子里的自己看起来像个\"}"
+    },
+    {
+      "frame": 3,
+      "file": "003-reveal.png",
+      "sha256": "6a0521ceedb3fc6ded92f6b389fc6d2ecc5f86cc40a7732f11f9e9dd446e6e92",
+      "bytes": 52863,
+      "probedAt": "2026-10-25T03:10:13.191Z",
+      "probe": "{\"curtain\":false,\"ava\":0,\"t\":\"剧情事件|第一套练习服||更衣柜里挂着印有你名字的练习服。镜子里的自己看起来像个\"}"
+    },
+    {
+      "frame": 4,
+      "file": "004-reveal.png",
+      "sha256": "ddc433a71423d33a33e03c0216dd43c91d80adc50d303faa1389df7fcc31df70",
+      "bytes": 52312,
+      "probedAt": "2026-10-25T03:10:13.376Z",
+      "probe": "{\"curtain\":false,\"ava\":0,\"t\":\"剧情事件|第一套练习服||更衣柜里挂着印有你名字的练习服。镜子里的自己看起来像个\"}"
+    },
+    {
+      "frame": 5,
+      "file": "005-reveal.png",
+      "sha256": "98578fde628ff3539964978b14ea412fa054fc4e3c2f3cc4b791f9bdba680c19",
+      "bytes": 52105,
+      "probedAt": "2026-10-25T03:10:13.571Z",
+      "probe": "{\"curtain\":false,\"ava\":0,\"t\":\"剧情事件|第一套练习服||更衣柜里挂着印有你名字的练习服。镜子里的自己看起来像个\"}"
+    },
+    {
+      "frame": 6,
+      "file": "006-reveal.png",
+      "sha256": "6db3288ac0a0123cee2ebb59ce72fa644d4634c8950cc0f0cb43957061daf491",
+      "bytes": 51603,
+      "probedAt": "2026-10-25T03:10:13.773Z",
+      "probe": "{\"curtain\":false,\"ava\":0,\"t\":\"剧情事件|第一套练习服||更衣柜里挂着印有你名字的练习服。镜子里的自己看起来像个\"}"
+    },
+    {
+      "frame": 7,
+      "file": "007-reveal.png",
+      "sha256": "1a25cd7414d35261d5bae74ebcdd01720f66be68da75c13b78dbfd71660bd279",
+      "bytes": 51760,
+      "probedAt": "2026-10-25T03:10:13.953Z",
+      "probe": "{\"curtain\":false,\"ava\":0,\"t\":\"剧情事件|第一套练习服||更衣柜里挂着印有你名字的练习服。镜子里的自己看起来像个\"}"
+    },
+    {
+      "frame": 8,
+      "file": "008-reveal.png",
+      "sha256": "1a25cd7414d35261d5bae74ebcdd01720f66be68da75c13b78dbfd71660bd279",
+      "bytes": 51760,
+      "probedAt": "2026-10-25T03:10:14.120Z",
+      "probe": "{\"curtain\":false,\"ava\":0,\"t\":\"剧情事件|第一套练习服||更衣柜里挂着印有你名字的练习服。镜子里的自己看起来像个\"}"
+    }
+  ],
+  "intervalMs": 120,
+  "distinctSha256": 7,
+  "stillImage": false
+}

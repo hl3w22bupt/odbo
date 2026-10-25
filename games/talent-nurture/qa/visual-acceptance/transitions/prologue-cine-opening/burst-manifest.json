@@ -1,0 +1,105 @@
+{
+  "label": "cine",
+  "out": "games/talent-nurture/qa/visual-acceptance/transitions/prologue-cine-opening",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-cine.png",
+      "sha256": "55d46f739f8b45fef8e122743d52543efc0786ccb691ddca8f510bf05097abc6",
+      "bytes": 96897,
+      "probedAt": "2026-10-25T03:29:13.672Z",
+      "probe": "{\"cine\":false,\"bars\":0,\"grain\":false,\"black\":false,\"push\":false,\"cineOpacity\":null,\"t\":\"🌟 星光练习生：才艺养成物语|\"}"
+    },
+    {
+      "frame": 2,
+      "file": "002-cine.png",
+      "sha256": "04f21a9e79a9c0e8156bf0842c9b11ceaaf1c3a857b235cc2dbdf0fd259da467",
+      "bytes": 172617,
+      "probedAt": "2026-10-25T03:29:14.577Z",
+      "probe": "{\"cine\":true,\"bars\":2,\"grain\":true,\"black\":true,\"push\":true,\"cineOpacity\":\"1\",\"t\":\"序章|入社第一天||🎤 林澜：\"}"
+    },
+    {
+      "frame": 3,
+      "file": "003-cine.png",
+      "sha256": "369bd8eeb3dd731cb14e35c5cead18d94af0490c401d4dd66ac9e285ac3c6289",
+      "bytes": 214710,
+      "probedAt": "2026-10-25T03:29:14.956Z",
+      "probe": "{\"cine\":true,\"bars\":2,\"grain\":true,\"black\":true,\"push\":true,\"cineOpacity\":\"1\",\"t\":\"序章|入社第一天||🎤 林澜：\"}"
+    },
+    {
+      "frame": 4,
+      "file": "004-cine.png",
+      "sha256": "181aafa096b7ef870e7d6293d29c846acc8baefb29090ffe24ae39260c579226",
+      "bytes": 250808,
+      "probedAt": "2026-10-25T03:29:15.309Z",
+      "probe": "{\"cine\":true,\"bars\":2,\"grain\":true,\"black\":true,\"push\":true,\"cineOpacity\":\"1\",\"t\":\"序章|入社第一天||🎤 林澜：\"}"
+    },
+    {
+      "frame": 5,
+      "file": "005-cine.png",
+      "sha256": "181aafa096b7ef870e7d6293d29c846acc8baefb29090ffe24ae39260c579226",
+      "bytes": 250808,
+      "probedAt": "2026-10-25T03:29:15.652Z",
+      "probe": "{\"cine\":true,\"bars\":2,\"grain\":true,\"black\":true,\"push\":true,\"cineOpacity\":\"1\",\"t\":\"序章|入社第一天||🎤 林澜：\"}"
+    },
+    {
+      "frame": 6,
+      "file": "006-cine.png",
+      "sha256": "9c0c25fda138d13d82db441c6da39cf79f44368f9b92d8cf21532dee88f7c07b",
+      "bytes": 249640,
+      "probedAt": "2026-10-25T03:29:16.018Z",
+      "probe": "{\"cine\":true,\"bars\":2,\"grain\":true,\"black\":true,\"push\":true,\"cineOpacity\":\"1\",\"t\":\"序章|入社第一天||🎤 林澜：\"}"
+    },
+    {
+      "frame": 7,
+      "file": "007-cine.png",
+      "sha256": "f462e17707875c1e4c3e616c50b1aac8be7161dbfc1bb89a419bd3ce6f6afbd3",
+      "bytes": 219763,
+      "probedAt": "2026-10-25T03:29:16.373Z",
+      "probe": "{\"cine\":true,\"bars\":2,\"grain\":true,\"black\":true,\"push\":true,\"cineOpacity\":\"1\",\"t\":\"序章|入社第一天||🎤 林澜：\"}"
+    },
+    {
+      "frame": 8,
+      "file": "008-cine.png",
+      "sha256": "6d7d1ac29353e8fa42edd065c262b46cc7bf093ac68dfd1bed112f8602059112",
+      "bytes": 59581,
+      "probedAt": "2026-10-25T03:29:16.669Z",
+      "probe": "{\"cine\":true,\"bars\":2,\"grain\":true,\"black\":true,\"push\":true,\"cineOpacity\":\"1\",\"t\":\"序章|入社第一天||🎤 林澜：\"}"
+    },
+    {
+      "frame": 9,
+      "file": "009-cine.png",
+      "sha256": "6d7d1ac29353e8fa42edd065c262b46cc7bf093ac68dfd1bed112f8602059112",
+      "bytes": 59581,
+      "probedAt": "2026-10-25T03:29:16.971Z",
+      "probe": "{\"cine\":false,\"bars\":0,\"grain\":false,\"black\":false,\"push\":true,\"cineOpacity\":null,\"t\":\"序章|入社第一天||🎤 林澜：\"}"
+    },
+    {
+      "frame": 10,
+      "file": "010-cine.png",
+      "sha256": "6d7d1ac29353e8fa42edd065c262b46cc7bf093ac68dfd1bed112f8602059112",
+      "bytes": 59581,
+      "probedAt": "2026-10-25T03:29:17.271Z",
+      "probe": "{\"cine\":false,\"bars\":0,\"grain\":false,\"black\":false,\"push\":true,\"cineOpacity\":null,\"t\":\"序章|入社第一天||🎤 林澜：\"}"
+    },
+    {
+      "frame": 11,
+      "file": "011-cine.png",
+      "sha256": "6d7d1ac29353e8fa42edd065c262b46cc7bf093ac68dfd1bed112f8602059112",
+      "bytes": 59581,
+      "probedAt": "2026-10-25T03:29:17.553Z",
+      "probe": "{\"cine\":false,\"bars\":0,\"grain\":false,\"black\":false,\"push\":true,\"cineOpacity\":null,\"t\":\"序章|入社第一天||🎤 林澜：\"}"
+    },
+    {
+      "frame": 12,
+      "file": "012-cine.png",
+      "sha256": "6d7d1ac29353e8fa42edd065c262b46cc7bf093ac68dfd1bed112f8602059112",
+      "bytes": 59581,
+      "probedAt": "2026-10-25T03:29:17.848Z",
+      "probe": "{\"cine\":false,\"bars\":0,\"grain\":false,\"black\":false,\"push\":true,\"cineOpacity\":null,\"t\":\"序章|入社第一天||🎤 林澜：\"}"
+    }
+  ],
+  "intervalMs": 250,
+  "distinctSha256": 7,
+  "stillImage": false
+}

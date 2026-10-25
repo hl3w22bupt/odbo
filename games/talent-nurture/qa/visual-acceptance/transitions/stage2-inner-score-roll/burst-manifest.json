@@ -1,0 +1,105 @@
+{
+  "label": "roll2",
+  "out": "games/talent-nurture/qa/visual-acceptance/transitions/stage2-inner-score-roll",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-roll2.png",
+      "sha256": "9e37b4fda77cd9f841c447a4061584eb95ff3d9b500ae64144e1f44be90f863b",
+      "bytes": 62049,
+      "probedAt": "2026-10-25T03:21:11.481Z",
+      "probe": "{\"score\":null,\"tier\":null,\"pose\":\"r pose-train ava-swe\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 2,
+      "file": "002-roll2.png",
+      "sha256": "f3c3be6c74e803ebe1c0570cfa7ece70dd3c2f09627d2e5f9747234476882300",
+      "bytes": 81080,
+      "probedAt": "2026-10-25T03:21:11.745Z",
+      "probe": "{\"score\":\"8\",\"tier\":\"t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 3,
+      "file": "003-roll2.png",
+      "sha256": "556e5a5bc5943d7fc9b27303ef4a54988bb29db67236db1cc43d3bf39aa64682",
+      "bytes": 49188,
+      "probedAt": "2026-10-25T03:21:11.964Z",
+      "probe": "{\"score\":\"25\",\"tier\":\"t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 4,
+      "file": "004-roll2.png",
+      "sha256": "f3497949b7469dd9e4314d53a2312925c9add352c041aea5290353ddc4ca475c",
+      "bytes": 49739,
+      "probedAt": "2026-10-25T03:21:12.189Z",
+      "probe": "{\"score\":\"37\",\"tier\":\"t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 5,
+      "file": "005-roll2.png",
+      "sha256": "ed3d78075dc1d7774c9663714327cfe796ae28bde14b9976dad74fb77dcc89f0",
+      "bytes": 49354,
+      "probedAt": "2026-10-25T03:21:12.407Z",
+      "probe": "{\"score\":\"44\",\"tier\":\"t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 6,
+      "file": "006-roll2.png",
+      "sha256": "f05559330e178e26f7dcda3273eb2c86556abebfa10c94f724935b24f217748f",
+      "bytes": 49039,
+      "probedAt": "2026-10-25T03:21:12.623Z",
+      "probe": "{\"score\":\"47\",\"tier\":\"t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 7,
+      "file": "007-roll2.png",
+      "sha256": "aedf36e08f55587bb09b032cd7622500be49d584dda54e873c65fb308d1ccfa1",
+      "bytes": 49399,
+      "probedAt": "2026-10-25T03:21:12.838Z",
+      "probe": "{\"score\":\"49\",\"tier\":\"t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 8,
+      "file": "008-roll2.png",
+      "sha256": "b774c9ef326b8ca3aa7dd7735f5673551f9c3ed6da6be7e193999d11d6f64b6c",
+      "bytes": 49407,
+      "probedAt": "2026-10-25T03:21:13.056Z",
+      "probe": "{\"score\":\"49\",\"tier\":\"t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 9,
+      "file": "009-roll2.png",
+      "sha256": "b1a5edfb3499bbd256f872247bfab47b91a034becc34d601d4aae567e67290b8",
+      "bytes": 49450,
+      "probedAt": "2026-10-25T03:21:13.278Z",
+      "probe": "{\"score\":\"49\",\"tier\":\"t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 10,
+      "file": "010-roll2.png",
+      "sha256": "88ad363fa93e561233b3074faaaf26127eea4bdbfea4e2e728c6351e96ba8fba",
+      "bytes": 49445,
+      "probedAt": "2026-10-25T03:21:13.511Z",
+      "probe": "{\"score\":\"49\",\"tier\":\"t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 11,
+      "file": "011-roll2.png",
+      "sha256": "ab6354ec1f02e91667935fff608b63234bfaff664bdde7771aaf004a750c1e2b",
+      "bytes": 49436,
+      "probedAt": "2026-10-25T03:21:13.745Z",
+      "probe": "{\"score\":\"49\",\"tier\":\"t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 12,
+      "file": "012-roll2.png",
+      "sha256": "3cf3ac0768e6648f73ca7a62fe79324edaad326b2dfc781e971e44d1a4f8d80b",
+      "bytes": 49420,
+      "probedAt": "2026-10-25T03:21:13.977Z",
+      "probe": "{\"score\":\"49\",\"tier\":\"t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":[]}"
+    }
+  ],
+  "intervalMs": 150,
+  "distinctSha256": 12,
+  "stillImage": false
+}

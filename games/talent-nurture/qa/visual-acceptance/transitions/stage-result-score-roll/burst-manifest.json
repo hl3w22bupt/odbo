@@ -1,0 +1,105 @@
+{
+  "label": "roll",
+  "out": "games/talent-nurture/qa/visual-acceptance/transitions/stage-result-score-roll",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-roll.png",
+      "sha256": "138b8e128c4b2bfddb7b6c0275469d8f0cdb5cc32a1f4a047baed76537c7d32a",
+      "bytes": 70264,
+      "probedAt": "2026-10-25T03:15:01.900Z",
+      "probe": "{\"score\":null,\"tier\":null,\"pose\":\"r pose-train ava-swe\",\"particles\":0,\"floats\":0,\"beams\":3,\"txt\":\"周末舞台|入社试镜||周末的舞台来了。全场的灯打在你身上。||🎤 唱功\"}"
+    },
+    {
+      "frame": 2,
+      "file": "002-roll.png",
+      "sha256": "1a55b99764b8631ee9f8004cbf07b5d8c660f2076c8d332b74322b1f0f91ad6f",
+      "bytes": 79438,
+      "probedAt": "2026-10-25T03:15:02.172Z",
+      "probe": "{\"score\":\"5\",\"tier\":\"score-big t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":0,\"beams\":0,\"txt\":\"舞台结算|入社试镜|5 分 · 及格||粉丝数没有变化。||🎤 唱功 \"}"
+    },
+    {
+      "frame": 3,
+      "file": "003-roll.png",
+      "sha256": "b4a377657c08c78c7a97c9b975e45193859ee0af5f1616a726723b2a16ee81c1",
+      "bytes": 47724,
+      "probedAt": "2026-10-25T03:15:02.377Z",
+      "probe": "{\"score\":\"15\",\"tier\":\"score-big t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":0,\"beams\":0,\"txt\":\"舞台结算|入社试镜|15 分 · 及格||粉丝数没有变化。||🎤 唱功\"}"
+    },
+    {
+      "frame": 4,
+      "file": "004-roll.png",
+      "sha256": "d92c7546ee7c0f3ced59013d31ad74b95496accce899fb1d730a249252f3e5bc",
+      "bytes": 47929,
+      "probedAt": "2026-10-25T03:15:02.601Z",
+      "probe": "{\"score\":\"22\",\"tier\":\"score-big t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":0,\"beams\":0,\"txt\":\"舞台结算|入社试镜|22 分 · 及格||粉丝数没有变化。||🎤 唱功\"}"
+    },
+    {
+      "frame": 5,
+      "file": "005-roll.png",
+      "sha256": "d85ca3c7525a77a7a85a36b44063260c18687fc1ae82127ecf6244f202e70165",
+      "bytes": 48145,
+      "probedAt": "2026-10-25T03:15:02.823Z",
+      "probe": "{\"score\":\"27\",\"tier\":\"score-big t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":0,\"beams\":0,\"txt\":\"舞台结算|入社试镜|27 分 · 及格||粉丝数没有变化。||🎤 唱功\"}"
+    },
+    {
+      "frame": 6,
+      "file": "006-roll.png",
+      "sha256": "13a83cc9ab76538560b5a59d98000156227f9872c3f2548d16f62c96ea2f2335",
+      "bytes": 48130,
+      "probedAt": "2026-10-25T03:15:03.057Z",
+      "probe": "{\"score\":\"29\",\"tier\":\"score-big t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":0,\"beams\":0,\"txt\":\"舞台结算|入社试镜|29 分 · 及格||粉丝数没有变化。||🎤 唱功\"}"
+    },
+    {
+      "frame": 7,
+      "file": "007-roll.png",
+      "sha256": "6bfa11f6f1c120c717c83daad88dd8e93106dce55cadceeba24f90f8029f1627",
+      "bytes": 48189,
+      "probedAt": "2026-10-25T03:15:03.289Z",
+      "probe": "{\"score\":\"30\",\"tier\":\"score-big t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":0,\"beams\":0,\"txt\":\"舞台结算|入社试镜|30 分 · 及格||粉丝数没有变化。||🎤 唱功\"}"
+    },
+    {
+      "frame": 8,
+      "file": "008-roll.png",
+      "sha256": "ffc61c4b6d719cca619e81f8e75451a408597ad2163b9a19d5deb7c690574342",
+      "bytes": 48181,
+      "probedAt": "2026-10-25T03:15:03.520Z",
+      "probe": "{\"score\":\"30\",\"tier\":\"score-big t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":0,\"beams\":0,\"txt\":\"舞台结算|入社试镜|30 分 · 及格||粉丝数没有变化。||🎤 唱功\"}"
+    },
+    {
+      "frame": 9,
+      "file": "009-roll.png",
+      "sha256": "14ab969b0cf71ca7014599f3242e131cb2e8d0e02c8dc9bd281c2d6f5bc4da01",
+      "bytes": 48258,
+      "probedAt": "2026-10-25T03:15:03.740Z",
+      "probe": "{\"score\":\"30\",\"tier\":\"score-big t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":0,\"beams\":0,\"txt\":\"舞台结算|入社试镜|30 分 · 及格||粉丝数没有变化。||🎤 唱功\"}"
+    },
+    {
+      "frame": 10,
+      "file": "010-roll.png",
+      "sha256": "f320f27d72afd982a03700a27e2754751650cace81177051437fe6555ea93e4a",
+      "bytes": 48239,
+      "probedAt": "2026-10-25T03:15:03.976Z",
+      "probe": "{\"score\":\"30\",\"tier\":\"score-big t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":0,\"beams\":0,\"txt\":\"舞台结算|入社试镜|30 分 · 及格||粉丝数没有变化。||🎤 唱功\"}"
+    },
+    {
+      "frame": 11,
+      "file": "011-roll.png",
+      "sha256": "ea7a19a0d5b7472e97045ceae1434461aedf9401a514a61b3d094441696cd41e",
+      "bytes": 48247,
+      "probedAt": "2026-10-25T03:15:04.210Z",
+      "probe": "{\"score\":\"30\",\"tier\":\"score-big t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":0,\"beams\":0,\"txt\":\"舞台结算|入社试镜|30 分 · 及格||粉丝数没有变化。||🎤 唱功\"}"
+    },
+    {
+      "frame": 12,
+      "file": "012-roll.png",
+      "sha256": "69a99cadcfb44f2b06b2903c762c51a2838a0aaff92765cf3bae099111600050",
+      "bytes": 48258,
+      "probedAt": "2026-10-25T03:15:04.437Z",
+      "probe": "{\"score\":\"30\",\"tier\":\"score-big t-pass\",\"pose\":\"r pose-sing\",\"particles\":0,\"floats\":0,\"beams\":0,\"txt\":\"舞台结算|入社试镜|30 分 · 及格||粉丝数没有变化。||🎤 唱功\"}"
+    }
+  ],
+  "intervalMs": 150,
+  "distinctSha256": 12,
+  "stillImage": false
+}

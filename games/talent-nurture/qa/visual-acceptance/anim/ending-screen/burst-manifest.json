@@ -1,0 +1,73 @@
+{
+  "label": "ending",
+  "out": "games/talent-nurture/qa/visual-acceptance/anim/ending-screen",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-ending.png",
+      "sha256": "dcbcddbe8c294b681a03c7bcd8d6cfa28436ceb4f539b19ac367589fa307de56",
+      "bytes": 59097,
+      "probedAt": "2026-10-25T03:35:05.054Z",
+      "probe": "{\"pose\":\"r pose-celebrate\",\"anim\":\"poseCelebrate\",\"t\":\"舞台结算|新人出道公演|70 分 · 良好||你 70 : 72 苏晴——这一场\"}"
+    },
+    {
+      "frame": 2,
+      "file": "002-ending.png",
+      "sha256": "6353e4d0ad5eaa570851453301a4f14fe59ff47a254afacf082fe7aba79bc2ad",
+      "bytes": 123939,
+      "probedAt": "2026-10-25T03:35:05.409Z",
+      "probe": "{\"pose\":\"r pose-celebrate\",\"anim\":\"poseCelebrate\",\"t\":\"GOOD END B|🕺 舞灵之路|🎉|✨|💧|小星||最后一个定格，全场\"}"
+    },
+    {
+      "frame": 3,
+      "file": "003-ending.png",
+      "sha256": "07f619ccc117d6dd71c663bd7b0807940f73e98cc1b73c753d3b3acadd4c4099",
+      "bytes": 108676,
+      "probedAt": "2026-10-25T03:35:05.667Z",
+      "probe": "{\"pose\":\"r pose-celebrate\",\"anim\":\"poseCelebrate\",\"t\":\"GOOD END B|🕺 舞灵之路|🎉|✨|💧|小星||最后一个定格，全场\"}"
+    },
+    {
+      "frame": 4,
+      "file": "004-ending.png",
+      "sha256": "2a04d1e2b6024e5384f7e03e597ff963a01a1770ffb7f6d531a80194753b2e68",
+      "bytes": 119371,
+      "probedAt": "2026-10-25T03:35:05.938Z",
+      "probe": "{\"pose\":\"r pose-celebrate\",\"anim\":\"poseCelebrate\",\"t\":\"GOOD END B|🕺 舞灵之路|🎉|✨|💧|小星||最后一个定格，全场\"}"
+    },
+    {
+      "frame": 5,
+      "file": "005-ending.png",
+      "sha256": "eb21a849101e89c671c377981f448d35de621224a4ff4ee19786543cffb2551d",
+      "bytes": 117951,
+      "probedAt": "2026-10-25T03:35:06.204Z",
+      "probe": "{\"pose\":\"r pose-celebrate\",\"anim\":\"poseCelebrate\",\"t\":\"GOOD END B|🕺 舞灵之路|🎉|✨|💧|小星||最后一个定格，全场\"}"
+    },
+    {
+      "frame": 6,
+      "file": "006-ending.png",
+      "sha256": "648dbcaf4d52288240c37b6d47061adfd0f8f469ff9212daebb43f3ebd617ba4",
+      "bytes": 113382,
+      "probedAt": "2026-10-25T03:35:06.619Z",
+      "probe": "{\"pose\":\"r pose-celebrate\",\"anim\":\"poseCelebrate\",\"t\":\"GOOD END B|🕺 舞灵之路|🎉|✨|💧|小星||最后一个定格，全场\"}"
+    },
+    {
+      "frame": 7,
+      "file": "007-ending.png",
+      "sha256": "b90cb813b8ecd30fc03709fe8e897bbcbd9722782a761f5397afdbf7b14177c4",
+      "bytes": 111118,
+      "probedAt": "2026-10-25T03:35:06.921Z",
+      "probe": "{\"pose\":\"r pose-celebrate\",\"anim\":\"poseCelebrate\",\"t\":\"GOOD END B|🕺 舞灵之路|🎉|✨|💧|小星||最后一个定格，全场\"}"
+    },
+    {
+      "frame": 8,
+      "file": "008-ending.png",
+      "sha256": "cd19427a150e4aafae237e2a020da4429435e76f34ccf871f6dd5ff54d7f6a7a",
+      "bytes": 105729,
+      "probedAt": "2026-10-25T03:35:07.219Z",
+      "probe": "{\"pose\":\"r pose-celebrate\",\"anim\":\"poseCelebrate\",\"t\":\"GOOD END B|🕺 舞灵之路|🎉|✨|💧|小星||最后一个定格，全场\"}"
+    }
+  ],
+  "intervalMs": 200,
+  "distinctSha256": 8,
+  "stillImage": false
+}

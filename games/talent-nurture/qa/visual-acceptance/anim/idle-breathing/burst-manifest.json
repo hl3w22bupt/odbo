@@ -1,0 +1,73 @@
+{
+  "label": "idle",
+  "out": "games/talent-nurture/qa/visual-acceptance/anim/idle-breathing",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-idle.png",
+      "sha256": "04728a40faecda96f5566e276079b68a0ab9e8993bf6368e443f79bf87a4e339",
+      "bytes": 94278,
+      "probedAt": "2026-10-25T03:11:11.198Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"transform\":\"matrix(1, 0, 0, 1, 0, -2.80251)\",\"playing\":\"running\"}"
+    },
+    {
+      "frame": 2,
+      "file": "002-idle.png",
+      "sha256": "4b415df5cc4ff5f878240d5f66a7627d7033aa3d2dde054093d72fe18b104671",
+      "bytes": 94512,
+      "probedAt": "2026-10-25T03:11:11.699Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"transform\":\"matrix(1, 0, 0, 1, 0, -1.01124)\",\"playing\":\"running\"}"
+    },
+    {
+      "frame": 3,
+      "file": "003-idle.png",
+      "sha256": "843a4fc30e36b2255844cb04cf94bb33d50d4e9d5a6197d627e94f03c480ed92",
+      "bytes": 94333,
+      "probedAt": "2026-10-25T03:11:12.202Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"transform\":\"matrix(1, 0, 0, 1, 0, -0.0042746)\",\"playing\":\"running\"}"
+    },
+    {
+      "frame": 4,
+      "file": "004-idle.png",
+      "sha256": "88089ac9a709c67d6378af978fab31a7d45f8bc7a9956126e2812cd9e4dcc6ed",
+      "bytes": 94311,
+      "probedAt": "2026-10-25T03:11:12.700Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"transform\":\"matrix(1, 0, 0, 1, 0, -1.21235)\",\"playing\":\"running\"}"
+    },
+    {
+      "frame": 5,
+      "file": "005-idle.png",
+      "sha256": "9097696693e12266da55413776a8a6c788c79c7b9c68bec23e9aa7f6834ee0f6",
+      "bytes": 94283,
+      "probedAt": "2026-10-25T03:11:13.200Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"transform\":\"matrix(1, 0, 0, 1, 0, -2.88329)\",\"playing\":\"running\"}"
+    },
+    {
+      "frame": 6,
+      "file": "006-idle.png",
+      "sha256": "641f4ed4127fe9228dcb2d4537240c156233b89ccd054981ec15959becf1f9cc",
+      "bytes": 94302,
+      "probedAt": "2026-10-25T03:11:13.701Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"transform\":\"matrix(1, 0, 0, 1, 0, -2.5212)\",\"playing\":\"running\"}"
+    },
+    {
+      "frame": 7,
+      "file": "007-idle.png",
+      "sha256": "07ec5dca69802c90c24e4a536b9d1af766d180e48b2d761d1269b40e5c0a5da4",
+      "bytes": 94285,
+      "probedAt": "2026-10-25T03:11:14.199Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"transform\":\"matrix(1, 0, 0, 1, 0, -0.640543)\",\"playing\":\"running\"}"
+    },
+    {
+      "frame": 8,
+      "file": "008-idle.png",
+      "sha256": "d3e976b7c6759bb3b35795787ed2a164373a459e76b325baaa944bfeb0002d49",
+      "bytes": 94327,
+      "probedAt": "2026-10-25T03:11:14.699Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"transform\":\"matrix(1, 0, 0, 1, 0, -0.055201)\",\"playing\":\"running\"}"
+    }
+  ],
+  "intervalMs": 400,
+  "distinctSha256": 8,
+  "stillImage": false
+}

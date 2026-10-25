@@ -1,0 +1,57 @@
+{
+  "label": "reveal",
+  "out": "games/talent-nurture/qa/visual-acceptance/transitions/ev-midnight-choice-reveal",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-reveal.png",
+      "sha256": "86ca1e9615793e07a10e4b7c720644b0869fe3a4aa4f29f8ca6093da7e7898e1",
+      "bytes": 46233,
+      "probedAt": "2026-10-25T03:16:51.204Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|深夜加练的诱惑||晚上十一点，练习室的灯还\"}"
+    },
+    {
+      "frame": 2,
+      "file": "002-reveal.png",
+      "sha256": "66f4d94c2c9acc5b3547caaa81adaf3cb96ee3f00801ce74f41d716c3b444259",
+      "bytes": 51959,
+      "probedAt": "2026-10-25T03:16:51.408Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|深夜加练的诱惑||晚上十一点，练习室的灯还\"}"
+    },
+    {
+      "frame": 3,
+      "file": "003-reveal.png",
+      "sha256": "61ce500faafdd1ddd2708b1dc73bce977c0c42aa58646769bb79d3aa0391ce55",
+      "bytes": 53330,
+      "probedAt": "2026-10-25T03:16:51.592Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|深夜加练的诱惑||晚上十一点，练习室的灯还\"}"
+    },
+    {
+      "frame": 4,
+      "file": "004-reveal.png",
+      "sha256": "05d52e0ae55d1e36e5b6db9ab3cab0cc1b762b959cc267b48b3d3d9069de72ee",
+      "bytes": 52617,
+      "probedAt": "2026-10-25T03:16:51.778Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|深夜加练的诱惑||晚上十一点，练习室的灯还\"}"
+    },
+    {
+      "frame": 5,
+      "file": "005-reveal.png",
+      "sha256": "d4e9b4a9a76b038f864b39986120650408b09bb122cb7f1ab6119b15450fbb64",
+      "bytes": 52386,
+      "probedAt": "2026-10-25T03:16:51.971Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|深夜加练的诱惑||晚上十一点，练习室的灯还\"}"
+    },
+    {
+      "frame": 6,
+      "file": "006-reveal.png",
+      "sha256": "0163a4c46d30e2275bc35bc5693524e22bb01ec5565ee268757769e926a163f7",
+      "bytes": 52027,
+      "probedAt": "2026-10-25T03:16:52.173Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|深夜加练的诱惑||晚上十一点，练习室的灯还\"}"
+    }
+  ],
+  "intervalMs": 120,
+  "distinctSha256": 6,
+  "stillImage": false
+}

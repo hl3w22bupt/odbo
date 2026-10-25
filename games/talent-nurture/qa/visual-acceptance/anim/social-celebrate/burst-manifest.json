@@ -1,0 +1,65 @@
+{
+  "label": "celebr",
+  "out": "games/talent-nurture/qa/visual-acceptance/anim/social-celebrate",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-celebr.png",
+      "sha256": "59ad538ac27b9be154739a22424e87a1479ec2d52deeae1ad440fa6d3b9a2ae2",
+      "bytes": 93770,
+      "probedAt": "2026-10-25T03:13:28.471Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"fans\":\"粉丝 0\"}"
+    },
+    {
+      "frame": 2,
+      "file": "002-celebr.png",
+      "sha256": "30bb66885825ff1ca410c521895aa28a503fe1a3e82241ab3ac33d17141b3b00",
+      "bytes": 98304,
+      "probedAt": "2026-10-25T03:13:28.752Z",
+      "probe": "{\"pose\":\"idol-avatar pose-celebrate\",\"anim\":\"poseCelebrate\",\"dur\":\"0.5s\",\"fans\":\"粉丝 15\"}"
+    },
+    {
+      "frame": 3,
+      "file": "003-celebr.png",
+      "sha256": "6c3009a9fe213c657dac7a33d10e23f85b753564206d869a01ecac400679470c",
+      "bytes": 99902,
+      "probedAt": "2026-10-25T03:13:28.978Z",
+      "probe": "{\"pose\":\"idol-avatar pose-celebrate\",\"anim\":\"poseCelebrate\",\"dur\":\"0.5s\",\"fans\":\"粉丝 15\"}"
+    },
+    {
+      "frame": 4,
+      "file": "004-celebr.png",
+      "sha256": "7c881447247390ae03dde6d54dd9265c29ef1d493a2e095fe29cf6bd657f3f24",
+      "bytes": 97767,
+      "probedAt": "2026-10-25T03:13:29.213Z",
+      "probe": "{\"pose\":\"idol-avatar pose-celebrate\",\"anim\":\"poseCelebrate\",\"dur\":\"0.5s\",\"fans\":\"粉丝 15\"}"
+    },
+    {
+      "frame": 5,
+      "file": "005-celebr.png",
+      "sha256": "4c54364c5fc958a58e53b11cffadc5601fb749608022661f0756c4c720533757",
+      "bytes": 97713,
+      "probedAt": "2026-10-25T03:13:29.457Z",
+      "probe": "{\"pose\":\"idol-avatar pose-celebrate\",\"anim\":\"poseCelebrate\",\"dur\":\"0.5s\",\"fans\":\"粉丝 15\"}"
+    },
+    {
+      "frame": 6,
+      "file": "006-celebr.png",
+      "sha256": "aed1bff55add37979905702645d033d26f74f2219d1da3028f7981ec6e454645",
+      "bytes": 97338,
+      "probedAt": "2026-10-25T03:13:29.691Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"fans\":\"粉丝 15\"}"
+    },
+    {
+      "frame": 7,
+      "file": "007-celebr.png",
+      "sha256": "08e7316dcdc4aaf41c7292d3d165641fd19a57afe5f1a901c9e70919d1cff91d",
+      "bytes": 96974,
+      "probedAt": "2026-10-25T03:13:29.924Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"fans\":\"粉丝 15\"}"
+    }
+  ],
+  "intervalMs": 130,
+  "distinctSha256": 7,
+  "stillImage": false
+}

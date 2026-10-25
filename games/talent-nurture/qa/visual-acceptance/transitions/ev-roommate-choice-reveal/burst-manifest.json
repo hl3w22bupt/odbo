@@ -1,0 +1,73 @@
+{
+  "label": "ev-curtain",
+  "out": "games/talent-nurture/qa/visual-acceptance/transitions/ev-roommate-curtain",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-ev-curtain.png",
+      "sha256": "7d96ff764fb2cc386c3785c052b8f16b1f4a1cfc94739b5c09f112991fd09629",
+      "bytes": 49945,
+      "probedAt": "2026-10-25T03:08:16.841Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|室友初见||宿舍门推开，一个抱着一摞偶像杂志的女生冲你笑：「你就是同期的小星吧？我叫周雨，\"}"
+    },
+    {
+      "frame": 2,
+      "file": "002-ev-curtain.png",
+      "sha256": "6bcdaaa257abd458488a44d99c8b2e7db25dfc310b1bde333d7c4f0576a1c8a2",
+      "bytes": 55780,
+      "probedAt": "2026-10-25T03:08:17.045Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|室友初见||宿舍门推开，一个抱着一摞偶像杂志的女生冲你笑：「你就是同期的小星吧？我叫周雨，\"}"
+    },
+    {
+      "frame": 3,
+      "file": "003-ev-curtain.png",
+      "sha256": "b825534f02a4e3441629d793476103aa962e389ab0d253e9aeb45b84a5ddfa76",
+      "bytes": 57193,
+      "probedAt": "2026-10-25T03:08:17.228Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|室友初见||宿舍门推开，一个抱着一摞偶像杂志的女生冲你笑：「你就是同期的小星吧？我叫周雨，\"}"
+    },
+    {
+      "frame": 4,
+      "file": "004-ev-curtain.png",
+      "sha256": "fdba2c112fe4d11745bf21d0c8673d90faefca32acab3058d2fdae05cdbe04e7",
+      "bytes": 56477,
+      "probedAt": "2026-10-25T03:08:17.415Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|室友初见||宿舍门推开，一个抱着一摞偶像杂志的女生冲你笑：「你就是同期的小星吧？我叫周雨，\"}"
+    },
+    {
+      "frame": 5,
+      "file": "005-ev-curtain.png",
+      "sha256": "0893a41602c9cc7cdaccb4ff997a5a6aad8f02fbd2fcbc5780a24d5675995ae2",
+      "bytes": 56256,
+      "probedAt": "2026-10-25T03:08:17.612Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|室友初见||宿舍门推开，一个抱着一摞偶像杂志的女生冲你笑：「你就是同期的小星吧？我叫周雨，\"}"
+    },
+    {
+      "frame": 6,
+      "file": "006-ev-curtain.png",
+      "sha256": "88192d13fea6786681f4dc6375e62911eee6fe1a95962cc5600bb035250ea707",
+      "bytes": 55799,
+      "probedAt": "2026-10-25T03:08:17.808Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|室友初见||宿舍门推开，一个抱着一摞偶像杂志的女生冲你笑：「你就是同期的小星吧？我叫周雨，\"}"
+    },
+    {
+      "frame": 7,
+      "file": "007-ev-curtain.png",
+      "sha256": "691363283d803f262df2206f9a8f738b5e55d4c4e06504ad5b0e4587346f5212",
+      "bytes": 55941,
+      "probedAt": "2026-10-25T03:08:17.970Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|室友初见||宿舍门推开，一个抱着一摞偶像杂志的女生冲你笑：「你就是同期的小星吧？我叫周雨，\"}"
+    },
+    {
+      "frame": 8,
+      "file": "008-ev-curtain.png",
+      "sha256": "691363283d803f262df2206f9a8f738b5e55d4c4e06504ad5b0e4587346f5212",
+      "bytes": 55941,
+      "probedAt": "2026-10-25T03:08:18.143Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|室友初见||宿舍门推开，一个抱着一摞偶像杂志的女生冲你笑：「你就是同期的小星吧？我叫周雨，\"}"
+    }
+  ],
+  "intervalMs": 120,
+  "distinctSha256": 7,
+  "stillImage": false
+}

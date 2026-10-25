@@ -1,0 +1,73 @@
+{
+  "label": "train",
+  "out": "games/talent-nurture/qa/visual-acceptance/anim/train-vocal",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-train.png",
+      "sha256": "30f0bbabaabb82e3b8905b7c91c3a93dca5d2918b6b19d1ce0f2950d8007cc14",
+      "bytes": 94326,
+      "probedAt": "2026-10-25T03:11:53.159Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"sweatVis\":\"0\",\"sweatAnim\":null,\"txt\":\"序章·入社试镜|剩余行动 5 / 5 ｜ 周末：入社试镜|\\ud83c\"}"
+    },
+    {
+      "frame": 2,
+      "file": "002-train.png",
+      "sha256": "6e8638e8712da7aa0c84af71a875b51867ba106290d451ac38dea04520ec547a",
+      "bytes": 98980,
+      "probedAt": "2026-10-25T03:11:54.073Z",
+      "probe": "{\"pose\":\"idol-avatar pose-train ava-sweaty\",\"anim\":\"poseTrain\",\"dur\":\"0.8s\",\"sweatVis\":\"0.233945\",\"sweatAnim\":null,\"txt\":\"序章·入社试镜|剩余行动 4 / 5 ｜ 周末：入社试镜|\\ud83c\"}"
+    },
+    {
+      "frame": 3,
+      "file": "003-train.png",
+      "sha256": "6cbc66ed88da477ec57f607ef00c68f572a39951a126ee509ea9fbb2489b667b",
+      "bytes": 98228,
+      "probedAt": "2026-10-25T03:11:54.633Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"sweatVis\":\"0\",\"sweatAnim\":null,\"txt\":\"序章·入社试镜|剩余行动 4 / 5 ｜ 周末：入社试镜|\\ud83c\"}"
+    },
+    {
+      "frame": 4,
+      "file": "004-train.png",
+      "sha256": "b9ed22ad5618cf5cc805ab1254fb54c4eec55a5603160cebaf81a057fd527561",
+      "bytes": 98314,
+      "probedAt": "2026-10-25T03:11:54.898Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"sweatVis\":\"0\",\"sweatAnim\":null,\"txt\":\"序章·入社试镜|剩余行动 4 / 5 ｜ 周末：入社试镜|\\ud83c\"}"
+    },
+    {
+      "frame": 5,
+      "file": "005-train.png",
+      "sha256": "ebeeac80dc99ba1f737459bdd26e158249165da9ff43662874c2ca5598da2d4c",
+      "bytes": 98185,
+      "probedAt": "2026-10-25T03:11:55.165Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"sweatVis\":\"0\",\"sweatAnim\":null,\"txt\":\"序章·入社试镜|剩余行动 4 / 5 ｜ 周末：入社试镜|\\ud83c\"}"
+    },
+    {
+      "frame": 6,
+      "file": "006-train.png",
+      "sha256": "b5b3ae09176c3a8060a51a4a12362ad320ef164abff02222943cc49a84d9a1a6",
+      "bytes": 98056,
+      "probedAt": "2026-10-25T03:11:55.431Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"sweatVis\":\"0\",\"sweatAnim\":null,\"txt\":\"序章·入社试镜|剩余行动 4 / 5 ｜ 周末：入社试镜|\\ud83c\"}"
+    },
+    {
+      "frame": 7,
+      "file": "007-train.png",
+      "sha256": "f05ceaa78e2595cb2b2394fe6dbac69d3dcb8cd183935334fa78e0ea6dab2bf4",
+      "bytes": 98122,
+      "probedAt": "2026-10-25T03:11:55.697Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"sweatVis\":\"0\",\"sweatAnim\":null,\"txt\":\"序章·入社试镜|剩余行动 4 / 5 ｜ 周末：入社试镜|\\ud83c\"}"
+    },
+    {
+      "frame": 8,
+      "file": "008-train.png",
+      "sha256": "e226f4a93f0fa46f631b79a728e7c088641f1ecebe16ee8fb0149a15217c0377",
+      "bytes": 98197,
+      "probedAt": "2026-10-25T03:11:55.931Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"dur\":\"2.4s\",\"sweatVis\":\"0\",\"sweatAnim\":null,\"txt\":\"序章·入社试镜|剩余行动 4 / 5 ｜ 周末：入社试镜|\\ud83c\"}"
+    }
+  ],
+  "intervalMs": 150,
+  "distinctSha256": 8,
+  "stillImage": false
+}

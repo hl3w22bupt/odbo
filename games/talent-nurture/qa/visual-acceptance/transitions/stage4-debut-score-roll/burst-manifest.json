@@ -1,0 +1,121 @@
+{
+  "label": "roll3",
+  "out": "games/talent-nurture/qa/visual-acceptance/transitions/stage4-debut-score-roll",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-roll3.png",
+      "sha256": "b3888ccef6fdb3751d03c990d9c2c0339c66ffa972d667cb89ab69c0e0012242",
+      "bytes": 71965,
+      "probedAt": "2026-10-25T03:24:24.260Z",
+      "probe": "{\"score\":null,\"tier\":null,\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 2,
+      "file": "002-roll3.png",
+      "sha256": "b00f7a35e98bcfd2e4865851939aff959175060f33ca81289df18ddda82412ff",
+      "bytes": 82444,
+      "probedAt": "2026-10-25T03:24:24.499Z",
+      "probe": "{\"score\":\"8\",\"tier\":\"t-pass\",\"particles\":0,\"floats\":[\"💗 +107\"]}"
+    },
+    {
+      "frame": 3,
+      "file": "003-roll3.png",
+      "sha256": "c2d3c803f65173d9d22ededa3ee0cd397abddd19d481d87121aec3f69f225c81",
+      "bytes": 50687,
+      "probedAt": "2026-10-25T03:24:24.687Z",
+      "probe": "{\"score\":\"28\",\"tier\":\"t-pass\",\"particles\":0,\"floats\":[\"💗 +107\"]}"
+    },
+    {
+      "frame": 4,
+      "file": "004-roll3.png",
+      "sha256": "0192f9d7ef00747116eaaa18d0320d62ca90780c665926b54ab41fb4e0d84a15",
+      "bytes": 50248,
+      "probedAt": "2026-10-25T03:24:24.885Z",
+      "probe": "{\"score\":\"43\",\"tier\":\"t-pass\",\"particles\":0,\"floats\":[\"💗 +107\"]}"
+    },
+    {
+      "frame": 5,
+      "file": "005-roll3.png",
+      "sha256": "a090f49bd4b59490e9284c54a40335ec60ec190ab74610be776a1c87be2cefb1",
+      "bytes": 49855,
+      "probedAt": "2026-10-25T03:24:25.068Z",
+      "probe": "{\"score\":\"51\",\"tier\":\"t-pass\",\"particles\":0,\"floats\":[\"💗 +107\"]}"
+    },
+    {
+      "frame": 6,
+      "file": "006-roll3.png",
+      "sha256": "05e806a2b9cfd743ac0b2fbd971a670dd64f26ee7307cd090e8c728c2cdb036a",
+      "bytes": 49303,
+      "probedAt": "2026-10-25T03:24:25.250Z",
+      "probe": "{\"score\":\"57\",\"tier\":\"t-pass\",\"particles\":0,\"floats\":[\"💗 +107\"]}"
+    },
+    {
+      "frame": 7,
+      "file": "007-roll3.png",
+      "sha256": "588c4ae63541e6c174bd6572a828afdade96501965e29408d953763c33df01dc",
+      "bytes": 49166,
+      "probedAt": "2026-10-25T03:24:25.437Z",
+      "probe": "{\"score\":\"60\",\"tier\":\"t-pass\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 8,
+      "file": "008-roll3.png",
+      "sha256": "696be1f7bed49cfdad5c288d12682a2ea2f5c30fc1adc604c228e88a76411877",
+      "bytes": 48733,
+      "probedAt": "2026-10-25T03:24:25.635Z",
+      "probe": "{\"score\":\"61\",\"tier\":\"t-pass\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 9,
+      "file": "009-roll3.png",
+      "sha256": "9e4d05a864c8315f39a4634a9c4687c4d42857d8ff02dd778fd0b8cbd88d226c",
+      "bytes": 48758,
+      "probedAt": "2026-10-25T03:24:25.834Z",
+      "probe": "{\"score\":\"61\",\"tier\":\"t-pass\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 10,
+      "file": "010-roll3.png",
+      "sha256": "8aa8d4cabaf9d220fc3fdfd041e062ed0f629341068b7e3512ce22d20462b52c",
+      "bytes": 48781,
+      "probedAt": "2026-10-25T03:24:26.016Z",
+      "probe": "{\"score\":\"61\",\"tier\":\"t-pass\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 11,
+      "file": "011-roll3.png",
+      "sha256": "a434d32fbc56b074c0719e4865066a38019e8b9ddc544aa866431287a9802e59",
+      "bytes": 48797,
+      "probedAt": "2026-10-25T03:24:26.201Z",
+      "probe": "{\"score\":\"61\",\"tier\":\"t-pass\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 12,
+      "file": "012-roll3.png",
+      "sha256": "ed3c6361af8134bc85a9e8b39a7ecb00a17a28065e05b8eae0b976cd057281ea",
+      "bytes": 48784,
+      "probedAt": "2026-10-25T03:24:26.384Z",
+      "probe": "{\"score\":\"61\",\"tier\":\"t-pass\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 13,
+      "file": "013-roll3.png",
+      "sha256": "5717ad47d844381e5813ddb5ba3995720cc8f222aeb36ed57d98d0c65029fc9f",
+      "bytes": 48781,
+      "probedAt": "2026-10-25T03:24:26.567Z",
+      "probe": "{\"score\":\"61\",\"tier\":\"t-pass\",\"particles\":0,\"floats\":[]}"
+    },
+    {
+      "frame": 14,
+      "file": "014-roll3.png",
+      "sha256": "9bc75706167f58d622743b8715cf4c3c59925da81c7a28f60c82074a13025644",
+      "bytes": 48766,
+      "probedAt": "2026-10-25T03:24:26.752Z",
+      "probe": "{\"score\":\"61\",\"tier\":\"t-pass\",\"particles\":0,\"floats\":[]}"
+    }
+  ],
+  "intervalMs": 130,
+  "distinctSha256": 14,
+  "stillImage": false
+}

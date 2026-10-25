@@ -1,0 +1,121 @@
+{
+  "label": "finale",
+  "out": "games/talent-nurture/qa/visual-acceptance/transitions/finale-score-roll",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-finale.png",
+      "sha256": "f3c875e3aead6320b06d3b1c1d6f621879a28ee5005634b67c4dfa190ea5fd21",
+      "bytes": 57892,
+      "probedAt": "2026-10-25T03:34:03.587Z",
+      "probe": "{\"score\":\"70\",\"tier\":\"t-good\",\"pose\":\"r pose-celebrate\",\"particles\":0,\"floats\":[],\"t\":\"舞台结算|新人出道公演|70 分 · 良好||你 70 : \"}"
+    },
+    {
+      "frame": 2,
+      "file": "002-finale.png",
+      "sha256": "19b6721cff44a2c65a9e9c311223c2a8bf4ef41dc38f733ceb1becdfceb48ded",
+      "bytes": 58137,
+      "probedAt": "2026-10-25T03:34:03.830Z",
+      "probe": "{\"score\":\"70\",\"tier\":\"t-good\",\"pose\":\"r pose-celebrate\",\"particles\":0,\"floats\":[],\"t\":\"舞台结算|新人出道公演|70 分 · 良好||你 70 : \"}"
+    },
+    {
+      "frame": 3,
+      "file": "003-finale.png",
+      "sha256": "86756c11d306304fb3c45f45456301527cc7970542e808705873c0443d02e841",
+      "bytes": 58329,
+      "probedAt": "2026-10-25T03:34:04.033Z",
+      "probe": "{\"score\":\"70\",\"tier\":\"t-good\",\"pose\":\"r pose-celebrate\",\"particles\":0,\"floats\":[],\"t\":\"舞台结算|新人出道公演|70 分 · 良好||你 70 : \"}"
+    },
+    {
+      "frame": 4,
+      "file": "004-finale.png",
+      "sha256": "fcd9ac58ed0b38dab2ebef1a5b75545c1f7eccf2161c708484ebd8e329e15b86",
+      "bytes": 59054,
+      "probedAt": "2026-10-25T03:34:04.231Z",
+      "probe": "{\"score\":\"70\",\"tier\":\"t-good\",\"pose\":\"r pose-celebrate\",\"particles\":0,\"floats\":[],\"t\":\"舞台结算|新人出道公演|70 分 · 良好||你 70 : \"}"
+    },
+    {
+      "frame": 5,
+      "file": "005-finale.png",
+      "sha256": "76f6c8403964b4ef101e2408e3ee6303d2cc631bd6ab44ddb92d98abae30c8cd",
+      "bytes": 59635,
+      "probedAt": "2026-10-25T03:34:04.431Z",
+      "probe": "{\"score\":\"70\",\"tier\":\"t-good\",\"pose\":\"r pose-celebrate\",\"particles\":0,\"floats\":[],\"t\":\"舞台结算|新人出道公演|70 分 · 良好||你 70 : \"}"
+    },
+    {
+      "frame": 6,
+      "file": "006-finale.png",
+      "sha256": "2be03ec66ac4dfe2de1c72ce1501c1b36301b01b9448624494c4fdab6085b2e6",
+      "bytes": 61195,
+      "probedAt": "2026-10-25T03:34:04.631Z",
+      "probe": "{\"score\":\"70\",\"tier\":\"t-good\",\"pose\":\"r pose-celebrate\",\"particles\":0,\"floats\":[],\"t\":\"舞台结算|新人出道公演|70 分 · 良好||你 70 : \"}"
+    },
+    {
+      "frame": 7,
+      "file": "007-finale.png",
+      "sha256": "145fc1e25866dbe66d534e08fed8f4289ca570b1789bbeec97d068d2675fd1a7",
+      "bytes": 61650,
+      "probedAt": "2026-10-25T03:34:04.832Z",
+      "probe": "{\"score\":\"70\",\"tier\":\"t-good\",\"pose\":\"r pose-celebrate\",\"particles\":0,\"floats\":[],\"t\":\"舞台结算|新人出道公演|70 分 · 良好||你 70 : \"}"
+    },
+    {
+      "frame": 8,
+      "file": "008-finale.png",
+      "sha256": "77953263d2dfacc3b20d59c608b37d95652aafc584c94171280276bca5c9f141",
+      "bytes": 62196,
+      "probedAt": "2026-10-25T03:34:05.031Z",
+      "probe": "{\"score\":\"70\",\"tier\":\"t-good\",\"pose\":\"r pose-celebrate\",\"particles\":0,\"floats\":[],\"t\":\"舞台结算|新人出道公演|70 分 · 良好||你 70 : \"}"
+    },
+    {
+      "frame": 9,
+      "file": "009-finale.png",
+      "sha256": "43829c4d988addd2ec7fa8bef2abe671b258074e2204089627526499ac5da806",
+      "bytes": 62111,
+      "probedAt": "2026-10-25T03:34:05.231Z",
+      "probe": "{\"score\":\"70\",\"tier\":\"t-good\",\"pose\":\"r pose-celebrate\",\"particles\":0,\"floats\":[],\"t\":\"舞台结算|新人出道公演|70 分 · 良好||你 70 : \"}"
+    },
+    {
+      "frame": 10,
+      "file": "010-finale.png",
+      "sha256": "ee185505a60d61b082962622ef92db70a57a8849a2268182920a5c699a69accb",
+      "bytes": 62092,
+      "probedAt": "2026-10-25T03:34:05.430Z",
+      "probe": "{\"score\":\"70\",\"tier\":\"t-good\",\"pose\":\"r pose-celebrate\",\"particles\":0,\"floats\":[],\"t\":\"舞台结算|新人出道公演|70 分 · 良好||你 70 : \"}"
+    },
+    {
+      "frame": 11,
+      "file": "011-finale.png",
+      "sha256": "6af5bc7d96ceeeeafe32e13ec093f6fc15b25b652027ffc436bf8e7f20e16c9d",
+      "bytes": 61832,
+      "probedAt": "2026-10-25T03:34:05.630Z",
+      "probe": "{\"score\":\"70\",\"tier\":\"t-good\",\"pose\":\"r pose-celebrate\",\"particles\":0,\"floats\":[],\"t\":\"舞台结算|新人出道公演|70 分 · 良好||你 70 : \"}"
+    },
+    {
+      "frame": 12,
+      "file": "012-finale.png",
+      "sha256": "c5fc07c26a74b1e770ec33428031f9470aad97fe407bc774ab65d719f9f2e991",
+      "bytes": 61345,
+      "probedAt": "2026-10-25T03:34:05.830Z",
+      "probe": "{\"score\":\"70\",\"tier\":\"t-good\",\"pose\":\"r pose-celebrate\",\"particles\":0,\"floats\":[],\"t\":\"舞台结算|新人出道公演|70 分 · 良好||你 70 : \"}"
+    },
+    {
+      "frame": 13,
+      "file": "013-finale.png",
+      "sha256": "8f3420bec76800497e6be34b18e4bbc2973679bada596d766d1c4aa45038a87c",
+      "bytes": 60748,
+      "probedAt": "2026-10-25T03:34:06.031Z",
+      "probe": "{\"score\":\"70\",\"tier\":\"t-good\",\"pose\":\"r pose-celebrate\",\"particles\":0,\"floats\":[],\"t\":\"舞台结算|新人出道公演|70 分 · 良好||你 70 : \"}"
+    },
+    {
+      "frame": 14,
+      "file": "014-finale.png",
+      "sha256": "0f478b5f9405ffc391026e6d702be1da4c956a50384bb2e9361e4aee7d876a4c",
+      "bytes": 59465,
+      "probedAt": "2026-10-25T03:34:06.230Z",
+      "probe": "{\"score\":\"70\",\"tier\":\"t-good\",\"pose\":\"r pose-celebrate\",\"particles\":0,\"floats\":[],\"t\":\"舞台结算|新人出道公演|70 分 · 良好||你 70 : \"}"
+    }
+  ],
+  "intervalMs": 130,
+  "distinctSha256": 14,
+  "stillImage": false
+}

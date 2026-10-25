@@ -1,0 +1,65 @@
+{
+  "label": "dance",
+  "out": "games/talent-nurture/qa/visual-acceptance/anim/rehearsal-dance",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-dance.png",
+      "sha256": "1a34f80ebdf1f659ac6738e50db90ce9c8a32212329533f4add8e9e78861b23c",
+      "bytes": 96878,
+      "probedAt": "2026-10-25T03:13:41.742Z",
+      "probe": null
+    },
+    {
+      "frame": 2,
+      "file": "002-dance.png",
+      "sha256": "e361752f70f1e5a4f3c82318317d95fed9f0e924f1bfcb56cc2b902a662756b9",
+      "bytes": 109995,
+      "probedAt": "2026-10-25T03:13:42.070Z",
+      "probe": null
+    },
+    {
+      "frame": 3,
+      "file": "003-dance.png",
+      "sha256": "e8386608e96360999c3cce020294677a24f9d092dd5cbe4a5d8a528c7dbb5662",
+      "bytes": 112200,
+      "probedAt": "2026-10-25T03:13:42.302Z",
+      "probe": null
+    },
+    {
+      "frame": 4,
+      "file": "004-dance.png",
+      "sha256": "f26e6366b04964eee7b507f584d8dd14f49ca81d14e8e5a54e1256df97d57789",
+      "bytes": 110448,
+      "probedAt": "2026-10-25T03:13:42.543Z",
+      "probe": null
+    },
+    {
+      "frame": 5,
+      "file": "005-dance.png",
+      "sha256": "5c469e5da1b5032210e9a5c9528fc13cb0d07b19a5b4131fe1c78acdac092918",
+      "bytes": 110552,
+      "probedAt": "2026-10-25T03:13:42.780Z",
+      "probe": null
+    },
+    {
+      "frame": 6,
+      "file": "006-dance.png",
+      "sha256": "69834d6d68a76f1853e05274bfaebd3779bafeda9182f5697205300dad24033f",
+      "bytes": 110580,
+      "probedAt": "2026-10-25T03:13:43.030Z",
+      "probe": null
+    },
+    {
+      "frame": 7,
+      "file": "007-dance.png",
+      "sha256": "3bde95076b6cb3f2fdd7f007d2d28ab8c780cda7e7db9fa56d3adeb98b31cfc9",
+      "bytes": 110563,
+      "probedAt": "2026-10-25T03:13:43.280Z",
+      "probe": null
+    }
+  ],
+  "intervalMs": 130,
+  "distinctSha256": 7,
+  "stillImage": false
+}

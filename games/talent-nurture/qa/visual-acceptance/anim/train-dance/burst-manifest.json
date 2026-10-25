@@ -1,0 +1,57 @@
+{
+  "label": "trainD",
+  "out": "games/talent-nurture/qa/visual-acceptance/anim/train-dance",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-trainD.png",
+      "sha256": "82f55da82d4fe28a12fc3a8678a406e51210a04f1c0ba34a6a2032f07e127cd5",
+      "bytes": 98199,
+      "probedAt": "2026-10-25T03:12:47.043Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"sweatOp\":\"0.00\",\"vocalDance\":\"唱功 D\\n20 舞技 D\\n13\",\"acts\":\"剩余行动 4\"}"
+    },
+    {
+      "frame": 2,
+      "file": "002-trainD.png",
+      "sha256": "a55b2ace56640ccb8ace53a9d15d8a8c1855cd248fba4f4b73c540962eb9dc11",
+      "bytes": 101114,
+      "probedAt": "2026-10-25T03:12:47.342Z",
+      "probe": "{\"pose\":\"idol-avatar pose-train ava-sweaty\",\"anim\":\"poseTrain\",\"sweatOp\":\"0.17\",\"vocalDance\":\"唱功 D\\n20 舞技 D\\n20\",\"acts\":\"剩余行动 3\"}"
+    },
+    {
+      "frame": 3,
+      "file": "003-trainD.png",
+      "sha256": "4b50ae98fafc9e4c3797bb039e4545b9908b0b336085056f753cc6494e25438d",
+      "bytes": 102046,
+      "probedAt": "2026-10-25T03:12:47.562Z",
+      "probe": "{\"pose\":\"idol-avatar pose-train ava-sweaty\",\"anim\":\"poseTrain\",\"sweatOp\":\"0.98\",\"vocalDance\":\"唱功 D\\n20 舞技 D\\n20\",\"acts\":\"剩余行动 3\"}"
+    },
+    {
+      "frame": 4,
+      "file": "004-trainD.png",
+      "sha256": "eb2b70a95310029679d558eecdea80cc1de4cc73afb20e0f48ed5375c37b4b34",
+      "bytes": 101410,
+      "probedAt": "2026-10-25T03:12:47.806Z",
+      "probe": "{\"pose\":\"idol-avatar pose-train ava-sweaty\",\"anim\":\"poseTrain\",\"sweatOp\":\"0.63\",\"vocalDance\":\"唱功 D\\n20 舞技 D\\n20\",\"acts\":\"剩余行动 3\"}"
+    },
+    {
+      "frame": 5,
+      "file": "005-trainD.png",
+      "sha256": "89c673b91a1d19155ffda29cbaa55de5183ec12abdc52dcffac58097dbc43e9f",
+      "bytes": 101245,
+      "probedAt": "2026-10-25T03:12:48.048Z",
+      "probe": "{\"pose\":\"idol-avatar pose-train ava-sweaty\",\"anim\":\"poseTrain\",\"sweatOp\":\"0.00\",\"vocalDance\":\"唱功 D\\n20 舞技 D\\n20\",\"acts\":\"剩余行动 3\"}"
+    },
+    {
+      "frame": 6,
+      "file": "006-trainD.png",
+      "sha256": "219903a3a4261774399e6094700bc01967fa5003b7dcacbbca248d0434c264b7",
+      "bytes": 100662,
+      "probedAt": "2026-10-25T03:12:48.297Z",
+      "probe": "{\"pose\":\"idol-avatar pose-idle\",\"anim\":\"poseIdle\",\"sweatOp\":\"0.00\",\"vocalDance\":\"唱功 D\\n20 舞技 D\\n20\",\"acts\":\"剩余行动 3\"}"
+    }
+  ],
+  "intervalMs": 150,
+  "distinctSha256": 6,
+  "stillImage": false
+}

@@ -1,0 +1,73 @@
+{
+  "label": "curtain",
+  "out": "games/talent-nurture/qa/visual-acceptance/transitions/wk1-to-wk2-birthday-curtain",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-curtain.png",
+      "sha256": "96728935be03d357b391d63167f9a8acb9684c6155dc74234b20e7d2261c9fd1",
+      "bytes": 90903,
+      "probedAt": "2026-10-25T03:18:11.378Z",
+      "probe": "{\"curtain\":false,\"t\":\"第 1 / 12 周|剩余行动 1 / 5 \"}"
+    },
+    {
+      "frame": 2,
+      "file": "002-curtain.png",
+      "sha256": "b53fa6ab664f67a536d4b59c0389966a1170bca193a0ef785a57a723d21a2e97",
+      "bytes": 62047,
+      "probedAt": "2026-10-25T03:18:11.582Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|室友的生日会||室友周雨的生日会就\"}"
+    },
+    {
+      "frame": 3,
+      "file": "003-curtain.png",
+      "sha256": "2819ade106b62fc834688c43b2ece3201e2064c045a4f8bdec7720942445726c",
+      "bytes": 45428,
+      "probedAt": "2026-10-25T03:18:11.763Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|室友的生日会||室友周雨的生日会就\"}"
+    },
+    {
+      "frame": 4,
+      "file": "004-curtain.png",
+      "sha256": "75287dc1a70a1d42dbe4be2dacaf406131e8d5ae56d186c5cce06a5ba1c9ad55",
+      "bytes": 42295,
+      "probedAt": "2026-10-25T03:18:11.912Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|室友的生日会||室友周雨的生日会就\"}"
+    },
+    {
+      "frame": 5,
+      "file": "005-curtain.png",
+      "sha256": "75287dc1a70a1d42dbe4be2dacaf406131e8d5ae56d186c5cce06a5ba1c9ad55",
+      "bytes": 42295,
+      "probedAt": "2026-10-25T03:18:12.066Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|室友的生日会||室友周雨的生日会就\"}"
+    },
+    {
+      "frame": 6,
+      "file": "006-curtain.png",
+      "sha256": "75287dc1a70a1d42dbe4be2dacaf406131e8d5ae56d186c5cce06a5ba1c9ad55",
+      "bytes": 42295,
+      "probedAt": "2026-10-25T03:18:12.217Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|室友的生日会||室友周雨的生日会就\"}"
+    },
+    {
+      "frame": 7,
+      "file": "007-curtain.png",
+      "sha256": "75287dc1a70a1d42dbe4be2dacaf406131e8d5ae56d186c5cce06a5ba1c9ad55",
+      "bytes": 42295,
+      "probedAt": "2026-10-25T03:18:12.365Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|室友的生日会||室友周雨的生日会就\"}"
+    },
+    {
+      "frame": 8,
+      "file": "008-curtain.png",
+      "sha256": "75287dc1a70a1d42dbe4be2dacaf406131e8d5ae56d186c5cce06a5ba1c9ad55",
+      "bytes": 42295,
+      "probedAt": "2026-10-25T03:18:12.514Z",
+      "probe": "{\"curtain\":false,\"t\":\"剧情事件|室友的生日会||室友周雨的生日会就\"}"
+    }
+  ],
+  "intervalMs": 100,
+  "distinctSha256": 4,
+  "stillImage": false
+}

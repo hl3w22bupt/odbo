@@ -1,0 +1,123 @@
+{
+  "task": "使用验收：线上实测 v+1 视觉升级效果（liveUrl 独立实测）",
+  "generatedAt": "2026-10-25T03:55:00+08:00",
+  "target": {
+    "liveUrl": "https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/",
+    "deploymentId": "cmvn7x4aq008gm9gbbyl8zy3z",
+    "buildVersion": "183a2f9",
+    "healthVersion": "v2-visual-1",
+    "branchHeadAtAcceptance": "c835113",
+    "versionVerification": "线上 15 个关键资产（style.css/main.mjs/scenes 7 个含 fx.mjs+idol-avatar.mjs/data/levels/entities）sha256 与本地 HEAD 导出逐一比对全部一致；/health version=v2-visual-1；落地页 __BUILD_VERSION=183a2f9 与 build 角标命中"
+  },
+  "method": {
+    "tool": "experience-harness sessiond/session-step（375w 级移动仿真 390x844@1.8 touch 管线）+ 项目侧 tools/burst-capture.mjs 连发截帧（Input.dispatchTouchEvent 真实触摸）+ MutationObserver DOM 生命周期探针",
+    "principle": "只记录不判定主观项；机器可判项给确定性结论；两轮独立完整通关（第一轮 25min TTL 到期中断后第二轮重打至结局）",
+    "selftest": "experience-harness selftest 39/39 PASS"
+  },
+  "machineChecks": [
+    {
+      "id": "acc-1-idle-breathing",
+      "item": "①人物待机呼吸动画（非静态贴图）",
+      "verdict": "PASS",
+      "evidence": "anim/idle-breathing/：8/8 帧 sha256 全异；computed animationName=poseIdle duration=2.4s playState=running；translateY 实测 -2.80→-1.01→-0.004→-1.21→-2.88→-2.52→-0.64→-0.055px 完整正弦轨迹（0~-3px，与 spec 起伏 3px 吻合）；动图 idle-breathing.gif",
+      "phase": "week-board（avatar 常驻相位）"
+    },
+    {
+      "id": "acc-1-train-pose",
+      "item": "①训练态（pose-train + 汗滴）",
+      "verdict": "PASS",
+      "evidence": "anim/train-vocal/ 8/8 帧异：tap 唱功特训后 frame2 pose-train（poseTrain 0.8s）+ 汗滴 opacity 0.23 可见 + 剩余行动 5→4 真实推进；frame3 起瞬态 900ms 自动回切 pose-idle；anim/train-dance/ 6/6 帧异：汗滴 opacity 0.17→0.98→0.63→0.00 滴落循环完整入帧，唱功 12→20、舞技 13→20",
+      "phase": "week-board 唱/舞特训"
+    },
+    {
+      "id": "acc-1-celebrate-pose",
+      "item": "①庆祝态（pose-celebrate）",
+      "verdict": "PASS",
+      "evidence": "anim/social-celebrate/ 7/7 帧异：社交 → 粉丝 0→15 + poseCelebrate 持续 ~650ms（frame2-5）→ 自动回切 idle（frame6-7）；结局页（GOOD END B）poseCelebrate running 8/8 帧异",
+      "phase": "week-board 社交 / ending"
+    },
+    {
+      "id": "acc-1-sing-pose",
+      "item": "①演唱态（pose-sing）",
+      "verdict": "PASS",
+      "evidence": "三场舞台结算（入社试镜/内部考核/首秀）结算页 pose-sing 挂载（t-pass 档位映射），stage-result-score-roll 等 burst 中 pose=r pose-sing 连续多帧",
+      "phase": "stage-result"
+    },
+    {
+      "id": "acc-1-dance-pose",
+      "item": "①舞蹈态（pose-dance）",
+      "verdict": "PARTIAL（覆盖缺口 C2）",
+      "evidence": "彩排触发 pose-dance 瞬态 900ms 的帧序列已拍（anim/rehearsal-dance/ 7/7 帧异）但该次 burst 探针表达式语法错误致 computed animationName 未记录；代码路径存在（main.mjs POSE_BY_ACTION.rehearsal='dance'、stage-live.mjs isFinale/fansGain→dance）",
+      "phase": "week-board 彩排"
+    },
+    {
+      "id": "acc-2-prologue-cine",
+      "item": "②序章程序化开场（黑边+胶片颗粒+缓推+透黑淡入，零视频）",
+      "verdict": "PASS",
+      "evidence": "transitions/prologue-cine-opening/ 12 帧：tap 开始后 frame2-8（0.25s~1.75s）.fx-cine 挂载、黑边 2 条、颗粒/透黑/缓推全在、7 帧画面各异；frame9+ 按 grainFade 2.4s/blackOut 0.6s 时序收尾卸载；动图 prologue-cine.gif",
+      "phase": "title→intro"
+    },
+    {
+      "id": "acc-2-event-curtain",
+      "item": "②全部分支事件 420ms 幕布过场（v+1 spec 要求）",
+      "verdict": "FAIL（缺陷 V1，退回实现玩法返工）",
+      "evidence": "MutationObserver 两次独立事件转场记录 .fx-curtain added→removed 存活均 0.1ms（怯场事件 t=1108156.6→1108156.7；赛后采访 t=1224886.8→1224886.9，同 tick 同步移除、未及任何绘制帧）；6 次事件转场 8 帧连发无一捕获幕布可见态；根因：main.mjs render() event 分支先 curtain(root) 挂载、renderEventDialog（event-dialog.mjs:14 clear(root)）随即清空 root——时序冲突致幕布从未可见。对比组：序章 introCinematic 在 renderIntro 末尾调用故正常。curtain() 函数与 curtainL/R CSS 本身无缺陷",
+      "phase": "任意分支事件触发转场"
+    },
+    {
+      "id": "acc-2-settlement",
+      "item": "②结算演出（评分 1.4s 滚动四档分色 + 粉丝浮字）",
+      "verdict": "PASS",
+      "evidence": "三场舞台滚动序列实拍：入社试镜 5→15→22→27→29→30、内部考核 8→25→37→44→47→49、首秀 8→28→43→51→57→60→61（countUp 实时值逐帧变化）；t-pass/t-good 分色 class 命中；粉丝浮字「💗 +107」实拍（首秀 6 帧）；动图 stage-score-roll.gif",
+      "phase": "stage-result"
+    },
+    {
+      "id": "acc-2-particles",
+      "item": "②结算彩带/灰烬粒子",
+      "verdict": "NOT-COVERED（覆盖缺口 C1，非缺陷）",
+      "evidence": "pass 档按设计无粒子（stage-live.mjs:72 仅 perfect/good 彩带、fail 灰烬）；本轮两场 good 档（答谢祭 80 分/公演 70 分）均未赶上连发窗口（答谢祭未连发、公演连发晚于结算渲染）。复验建议：登台 tap 后立即 200ms 连发",
+      "phase": "stage-result"
+    },
+    {
+      "id": "acc-2-stage-lights",
+      "item": "②舞台四方案灯效",
+      "verdict": "PASS",
+      "evidence": "线上实测四方案互异且与 spec 对应：内部考核 1 束 beamSweep（内测单束追光）；首秀 3 束 fx-beam（首秀三束扫光）；对决 2 · 苏晴 灯束=2 + fx-vs=1（VS 对打灯）；粉丝答谢祭 fx-dot=56（答谢祭灯海）；公演 灯束=3 + fx-dot=40（演出链）",
+      "phase": "stage-confirm"
+    },
+    {
+      "id": "acc-3-loop",
+      "item": "③唱/舞养成与分支剧情闭环不回退、移动端仍可玩",
+      "verdict": "PASS",
+      "evidence": "两轮独立完整通关（第二轮 12 周至 GOOD END B「舞灵之路」）：唱功 D10→C37+、舞技 D→B 双线训练推进；分支事件 ≥8 个真实生效（室友初见/练习服/深夜加练/生日会/怯场/赛后采访/直播翻车/导师二选一/媒体质疑/人气上升期），选择即时 delta 徽标反馈（+3 压力 +2 唱功等）且选项点击后 disabled 防重；体力边界正确（<25 登台禁用→弃权合法路径）；重开后无残留（结局文本消失、状态全新）；全程 375w 级仿真 touch 管线；与 v1 门禁 smoke PASS 9/9 对照无玩法回退",
+      "phase": "全流程"
+    },
+    {
+      "id": "acc-4-evidence",
+      "item": "④序列截图/动图证据落盘并 commit",
+      "verdict": "PASS",
+      "evidence": "qa/visual-acceptance/ 下 6 组 burst 目录（60+ PNG + burst-manifest.json 逐帧 sha256/probe）+ 6 个 GIF 动图 + findings.json + 本 README；工具 tools/burst-capture.mjs 随分支归档",
+      "phase": "归档"
+    }
+  ],
+  "defects": [
+    {
+      "id": "V1",
+      "severity": "medium（视觉动效未达 spec，不影响玩法与数值）",
+      "title": "分支事件 420ms 幕布过场从未可见（挂载即被清除）",
+      "rootCause": "main.mjs render() 的 event 分支：curtain(root) 先挂载 → renderEventDialog(root, ev, ctx) 第一行 clear(root) 把刚挂的 .fx-curtain 一并移除",
+      "repro": "任意分支事件触发（进入带事件的周/事件接力）必然复现；MutationObserver 两次记录存活 0.1ms",
+      "fixHint": "将 curtain(root) 移到 renderEventDialog 之后调用（对齐 introCinematic 在 renderIntro 末尾的模式），或 renderEventDialog 不做全量 clear",
+      "specBasis": "v+1 策划案②「全部分支事件统一 420ms 幕布过场」（spec cmvn6pmb3007im9gbv4xelwj2）"
+    }
+  ],
+  "coverageGaps": [
+    {"id": "C1", "item": "彩带/灰烬粒子未实拍（good 档两次错过连发窗口；pass 档按设计无粒子）"},
+    {"id": "C2", "item": "pose-dance 瞬态 computed 佐证未记录（帧序列已有，探针表达式语法错误所致）"}
+  ],
+  "priorEvidenceFlaws": [
+    "承前节点门禁证据复读（qa/mobile/report.json）：PASS 9/9 属实、fail-return 结局已按 SOP §9 标注合法路径差异；hotzone detail 中 stage-confirm 样本 11 屏中 7 屏同名重复展示（信息量弱化但不失真）；门禁六阶段截图为单帧，不能证明动画运行——本包补齐"
+  ],
+  "outOfScope": "主观体验（画面审美/动效手感/四问量表/好玩与否）不在机器取证范围，待 owner 试玩回填；真机 iOS Safari / Android Chrome 实测待 owner 执行",
+  "verdict": "NOT_ALL_GREEN——机器可判项 10 PASS + 1 FAIL（V1 幕布缺陷）+ 1 PARTIAL（C2）+ 1 NOT-COVERED（C1）；按任务口径退回「实现玩法」返工 V1，其余项达标"
+}

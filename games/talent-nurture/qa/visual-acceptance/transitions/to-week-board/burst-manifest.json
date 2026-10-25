@@ -1,0 +1,57 @@
+{
+  "label": "week",
+  "out": "games/talent-nurture/qa/visual-acceptance/transitions/to-week-board",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-week.png",
+      "sha256": "eb2c5eb3915894f3be3b173ac2333b3edaafed973caade91b04783fbd8758c1f",
+      "bytes": 52224,
+      "probedAt": "2026-10-25T03:16:58.304Z",
+      "probe": "{\"curtain\":false,\"ava\":0,\"t\":\"剧情事件|深夜加练的诱惑||晚上十一点，练习室的\"}"
+    },
+    {
+      "frame": 2,
+      "file": "002-week.png",
+      "sha256": "6051734214f08941f6d3ecd2f3b181d3400342b1d78f63c4da19aeb5b8427009",
+      "bytes": 83067,
+      "probedAt": "2026-10-25T03:16:58.533Z",
+      "probe": "{\"curtain\":false,\"ava\":1,\"t\":\"第 1 / 12 周|剩余行动 5 / 5 ｜ \"}"
+    },
+    {
+      "frame": 3,
+      "file": "003-week.png",
+      "sha256": "363c7ad9346cb91194eef12dcc8e6d30202ffc497a3461f8642d2a9ff9bb150a",
+      "bytes": 83070,
+      "probedAt": "2026-10-25T03:16:58.745Z",
+      "probe": "{\"curtain\":false,\"ava\":1,\"t\":\"第 1 / 12 周|剩余行动 5 / 5 ｜ \"}"
+    },
+    {
+      "frame": 4,
+      "file": "004-week.png",
+      "sha256": "a1a328a32cefc07677188cd5eb0adaef667cec35c8503888fe0f0e8955893aad",
+      "bytes": 83075,
+      "probedAt": "2026-10-25T03:16:58.947Z",
+      "probe": "{\"curtain\":false,\"ava\":1,\"t\":\"第 1 / 12 周|剩余行动 5 / 5 ｜ \"}"
+    },
+    {
+      "frame": 5,
+      "file": "005-week.png",
+      "sha256": "436d05187eb00b666344fe72063a5c4e427901673d1c7b4b1f6caf84d5c8f4e6",
+      "bytes": 83046,
+      "probedAt": "2026-10-25T03:16:59.147Z",
+      "probe": "{\"curtain\":false,\"ava\":1,\"t\":\"第 1 / 12 周|剩余行动 5 / 5 ｜ \"}"
+    },
+    {
+      "frame": 6,
+      "file": "006-week.png",
+      "sha256": "50b116a3152ab8689e5d4c9c9249f39766f7ca93ade27d9c739556fb4d949fd3",
+      "bytes": 83160,
+      "probedAt": "2026-10-25T03:16:59.365Z",
+      "probe": "{\"curtain\":false,\"ava\":1,\"t\":\"第 1 / 12 周|剩余行动 5 / 5 ｜ \"}"
+    }
+  ],
+  "intervalMs": 120,
+  "distinctSha256": 6,
+  "stillImage": false
+}

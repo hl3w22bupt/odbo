@@ -1,0 +1,57 @@
+{
+  "label": "reveal",
+  "out": "games/talent-nurture/qa/visual-acceptance/transitions/ev-birthday-choice-reveal",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "001-reveal.png",
+      "sha256": "75287dc1a70a1d42dbe4be2dacaf406131e8d5ae56d186c5cce06a5ba1c9ad55",
+      "bytes": 42295,
+      "probedAt": "2026-10-25T03:20:08.661Z",
+      "probe": "{\"t\":\"剧情事件|室友的生日会||室友周雨的生日\"}"
+    },
+    {
+      "frame": 2,
+      "file": "002-reveal.png",
+      "sha256": "ef558bcc47447f01c46e8b073ff50baf4644f97b9bc345d8d580e96046e5bbe7",
+      "bytes": 47946,
+      "probedAt": "2026-10-25T03:20:08.863Z",
+      "probe": "{\"t\":\"剧情事件|室友的生日会||室友周雨的生日\"}"
+    },
+    {
+      "frame": 3,
+      "file": "003-reveal.png",
+      "sha256": "49d9eeba3b69f97f927e50c187a67cb18f928be863570c51855d537fe97da4e3",
+      "bytes": 49492,
+      "probedAt": "2026-10-25T03:20:09.051Z",
+      "probe": "{\"t\":\"剧情事件|室友的生日会||室友周雨的生日\"}"
+    },
+    {
+      "frame": 4,
+      "file": "004-reveal.png",
+      "sha256": "537935dd2d1139079c3eff754c8373e1eee5ab879d8d890db9587bb6eae4cb54",
+      "bytes": 48640,
+      "probedAt": "2026-10-25T03:20:09.235Z",
+      "probe": "{\"t\":\"剧情事件|室友的生日会||室友周雨的生日\"}"
+    },
+    {
+      "frame": 5,
+      "file": "005-reveal.png",
+      "sha256": "d5486996600a527fa50c61a7e12a62ca0560a2cf9ff1a9de46a4d13d965db4e8",
+      "bytes": 48337,
+      "probedAt": "2026-10-25T03:20:09.429Z",
+      "probe": "{\"t\":\"剧情事件|室友的生日会||室友周雨的生日\"}"
+    },
+    {
+      "frame": 6,
+      "file": "006-reveal.png",
+      "sha256": "ce62a13b26f491d305790a2df451d8e020cd599b910b243d6f7ea99b19905885",
+      "bytes": 47793,
+      "probedAt": "2026-10-25T03:20:09.630Z",
+      "probe": "{\"t\":\"剧情事件|室友的生日会||室友周雨的生日\"}"
+    }
+  ],
+  "intervalMs": 120,
+  "distinctSha256": 6,
+  "stillImage": false
+}

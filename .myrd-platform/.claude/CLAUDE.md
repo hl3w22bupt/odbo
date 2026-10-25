@@ -198,6 +198,10 @@ Agent 运行环境设有「无输出超时」保护机制：当 Agent 连续较�
 
 ---
 
+health 导出增补（只读聚合，不改任何判定口径）：①两 run 已评分用例集的 caseId 差集（新增/缺失用例清单）及新增用例得分；②回落读数（benchmark.deltaPct<0）强制并排「整体分/可比分/commonCases」三联；③commonCases < LOW_SAMPLE_THRESHOLD(5)（windows.ts:67 既有阈值）时导出层标注 lowConfidence。明确边界：本标准仅为回落查因提供裁决材料，不构成放宽进化护栏/评测标准的任何建议。
+
+---
+
 # Workflow Agent 节点执行纪律规范（反挂起）
 
 ## 背景

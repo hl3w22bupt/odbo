@@ -1,8 +1,8 @@
 {
   "verdict": "PASS",
-  "generatedAt": "2026-10-25T04:09:18.371Z",
+  "generatedAt": "2026-10-25T04:18:15.917Z",
   "target": {
-    "liveUrl": "http://127.0.0.1:8931/apps/talent-nurture/",
+    "liveUrl": "https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/",
     "gamePath": "games/talent-nurture",
     "viewport": "375x720"
   },
@@ -50,7 +50,7 @@
       "id": "touch-train",
       "name": "touch 点击训练按钮生效（状态推进）",
       "pass": true,
-      "detail": "vocal 10→13、actionsLeft 5→4"
+      "detail": "vocal 10→15、actionsLeft 5→4"
     },
     {
       "id": "touch-pipeline",
@@ -68,7 +68,7 @@
       "id": "curtain",
       "name": "事件切换幕布过场真实可见（跨帧存活≥300ms·body级覆盖层·不拦输入·全视口）",
       "pass": true,
-      "detail": "事件进入 17 次幕布挂载、观测样本 17 个；存活 530ms,529ms,532ms,526ms,527ms,525ms,531ms,530ms,528ms,527ms,530ms,531ms,529ms,526ms,533ms,531ms,526ms（阈值≥300ms，旧缺陷 0.1ms）；首帧后仍存活=true；挂载点全为 body=true；指针穿透+全视口可见=true；首次进入事件 +90ms 实拍幕布在挂=true（375×720px pe=none）"
+      "detail": "事件进入 17 次幕布挂载、观测样本 17 个；存活 531ms,531ms,532ms,527ms,528ms,529ms,532ms,529ms,532ms,530ms,530ms,526ms,532ms,527ms,532ms,528ms,527ms（阈值≥300ms，旧缺陷 0.1ms）；首帧后仍存活=true；挂载点全为 body=true；指针穿透+全视口可见=true；首次进入事件 +90ms 实拍幕布在挂=true（375×720px pe=none）"
     },
     {
       "id": "console",
@@ -103,36 +103,36 @@
     "totalResponses": 34,
     "failures": [],
     "assets": [
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/style.css",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/main.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/numeric.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/entities/idol.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/systems/event-engine.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/systems/rng.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/data/events-placed.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/systems/scheduler.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/levels/ch1-foundation.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/data/events-conditional.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/levels/prologue.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/systems/stage-score.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/levels/ch3-rival-crisis.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/levels/ch4-fanfest.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/levels/ch2-first-stage.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/systems/ending-judge.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/scenes/event-dialog.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/scenes/schedule-board.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/scenes/stage-live.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/levels/finale-showcase.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/scenes/ui.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/scenes/idol-avatar.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/scenes/fx.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/entities/mentor-vocal.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/scenes/ending-screen.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/entities/mentor-dance.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/entities/rival.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/data/events.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/systems/stat-growth.mjs",
-      "200 http://127.0.0.1:8931/apps/talent-nurture/api/public/assets/data/endings.mjs"
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/style.css",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/main.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/rng.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/numeric.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/entities/idol.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/event-engine.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/ui.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/ending-judge.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/event-dialog.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/ch4-fanfest.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/idol-avatar.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/data/events-placed.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/stage-score.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/ending-screen.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/ch1-foundation.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/ch3-rival-crisis.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/finale-showcase.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/data/events-conditional.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/entities/mentor-dance.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/data/events.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/scheduler.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/prologue.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/entities/rival.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/ch2-first-stage.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/schedule-board.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/entities/mentor-vocal.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/fx.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/data/endings.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/stage-live.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/stat-growth.mjs"
     ]
   },
   "hotzone": {
@@ -222,8 +222,8 @@
   "screenshotDigests": [
     {
       "name": "01-title.png",
-      "sha256": "090924c6bfcb73375d2c289aee570d15406e8ae20be8be6bc44e2629ae4356c8",
-      "bytes": 236013,
+      "sha256": "147964f30c224639526b20bbb46f1cad1ed3896b7733245696fbcc961fda5c93",
+      "bytes": 236449,
       "width": 750,
       "height": 1440,
       "sampledDistinctByteValues": 162,
@@ -231,17 +231,17 @@
     },
     {
       "name": "02-intro.png",
-      "sha256": "beec862bea94098f65201eaa1dfba21c1cdddf09969deea2fa3ee14a6471b741",
-      "bytes": 720387,
+      "sha256": "6f6894c66563c0453ac34eb9452143351ccd21d717dd68be17e21ccac9e8e3db",
+      "bytes": 709110,
       "width": 750,
       "height": 1440,
-      "sampledDistinctByteValues": 141,
+      "sampledDistinctByteValues": 131,
       "nonBlank": true
     },
     {
       "name": "03-event-choose.png",
-      "sha256": "7ba53417fef181028581711cdeb017468aec5eb5fe00f285ee5f48104a159c2f",
-      "bytes": 116981,
+      "sha256": "619dbf6eb290998c2210f2f94ee86a49127508288e71d75c72a705a1d056fe29",
+      "bytes": 117215,
       "width": 750,
       "height": 1440,
       "sampledDistinctByteValues": 135,
@@ -249,8 +249,8 @@
     },
     {
       "name": "04-week-board.png",
-      "sha256": "898df5d15c371776537193e6a046d49fcd1cc0f5c9b14ee1e47940639a948ff8",
-      "bytes": 223177,
+      "sha256": "2103de510f61885696cad973c238b3df568dbb79dc46c256cf7fcbf4e0719c50",
+      "bytes": 223763,
       "width": 750,
       "height": 1440,
       "sampledDistinctByteValues": 135,
@@ -258,8 +258,8 @@
     },
     {
       "name": "05-stage-result.png",
-      "sha256": "ed84d38d6d10b438bbdfed77f236dd19d1c3ef26bf8ba01bb9bccaab9ba88291",
-      "bytes": 116074,
+      "sha256": "5cac8665780005a43087bb8bbd001d213b68b6f6bb4ef6f46ae8c1a86956df88",
+      "bytes": 116678,
       "width": 750,
       "height": 1440,
       "sampledDistinctByteValues": 103,
@@ -267,11 +267,11 @@
     },
     {
       "name": "06-ending.png",
-      "sha256": "e4ec3121dfdf746f6c226882b0c97c371493030b15115042262bf9a19078b2f9",
-      "bytes": 183059,
+      "sha256": "82ee816e99e8a00f2ace94e9611788659e8c961b5f091f7dad1a7de2f3d53ba7",
+      "bytes": 182614,
       "width": 750,
       "height": 1440,
-      "sampledDistinctByteValues": 159,
+      "sampledDistinctByteValues": 168,
       "nonBlank": true
     }
   ],

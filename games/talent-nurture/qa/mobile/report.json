@@ -1,6 +1,6 @@
 {
   "verdict": "PASS",
-  "generatedAt": "2026-10-24T09:12:26.326Z",
+  "generatedAt": "2026-10-25T02:51:26.477Z",
   "target": {
     "liveUrl": "https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/",
     "gamePath": "games/talent-nurture",
@@ -20,7 +20,7 @@
       "id": "network",
       "name": "关键资产经 375×720 移动仿真加载全 200、无 404",
       "pass": true,
-      "detail": "请求 30 个（资产 28：html 1、css 1、main.mjs 1、scenes 5）、非 2xx/3xx 或加载失败 0 个；关键资产齐备"
+      "detail": "请求 32 个（资产 30：html 1、css 1、main.mjs 1、scenes 7）、非 2xx/3xx 或加载失败 0 个；关键资产齐备"
     },
     {
       "id": "first-screen",
@@ -50,7 +50,7 @@
       "id": "touch-train",
       "name": "touch 点击训练按钮生效（状态推进）",
       "pass": true,
-      "detail": "vocal 10→16、actionsLeft 5→4"
+      "detail": "vocal 10→17、actionsLeft 5→4"
     },
     {
       "id": "touch-pipeline",
@@ -94,36 +94,38 @@
     "errorSamples": []
   },
   "network": {
-    "totalResponses": 31,
+    "totalResponses": 34,
     "failures": [],
     "assets": [
       "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/style.css",
       "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/main.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/scheduler.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/rng.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/numeric.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/entities/idol.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/stage-score.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/ch1-foundation.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/ch2-first-stage.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/event-engine.mjs",
       "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/finale-showcase.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/event-dialog.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/entities/idol.mjs",
       "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/data/events-conditional.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/prologue.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/ch3-rival-crisis.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/data/events-placed.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/ending-judge.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/entities/rival.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/ending-screen.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/ui.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/ch2-first-stage.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/idol-avatar.mjs",
       "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/stage-live.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/numeric.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/scheduler.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/fx.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/ui.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/data/events-placed.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/ch1-foundation.mjs",
       "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/entities/mentor-dance.mjs",
       "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/ch4-fanfest.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/schedule-board.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/event-engine.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/entities/rival.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/prologue.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/levels/ch3-rival-crisis.mjs",
       "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/entities/mentor-vocal.mjs",
-      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/data/events.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/ending-screen.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/rng.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/ending-judge.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/stage-score.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/event-dialog.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/scenes/schedule-board.mjs",
       "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/data/endings.mjs",
+      "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/data/events.mjs",
       "200 https://leomac-studio.tail49399e.ts.net/apps/talent-nurture/api/public/assets/systems/stat-growth.mjs"
     ]
   },
@@ -213,8 +215,8 @@
   "screenshotDigests": [
     {
       "name": "01-title.png",
-      "sha256": "dbbd3c2f42fafcebc5085cd58f301cbb86121fb32dce3753b1e73ccc60b7e6a0",
-      "bytes": 233926,
+      "sha256": "fc16677307ea0d774b3245beb0cd719702343de118dc306d257c5538941b2aec",
+      "bytes": 236725,
       "width": 750,
       "height": 1440,
       "sampledDistinctByteValues": 162,
@@ -222,35 +224,35 @@
     },
     {
       "name": "02-intro.png",
-      "sha256": "e91d2a63496936b4ded6c57fc59b584233f9b26b7ac62f9ddefe60bacfd81f55",
-      "bytes": 131679,
+      "sha256": "1e946417a52745b6ffe6a06ec9f82b5f8a7229439c988090e31ad0059672cffd",
+      "bytes": 709119,
       "width": 750,
       "height": 1440,
-      "sampledDistinctByteValues": 150,
+      "sampledDistinctByteValues": 131,
       "nonBlank": true
     },
     {
       "name": "03-event-choose.png",
-      "sha256": "1a2cf197fb53439d72be68f8ecb45981476d0010bc920469bb6a3ee1dd4b02fd",
-      "bytes": 102422,
+      "sha256": "28dd3a18712f058ae37de534b41f8667dd9976a427594fa1fe62d8106a717b0d",
+      "bytes": 105371,
       "width": 750,
       "height": 1440,
-      "sampledDistinctByteValues": 141,
+      "sampledDistinctByteValues": 143,
       "nonBlank": true
     },
     {
       "name": "04-week-board.png",
-      "sha256": "a4c2e5ac81bc1ffd2939e6d55d749340ba5569d40ebf2eb43348290b2363ab17",
-      "bytes": 210555,
+      "sha256": "95aab94caca62805adca4cdcb682569e3f4f6691203f04bce14d5d9c9ea19ddb",
+      "bytes": 223823,
       "width": 750,
       "height": 1440,
-      "sampledDistinctByteValues": 146,
+      "sampledDistinctByteValues": 135,
       "nonBlank": true
     },
     {
       "name": "05-stage-result.png",
-      "sha256": "f62ef9323f67fb1188a1a3bdca1fe22ef976bca4b99ee6b32bbac02828742c6d",
-      "bytes": 102666,
+      "sha256": "92867ab1b5a1415a4c9996be8b5683d000d5411a9f74e727e696dd0ab44c4e59",
+      "bytes": 116695,
       "width": 750,
       "height": 1440,
       "sampledDistinctByteValues": 107,
@@ -258,11 +260,11 @@
     },
     {
       "name": "06-ending.png",
-      "sha256": "9da582142d18d691c0454e759dcb3fcbef9c6fe210b04d887723997b7396d7f5",
-      "bytes": 145880,
+      "sha256": "c784bf33450a242dcec5a915ad18bb964604c3900bd8d3be4e8b41a7992c9b48",
+      "bytes": 185015,
       "width": 750,
       "height": 1440,
-      "sampledDistinctByteValues": 148,
+      "sampledDistinctByteValues": 162,
       "nonBlank": true
     }
   ],

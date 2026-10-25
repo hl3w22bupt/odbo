@@ -51,10 +51,10 @@ report.evidenceMethod = {
   emulation: 'headless Chrome 375x720 @2x deviceScaleFactor、mobile:true、Emulation.setTouchEmulationEnabled(maxTouchPoints:5)',
   input: 'Input.dispatchTouchEvent touchStart→touchEnd 真实触摸管线（非 JS 直调 onclick）',
   flow: '开屏→序章→分支事件（连点 3 次防重判定的反取证）→教程训练→全 touch 主循环推进 12 周至结局判定',
-  reproNote: '2026-10-24 复跑取证：首轮 FAIL 暴露脚本两处取证缺陷——tapSelector 不跳过 disabled 按钮（体力不足时「登台演出」被禁用致卡 stage-confirm 循环 823 次）与 html 入口按 URL 后缀判漏网关 308 规范化形态；修复脚本后复跑 PASS 9/9，本报告为修复后取证，digests 由本脚本增补（复跑 smoke-mobile.mjs 后重放本脚本即可恢复）',
+  reproNote: '2026-10-24 首轮取证：FAIL 暴露脚本两处取证缺陷——tapSelector 不跳过 disabled 按钮（体力不足时「登台演出」被禁用致卡 stage-confirm 循环 823 次）与 html 入口按 URL 后缀判漏网关 308 规范化形态；修复脚本后复跑 PASS 9/9。2026-10-25 V1 缺陷轮（验收 commit 062d30d 发现分支事件 420ms 幕布从未可见、同帧被 clear 清除）：修复幕布挂载至 body 级持久层（commit beb9e7b）并在 smoke-mobile 新增 curtain 回归断言；本地对导出产物首轮复跑 FAIL——暴露本地伺服器缺 /favicon.ico（live 网关实测 200 image/x-icon 2763B）致 network/console 假失败（取证形态缺陷非产品缺陷，判例承上轮），镜像网关 favicon 后复跑 PASS 10/10（幕布 17 次挂载存活 525-533ms 全过断言）。digests 由本脚本增补（复跑 smoke-mobile.mjs 后重放本脚本即可恢复）',
   outOfScope: '主观体验（好玩/画面审美/四问量表）不在机器取证范围，待用户试玩回填',
 };
-report.conclusion = '机器可判项 9/9 PASS：375x720 移动仿真下资产加载全 200、首屏可点、touch 管线全程推进至结局（fail-return，公演 0 分——体力不足按游戏规则弃权所致的合法结局，与桌面 smoke 歌姬结局/76 分差异源于玩法路径非端差异）、热区无重叠最矮 44px、console 零 error 零 warning；截图均非空白且与阶段一一对应。使用验收结论待用户回填。';
+report.conclusion = '机器可判项 10/10 PASS：375x720 移动仿真下资产加载全 200、首屏可点、touch 管线全程推进至结局（fail-return，公演 0 分——体力不足按游戏规则弃权所致的合法结局，与桌面 smoke 歌姬结局/76 分差异源于玩法路径非端差异）、热区无重叠最矮 44px、console 零 error 零 warning；事件切换幕布过场真实可见（17 次进入全挂 body 级持久层、跨帧存活 525-533ms≥300ms 阈值、pointer-events=none 全视口覆盖，旧缺陷存活仅 0.1ms）；截图均非空白且与阶段一一对应。使用验收结论待用户回填。';
 
 writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
 console.log(`report.json 增补完成：digests=${digests.length} checks=${report.checks.length} verdict=${report.verdict}（判定字段未改动）`);

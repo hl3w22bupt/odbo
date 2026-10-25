@@ -120,9 +120,14 @@ export function floatText(container, text, cls = '') {
 }
 
 // ---- 幕布过场（v+1：全部分支事件统一 420ms 幕布；pointer-events:none 不拦输入）----
+// V1 修复（验收 commit 062d30d）：此前幕布挂进 game-root，会在同一帧被 renderEventDialog
+// 的 clear(root) 连 UI 一起清掉——MutationObserver 实测存活仅 0.1ms，420ms 过场从未可见。
+// 现挂到 body 级持久覆盖层：.fx-curtain 为 position:fixed 全视口层，视觉与挂 root 完全
+// 等价，但不受任何场景 clear/render 重建影响；存活计数控并发 ≤2，仍由 520ms 定时自清理。
 let curtainsAlive = 0;
 export function curtain(root) {
-  if (!root || reducedMotion() || curtainsAlive >= 2) return;
+  const host = (typeof document !== 'undefined' && document.body) || root || null;
+  if (!host || reducedMotion() || curtainsAlive >= 2) return;
   curtainsAlive += 1;
   const c = document.createElement('div');
   c.className = 'fx-curtain';
@@ -130,7 +135,7 @@ export function curtain(root) {
     Object.assign(document.createElement('i'), { className: 'curtain-left' }),
     Object.assign(document.createElement('i'), { className: 'curtain-right' }),
   );
-  root.appendChild(c);
+  host.appendChild(c);
   setTimeout(() => {
     c.remove();
     curtainsAlive -= 1;

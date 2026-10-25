@@ -125,7 +125,7 @@ function render() {
     case 'event': {
       const ev = state.pendingEvents[0];
       if (!ev) { state.phase = 'week'; return render(); }
-      curtain(root); // v+1：全部分支事件统一 420ms 幕布过场（覆盖层不拦输入）
+      curtain(root); // v+1：事件幕布过场（V1 修复：挂 body 级 fx 层，不被下方 renderEventDialog 的 clear(root) 同帧清除）
       return renderEventDialog(root, ev, {
         onChoose: (e, choice) => {
           const r = chooseEventOption(state, e.id, choice.id);

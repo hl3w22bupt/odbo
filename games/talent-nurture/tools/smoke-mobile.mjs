@@ -2,7 +2,7 @@
 /**
  * smoke-mobile —— 移动端模拟门禁（375×720 移动仿真，判例承 tools/smoke-live.mjs，零 npm 依赖 CDP）。
  * 用法：node tools/smoke-mobile.mjs [liveUrl]
- * 六类检查：network / console / first-screen / touch-pipeline / viewport / hotzone。
+ * 检查项：network / console / first-screen / touch-pipeline / viewport / hotzone / curtain（V1 回归：事件幕布过场真实可见）。
  * 产出：qa/mobile/report.json + qa/mobile/NN-<stage>.png；PASS 退出 0，FAIL 退出 1。
  */
 import { readFileSync, existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -280,13 +280,67 @@ const touchLog = [];
   await shot('intro');
 }
 
-// ---- 检查 f（采样）+ touch 进入序章事件 ----
+// ---- 检查 f（采样）+ touch 进入序章事件（同时安装幕布探针，V1 回归取证）----
+let curtainMidFlight = null;
 {
+  // 幕布探针：观测 body 子树上 .fx-curtain 的挂载——记录挂载点、下一帧连通性、
+  // 存活时长（rAF 轮询至移除）、挂载后样式（pointer-events / 全视口覆盖）。
+  // 背景（V1，commit 062d30d 发现）：幕布曾挂 game-root，被 renderEventDialog 的
+  // clear(root) 同帧清除，实测存活仅 0.1ms、420ms 过场从未可见——本探针防再犯。
+  const probeJs = `(() => {
+    if (window.__curtainProbe) return 'already';
+    window.__curtainProbe = { mounts: 0, samples: [] };
+    const mo = new MutationObserver((muts) => {
+      for (const m of muts) {
+        for (const n of m.addedNodes) {
+          if (!n || n.nodeType !== 1 || !n.classList || !n.classList.contains('fx-curtain')) continue;
+          const t0 = performance.now();
+          const rec = { host: (n.parentNode === document.body ? 'body' : (n.parentNode && (n.parentNode.id || n.parentNode.tagName)) || 'detached'),
+            aliveMs: -1, nextFrameConnected: null, styleAtFrame: null };
+          window.__curtainProbe.mounts += 1;
+          window.__curtainProbe.samples.push(rec);
+          requestAnimationFrame(() => {
+            rec.nextFrameConnected = !!n.isConnected;
+            if (n.isConnected) {
+              const st = getComputedStyle(n);
+              const r = n.getBoundingClientRect();
+              rec.styleAtFrame = { display: st.display, pointerEvents: st.pointerEvents,
+                w: Math.round(r.width), h: Math.round(r.height),
+                coversVp: r.width >= innerWidth - 1 && r.height >= innerHeight - 1 };
+            }
+          });
+          const poll = () => {
+            if (!n.isConnected) { rec.aliveMs = Math.round(performance.now() - t0); return; }
+            if (performance.now() - t0 > 4000) { rec.aliveMs = -2; return; }
+            requestAnimationFrame(poll);
+          };
+          requestAnimationFrame(poll);
+        }
+      }
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+    window.__curtainProbe.disconnect = () => mo.disconnect();
+    return 'installed';
+  })()`;
+  const probeState = await evalJs(probeJs);
+  if (probeState !== 'installed') die('幕布探针安装失败：' + probeState);
+
   const tap = await tapSelector('.dialog button.primary');
-  await sleep(300);
+  // 飞行中实拍：tap 生效后 +90ms 幕布必须在挂（修复后存活窗口 520ms；旧缺陷 0.1ms 即死）
+  await sleep(90);
+  curtainMidFlight = JSON.parse(await evalJs(`(() => {
+    const c = document.querySelector('.fx-curtain');
+    if (!c) return JSON.stringify({ present: false });
+    const st = getComputedStyle(c);
+    const r = c.getBoundingClientRect();
+    return JSON.stringify({ present: true, connected: c.isConnected, display: st.display, pointerEvents: st.pointerEvents,
+      w: Math.round(r.width), h: Math.round(r.height),
+      coversVp: r.width >= innerWidth - 1 && r.height >= innerHeight - 1 });
+  })()`));
+  await sleep(210);
   const d = await debug();
   if (!tap.ok) die('touch 点击「开始第一周」失败：' + tap.reason);
-  touchLog.push({ step: 'begin-prologue', tapOk: true, after: d.phase });
+  touchLog.push({ step: 'begin-prologue', tapOk: true, after: d.phase, curtainAt90ms: curtainMidFlight.present });
 }
 
 // ---- 检查 d（续）+ e：分支事件选项 touch 连点 3 次只生效一次 ----
@@ -428,6 +482,23 @@ await shot('ending');
   const minH = allH.length ? Math.min(...allH) : 0;
   addCheck('hotzone', '可点按钮热区两两无重叠且高度 ≥40px', overlaps.length === 0 && shortBtns.length === 0,
     `采样 ${hotzoneSamples.length} 屏（${sampled}）；重叠 ${overlaps.length} 对${overlaps.length ? '：' + overlaps.slice(0, 4).join(' | ') : ''}；矮于 40px 的按钮 ${shortBtns.length} 个${shortBtns.length ? '：' + shortBtns.slice(0, 4).join(', ') : ''}；最矮 ${minH}px`);
+}
+
+// ---- 检查 g：curtain —— 事件切换幕布过场真实可见（V1 回归断言，commit 062d30d 发现的缺陷）----
+{
+  const probe = JSON.parse(await evalJs('JSON.stringify(window.__curtainProbe ? { mounts: window.__curtainProbe.mounts, samples: window.__curtainProbe.samples } : null)'));
+  try { await evalJs('window.__curtainProbe && window.__curtainProbe.disconnect && window.__curtainProbe.disconnect()'); } catch { /* 页面即将销毁 */ }
+  const s = (probe && probe.samples) || [];
+  const mounts = probe ? probe.mounts : 0;
+  const okAlive = s.length > 0 && s.every((r) => r.aliveMs >= 300); // 设计 520ms 自清理；旧缺陷 0.1ms
+  const okFrame = s.length > 0 && s.every((r) => r.nextFrameConnected === true); // 同帧被 clear 即 false
+  const okStyle = s.length > 0 && s.every((r) => r.styleAtFrame && r.styleAtFrame.display !== 'none' && r.styleAtFrame.pointerEvents === 'none' && r.styleAtFrame.coversVp);
+  const okHost = s.length > 0 && s.every((r) => r.host === 'body'); // body 级持久层，不受场景 clear 影响
+  const m = curtainMidFlight;
+  const midOk = !!(m && m.present && m.connected && m.display !== 'none' && m.pointerEvents === 'none' && m.coversVp);
+  const pass = mounts >= 2 && okAlive && okFrame && okStyle && okHost && midOk;
+  addCheck('curtain', '事件切换幕布过场真实可见（跨帧存活≥300ms·body级覆盖层·不拦输入·全视口）', pass,
+    `事件进入 ${mounts} 次幕布挂载、观测样本 ${s.length} 个；存活 ${s.map((r) => r.aliveMs + 'ms').join(',')}（阈值≥300ms，旧缺陷 0.1ms）；首帧后仍存活=${okFrame}；挂载点全为 body=${okHost}；指针穿透+全视口可见=${okStyle}；首次进入事件 +90ms 实拍幕布在挂=${midOk}${m && m.present ? `（${m.w}×${m.h}px pe=${m.pointerEvents}）` : '（未捕获——同帧被清即此项失败）'}`);
 }
 
 // ---- 检查 b：console —— 全流程零 error，warning 计数 ----

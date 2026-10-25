@@ -4,6 +4,7 @@
  * AC④ 输入语义：选择后立即展示该选项的效果徽标（所见即所选）。
  */
 import { h, clear, deltaBadge } from './ui.mjs';
+import { floatText } from './fx.mjs';
 
 /**
  * 渲染一个事件。
@@ -12,6 +13,7 @@ import { h, clear, deltaBadge } from './ui.mjs';
 export function renderEventDialog(root, ev, ctx) {
   clear(root);
   const choicesBox = h('div', { class: 'event-choices' });
+  const dialog = h('div', { class: 'dialog' });
 
   for (const choice of ev.choices) {
     const btn = h('button', {
@@ -22,10 +24,18 @@ export function renderEventDialog(root, ev, ctx) {
         btn.classList.add('chosen');
         const result = ctx.onChoose(ev, choice);
         if (result && result.ok) {
-          resultBox.append(h('div', { class: 'event-result' },
+          const box = h('div', { class: 'event-result' },
             h('span', { text: `你选择了「${choice.text}」` }),
             deltaBadge(result.effects),
-          ));
+          );
+          resultBox.append(box);
+          // v+1：选择反馈浮字（首个变动值，如「+8 唱功」）
+          const first = Object.entries(result.effects || {}).find(([, v]) => v);
+          if (first) {
+            const NAMES = { vocal: '唱功', dance: '舞技', stamina: '体力', mood: '心情', stress: '压力', fans: '粉丝' };
+            const [k, v] = first;
+            floatText(dialog, `${v > 0 ? '+' : ''}${v} ${NAMES[k] || k}`, v > 0 ? 'fx-up' : 'fx-down');
+          }
           resultBox.append(h('button', { class: 'primary continue-btn', onclick: () => ctx.onContinue() }, '继续'));
         }
       },
@@ -34,15 +44,14 @@ export function renderEventDialog(root, ev, ctx) {
   }
 
   const resultBox = h('div', { class: 'event-result-box' });
-  root.append(
-    h('div', { class: 'dialog' },
-      h('div', { class: 'event-tag', text: '剧情事件' }),
-      h('h2', { class: 'event-title', text: ev.title }),
-      h('p', { class: 'event-text', text: ev.text }),
-      choicesBox,
-      resultBox,
-    ),
+  dialog.append(
+    h('div', { class: 'event-tag', text: '剧情事件' }),
+    h('h2', { class: 'event-title', text: ev.title }),
+    h('p', { class: 'event-text', text: ev.text }),
+    choicesBox,
+    resultBox,
   );
+  root.append(dialog);
 }
 
 function lockChoices(box) {

@@ -3,6 +3,8 @@
  * AC②：结局达成后可重新开始；重开 = 全新 state（重开重置由 main.newGame 保证，此处只读展示）。
  */
 import { h, clear } from './ui.mjs';
+import { stageFx, burstParticles } from './fx.mjs';
+import { renderIdolAvatar } from './idol-avatar.mjs';
 
 /**
  * ctx: { onRestart(), gallery: Set<endingId> }
@@ -27,20 +29,26 @@ export function renderEndingScreen(root, judge, state, ctx) {
     ),
   );
 
-  root.append(
-    h('div', { class: 'dialog ending-dialog' },
-      h('div', { class: 'event-tag', text: ending.rank }),
-      h('h1', { class: 'ending-title', text: `${ending.emoji} ${ending.name}` }),
-      h('p', { class: 'ending-text', text: ending.text }),
-      ...flavor.map((t) => h('p', { class: 'ending-flavor', text: t })),
-      h('div', { class: 'ending-stats' },
-        h('span', { text: `🎤 唱功 ${state.idol.vocal}` }),
-        h('span', { text: `🕺 舞技 ${state.idol.dance}` }),
-        h('span', { text: `🏆 公演 ${state.finalScore ?? '—'} 分` }),
-        h('span', { text: `💗 粉丝 ${state.idol.fans}` }),
-      ),
-      gallery,
-      h('button', { class: 'primary restart-btn', onclick: () => ctx.onRestart() }, '🔁 重新开始（完全重置）'),
+  // v+1：结局演出——好结局庆祝+彩带+灯海，遗憾结局失落
+  const goodEnding = ending.id !== 'fail-return';
+  const dialog = h('div', { class: 'dialog ending-dialog' },
+    h('div', { class: 'event-tag', text: ending.rank }),
+    h('h1', { class: 'ending-title', text: `${ending.emoji} ${ending.name}` }),
+    h('div', { class: 'idol-slot' }, renderIdolAvatar({ pose: goodEnding ? 'celebrate' : 'dejected' })),
+    h('p', { class: 'ending-text', text: ending.text }),
+    ...flavor.map((t) => h('p', { class: 'ending-flavor', text: t })),
+    h('div', { class: 'ending-stats' },
+      h('span', { text: `🎤 唱功 ${state.idol.vocal}` }),
+      h('span', { text: `🕺 舞技 ${state.idol.dance}` }),
+      h('span', { text: `🏆 公演 ${state.finalScore ?? '—'} 分` }),
+      h('span', { text: `💗 粉丝 ${state.idol.fans}` }),
     ),
+    gallery,
+    h('button', { class: 'primary restart-btn', onclick: () => ctx.onRestart() }, '🔁 重新开始（完全重置）'),
   );
+  root.append(dialog);
+  if (goodEnding) {
+    stageFx(dialog, { stage: 'fan-festival', fansGainMultiplier: 1.5 }); // 灯海方案
+    burstParticles(dialog, ending.id === 'legend-dual' ? 64 : 40, 'confetti');
+  }
 }

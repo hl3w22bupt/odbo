@@ -2,6 +2,10 @@ import { Hono } from "hono";
 import { ctx } from "#apphost";
 import { getAsset } from "./lib/asset-store";
 
+// 构建版本标识（每次发布手动 bump；与落地页 #build-badge / window.__BUILD_VERSION 对应，
+// 用于冒烟复核区分新旧部署——线上页面注入的是部署 ref 的 git 短哈希，此处是发布代号）
+const APP_VERSION = "v2-visual-1";
+
 const app = new Hono();
 
 // 平台契约：健康检查（编排健康探针依据，部署后 30s 内必须 200）。
@@ -11,6 +15,7 @@ app.get("/health", (c) =>
     ok: true,
     app: "talent-nurture",
     title: "星光练习生：才艺养成物语",
+    version: APP_VERSION,
     env: ctx.environment,
     assets: "lazy/object-storage",
   }),

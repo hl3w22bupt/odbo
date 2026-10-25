@@ -7,6 +7,7 @@ import { h, clear, deltaBadge, statRow } from './ui.mjs';
 import { CYCLE } from '../numeric.mjs';
 import { skillRank } from '../entities/idol.mjs';
 import { previewScore } from '../systems/stage-score.mjs';
+import { renderIdolAvatar, currentPose } from './idol-avatar.mjs';
 
 const ACTION_META = {
   'train-vocal': { label: '唱功特训', emoji: '🎤', desc: 'vocal +3~9（60 后减半）｜体力 -18 压力 +8' },
@@ -64,8 +65,14 @@ export function renderScheduleBoard(root, state, ctx) {
     ? h('div', { class: 'preview', text: `🎭 彩排预览：当前预计舞台得分 ${previewScore(state)}` })
     : null;
 
+  // 人物头像与章目标同行（v+1：周面板常驻人物，六态状态机随行动切换）
+  const idolRow = h('div', { class: 'idol-slot' },
+    renderIdolAvatar({ pose: currentPose() }),
+    h('div', { class: 'chapter-goal', text: chapterHint(state) }),
+  );
+
   root.append(
-    ...[header, statRow(idol), h('div', { class: 'chapter-goal', text: chapterHint(state) }), rehearsalPreview, actions, endBtn, logBox]
+    ...[header, statRow(idol), idolRow, rehearsalPreview, actions, endBtn, logBox]
       .filter((n) => n != null),
   );
 }

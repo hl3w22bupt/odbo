@@ -24,6 +24,8 @@ import { renderScheduleBoard } from './scenes/schedule-board.mjs';
 import { renderEventDialog } from './scenes/event-dialog.mjs';
 import { renderStageConfirm, renderStageResult } from './scenes/stage-live.mjs';
 import { renderEndingScreen } from './scenes/ending-screen.mjs';
+import { curtain, introCinematic } from './scenes/fx.mjs';
+import { flashPose } from './scenes/idol-avatar.mjs';
 import { MENTOR_VOCAL } from './entities/mentor-vocal.mjs';
 import { MENTOR_DANCE } from './entities/mentor-dance.mjs';
 import { RIVAL_INFO } from './entities/rival.mjs';
@@ -123,6 +125,7 @@ function render() {
     case 'event': {
       const ev = state.pendingEvents[0];
       if (!ev) { state.phase = 'week'; return render(); }
+      curtain(root); // v+1：全部分支事件统一 420ms 幕布过场（覆盖层不拦输入）
       return renderEventDialog(root, ev, {
         onChoose: (e, choice) => {
           const r = chooseEventOption(state, e.id, choice.id);
@@ -189,6 +192,7 @@ function renderIntro() {
       h('button', { class: 'primary', onclick: () => { state.phase = state.pendingEvents.length ? 'event' : 'week'; render(); } }, '开始第一周'),
     ),
   );
+  introCinematic(root); // v+1：程序化开场演出（黑边+胶片颗粒+缓推+透黑淡入，触摸即跳过，零视频）
 }
 
 function startGame() {
@@ -227,6 +231,9 @@ function onAction(actionId) {
   const r = doAction(state, actionId, 'vocal');
   if (!r.ok) return;
   if (step) state.tutorialIndex += 1;
+  // v+1：行动瞬态姿态（特训=流汗训练 / 社交=小庆祝 / 彩排=起舞 / 休息=回待机）
+  const POSE_BY_ACTION = { 'train-vocal': 'train', 'train-dance': 'train', social: 'celebrate', rehearsal: 'dance', rest: 'idle' };
+  flashPose(POSE_BY_ACTION[actionId] || 'idle', actionId === 'rest' ? 400 : 900, 'idle');
   sfx.click();
   render();
 }
@@ -312,6 +319,7 @@ if (typeof window !== 'undefined') {
   }
   window.__talentDebug = () => ({
     phase: state.phase, week: state.week, actionsLeft: state.actionsLeft,
+    buildVersion: window.__BUILD_VERSION || null,
     idol: { ...state.idol }, flags: { ...state.flags },
     fired: [...state.firedEvents], finalScore: state.finalScore, ending: state.judge && state.judge.id,
     conditionalLibrary: CONDITIONAL_EVENTS.length,

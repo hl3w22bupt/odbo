@@ -128,3 +128,235 @@ button { font-family: inherit; touch-action: manipulation; }
   .game-title { font-size: 1.25rem; }
   .score-big { font-size: 1.6rem; }
 }
+
+/* ================================================================
+   v+1 视觉动效层（spec cmvn6pmb3007im9gbv4xelwj2）
+   红线：覆盖层一律 pointer-events:none；fx 层 overflow:hidden；
+        交互按钮不做持续 transform（tap 取样不能漂移）。
+   ================================================================ */
+
+/* —— 面板入场（uiMotion 240ms；仅 .dialog 挂载时一次，非循环） —— */
+.dialog { position: relative; overflow: hidden; animation: panelIn .24s ease-out; }
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* —— 按压反馈（uiMotion 120ms；仅 ：active 瞬态，不污染 rect 取样） —— */
+.primary:active, .ghost:active, .choice-btn:active, .action-btn:active { transform: scale(.97); transition: transform .12s ease; }
+
+/* —— 数值徽章弹跳（uiMotion 360ms） —— */
+.delta { animation: badgePop .36s ease-out; }
+@keyframes badgePop {
+  0% { opacity: 0; transform: translateY(4px) scale(.9); }
+  60% { opacity: 1; transform: translateY(0) scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* —— 评级光晕（四档分色增强；非交互元素可循环） —— */
+.t-perfect { animation: perfectGlow 1.6s ease-in-out infinite alternate; }
+@keyframes perfectGlow {
+  from { text-shadow: 0 0 18px rgba(255, 126, 182, .5); }
+  to { text-shadow: 0 0 34px rgba(255, 126, 182, .95), 0 0 8px #fff; }
+}
+.t-good { animation: goodGlow 1.6s ease-in-out infinite alternate; }
+@keyframes goodGlow {
+  from { text-shadow: 0 0 10px rgba(255, 209, 102, .35); }
+  to { text-shadow: 0 0 24px rgba(255, 209, 102, .8); }
+}
+.score-num { font-variant-numeric: tabular-nums; }
+
+/* ================================================================
+   fx 装饰层基座
+   ================================================================ */
+.fx-layer {
+  position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+  border-radius: inherit; z-index: 0;
+}
+.dialog > *:not(.fx-layer) { position: relative; z-index: 1; }
+
+/* —— 舞台灯束（30° 扫摆） —— */
+.fx-beam {
+  position: absolute; top: -18%; left: var(--bx, 30%);
+  width: 64px; height: 130%;
+  background: linear-gradient(to bottom, rgba(255, 232, 170, .34), rgba(255, 232, 170, 0) 78%);
+  transform-origin: top center; transform: translateX(-50%) rotate(var(--r0, -12deg));
+  filter: blur(2px);
+}
+.fx-beam:nth-of-type(1) { --bx: 24%; --r0: -14deg; animation: beamSweep 3.6s ease-in-out infinite alternate; }
+.fx-beam:nth-of-type(2) { --bx: 52%; --r0: 0deg; animation: beamSweep 3.1s .4s ease-in-out infinite alternate; }
+.fx-beam:nth-of-type(3) { --bx: 78%; --r0: 13deg; animation: beamSweep 4.2s .8s ease-in-out infinite alternate; }
+.fx-beam.solo { --bx: 50%; --r0: -12deg; animation: beamSweep 2.8s ease-in-out infinite alternate; }
+@keyframes beamSweep { from { transform: translateX(-50%) rotate(-15deg); } to { transform: translateX(-50%) rotate(15deg); } }
+
+/* —— VS 对打灯 —— */
+.fx-vs {
+  position: absolute; inset: 0;
+  background: linear-gradient(100deg, rgba(126, 232, 255, .14) 38%, transparent 50%, rgba(255, 126, 182, .14) 62%);
+  animation: vsFlash 1.8s ease-in-out infinite alternate;
+}
+@keyframes vsFlash { from { opacity: .45; } to { opacity: 1; } }
+
+/* —— 灯海/公演光点（纯 CSS 闪烁，零 rAF） —— */
+.fx-dot {
+  position: absolute; width: 5px; height: 5px; border-radius: 50%;
+  background: rgba(255, 232, 170, .8); box-shadow: 0 0 8px 2px rgba(255, 209, 102, .35);
+  animation: dotTwinkle 2s ease-in-out infinite alternate;
+}
+@keyframes dotTwinkle { from { opacity: .15; transform: scale(.7); } to { opacity: .95; transform: scale(1.15); } }
+
+/* —— 粒子（彩带/灰烬，一次性 CSS 动画） —— */
+.fx-particle {
+  position: absolute; top: -12px; width: 8px; height: 5px; border-radius: 2px;
+  opacity: 0; will-change: transform, opacity;
+  animation: particleFall 1.4s ease-in forwards;
+}
+@keyframes particleFall {
+  0% { opacity: 0; transform: translate3d(0, -8px, 0) rotate(0deg); }
+  12% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--dx, 0px), 190px, 0) rotate(var(--rot, 180deg)); }
+}
+
+/* —— 浮字（uiMotion 900ms） —— */
+.fx-float {
+  position: absolute; top: 0; transform: translateX(-50%);
+  font-size: .9rem; font-weight: 700; color: var(--pink); pointer-events: none;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, .4); z-index: 2;
+  animation: floatUp .9s ease-out forwards;
+}
+@keyframes floatUp {
+  0% { opacity: 0; transform: translate(-50%, 6px); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -26px); }
+}
+.fx-float.fx-up { color: var(--green); }
+.fx-float.fx-down { color: var(--red); }
+
+/* —— 幕布过场（420ms；fixed 覆盖层不参与滚动尺寸，pointer-events:none 不拦 tap） —— */
+.fx-curtain { position: fixed; inset: 0; z-index: 50; pointer-events: none; overflow: hidden; }
+.fx-curtain .curtain-left, .fx-curtain .curtain-right {
+  position: absolute; top: 0; bottom: 0; width: 52%;
+  background: linear-gradient(90deg, #0b0715, #241a3f);
+}
+.fx-curtain .curtain-left { left: 0; animation: curtainL .42s ease-in forwards; }
+.fx-curtain .curtain-right { right: 0; animation: curtainR .42s ease-in forwards; }
+@keyframes curtainL { from { transform: translateX(0); } to { transform: translateX(-102%); } }
+@keyframes curtainR { from { transform: translateX(0); } to { transform: translateX(102%); } }
+
+/* —— 序章程序化开场：黑边 + 胶片颗粒 + 透黑淡入（缓推在 .cine-push） —— */
+.fx-cine { position: fixed; inset: 0; z-index: 60; pointer-events: none; overflow: hidden; }
+.cine-bar {
+  position: absolute; left: 0; right: 0; height: 9%; background: #05030c;
+  animation: cineBar 1s ease-out forwards;
+}
+.cine-bar.top { top: 0; }
+.cine-bar.bottom { bottom: 0; }
+@keyframes cineBar {
+  0% { transform: scaleY(4.2); }
+  45% { transform: scaleY(1); }
+  82% { transform: scaleY(1); opacity: 1; }
+  100% { transform: scaleY(1); opacity: 0; }
+}
+.cine-grain {
+  position: absolute; inset: 0; opacity: .16; mix-blend-mode: overlay;
+  animation: grainShift .34s steps(3) infinite, grainFade 2.4s ease-in forwards;
+}
+@keyframes grainShift {
+  0% { background-position: 0 0; }
+  50% { background-position: 40px 30px; }
+  100% { background-position: -30px 20px; }
+}
+@keyframes grainFade { 0% { opacity: .16; } 75% { opacity: .16; } 100% { opacity: 0; } }
+.cine-black { position: absolute; inset: 0; background: #05030c; animation: blackOut .6s ease-out forwards; }
+@keyframes blackOut { from { opacity: 1; } to { opacity: 0; } }
+.cine-push { animation: panelIn .24s ease-out, cinePush 1.1s cubic-bezier(.16, .8, .3, 1); }
+@keyframes cinePush {
+  0% { opacity: 0; transform: scale(1.035); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ================================================================
+   人物六态动画状态机（sys-anim-state-machine）
+   ================================================================ */
+.idol-slot { display: flex; align-items: center; gap: 10px; margin: 2px 0 8px; }
+.idol-slot .chapter-goal { flex: 1; margin: 0; }
+.idol-avatar { display: flex; align-items: center; gap: 6px; flex: none; }
+.ava-frame {
+  position: relative; width: 56px; height: 56px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 32%, #3a2d5e, #241a3f 72%);
+  border: 1px solid var(--line); overflow: hidden; flex: none;
+}
+.ava-glyph {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 30px; transition: opacity .2s ease;
+}
+.ava-glyph.ava-hidden { opacity: 0; }
+.ava-fx {
+  position: absolute; top: 2px; right: 4px; font-size: 13px; color: var(--gold);
+  transition: opacity .2s ease;
+}
+.ava-name { font-size: .68rem; color: var(--dim); white-space: nowrap; }
+.ava-sweat { position: absolute; top: 4px; right: 8px; font-size: 12px; opacity: 0; }
+.idol-avatar.ava-sweaty .ava-sweat { animation: sweatDrip .8s ease-in infinite; }
+@keyframes sweatDrip {
+  0% { opacity: 0; transform: translateY(-4px); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(14px); }
+}
+
+/* 六态 */
+.idol-avatar.pose-idle .ava-glyph:not(.ava-hidden) { animation: poseIdle 2.4s ease-in-out infinite; }
+@keyframes poseIdle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+
+.idol-avatar.pose-sing .ava-glyph:not(.ava-hidden) { animation: poseSing 1s ease-in-out infinite; }
+.idol-avatar.pose-sing .ava-fx { animation: noteFloat 1.5s ease-out infinite; }
+@keyframes poseSing {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-3px) rotate(4deg); }
+}
+@keyframes noteFloat {
+  0% { opacity: 0; transform: translateY(2px); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+
+.idol-avatar.pose-dance .ava-glyph:not(.ava-hidden) { animation: poseDance .48s ease-in-out infinite; }
+@keyframes poseDance {
+  0%, 100% { transform: translateY(0) rotate(-8deg); }
+  50% { transform: translateY(-5px) rotate(8deg); }
+}
+
+.idol-avatar.pose-train .ava-glyph:not(.ava-hidden) { animation: poseTrain .8s ease-in-out infinite; }
+@keyframes poseTrain {
+  0%, 100% { transform: translateY(1px) scale(.96); }
+  40% { transform: translateY(-3px) scale(1.05); }
+}
+
+.idol-avatar.pose-celebrate .ava-glyph:not(.ava-hidden) { animation: poseCelebrate .5s ease-in-out infinite alternate; }
+@keyframes poseCelebrate {
+  from { transform: translateY(0); }
+  to { transform: translateY(-10px); }
+}
+
+.idol-avatar.pose-dejected .ava-glyph:not(.ava-hidden) { animation: poseDejected 1.8s ease-in-out infinite alternate; }
+@keyframes poseDejected {
+  from { transform: rotate(-6deg) translateY(1px); }
+  to { transform: rotate(12deg) translateY(2px); }
+}
+.idol-avatar.pose-dejected .ava-frame { border-color: #565070; }
+
+/* —— 构建版本角标（部署取证用；非交互、不参与滚动尺寸） —— */
+#build-badge {
+  position: fixed; right: 8px; bottom: 6px; z-index: 5;
+  font-size: .6rem; color: rgba(185, 168, 221, .55);
+  pointer-events: none; user-select: none; letter-spacing: .04em;
+}
+
+/* —— reduced-motion：全部直切（v+1 降级契约） —— */
+@media (prefers-reduced-motion: reduce) {
+  .dialog, .delta, .fx-float, .ava-glyph:not(.ava-hidden), .ava-fx, .ava-sweat,
+  .fx-beam, .fx-vs, .fx-dot, .fx-particle, .fx-cine *, .cine-push,
+  .t-perfect, .t-good { animation: none !important; }
+  .fx-cine, .fx-curtain { display: none !important; }
+  .ava-glyph, .primary:active, .ghost:active, .choice-btn:active, .action-btn:active { transition: none !important; }
+}

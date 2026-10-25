@@ -8,6 +8,13 @@
 import { cpSync, rmSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
+
+// 构建版本标识：部署 ref 的 git 短哈希（线上冒烟用它核对「新部署已生效」）
+const BUILD_VERSION = (() => {
+  try { return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim(); }
+  catch { return 'dev'; }
+})();
 
 const here = dirname(fileURLToPath(import.meta.url));
 const gameRoot = join(here, '..');
@@ -38,10 +45,13 @@ const landing = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="build-version" content="${BUILD_VERSION}">
 <title>星光练习生：才艺养成物语</title>
 <script>
 (function () {
   'use strict';
+  // 构建版本标识（冒烟取证：window.__BUILD_VERSION 应等于部署 ref 的 git 短哈希）
+  window.__BUILD_VERSION = '${BUILD_VERSION}';
   // ---- 资产基路径（game-9 判例）：公网入口 /apps/<slug>（无尾斜杠）下，裸相对路径会
   // 解析到 /apps/*（网关 404）。按页面路径推导：/apps/talent-nurture → /apps/talent-nurture/。
   var BASE_PATH = (function () {
@@ -104,6 +114,7 @@ const landing = `<!doctype html>
 </head>
 <body>
 <div id="game-root"></div>
+<div id="build-badge" title="构建版本">build ${BUILD_VERSION}</div>
 </body>
 </html>
 `;
